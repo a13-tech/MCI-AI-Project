@@ -28,8 +28,8 @@ log = logging.getLogger("mci")
 START_TIME = time.time()
 WIB = pytz.timezone("Asia/Jakarta")
 
-# Dikunci langsung ke model 2.0-flash biar gak perlu setting variabel GEMINI_MODEL di Render
-MODEL = "gemini-2.0-flash"
+# Diperbarui ke model gemini-3.8-flash sesuai instruksi API Google terbaru
+MODEL = "gemini-3.8-flash"
 
 # --- CONFIG 5 DIVISI MCI (token Telegram & key Gemini terpisah, dari Environment) ---
 AGENTS_CONFIG = {
