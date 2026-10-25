@@ -27,7 +27,9 @@ log = logging.getLogger("mci")
 
 START_TIME = time.time()
 WIB = pytz.timezone("Asia/Jakarta")
-MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+
+# Menggunakan model resmi yang didukung SDK google-genai v1beta
+MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
 # --- CONFIG 5 DIVISI MCI (token Telegram & key Gemini terpisah, dari Environment) ---
 AGENTS_CONFIG = {
@@ -218,7 +220,6 @@ def make_handlers(key):
         try:
             await context.bot.send_chat_action(chat_id=msg.chat_id, action="typing")
             
-            # Inisialisasi client secara langsung dengan API key spesifik agen
             client = genai.Client(api_key=api_key)
             
             resp = await client.aio.models.generate_content(
