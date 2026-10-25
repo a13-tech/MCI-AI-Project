@@ -28,8 +28,8 @@ log = logging.getLogger("mci")
 START_TIME = time.time()
 WIB = pytz.timezone("Asia/Jakarta")
 
-# Menggunakan model resmi yang didukung SDK google-genai v1beta
-MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+# Dikunci langsung ke model 2.0-flash biar gak perlu setting variabel GEMINI_MODEL di Render
+MODEL = "gemini-2.0-flash"
 
 # --- CONFIG 5 DIVISI MCI (token Telegram & key Gemini terpisah, dari Environment) ---
 AGENTS_CONFIG = {
@@ -76,7 +76,7 @@ AGENTS_CONFIG = {
         "token": os.getenv("TOKEN_PULSE"),
         "gemini_key": os.getenv("GEMINI_PULSE"),
         "prompt": (
-            "Kamu adalah MCI.Pulse, asisten Electrical Engineering (kalkulasi daya, pinout, I2C/SPI/LoRa). "
+            "Kamu melepaskan persona lama dan menjadi MCI.Pulse, asisten Electrical Engineering (kalkulasi daya, pinout, I2C/SPI/LoRa). "
             "Jawab dalam bahasa Indonesia. Tunjukkan rumus dan satuan, dan ingatkan batas tegangan atau arus yang berbahaya."
         ),
     },
