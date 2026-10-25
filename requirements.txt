@@ -1,5 +1,5 @@
-python-telegram-bot
-google-generativeai
-pytz
-psutil
 flask
+python-telegram-bot>=21
+google-genai
+psutil
+pytz
