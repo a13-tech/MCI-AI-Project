@@ -217,7 +217,6 @@ def make_bot_handlers(agent_key):
     # Command /status atau /tokens untuk cek penggunaan API Gemini
     async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         state = agents_state[agent_key]
-        wib = pytz.timezone("Asia/Jakarta")
         uptime = int(time.time() - START_TIME)
         
         tot_tokens = state["total_prompt_tokens"] + state["total_candidates_tokens"]
@@ -235,83 +234,4 @@ def make_bot_handlers(agent_key):
             f"• Uptime Server: `{uptime // 3600}j {(uptime % 3600) // 60}m`\n"
             f"• Limit Gemini Free: ~15 RPM / 1M TPM (Aman)"
         )
-        await update.message.reply_text(msg, parse_mode="Markdown")
-
-    # Handler Pesan Biasa
-    async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user_text = update.message.text or "Dokumen terdeteksi"
-        state = agents_state[agent_key]
-
-        # 1. Animasi Jalan ke Meja
-        state["status"] = "WALKING"
-        state["target"] = "desk"
-        state["activity"] = "🚶 Jalan ke meja..."
-        state["image"] = cfg["sprite_work"]
-        
-        await context.bot.send_photo(chat_id=update.effective_chat.id, photo=open(cfg["sprite_work"], "rb"), caption=f"🚶 {cfg['name']} menuju meja kerja...")
-        await asyncio.sleep(2.5)
-
-        # 2. Eksekusi Gemini
-        state["status"] = "WORKING"
-        state["activity"] = f"💻 Ngetik: '{user_text[:12]}...'"
-
-        if cfg["gemini_key"]:
-            genai.configure(api_key=cfg["gemini_key"])
-            model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=cfg["prompt"])
-            try:
-                res = model.generate_content(user_text)
-                reply = res.text
-                
-                # Tracking Token Usage
-                if hasattr(res, 'usage_metadata') and res.usage_metadata:
-                    state["total_prompt_tokens"] += res.usage_metadata.prompt_token_count
-                    state["total_candidates_tokens"] += res.usage_metadata.candidates_token_count
-                
-                state["total_calls"] += 1
-                wib = pytz.timezone("Asia/Jakarta")
-                state["last_call_time"] = datetime.now(wib).strftime("%H:%M:%S WIB")
-
-            except Exception as e:
-                reply = f"Error Gemini API: {str(e)}"
-        else:
-            reply = "API Key Gemini belum di-set di Environment Variables Render!"
-
-        await update.message.reply_text(reply)
-
-        # 3. Animasi Jalan Balik ke Sofa / Pantry
-        wib = pytz.timezone("Asia/Jakarta")
-        if datetime.now(wib).hour == 12:
-            state["target"] = "pantry"
-            state["activity"] = "🍱 Lagi makan di dapur..."
-            state["image"] = "eating.jpg"
-        else:
-            state["target"] = "sofa"
-            state["activity"] = "☕ Balik santai di sofa..."
-            state["image"] = "idle_sofa.jpg"
-            
-        state["status"] = "IDLE"
-
-    return status_command, message_handler
-
-async def start_all_bots():
-    apps = []
-    for key, cfg in AGENTS_CONFIG.items():
-        if cfg["token"]:
-            bot_app = ApplicationBuilder().token(cfg["token"]).build()
-            status_h, msg_h = make_bot_handlers(key)
-            
-            bot_app.add_handler(CommandHandler(["status", "tokens"], status_h))
-            bot_app.add_handler(MessageHandler(filters.TEXT | filters.Document.ALL, msg_h))
-            
-            await bot_app.initialize()
-            await bot_app.start()
-            await bot_app.updater.start_polling()
-            apps.append(bot_app)
-            print(f"Bot {cfg['name']} Aktif!")
-
-    while True:
-        await asyncio.sleep(3600)
-
-if __name__ == "__main__":
-    threading.Thread(target=run_flask, daemon=True).start()
-    asyncio.run(start_all_bots())
+        await update.message.reply_text(msg, parse_mode
