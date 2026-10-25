@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MCI Virtual Office</title>
+<style>
+:root{--bg:#e9edf2;--ink:#17202b;--card:rgba(255,255,255,.93);--line:rgba(0,0,0,.14);--mute:#556070}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1117;--ink:#e8edf4;--card:rgba(22,28,38,.93);--line:rgba(255,255,255,.16);--mute:#9aa6b6}}
+:root[data-theme="dark"]{--bg:#0d1117;--ink:#e8edf4;--card:rgba(22,28,38,.93);--line:rgba(255,255,255,.16);--mute:#9aa6b6}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+#top{position:fixed;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 0;pointer-events:none}
+#top b{font-size:16px}#top small{display:block;color:var(--mute);font-size:12px;margin-top:2px}
+#pnl{margin-top:8px;display:inline-block;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:11px}
+#pnl div{white-space:nowrap}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+.bub{position:fixed;left:0;top:0;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:3px 7px;font-size:11px;max-width:150px;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.bub .tx{display:block;color:var(--mute);font-size:10px}
+@media (max-width:640px){.bub .tx{display:none}}
+@media (min-width:641px){#pnl{display:none}}
+#bar{position:fixed;left:0;right:0;bottom:0;padding:10px 10px calc(env(safe-area-inset-bottom,0px) + 10px);display:flex;gap:8px;overflow-x:auto;justify-content:safe center}
+#bar button{flex:0 0 auto;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:9px 13px;font:inherit;cursor:pointer}
+#bar button:focus-visible{outline:2px solid #3b82f6;outline-offset:2px}
+</style></head><body>
+<div id="top"><b>MCI Virtual Office</b><small>Simulasi. Tekan tombol di bawah untuk memberi tugas ke agen.</small><div id="pnl"></div></div>
+<div id="bar"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(()=>{
+const rnd=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.floor(Math.random()*a.length)];
+const wrap=x=>{while(x>Math.PI)x-=2*Math.PI;while(x<-Math.PI)x+=2*Math.PI;return x};
+let AUTO=true;
+const AG=[
+{n:"DevMatrix",col:0x3b82f6,b:{kopi:3,muter:1.5},jobs:["Menulis kode ESP32","Debug program C++","Merancang logika sensor"]},
+{n:"Nexus",col:0xf59e0b,b:{makan:2},jobs:["Mengecek stok inventaris","Menyusun tugas tim","Memperbarui papan proyek"]},
+{n:"Aegis",col:0xef4444,b:{koran:3},jobs:["Memeriksa risiko wiring","Menyusun checklist safety","Memverifikasi rancangan"]},
+{n:"Sentinel",col:0x8b5cf6,b:{melamun:3},jobs:["Merangkum diskusi grup","Memantau pesan masuk","Mencatat poin penting"]},
+{n:"Pulse",col:0x10b981,b:{muter:3,makan:1.5},jobs:["Menghitung kebutuhan daya","Memeriksa pinout I2C","Cek jalur SPI/LoRa"]}];
+const BR=[
+{id:"kopi",t:"Menyeduh kopi ke-4 hari ini",w:5,an:"sip",pr:"cup",f:Math.PI/2,p:i=>[[6,1.4],[6,.8+.9*i]]},
+{id:"makan",t:"Ngemil roti bakar",w:3,an:"eat",pr:"snack",f:Math.PI/2,p:i=>[[6,1.4],[6,.8+.9*i]]},
+{id:"koran",t:"Baca koran, langsung ke halaman TTS",w:3,an:"read",pr:"paper",f:0,p:i=>[[-6.4+.9*i,1.4],[-6.4+.9*i,3.9],[-6.4+.9*i,4.8]]},
+{id:"melamun",t:"Menatap jendela tanpa tujuan",w:2,an:"stare",f:-Math.PI/2,p:i=>[[-7,1.4],[-7,-4.4+1.1*i]]},
+{id:"muter",t:"Muter-muter di kursi putar",w:2,an:"spin"},
+{id:"sibuk",t:"Pura-pura sibuk, ada bos lewat?",w:1,an:"type"}];
+const LBL={idle:"Siaga",break:"Istirahat",thinking:"Berpikir",working:"Bekerja",done:"Selesai"};
+const DOT={idle:"#22c55e",break:"#22c55e",done:"#22c55e",thinking:"#f59e0b",working:"#ef4444"};
+
+const sc=new THREE.Scene(),R=new THREE.WebGLRenderer({antialias:true,alpha:true});
+R.setPixelRatio(Math.min(devicePixelRatio,2));R.shadowMap.enabled=true;document.body.prepend(R.domElement);
+const cam=new THREE.OrthographicCamera(-10,10,8,-8,-60,100);cam.position.set(14,14,14);cam.lookAt(0,0,0);
+function fit(){const w=innerWidth,h=innerHeight,a=w/h;let hw,hh;if(a>=9.5/8.8){hh=8.8;hw=hh*a}else{hw=9.5;hh=hw/a}
+cam.left=-hw;cam.right=hw;cam.top=hh;cam.bottom=-hh;cam.updateProjectionMatrix();R.setSize(w,h)}
+addEventListener("resize",fit);fit();
+sc.add(new THREE.AmbientLight(0xffffff,.78));
+const dl=new THREE.DirectionalLight(0xffffff,.65);dl.position.set(8,14,6);dl.castShadow=true;dl.shadow.mapSize.set(1024,1024);
+Object.assign(dl.shadow.camera,{left:-14,right:14,top:14,bottom:-14,near:1,far:40});sc.add(dl);
+
+const M=c=>new THREE.MeshStandardMaterial({color:c,roughness:.8});
+function box(w,h,d,c,x,y,z,p=sc){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),M(c));m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;p.add(m);return m}
+const part=(g,c)=>{const m=new THREE.Mesh(g,M(c));m.castShadow=true;return m};
+box(16,.2,12,0xe6e0d2,0,-.1,0);box(5.5,.02,3,0x9db4c0,0,.01,.4);
+box(.3,3,12.3,0xf3f0e8,-8.15,1.5,0);box(16.6,3,.3,0xf3f0e8,0,1.5,-6.15);
+for(let i=0;i<5;i++)box(.05,1.4,1.5,0x9ad1f5,-7.97,1.7,-4.4+i*1.1*1.0);
+box(3.2,1.3,.05,0xffffff,0,1.9,-5.95);
+// pantry
+box(1.1,1,5.2,0xb8bcc4,7.3,.5,2.8);box(1.2,.08,5.3,0x5f6877,7.3,1.02,2.8);
+box(.5,.6,.5,0x222831,7.3,1.36,1);box(.52,.1,.52,0xe11d48,7.3,1.7,1);box(.7,.4,.5,0xdddddd,7.3,1.26,2.4);
+// bench
+box(4.8,.5,.9,0x4b6a88,-4.6,.25,4.8);box(.2,.7,.9,0x3d5873,-7.1,.35,4.8);box(.2,.7,.9,0x3d5873,-2.1,.35,4.8);
+function plant(x,z){const p=new THREE.Group();p.position.set(x,0,z);sc.add(p);
+const pot=part(new THREE.CylinderGeometry(.3,.22,.5,10),0x8b5a3c);pot.position.y=.25;p.add(pot);
+const l=part(new THREE.SphereGeometry(.5,10,8),0x3f9b54);l.position.y=.95;p.add(l)}
+plant(-7.2,-5.2);plant(7.2,-5.2);plant(-7.2,5.4);
+
+function mkChar(col){const g=new THREE.Group(),sk=0xf1c9a5;
+const body=part(new THREE.BoxGeometry(.5,.7,.3),col);body.position.y=.85;g.add(body);
+const head=part(new THREE.SphereGeometry(.26,16,12),sk);head.position.y=1.5;g.add(head);
+const hair=part(new THREE.SphereGeometry(.275,16,12,0,Math.PI*2,0,Math.PI/2),0x2b2118);hair.position.y=1.54;head.parent.add(hair);
+for(const s of[-1,1]){const e=new THREE.Mesh(new THREE.SphereGeometry(.035,8,6),new THREE.MeshBasicMaterial({color:0x111111}));e.position.set(s*.09,1.5,.24);g.add(e)}
+function limb(x,y,len,c,hand){const p=new THREE.Group();p.position.set(x,y,0);
+const m=part(new THREE.CylinderGeometry(.09,.09,len,8),c);m.position.y=-len/2;p.add(m);
+if(hand){const h=part(new THREE.SphereGeometry(.09,8,6),sk);h.position.y=-len;p.add(h)}g.add(p);return p}
+const aL=limb(-.34,1.15,.55,col,1),aR=limb(.34,1.15,.55,col,1),lL=limb(-.13,.5,.5,0x2d3748),lR=limb(.13,.5,.5,0x2d3748);
+const cup=part(new THREE.CylinderGeometry(.07,.055,.14,10),0xffffff);cup.position.set(0,-.62,0);cup.visible=false;aR.add(cup);
+const snack=part(new THREE.BoxGeometry(.12,.06,.12),0xd97706);snack.position.set(0,-.62,0);snack.visible=false;aR.add(snack);
+const paper=part(new THREE.BoxGeometry(.75,.5,.03),0xf7f7f2);paper.position.set(0,1.05,.42);paper.rotation.x=-.3;paper.visible=false;g.add(paper);
+return{g,head,aL,aR,lL,lR,cup,snack,paper}}
+
+const bar=document.getElementById("bar"),pnl=document.getElementById("pnl");
+AG.forEach((a,i)=>{
+a.i=i;a.cx=-5+i*2.5;a.cz=-1.7;
+const ch=new THREE.Group();ch.position.set(a.cx,0,a.cz);sc.add(ch);a.ch=ch;
+box(.6,.08,.6,0x2f3640,0,.45,0,ch);box(.6,.65,.08,0x2f3640,0,.82,.3,ch);box(.06,.4,.06,0x777777,0,.22,0,ch);
+box(1.9,.08,.9,0xc9a97a,a.cx,.9,-2.6);
+for(const[dx,dz]of[[-.9,-.4],[.9,-.4],[-.9,.4],[.9,.4]])box(.06,.9,.06,0x8a6f4d,a.cx+dx,.45,-2.6+dz);
+box(.7,.45,.05,0x222831,a.cx,1.28,-2.85);box(.62,.37,.02,a.col,a.cx,1.28,-2.82);box(.5,.03,.18,0x333a44,a.cx,.96,-2.3);
+Object.assign(a,mkChar(a.col));sc.add(a.g);
+a.p={aL:0,aR:0,lL:0,lR:0};a.q=[];a.path=[];a.job=null;a.prop=null;a.rotT=Math.PI;a.ph="idle";a.t=rnd(1,5+i);a.auto=rnd(5,18);a.phase=rnd(0,6);
+a.el=document.createElement("div");a.el.className="bub";document.body.appendChild(a.el);
+const r=document.createElement("div");pnl.appendChild(r);a.row=r;
+const bt=document.createElement("button");bt.textContent="Tugas ▸ "+a.n;bt.onclick=()=>assign(a,pick(a.jobs));bar.appendChild(bt);
+sit(a);status(a,"idle","Siaga, menunggu perintah")});
+
+function status(a,st,msg){a.st=st;a.msg=msg;a.dirty=true}
+function sit(a){if(a.anim==="spin")a.g.rotation.y=Math.PI;a.g.position.set(a.cx,0,a.cz);a.anim="sit";a.rotT=Math.PI;a.atDesk=true;a.ch.rotation.y=0}
+function walk(a,pts,cb){a.atDesk=false;a.ch.rotation.y=0;a.path=pts.map(p=>[p[0],p[1]]);a.cb=cb;a.anim="walk";a.rotT=null;a.t=Infinity;if(!pts.length){a.cb=null;cb&&cb()}}
+function goDesk(a){const x=a.g.position.x,z=a.g.position.z,pts=[];
+if(Math.hypot(x-a.cx,z-a.cz)>.05){if(Math.abs(z-1.4)>.05)pts.push([x,1.4]);pts.push([a.cx,1.4],[a.cx,a.cz])}
+walk(a,pts,()=>arrived(a))}
+function arrived(a){sit(a);if(a.job)think(a);else{a.ph="idle";status(a,"idle","Siaga, menunggu perintah");a.t=rnd(3,7)}}
+function think(a){a.ph="thinking";status(a,"thinking","Membaca perintah…");a.anim="think";a.t=1.3}
+function assign(a,text,dur){
+if(["thinking","working","done","to_desk"].includes(a.ph)){a.q.push([text,dur]);return}
+a.job=[text,dur];
+if(a.ph==="back"){status(a,"thinking","Bergegas ke meja…");return}
+if(a.atDesk){a.prop=null;if(a.anim==="spin")sit(a);think(a)}
+else{a.ph="to_desk";status(a,"thinking","Bergegas ke meja…");goDesk(a)}}
+function finish(a){const was=a.job;a.job=null;a.ph="done";status(a,"done","Selesai ✓ "+(was?was[0]:""));a.anim="sit";a.t=2.2;
+if(AUTO&&a.n==="DevMatrix"&&Math.random()<.6)assign(AG[2],"Memverifikasi hasil DevMatrix")}
+function brk(a){const L=BR.map(b=>[b,b.w*(a.b[b.id]||1)]);let r=Math.random()*L.reduce((s,x)=>s+x[1],0),b=L[0][0];
+for(const[k,w]of L){r-=w;if(r<0){b=k;break}}
+a.ph="going";status(a,"break",b.t);a.t=Infinity;
+const go=()=>{a.ph="break";a.anim=b.an;a.prop=b.pr||null;if(b.f!=null)a.rotT=b.f;a.t=rnd(9,20);status(a,"break",b.t)};
+if(b.p)walk(a,[[a.cx,1.4],...b.p(a.i)],go);else go()}
+function endBrk(a){a.prop=null;a.ph="back";status(a,"idle","Kembali ke meja");if(a.atDesk)arrived(a);else goDesk(a)}
+function nxt(a){switch(a.ph){
+case"thinking":a.ph="working";status(a,"working",a.job[0]);a.anim="type";a.t=a.job[1]===Infinity?Infinity:rnd(5,11);break;
+case"working":finish(a);break;
+case"done":if(a.q.length){a.job=a.q.shift();think(a)}else{a.ph="idle";status(a,"idle","Siaga, menunggu perintah");a.anim="sit";a.t=rnd(2.5,6)}break;
+case"idle":brk(a);break;
+case"break":endBrk(a);break}}
+
+function step(a,dt,t){const g=a.g;
+if(a.path.length){const[tx,tz]=a.path[0],dx=tx-g.position.x,dz=tz-g.position.z,d=Math.hypot(dx,dz),s=2.4*dt;
+if(d<=s){g.position.x=tx;g.position.z=tz;a.path.shift();if(!a.path.length){const cb=a.cb;a.cb=null;cb&&cb()}}
+else{g.position.x+=dx/d*s;g.position.z+=dz/d*s;g.rotation.y+=wrap(Math.atan2(dx,dz)-g.rotation.y)*Math.min(1,dt*12)}}
+else if(a.anim==="spin"){g.rotation.y+=dt*7;a.ch.rotation.y=g.rotation.y-Math.PI}
+else if(a.rotT!=null)g.rotation.y+=wrap(a.rotT-g.rotation.y)*Math.min(1,dt*8);
+a.t-=dt;if(a.t<=0){a.t=Infinity;nxt(a)}
+if(AUTO){a.auto-=dt;if(a.auto<=0){a.auto=rnd(18,40);if(a.ph!=="thinking"&&a.ph!=="working")assign(a,pick(a.jobs))}}
+const k=a.anim,ph=a.phase;let aL=0,aR=0,lL=0,lR=0,bob=0;
+if(k==="walk"){const s=Math.sin(t*9+ph);lL=s*.6;lR=-s*.6;aL=-s*.5;aR=s*.5;bob=Math.abs(s)*.05}
+else if(["sit","type","think","read","spin"].includes(k)){lL=lR=-1.5;
+if(k==="type"){aL=-1.3+Math.sin(t*16+ph)*.1;aR=-1.3+Math.sin(t*16+ph+2)*.1}
+else if(k==="think"){aL=-1.3;aR=-2.4+Math.sin(t*2)*.05}
+else if(k==="read")aL=aR=-1.4;else if(k==="spin")aL=aR=-.4;else aL=aR=-.5}
+else if(k==="sip")aR=-2.3+Math.sin(t*2.2+ph)*.15;
+else if(k==="eat")aR=-2.4+Math.abs(Math.sin(t*3+ph))*.25;
+else if(k==="stare"){bob=Math.sin(t*1.2+ph)*.012;a.head.rotation.y=Math.sin(t*.8+ph)*.3}
+if(k!=="stare")a.head.rotation.y=0;
+const f=Math.min(1,dt*10),p=a.p;p.aL+=(aL-p.aL)*f;p.aR+=(aR-p.aR)*f;p.lL+=(lL-p.lL)*f;p.lR+=(lR-p.lR)*f;
+a.aL.rotation.x=p.aL;a.aR.rotation.x=p.aR;a.lL.rotation.x=p.lL;a.lR.rotation.x=p.lR;g.position.y=bob;
+a.cup.visible=a.prop==="cup";a.snack.visible=a.prop==="snack";a.paper.visible=a.prop==="paper"}
+
+const v=new THREE.Vector3();
+function ui(a){if(a.dirty){a.dirty=false;
+const h=`<i class="dot" style="background:${DOT[a.st]}"></i><b>${a.n}</b> · ${LBL[a.st]}`;
+a.el.innerHTML=h+`<span class="tx">${a.msg}</span>`;a.row.innerHTML=h+`: ${a.msg}`}
+a.head.getWorldPosition(v);v.y+=.45;v.project(cam);
+const x=(v.x*.5+.5)*innerWidth,y=(-v.y*.5+.5)*innerHeight;
+a.el.style.transform=`translate(${x}px,${y}px) translate(-50%,-100%)`}
+
+window.officeEvent=(name,state,text)=>{const a=AG.find(x=>x.n.toLowerCase()===String(name).toLowerCase());if(!a)return;AUTO=false;
+if(state==="working"||state==="thinking")assign(a,text||"Bekerja",Infinity);
+else if(state==="done"||state==="idle"){if(a.ph==="working"||a.ph==="thinking")finish(a);else a.job=null}};
+
+const clock=new THREE.Clock();
+(function loop(){requestAnimationFrame(loop);const dt=Math.min(clock.getDelta(),.1),t=clock.elapsedTime;
+AG.forEach(a=>{step(a,dt,t);ui(a)});R.render(sc,cam)})();
+})();
+</script>
+<script>
+(()=>{const k=new URLSearchParams(location.search).get("k");if(!k)return;
+const last={};
+async function poll(){try{
+const r=await fetch("/api/all-status?k="+encodeURIComponent(k));if(!r.ok)return;
+const d=await r.json();
+for(const a of Object.values(d)){
+const n=String(a.name).replace(/^MCI\./,""),w=String(a.status).toUpperCase()!=="IDLE";
+if(last[n]===w)continue;last[n]=w;
+window.officeEvent(n,w?"working":"idle",String(a.activity||"Bekerja").slice(0,80))}
+}catch(e){}}
+setInterval(poll,1500);poll()})();
+</script></body></html>
