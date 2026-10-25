@@ -28,7 +28,6 @@ log = logging.getLogger("mci")
 START_TIME = time.time()
 WIB = pytz.timezone("Asia/Jakarta")
 MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-VIEW_TOKEN = os.getenv("VIEW_TOKEN", "")
 
 # --- CONFIG 5 DIVISI MCI (token Telegram & key Gemini terpisah, dari Environment) ---
 AGENTS_CONFIG = {
@@ -99,11 +98,14 @@ HISTORY = {}          # (agent_key, chat_id) -> list[types.Content], hanya di RA
 MAX_HISTORY = 12
 
 # --- WEB (Flask) ---
-app = Flask(__name__, static_folder=None)   # jangan sajikan file repo ke publik
+# Mengarahkan folder 'office' sebagai folder statis publik untuk halaman dan gambar
+app = Flask(__name__, static_folder="office", static_url_path="")
 
 
 def _ok():
-    return bool(VIEW_TOKEN) and secrets.compare_digest(request.args.get("k", ""), VIEW_TOKEN)
+    token_in_env = os.getenv("VIEW_TOKEN", "").strip()
+    token_in_url = request.args.get("k", "").strip()
+    return bool(token_in_env) and secrets.compare_digest(token_in_url, token_in_env)
 
 
 @app.route("/")
@@ -111,6 +113,13 @@ def home():
     if not _ok():
         abort(404)
     return send_from_directory("office", "index.html")
+
+
+@app.route("/<path:filename>")
+def serve_office_assets(filename):
+    if not _ok():
+        abort(404)
+    return send_from_directory("office", filename)
 
 
 @app.route("/api/all-status")
