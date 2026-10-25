@@ -27,7 +27,7 @@ log = logging.getLogger("mci")
 
 START_TIME = time.time()
 WIB = pytz.timezone("Asia/Jakarta")
-MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
 # --- CONFIG 5 DIVISI MCI (token Telegram & key Gemini terpisah, dari Environment) ---
 AGENTS_CONFIG = {
@@ -98,7 +98,6 @@ HISTORY = {}          # (agent_key, chat_id) -> list[types.Content], hanya di RA
 MAX_HISTORY = 12
 
 # --- WEB (Flask) ---
-# Mengarahkan folder 'office' sebagai folder statis publik untuk halaman dan gambar
 app = Flask(__name__, static_folder="office", static_url_path="")
 
 
@@ -144,7 +143,7 @@ def _begin(key):
     s = agents_state[key]
     s["active"] += 1
     s["status"] = "WORKING"
-    s["activity"] = "Memproses permintaan"   # sengaja umum, jangan isi chat
+    s["activity"] = "Memproses permintaan"
 
 
 def _end(key):
@@ -169,7 +168,6 @@ def _addressed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
 
 def make_handlers(key):
     cfg = AGENTS_CONFIG[key]
-    client = genai.Client(api_key=cfg["gemini_key"])
 
     async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
@@ -207,6 +205,11 @@ def make_handlers(key):
         if not text:
             return
 
+        api_key = (cfg["gemini_key"] or "").strip()
+        if not api_key:
+            await msg.reply_text("⚠️ API Key Gemini belum diatur di Environment Variables.")
+            return
+
         hist_key = (key, msg.chat_id)
         history = HISTORY.setdefault(hist_key, [])
         user_content = types.Content(role="user", parts=[types.Part(text=text)])
@@ -214,6 +217,10 @@ def make_handlers(key):
         _begin(key)
         try:
             await context.bot.send_chat_action(chat_id=msg.chat_id, action="typing")
+            
+            # Inisialisasi client secara langsung dengan API key spesifik agen
+            client = genai.Client(api_key=api_key)
+            
             resp = await client.aio.models.generate_content(
                 model=MODEL,
                 contents=history + [user_content],
@@ -232,9 +239,9 @@ def make_handlers(key):
             history.append(user_content)
             history.append(types.Content(role="model", parts=[types.Part(text=answer)]))
             del history[:-MAX_HISTORY]
-        except Exception:
-            log.exception("[%s] Gagal memanggil Gemini", cfg["name"])
-            answer = "⚠️ Maaf, ada gangguan saat menghubungi Gemini. Coba lagi sebentar lagi."
+        except Exception as e:
+            log.exception("[%s] Gagal memanggil Gemini: %s", cfg["name"], e)
+            answer = f"⚠️ Maaf, ada gangguan saat menghubungi Gemini.\n\nDetail error: {e}"
         finally:
             _end(key)
 
