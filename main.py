@@ -626,8 +626,9 @@ def council_members(pertanyaan, anggota=None):
 async def council_run(pertanyaan, anggota=None):
     m = council_members(pertanyaan, anggota)
     for k in m + ["apex"]:
+        STATE[k]["dw"] = STATE[k].get("dw", 0) + 1  # hitung sidang yang sedang berjalan
         STATE[k]["mode"] = "dewan"
-    _log("dewan", pertanyaan, "Sidang", "dewan")
+    e = _log("dewan", pertanyaan, "Sidang", "dewan")
     try:
         async def one(k):
             try:
@@ -641,10 +642,15 @@ async def council_run(pertanyaan, anggota=None):
         putusan = await ask("apex", f"Pertanyaan: {pertanyaan}\n\nPendapat dewan:\n{ring}\n\n"
                             "Tulis PUTUSAN DEWAN: 1) keputusan, 2) poin sepakat, 3) poin beda pendapat, 4) langkah berikut. Maksimal 150 kata.",
                             act="Membacakan putusan", use_mcp=False, cache=False)
+        e["status"] = "Selesai"
         return {"jalur": "dewan", "keterangan": "Sidang dewan: " + ", ".join(p["nama"] for p in pend), "pendapat": pend, "jawaban": putusan, "rencana": []}
+    except Exception:
+        e["status"] = "Gagal"
+        raise
     finally:
         for k in m + ["apex"]:
-            STATE[k]["mode"] = "meja"
+            STATE[k]["dw"] = max(0, STATE[k].get("dw", 0) - 1)
+            STATE[k]["mode"] = "dewan" if STATE[k]["dw"] else "meja"
 
 
 # ---------- LEDGER (olah teks/foto jadi tabel kas) ----------
@@ -1105,6 +1111,19 @@ def make_handlers(key):
             "hapus": hapus, "council": council, "dewan": council, "skills": skills, "skill": skill}, chat, photo
 
 
+def _group_cmd(key, f):
+    """Di grup, perintah tanpa @namabot hanya dijawab Apex. Tanpa ini, /council di grup
+    dijalankan 10 bot sekaligus (10 sidang, token terbuang 10x)."""
+    async def w(u, c):
+        m = u.message
+        if m and m.chat.type != "private" and key != "apex":
+            first = (m.text or m.caption or "").split(maxsplit=1)[0] if (m.text or m.caption) else ""
+            if "@" not in first:
+                return
+        return await f(u, c)
+    return w
+
+
 async def on_error(update, context):
     log.error("Error Telegram: %s", context.error)
 
@@ -1125,7 +1144,7 @@ async def run_bots():
             cmds, chat, photo = make_handlers(key)
             tg = ApplicationBuilder().token(tok).build()
             for n, f in cmds.items():
-                tg.add_handler(CommandHandler(n, f))
+                tg.add_handler(CommandHandler(n, _group_cmd(key, f)))
             tg.add_handler(MessageHandler(filters.PHOTO, photo))
             tg.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
             tg.add_error_handler(on_error)
