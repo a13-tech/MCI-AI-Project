@@ -1147,6 +1147,7 @@ const OFFICE = (() => {
       walkTo(a, pts, () => { sitDesk(a); a.ph = "idle"; a.t = 3 + Math.random() * 4; }); return;
     }
     if (a.ph === "work" || a.ph === "think") { a.ph = "done"; a.anim = "sit"; a.t = 2.2; }
+    // kalau masih "urgent" (jalan ke meja), cukup kosongkan job: begitu duduk, langsung selesai
     a.job = null;
   }
   function startBreak(a) {
@@ -1170,7 +1171,10 @@ const OFFICE = (() => {
   }
   function next(a) {
     switch (a.ph) {
-      case "think": a.ph = "work"; a.anim = "type"; a.t = Infinity; break;
+      case "think":
+        // tugas sudah selesai di server saat bot masih jalan ke meja: jangan kerja selamanya
+        if (!a.job) { a.ph = "done"; a.anim = "sit"; a.t = 1.2; break; }
+        a.ph = "work"; a.anim = "type"; a.t = Infinity; break;
       case "work": a.ph = "done"; a.anim = "sit"; a.t = 2.2; a.job = null; break;
       case "done": if (a.job) think(a); else { a.ph = "idle"; a.anim = "sit"; a.t = 3 + Math.random() * 5; } break;
       case "idle": startBreak(a); break;
