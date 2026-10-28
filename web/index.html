@@ -1,0 +1,1425 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MCI Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#0A2A6B;--ink:#0B1F4D;--mute:#4A5A7A;--line:#D9E4FA;--bg:#F3F7FF;--gold:#D4AF5A;--gold2:#F1D58A}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{font:14px/1.45 'Plus Jakarta Sans',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink)}
+button,input,select,textarea{font:inherit}
+#app{display:flex;min-height:100vh}
+#sd{width:236px;flex:none;background:var(--navy);padding:24px 14px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+.brand{padding:0 12px 22px}
+.brand b{display:block;font-size:30px;letter-spacing:.16em;color:var(--gold2);font-weight:800}
+.brand small{font-size:11px;letter-spacing:.2em;color:#9DB4E8}
+.brand i{display:block;width:48px;height:2px;background:var(--gold);margin-top:12px}
+.nv{all:unset;box-sizing:border-box;cursor:pointer;display:block;padding:12px 14px;border-radius:10px;color:#C9D7F5;font-size:14px;white-space:nowrap}
+.nv:hover{background:rgba(255,255,255,.06)}
+.nv.on{background:rgba(212,175,90,.18);color:var(--gold2);font-weight:700}
+.nv:focus-visible{outline:2px solid var(--gold2)}
+.cv{margin-top:auto;padding:14px;border-radius:14px;background:rgba(255,255,255,.07);color:#DCE6FB;font-size:12px;line-height:1.5}
+.cv b{color:var(--gold2)}
+main{flex:1;min-width:0;padding:28px 32px;max-width:1300px}
+h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.01em}
+h2{margin:22px 0 10px;font-size:17px}
+.mu{color:var(--mute)}
+.er{color:#B42318;font-weight:600}
+.demo{background:#F6E9C3;color:#6B4E0A;border-radius:12px;padding:8px 14px;margin-bottom:14px;font-weight:600;font-size:13px}
+.cd{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:16px}
+.gr{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:16px}
+.gr .cd{margin:0}
+.k{font-size:12px;color:var(--mute);font-weight:600}
+.v{font-size:24px;font-weight:800;margin-top:4px}
+.ch{display:inline-block;padding:4px 11px;border-radius:99px;font-size:12px;font-weight:600;background:#DCE8FF;color:#0B3FBF}
+.ch.y{background:#F6E9C3;color:#6B4E0A}.ch.n{background:#EEF1F7;color:var(--mute)}.ch.r{background:#FDE3E1;color:#B42318}.ch.g{background:#DDF5E7;color:#0E6B3A}
+.bt{border:0;border-radius:12px;padding:11px 20px;font-weight:800;font-size:14px;min-height:44px;cursor:pointer}
+.bt:disabled{opacity:.5;cursor:default}
+.g{background:var(--gold);color:var(--navy)}
+.o{background:#fff;color:var(--navy);border:1px solid #BFD0F2}
+.boss{background:var(--navy);color:#fff;border:1px solid var(--gold);border-radius:20px;padding:24px;margin-bottom:16px}
+.boss small{letter-spacing:.2em;color:var(--gold2);font-weight:700}
+.seg{display:inline-flex;background:rgba(255,255,255,.1);border-radius:12px;padding:4px;gap:4px;margin-top:12px}
+.seg button{border:0;background:transparent;color:#DCE6FB;border-radius:9px;padding:8px 14px;font-weight:700;cursor:pointer;min-height:38px}
+.seg button.on{background:var(--gold);color:var(--navy)}
+textarea,input[type=text],select{width:100%;border-radius:12px;border:1px solid #BFD0F2;padding:11px 12px;color:var(--ink);background:#fff}
+textarea{resize:vertical}
+.boss textarea{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.3);color:#fff;margin:10px 0}
+.boss textarea::placeholder{color:#AFC2EA}
+.picks{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px}
+.picks label{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:99px;padding:5px 11px;font-size:12.5px;cursor:pointer}
+.res{white-space:pre-wrap;background:rgba(255,255,255,.08);border-radius:12px;padding:14px;margin-top:10px}
+.op{background:rgba(255,255,255,.06);border-left:3px solid var(--gold);border-radius:10px;padding:10px 12px;margin-top:8px;white-space:pre-wrap}
+.rw{display:grid;grid-template-columns:120px 1fr auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid #E6EDFB}
+.tb{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:600px}
+th{text-align:left;font-size:12px;color:var(--mute);padding:10px;background:#EAF1FF}
+td{padding:10px;border-top:1px solid #E6EDFB;vertical-align:top}
+.rt{text-align:right}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.sw{display:flex;align-items:center;gap:10px;padding:8px 0}
+.sw input{width:22px;height:22px}
+.tm{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.fl{display:grid;gap:10px;grid-template-columns:1fr 1fr}
+.fl label{display:grid;gap:5px;font-size:12.5px;font-weight:600;color:var(--mute)}
+.fl .full{grid-column:1/-1}
+
+/* ---------- Virtual Office ---------- */
+#views{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:thin}
+#views .grp{display:flex;gap:6px;align-items:center;flex:none}
+#views .lbl{font-size:11.5px;font-weight:700;color:var(--mute);letter-spacing:.06em;margin:0 2px 0 8px}
+.vb{border:1px solid #BFD0F2;background:#fff;color:var(--navy);border-radius:10px;padding:8px 13px;font-weight:700;font-size:13px;min-height:40px;cursor:pointer;white-space:nowrap}
+.vb.on{background:var(--navy);color:var(--gold2);border-color:var(--navy)}
+.vb:focus-visible{outline:2px solid var(--gold)}
+#stage{position:relative;height:min(76vh,740px);min-height:420px;border-radius:20px;overflow:hidden;background:#0a1638;touch-action:none;margin-bottom:14px;border:1px solid #1b3a7a;user-select:none;-webkit-user-select:none}
+#stage canvas{display:block;width:100%;height:100%;outline:none}
+#chips{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.chip{position:absolute;left:0;top:0;pointer-events:auto;display:flex;align-items:center;gap:6px;background:rgba(8,20,58,.86);color:#fff;border:1px solid rgba(212,175,90,.75);border-radius:99px;padding:3px 10px 3px 7px;font-size:11.5px;font-weight:700;white-space:nowrap;cursor:pointer;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);will-change:transform}
+.chip i{width:8px;height:8px;border-radius:50%;flex:none;box-shadow:0 0 6px currentColor}
+.chip span{font-weight:500;color:#C9D7F5;max-width:190px;overflow:hidden;text-overflow:ellipsis;display:none}
+.chip.busy span,.chip.on span,.chip:hover span{display:inline}
+.chip.boss{border-color:var(--gold2);background:rgba(60,44,8,.88)}
+.chip.on{outline:2px solid var(--gold2)}
+.ovl{position:absolute;display:flex;gap:6px;align-items:center}
+#tools{left:12px;top:12px}
+.ob{border:1px solid rgba(255,255,255,.22);background:rgba(8,20,58,.72);color:#E2EAFB;border-radius:10px;padding:7px 12px;font-weight:700;font-size:13px;min-height:38px;min-width:40px;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.ob.on{background:var(--gold);color:var(--navy);border-color:var(--gold)}
+#legend{left:12px;bottom:12px;background:rgba(8,20,58,.72);color:#DCE6FB;border-radius:10px;padding:7px 11px;font-size:11.5px;gap:12px;pointer-events:none}
+#legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+#pip{position:absolute;right:12px;top:12px;border:2px solid var(--gold);border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.45);background:transparent;padding:0;cursor:pointer}
+#pip b{position:absolute;left:8px;top:6px;font-size:10.5px;color:var(--gold2);letter-spacing:.1em;text-shadow:0 1px 2px #000;pointer-events:none}
+#follow{left:50%;top:58px;transform:translateX(-50%);background:rgba(8,20,58,.86);color:#fff;border:1px solid var(--gold);border-radius:99px;padding:5px 6px 5px 14px;font-weight:700;font-size:13px}
+#follow button{border:0;background:var(--gold);color:var(--navy);border-radius:99px;padding:6px 12px;font-weight:800;cursor:pointer;min-height:32px}
+#where{right:12px;bottom:12px;background:rgba(8,20,58,.72);color:var(--gold2);border-radius:10px;padding:7px 11px;font-size:12px;font-weight:700;pointer-events:none}
+.fls{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.flc h3{margin:0 0 4px;font-size:15px}
+.st{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid #E6EDFB;min-width:0}
+.st i{width:9px;height:9px;border-radius:50%;flex:none}
+.st b{white-space:nowrap}
+.st span{color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+@media(max-width:860px){
+ #app{flex-direction:column}
+ #sd{width:auto;height:auto;position:sticky;top:0;z-index:5;flex-direction:row;overflow-x:auto;padding:10px 12px;align-items:center}
+ .brand{padding:0 8px 0 0}.brand small,.brand i,.cv{display:none}.brand b{font-size:22px}
+ main{padding:16px 12px}
+ #stage{height:70vh;min-height:400px;border-radius:16px}
+ .chip span,.chip.busy span{display:none}.chip.on span{display:inline}
+ #legend{display:none}
+ #pip{top:auto;bottom:12px}
+ #where{bottom:auto;top:58px;right:12px}
+ .rw{grid-template-columns:90px 1fr auto}
+ .fl{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div id="app">
+<aside id="sd">
+ <div class="brand"><b>MCI</b><small>AI COMMAND CENTER</small><i></i></div>
+ <button class="nv on" data-p="cmd">Command Center</button>
+ <button class="nv" data-p="office">Virtual Office</button>
+ <button class="nv" data-p="kas">Keuangan AI</button>
+ <button class="nv" data-p="skills">Skills</button>
+ <button class="nv" data-p="tim">Tim & Token</button>
+ <div class="cv"><b>Hemat token</b><br>Router lokal, skill, model Lite, cache, dan mode Caveman.</div>
+</aside>
+<main>
+ <div class="demo" id="demoBanner" hidden>DEMO: semua data contoh. Tanpa server dan tanpa AI sungguhan.</div>
+
+ <section id="p-cmd" class="pg">
+  <h1>Command Center</h1>
+  <p class="mu">Satu perintah ke Boss. Pesan yang jelas tujuannya langsung ke bot yang tepat tanpa memanggil Boss.</p>
+  <div class="boss">
+   <small>BOSS AI · MCI.APEX · LANTAI 4</small>
+   <div class="seg" role="group" aria-label="Mode perintah"><button class="on" data-mode="boss">Boss bagi tugas</button><button data-mode="dewan">Sidang Dewan</button></div>
+   <textarea id="bt" rows="3" aria-label="Perintah" placeholder="Contoh: rekap kas minggu ini lalu minta Aegis cek risikonya."></textarea>
+   <div id="pickWrap" hidden><div class="mu" style="color:#AFC2EA;font-size:12.5px">Anggota dewan (kosongkan untuk dipilih otomatis, maksimal 4):</div><div class="picks" id="picks"></div></div>
+   <button class="bt g" id="bs">Kirim</button>
+   <div id="br" style="margin-top:14px"></div>
+  </div>
+  <div class="gr">
+   <div class="cd"><div class="k">Saldo kas</div><div class="v" id="k1">-</div></div>
+   <div class="cd"><div class="k">Bot bekerja sekarang</div><div class="v" id="k2">-</div></div>
+   <div class="cd"><div class="k">Token hari ini</div><div class="v" id="k3">-</div><div class="mu" id="k3b" style="font-size:12px"></div></div>
+   <div class="cd"><div class="k">Penghematan</div><div class="v" id="k4">-</div><div class="mu" style="font-size:12px">pesan tanpa panggil Boss</div></div>
+  </div>
+  <div class="cd"><b>Aktivitas tugas terbaru</b><div id="lg"><p class="mu">Belum ada tugas.</p></div></div>
+ </section>
+
+ <section id="p-office" class="pg" hidden>
+  <h1>Virtual Office · Gedung MCI</h1>
+  <p class="mu">Pilih tampilan gedung, lantai, atau ruangan. Seret untuk memutar, cubit atau scroll untuk zoom, klik nama bot untuk mengikutinya.</p>
+  <div id="views">
+   <div class="grp"><button class="vb on" data-view="gedung">Gedung</button></div>
+   <div class="grp"><span class="lbl">LANTAI</span><button class="vb" data-view="f0">LT 1</button><button class="vb" data-view="f1">LT 2</button><button class="vb" data-view="f2">LT 3</button><button class="vb" data-view="f3">LT 4</button></div>
+   <div class="grp"><span class="lbl">RUANGAN</span><button class="vb" data-view="lounge">Lounge</button><button class="vb" data-view="pantry">Pantry</button><button class="vb" data-view="game">Game</button><button class="vb" data-view="lab">Lab Teknik</button><button class="vb" data-view="meeting">Meeting</button><button class="vb" data-view="dewan">Ruang Dewan</button><button class="vb" data-view="ceo">Ruang CEO</button></div>
+  </div>
+  <div id="stage">
+   <div id="chips"></div>
+   <button id="pip" type="button" aria-label="Peta atas, ketuk untuk ganti lantai"><b id="pipTxt">PETA LT 1</b></button>
+   <div class="ovl" id="tools"><button class="ob" id="pipBtn" aria-pressed="false">Peta atas</button><button class="ob" id="zIn" aria-label="Zoom masuk">+</button><button class="ob" id="zOut" aria-label="Zoom keluar">−</button></div>
+   <div class="ovl" id="follow" hidden><span id="followTxt"></span><button id="unfollow">Lepas</button></div>
+   <div class="ovl" id="where">Gedung MCI</div>
+   <div class="ovl" id="legend"><span><i style="background:#ef4444"></i>Bekerja</span><span><i style="background:#f59e0b"></i>Berpikir</span><span><i style="background:#a78bfa"></i>Sidang</span><span><i style="background:#38bdf8"></i>Istirahat</span><span><i style="background:#22c55e"></i>Siaga</span></div>
+  </div>
+  <div class="fls" id="sl"></div>
+ </section>
+
+ <section id="p-kas" class="pg" hidden>
+  <h1>Keuangan AI</h1>
+  <p class="mu">Tulis bebas atau foto struk. Ledger baca, kamu cek, lalu simpan.</p>
+  <div class="gr">
+   <div class="cd"><div class="k">Total masuk</div><div class="v" id="s1">-</div></div>
+   <div class="cd"><div class="k">Total keluar</div><div class="v" id="s2">-</div></div>
+   <div class="cd"><div class="k">Saldo</div><div class="v" id="s3">-</div></div>
+  </div>
+  <div class="cd"><b>Catat kas</b>
+   <textarea id="kt" rows="3" aria-label="Catatan kas" placeholder="Terima transfer Rp 2.500.000 dari klien untuk jasa pasang radar, 24 Okt." style="margin-top:10px"></textarea>
+   <div class="bar" style="margin:10px 0 0">
+    <button class="bt g" id="ko">Olah dengan AI</button>
+    <label class="bt o" for="kf" style="display:inline-flex;align-items:center">Foto struk</label>
+    <input id="kf" type="file" accept="image/*" hidden><span class="mu" id="kn"></span>
+   </div>
+   <div id="pv" style="margin-top:14px"></div>
+  </div>
+  <div class="cd" style="padding:0">
+   <div class="bar" style="padding:16px 20px 0;justify-content:space-between"><b>Buku kas</b><a class="bt o" id="csv" href="/api/kas.csv" style="text-decoration:none;display:inline-flex;align-items:center">Ekspor CSV</a></div>
+   <div class="tb"><table><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Kategori</th><th class="rt">Masuk</th><th class="rt">Keluar</th><th class="rt">Saldo</th><th></th></tr></thead><tbody id="kb"></tbody></table></div>
+  </div>
+ </section>
+
+ <section id="p-skills" class="pg" hidden>
+  <h1>Skills</h1>
+  <p class="mu">Skill = instruksi siap pakai untuk satu bot. Dipicu kata kunci, jadi Boss tidak perlu dipanggil. Isi lengkapnya hanya dikirim ke AI saat skill dipakai.</p>
+  <div class="cd">
+   <b id="skTitle">Tambah skill</b>
+   <div class="fl" style="margin-top:12px">
+    <label>Nama (huruf kecil, pakai minus)<input type="text" id="skNama" placeholder="contoh: laporan-proyek"></label>
+    <label>Dikerjakan oleh<select id="skBot"></select></label>
+    <label class="full">Deskripsi singkat<input type="text" id="skDesk" placeholder="Apa yang dilakukan skill ini"></label>
+    <label class="full">Kata pemicu (pisahkan koma)<input type="text" id="skPem" placeholder="laporan proyek, progress report"></label>
+    <label class="full">Instruksi lengkap<textarea id="skIsi" rows="4" placeholder="Format jawaban, aturan, batas panjang…"></textarea></label>
+   </div>
+   <div class="bar" style="margin:12px 0 0"><button class="bt g" id="skSave">Simpan skill</button><button class="bt o" id="skReset">Kosongkan</button><span id="skMsg" class="mu"></span></div>
+  </div>
+  <div class="tm" id="skList"></div>
+ </section>
+
+ <section id="p-tim" class="pg" hidden>
+  <h1>Tim & Token</h1>
+  <p class="mu">Maksimal 10 bot di 4 lantai. Bot "cepat" memakai model Lite yang lebih murah.</p>
+  <div class="cd" id="tg"></div>
+  <div class="cd" id="usage"></div>
+  <div id="tl"></div>
+ </section>
+</main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+"use strict";
+const DEMO = window.MCI_DEMO === true;
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const rp = n => "Rp " + Number(n || 0).toLocaleString("id-ID");
+const num = n => Number(n || 0).toLocaleString("id-ID");
+let LANTAI = {1: "Lobby & Santai", 2: "Divisi Teknik", 3: "Operasional & Keuangan", 4: "Eksekutif"};
+
+/* ================= DATA DEMO (hanya jika DEMO) ================= */
+const MOCK = (() => {
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  const A = [
+    ["herald","MCI.Herald","Jadwal, pengumuman, humas, caption",1,"Humas & Resepsionis",0,1,["Menyusun pengumuman","Membuat caption"]],
+    ["sentinel","MCI.Sentinel","Perangkum poin penting diskusi",1,"Humas & Resepsionis",0,1,["Merangkum diskusi grup"]],
+    ["devmatrix","MCI.DevMatrix","Koding & arsitek logika hardware (C/C++, Python, mikrokontroler)",2,"Divisi Teknik",0,0,["Menulis kode ESP32","Debug program C++"]],
+    ["pulse","MCI.Pulse","Electrical Engineering (daya, pinout, I2C/SPI/LoRa)",2,"Divisi Teknik",0,0,["Menghitung kebutuhan daya","Skill pinout-esp32"]],
+    ["aegis","MCI.Aegis","Verifikator kritis, risiko, safety checklist",2,"Divisi Teknik",0,0,["Skill cek-wiring","Memeriksa risiko"]],
+    ["nexus","MCI.Nexus","Manajemen proyek, inventaris, tugas tim",3,"Operasional & Keuangan",0,1,["Mengecek stok inventaris"]],
+    ["ledger","MCI.Ledger","Keuangan: kas masuk/keluar jadi tabel",3,"Operasional & Keuangan",0,1,["Skill rekap-kas","Mengolah kas"]],
+    ["scribe","MCI.Scribe","Dokumen, laporan, proposal",3,"Operasional & Keuangan",0,0,["Skill laporan-mingguan"]],
+    ["atlas","MCI.Atlas","Riset & olah data",3,"Operasional & Keuangan",0,0,["Mengumpulkan data riset"]],
+    ["apex","MCI.Apex","Boss koordinator, membagi tugas ke tim",4,"Eksekutif",1,1,["Membagi tugas"]]];
+  const W = {}, K = [
+    {id:1,tanggal:"2026-10-24",keterangan:"Jasa pasang radar, klien",kategori:"Jasa",masuk:2500000,keluar:0},
+    {id:2,tanggal:"2026-10-24",keterangan:"Beli sensor HC-SR04 x10",kategori:"Komponen",masuk:0,keluar:85000},
+    {id:3,tanggal:"2026-10-25",keterangan:"Iuran anggota",kategori:"Iuran",masuk:600000,keluar:0},
+    {id:4,tanggal:"2026-10-25",keterangan:"Ongkir komponen",kategori:"Operasional",masuk:0,keluar:40000}];
+  const SK = [
+    {nama:"rekap-kas",bot:"ledger",deskripsi:"Rekap kas per periode jadi tabel ringkas",pemicu:"rekap kas, laporan kas",isi:"Tabel tanggal | keterangan | masuk | keluar, total, saldo."},
+    {nama:"laporan-mingguan",bot:"scribe",deskripsi:"Laporan mingguan format resmi MCI",pemicu:"laporan mingguan",isi:"Judul, ringkasan, pencapaian, kendala, rencana."},
+    {nama:"cek-wiring",bot:"aegis",deskripsi:"Checklist keselamatan rangkaian",pemicu:"cek wiring, cek rangkaian",isi:"Tegangan, polaritas, ground, arus pin, korsleting."},
+    {nama:"pinout-esp32",bot:"pulse",deskripsi:"Pemetaan pin ESP32 DevKit",pemicu:"pinout esp32",isi:"Tabel pin, hindari GPIO 6-11."}];
+  let nid = 5, pv = [], council = {u: Date.now() + 25000, on: false, m: []};
+  const kas = () => { let s = 0; const rows = K.map(r => ({...r, saldo: s += r.masuk - r.keluar}));
+    const m = K.reduce((a, r) => a + r.masuk, 0), x = K.reduce((a, r) => a + r.keluar, 0);
+    return {rows: rows.reverse(), ringkas: {masuk: m, keluar: x, saldo: m - x, kategori: {}}}; };
+  return async (u, o) => {
+    await sleep(120);
+    if (u === "/api/me") return {role:"admin",caveman:false,mcp:false,mcp_siap:false,db_permanen:false,lantai:LANTAI};
+    if (u === "/api/office") {
+      const n = Date.now();
+      if (n > council.u) { council.on = !council.on; council.u = n + (council.on ? 30000 : 70000);
+        council.m = council.on ? A.slice(0, 9).map(a => a[0]).sort(() => Math.random() - .5).slice(0, 3) : []; }
+      const agents = A.map(a => {
+        let w = W[a[0]];
+        if (!w || n > w.u) w = W[a[0]] = Math.random() < .22 ? {on:1,u:n+9000+Math.random()*8000,t:pick(a[7])} : {on:0,u:n+22000+Math.random()*26000};
+        const inC = council.on && (a[0] === "apex" || council.m.includes(a[0]));
+        return {key:a[0],name:a[1],peran:a[2],lantai:a[3],divisi:a[4],boss:!!a[5],model:a[6]?"gemini-3.5-flash-lite":"gemini-3.8-flash",
+          status:(w.on||inC)?"WORKING":"IDLE",activity:inC?"Sidang dewan":w.on?w.t:"Siaga",mode:inC?"dewan":"meja",gemini:true,telegram:false,calls:12,tokens:4820};
+      });
+      return {agents, lantai: LANTAI, log:[{t:"10:12",bot:"ledger",tugas:"rekap kas minggu ini",status:"Selesai",jalur:"skill"},{t:"10:11",bot:"devmatrix",tugas:"buat kode arduino sensor suhu",status:"Selesai",jalur:"langsung"},{t:"10:10",bot:"aegis",tugas:"cek risiko dari rekap kas",status:"Selesai",jalur:"boss"}]};
+    }
+    if (u === "/api/usage") return {tanggal:"2026-10-28",total:48200,batas:500000,rpm:60,model_utama:"gemini-3.8-flash",model_lite:"gemini-3.5-flash-lite",router_hemat:37,cache_hit:9,boss_dipanggil:6,
+      model:{"gemini-3.5-flash-lite":{masuk:21000,keluar:6100,pikir:300,panggilan:41},"gemini-3.8-flash":{masuk:12800,keluar:6900,pikir:1100,panggilan:12}}};
+    if (u === "/api/boss") return {job: JSON.parse(o.body).mode === "dewan" ? "dewan" : "boss"};
+    if (u === "/api/job/boss") return {status:"selesai",hasil:{jalur:"boss",keterangan:"Boss membagi tugas ke MCI.Ledger, MCI.Aegis",rencana:[{bot:"ledger",perintah:"Rekap kas minggu ini",skill:"rekap-kas"},{bot:"aegis",perintah:"Cek risiko dari rekap",skill:""}],jawaban:"(DEMO) Kas masuk minggu ini Rp 3.100.000, keluar Rp 125.000. Saldo aman. Simpan bukti transfer klien."}};
+    if (u === "/api/job/dewan") return {status:"selesai",hasil:{jalur:"dewan",keterangan:"Sidang dewan: MCI.Pulse, MCI.Aegis",pendapat:[{bot:"pulse",nama:"MCI.Pulse",isi:"(DEMO) 18650 lebih awet dan stabil. LiPo ringan tapi butuh BMS dan proteksi."},{bot:"aegis",nama:"MCI.Aegis",isi:"(DEMO) Risiko LiPo: kembung, terbakar jika tertusuk. Wajib wadah tahan air dan sekring."}],jawaban:"(DEMO) PUTUSAN: pakai 18650 + BMS. Sepakat soal keamanan. Beda soal bobot. Langkah: hitung kapasitas, pilih holder tahan air."}};
+    if (u === "/api/kas") return kas();
+    if (u === "/api/kas/olah") { pv = [{tanggal:"2026-10-28",keterangan:"Transfer klien jasa radar",kategori:"Jasa",masuk:2500000,keluar:0}]; return {rows: pv}; }
+    if (u === "/api/kas/simpan") { pv.forEach(r => K.push({...r, id: nid++})); const n = pv.length; pv = []; return {disimpan: n}; }
+    if (u.startsWith("/api/kas/") && o && o.method === "DELETE") { const i = +u.split("/").pop(), k = K.findIndex(r => r.id === i); if (k >= 0) K.splice(k, 1); return {dihapus: 1}; }
+    if (u === "/api/skills" && o && o.method === "POST") { const d = JSON.parse(o.body); const i = SK.findIndex(s => s.nama === d.nama); if (i >= 0) SK[i] = d; else SK.push(d); return {disimpan: d.nama}; }
+    if (u === "/api/skills") return {skills: SK, bots: A.map(a => ({key: a[0], nama: a[1]}))};
+    if (u.startsWith("/api/skills/")) { const n = decodeURIComponent(u.split("/").pop()), i = SK.findIndex(s => s.nama === n); if (i >= 0) SK.splice(i, 1); return {dihapus: 1}; }
+    if (u === "/api/settings") return JSON.parse(o.body || "{}");
+    return {};
+  };
+})();
+
+async function api(u, o = {}) {
+  if (DEMO) { if (o.json) { o.method = "POST"; o.body = JSON.stringify(o.json); } return MOCK(u, o); }
+  o.headers = Object.assign({"X-MCI": "1"}, o.headers || {});
+  if (o.json) { o.method = "POST"; o.headers["Content-Type"] = "application/json"; o.body = JSON.stringify(o.json); delete o.json; }
+  const r = await fetch(u, o);
+  if (r.status === 401) { location = "/login"; throw new Error("login"); }
+  let d = {}; try { d = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error(d.error || "Error " + r.status);
+  return d;
+}
+
+/* ================= HALAMAN ================= */
+let ME = {}, DATA = [], LOG = [], KAS = null, PV = [], USE = null, MODE = "boss", SKL = {skills: [], bots: []};
+function show(p) {
+  $$(".pg").forEach(e => e.hidden = e.id !== "p-" + p);
+  $$(".nv").forEach(b => b.classList.toggle("on", b.dataset.p === p));
+  OFFICE.setVisible(p === "office");
+  if (p === "office" && DATA.length) OFFICE.ensure(DATA);
+  if (p === "kas") loadKas();
+  if (p === "tim") { renderTim(); loadUsage(); }
+  if (p === "skills") loadSkills();
+}
+$$(".nv").forEach(b => b.onclick = () => show(b.dataset.p));
+
+const JAL = {skill: ["Skill", "g"], langsung: ["Langsung", "g"], boss: ["Boss", ""], dewan: ["Dewan", "y"]};
+function renderCmd() {
+  const w = DATA.filter(d => d.status === "WORKING").length;
+  $("#k2").textContent = w + " dari " + DATA.length;
+  if (KAS) $("#k1").textContent = rp(KAS.ringkas.saldo);
+  if (USE) { $("#k3").textContent = num(USE.total); $("#k3b").textContent = USE.batas ? "batas " + num(USE.batas) + " per hari" : "tanpa batas harian"; $("#k4").textContent = num(USE.router_hemat); }
+  if (LOG.length) $("#lg").innerHTML = LOG.slice(0, 8).map(l => { const j = JAL[l.jalur] || ["", ""]; return `<div class="rw"><b>${esc(l.bot)}</b><span>${esc(l.tugas)} ${j[0] ? `<span class="ch ${j[1]}" style="margin-left:6px">${j[0]}</span>` : ""}</span><span class="ch ${l.status==="Selesai"?"y":l.status==="Gagal"?"r":""}">${esc(l.status)}</span></div>`; }).join("");
+}
+function renderList() {
+  const st = OFFICE.states();
+  const by = {}; DATA.forEach(d => (by[d.lantai] = by[d.lantai] || []).push(d));
+  $("#sl").innerHTML = Object.keys(LANTAI).map(f => `<div class="cd flc" style="margin:0"><h3>Lantai ${f} · ${esc(LANTAI[f])}</h3>${(by[f] || []).map(d => {
+    const s = st[d.key] || {c: d.status === "WORKING" ? "#ef4444" : "#22c55e", t: d.status === "WORKING" ? d.activity : "Siaga"};
+    return `<div class="st"><i style="background:${s.c}"></i><b>${esc(d.name.replace("MCI.",""))}</b><span>${esc(s.t)}</span></div>`; }).join("") || '<div class="mu">Kosong</div>'}</div>`).join("");
+}
+function renderTim() {
+  if ($("#p-tim").hidden) return;
+  const t = $("#tg");
+  if (ME.role === "admin") {
+    if (!t.dataset.r) {
+      t.dataset.r = 1;
+      t.innerHTML = `<b>Pengaturan</b><div class="sw"><input type="checkbox" id="cvm" ${ME.caveman?"checked":""}><label for="cvm"><b>Mode Caveman</b>: semua bot menjawab super singkat, token output jauh lebih sedikit</label></div>
+      <div class="sw"><input type="checkbox" id="mcm" ${ME.mcp?"checked":""} ${ME.mcp_siap?"":"disabled"}><label for="mcm"><b>MCP</b>: bot boleh memakai alat luar ${ME.mcp_siap?"":"(isi MCP_SERVERS di server dulu)"}</label></div>
+      <div class="sw mu">Database: ${ME.db_permanen?"permanen":"SEMENTARA, isi DATABASE_URL"}</div>`;
+      $("#cvm").onchange = e => api("/api/settings", {json: {caveman: e.target.checked}});
+      $("#mcm").onchange = e => api("/api/settings", {json: {mcp: e.target.checked}});
+    }
+  } else t.style.display = "none";
+  const by = {}; DATA.forEach(d => (by[d.lantai] = by[d.lantai] || []).push(d));
+  $("#tl").innerHTML = Object.keys(LANTAI).map(f => `<h2>Lantai ${f} · ${esc(LANTAI[f])}</h2><div class="tm">${(by[f] || []).map(d => `<div class="cd" style="margin:0"><b>${esc(d.name)}</b>${d.boss?' <span class="ch y">Boss</span>':""}<div class="mu" style="font-size:12px">${esc(d.divisi)}</div><div class="mu" style="margin:6px 0 10px">${esc(d.peran)}</div><span class="ch ${String(d.model).includes("lite")?"g":""}">${esc(d.model)}</span> <span class="ch ${d.gemini?"":"r"}">Gemini ${d.gemini?"siap":"belum"}</span> <span class="ch ${d.telegram?"":"n"}">Telegram ${d.telegram?"online":"tidak"}</span>${d.tokens!=null?`<div class="mu" style="margin-top:8px;font-size:12px">${d.calls} panggilan · ${num(d.tokens)} token</div>`:""}</div>`).join("")}</div>`).join("");
+}
+async function loadUsage() {
+  if (ME.role !== "admin") return;
+  try {
+    USE = await api("/api/usage"); renderCmd();
+    if ($("#p-tim").hidden) return;
+    const rows = Object.entries(USE.model).map(([m, v]) => `<tr><td>${esc(m)}</td><td class="rt">${num(v.panggilan)}</td><td class="rt">${num(v.masuk)}</td><td class="rt">${num(v.keluar)}</td><td class="rt">${num(v.pikir)}</td></tr>`).join("") || '<tr><td colspan="5" class="mu">Belum ada pemakaian hari ini.</td></tr>';
+    $("#usage").innerHTML = `<b>Pemakaian token ${esc(USE.tanggal)}</b><div class="mu" style="margin:4px 0 12px">Total ${num(USE.total)}${USE.batas ? " dari batas " + num(USE.batas) : ""} · RPM ${USE.rpm} · ${num(USE.router_hemat)} pesan tanpa Boss · ${num(USE.cache_hit)} dari cache · Boss dipanggil ${num(USE.boss_dipanggil)}x</div><div class="tb"><table><thead><tr><th>Model</th><th class="rt">Panggilan</th><th class="rt">Token masuk</th><th class="rt">Token keluar</th><th class="rt">Thinking</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  } catch (e) {}
+}
+async function poll() {
+  try {
+    const d = await api("/api/office");
+    DATA = d.agents; LOG = d.log || []; if (d.lantai) LANTAI = d.lantai;
+    renderCmd(); renderTim();
+    if (!$("#p-office").hidden) OFFICE.ensure(DATA);
+    OFFICE.sync(DATA);
+  } catch (e) {}
+}
+
+/* Boss / Dewan */
+$$("[data-mode]").forEach(b => b.onclick = () => { MODE = b.dataset.mode; $$("[data-mode]").forEach(x => x.classList.toggle("on", x === b)); $("#pickWrap").hidden = MODE !== "dewan"; $("#bs").textContent = MODE === "dewan" ? "Mulai sidang" : "Kirim"; renderPicks(); });
+function renderPicks() {
+  if ($("#picks").dataset.r || !DATA.length) return; $("#picks").dataset.r = 1;
+  $("#picks").innerHTML = DATA.filter(d => !d.boss).map(d => `<label><input type="checkbox" value="${esc(d.key)}">${esc(d.name.replace("MCI.",""))}</label>`).join("");
+}
+$("#bs").onclick = async () => {
+  const t = $("#bt").value.trim(); if (!t) return;
+  const b = $("#bs"), o = $("#br"); b.disabled = true;
+  const ang = $$("#picks input:checked").map(x => x.value).slice(0, 4);
+  o.innerHTML = MODE === "dewan" ? "<p>Dewan sedang bersidang di lantai 4…</p>" : "<p>Mencari jalur termurah…</p>";
+  try {
+    const {job} = await api("/api/boss", {json: {perintah: t, mode: MODE, anggota: ang}});
+    let ok = false;
+    for (let i = 0; i < 100 && !ok; i++) {
+      await sleep(1500);
+      const j = await api("/api/job/" + job);
+      if (j.status === "gagal") throw new Error(j.error);
+      if (j.status === "selesai") {
+        ok = true; const h = j.hasil, jl = JAL[h.jalur] || ["", ""];
+        let html = `<div style="margin-bottom:8px"><span class="ch ${jl[1]}">${jl[0]}</span> <span style="color:#C9D7F5;font-size:13px">${esc(h.keterangan || "")}</span></div>`;
+        if (h.pendapat) html += h.pendapat.map(p => `<div class="op"><b style="color:#F1D58A">${esc(p.nama)}</b>\n${esc(p.isi)}</div>`).join("") + `<div class="res"><b style="color:#F1D58A">PUTUSAN DEWAN</b>\n${esc(h.jawaban)}</div>`;
+        else { if (h.rencana && h.rencana.length > 1) html += '<div style="font-size:13px;color:#C9D7F5">' + h.rencana.map(r => `<b style="color:#F1D58A">${esc(r.bot)}</b>${r.skill ? " [" + esc(r.skill) + "]" : ""}: ${esc(String(r.perintah).slice(0, 120))}`).join("<br>") + "</div>";
+          html += `<div class="res">${esc(h.jawaban)}</div>`; }
+        o.innerHTML = html;
+      }
+    }
+    if (!ok) throw new Error("Terlalu lama. Cek lagi nanti di daftar tugas.");
+  } catch (e) { o.innerHTML = '<p style="color:#FFB4B4;font-weight:600">' + esc(e.message) + "</p>"; }
+  b.disabled = false; loadKas(true); loadUsage();
+};
+
+/* Kas */
+async function loadKas(quiet) {
+  if (ME.role !== "admin") return;
+  try {
+    KAS = await api("/api/kas");
+    $("#s1").textContent = rp(KAS.ringkas.masuk); $("#s2").textContent = rp(KAS.ringkas.keluar); $("#s3").textContent = rp(KAS.ringkas.saldo);
+    renderCmd();
+    $("#kb").innerHTML = KAS.rows.map(r => `<tr><td>${esc(r.tanggal)}</td><td>${esc(r.keterangan)}</td><td><span class="ch">${esc(r.kategori)}</span></td><td class="rt">${r.masuk?rp(r.masuk):"–"}</td><td class="rt">${r.keluar?rp(r.keluar):"–"}</td><td class="rt"><b>${rp(r.saldo)}</b></td><td><button class="bt o" style="padding:6px 12px;min-height:36px" data-d="${r.id}" aria-label="Hapus catatan ${r.id}">Hapus</button></td></tr>`).join("") || '<tr><td colspan="7" class="mu">Belum ada catatan.</td></tr>';
+    $$("[data-d]").forEach(b => b.onclick = async () => { if (confirm("Hapus catatan ini?")) { await api("/api/kas/" + b.dataset.d, {method: "DELETE"}); loadKas(); } });
+  } catch (e) { if (!quiet) $("#kb").innerHTML = '<tr><td colspan="7" class="er">' + esc(e.message) + "</td></tr>"; }
+}
+$("#kf").onchange = e => $("#kn").textContent = e.target.files[0] ? e.target.files[0].name : "";
+$("#ko").onclick = async () => {
+  const fd = new FormData(); fd.append("teks", $("#kt").value); if ($("#kf").files[0]) fd.append("foto", $("#kf").files[0]);
+  const b = $("#ko"); b.disabled = true; $("#pv").innerHTML = '<p class="mu">Ledger sedang membaca…</p>';
+  try {
+    PV = (await api("/api/kas/olah", {method: "POST", body: fd})).rows;
+    $("#pv").innerHTML = PV.length ? `<div class="tb"><table><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Kategori</th><th class="rt">Masuk</th><th class="rt">Keluar</th></tr></thead><tbody>${PV.map(r => `<tr><td>${esc(r.tanggal)}</td><td>${esc(r.keterangan)}</td><td><span class="ch">${esc(r.kategori)}</span></td><td class="rt">${r.masuk?rp(r.masuk):"–"}</td><td class="rt">${r.keluar?rp(r.keluar):"–"}</td></tr>`).join("")}</tbody></table></div><div class="bar" style="margin-top:12px"><button class="bt g" id="sv">Simpan semua</button><button class="bt o" id="bl">Batal</button></div>` : '<p class="mu">Tidak ada transaksi terbaca. Coba tulis lebih jelas.</p>';
+    if (PV.length) {
+      $("#sv").onclick = async () => { await api("/api/kas/simpan", {json: {rows: PV}}); $("#pv").innerHTML = '<p class="mu">Tersimpan.</p>'; $("#kt").value = ""; $("#kf").value = ""; $("#kn").textContent = ""; loadKas(); };
+      $("#bl").onclick = () => $("#pv").innerHTML = "";
+    }
+  } catch (e) { $("#pv").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
+  b.disabled = false;
+};
+
+/* Skills */
+async function loadSkills() {
+  try {
+    SKL = await api("/api/skills");
+    const sel = $("#skBot"); if (!sel.options.length) sel.innerHTML = SKL.bots.map(b => `<option value="${esc(b.key)}">${esc(b.nama)}</option>`).join("");
+    const nm = k => (SKL.bots.find(b => b.key === k) || {nama: k}).nama;
+    $("#skList").innerHTML = SKL.skills.map(s => `<div class="cd" style="margin:0"><b>${esc(s.nama)}</b> <span class="ch">${esc(nm(s.bot))}</span><div class="mu" style="margin:6px 0">${esc(s.deskripsi)}</div><div style="font-size:12.5px"><b>Pemicu:</b> ${esc(s.pemicu || "-")}</div><div class="bar" style="margin:12px 0 0"><button class="bt o" data-ske="${esc(s.nama)}" style="min-height:38px;padding:7px 14px">Ubah</button><button class="bt o" data-skd="${esc(s.nama)}" style="min-height:38px;padding:7px 14px">Hapus</button></div></div>`).join("") || '<p class="mu">Belum ada skill.</p>';
+    $$("[data-ske]").forEach(b => b.onclick = () => { const s = SKL.skills.find(x => x.nama === b.dataset.ske); $("#skTitle").textContent = "Ubah skill " + s.nama; $("#skNama").value = s.nama; $("#skBot").value = s.bot; $("#skDesk").value = s.deskripsi; $("#skPem").value = s.pemicu || ""; $("#skIsi").value = s.isi; scrollTo({top: 0, behavior: "smooth"}); });
+    $$("[data-skd]").forEach(b => b.onclick = async () => { if (confirm("Hapus skill " + b.dataset.skd + "?")) { await api("/api/skills/" + encodeURIComponent(b.dataset.skd), {method: "DELETE"}); loadSkills(); } });
+  } catch (e) { $("#skList").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
+}
+$("#skReset").onclick = () => { $("#skTitle").textContent = "Tambah skill"; ["#skNama", "#skDesk", "#skPem", "#skIsi"].forEach(s => $(s).value = ""); $("#skMsg").textContent = ""; };
+$("#skSave").onclick = async () => {
+  try { await api("/api/skills", {json: {nama: $("#skNama").value, bot: $("#skBot").value, deskripsi: $("#skDesk").value, pemicu: $("#skPem").value, isi: $("#skIsi").value}});
+    $("#skMsg").textContent = "Tersimpan."; loadSkills(); } catch (e) { $("#skMsg").textContent = e.message; }
+};
+
+/* ======================================================================
+   GEDUNG MCI 3D · 4 LANTAI
+   Semua bentuk dari bola, kapsul, silinder, torus, dan panel bersudut bulat.
+   ====================================================================== */
+const OFFICE = (() => {
+  const PI = Math.PI, TOP = .68, FH = 4.4, FY = [0, 4.4, 8.8, 13.2], WH = 4.05, LIFT = [10.6, -5.4];
+  let R, sc, cam, ctl, topCam, stage, chipsEl, pipEl, ready = false, visible = false, clock, CUR;
+  let AG = [], ANI = [], CAST = false, pipOn = true, pipF = 0, follow = null, fly = null, last = {}, BALL = null;
+  let view = "gedung", VIS = {all: true};
+  const FG = [], FLAB = [], NODES = {}, EDGES = {}, SPOTS = {}, BUSY = {};
+  let ROOF, BASE;
+
+  /* ---------- material & geometri ---------- */
+  const LIN = c => new THREE.Color(c).convertSRGBToLinear();
+  const MC = {}, GC = {};
+  function M(c, o) {
+    o = o || {}; const k = c + "|" + JSON.stringify(o);
+    if (MC[k]) return MC[k];
+    const p = Object.assign({roughness: .55, metalness: .06}, o);
+    p.color = LIN(c); if (p.emissive != null) p.emissive = LIN(p.emissive);
+    return MC[k] = new THREE.MeshStandardMaterial(p);
+  }
+  const GOLD = {metalness: .85, roughness: .28}, CHROME = {metalness: .8, roughness: .22};
+  const G = (k, f) => GC[k] || (GC[k] = f());
+  const SP = (r, w = 22, h = 16) => G("s" + r + "," + w, () => new THREE.SphereGeometry(r, w, h));
+  const CY = (a, b, h, s = 28) => G(`c${a},${b},${h},${s}`, () => new THREE.CylinderGeometry(a, b, h, s));
+  const TO = (R, r, arc = PI * 2) => G(`t${R},${r},${arc}`, () => new THREE.TorusGeometry(R, r, 12, 44, arc));
+  const CN = (r, h, s = 28) => G(`n${r},${h},${s}`, () => new THREE.ConeGeometry(r, h, s));
+  function CAP(r, L) {
+    return G(`p${r},${L}`, () => {
+      const p = [];
+      for (let i = 0; i <= 8; i++) { const a = -PI / 2 + i * PI / 16; p.push(new THREE.Vector2(Math.max(Math.cos(a) * r, 1e-4), -L / 2 + Math.sin(a) * r)); }
+      for (let i = 0; i <= 8; i++) { const a = i * PI / 16; p.push(new THREE.Vector2(Math.max(Math.cos(a) * r, 1e-4), L / 2 + Math.sin(a) * r)); }
+      return new THREE.LatheGeometry(p, 18);
+    });
+  }
+  function rr(w, h, r) {
+    const s = new THREE.Shape(), x = -w / 2, y = -h / 2;
+    r = Math.max(.001, Math.min(r, w / 2 - .001, h / 2 - .001));
+    s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r);
+    s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r);
+    s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return s;
+  }
+  function PANEL(w, h, d, r) {
+    return G(`P${w},${h},${d},${r}`, () => {
+      const b = Math.max(.002, Math.min(d * .45, .03, w * .2, h * .2));
+      const g = new THREE.ExtrudeGeometry(rr(Math.max(w - 2 * b, .004), Math.max(h - 2 * b, .004), Math.max(r - b, .002)),
+        {depth: Math.max(d - 2 * b, .001), bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 3, curveSegments: 10});
+      g.center(); return g;
+    });
+  }
+  const SLAB = (w, d, h, r) => G(`S${w},${d},${h},${r}`, () => { const g = PANEL(w, d, h, r).clone(); g.rotateX(-PI / 2); return g; });
+  function ARC(r1, r2, t0, t1, h) {
+    return G(`A${r1},${r2},${t0},${t1},${h}`, () => {
+      const s = new THREE.Shape(); s.absarc(0, 0, r2, -t1, -t0, false); s.absarc(0, 0, r1, -t0, -t1, true); s.closePath();
+      const b = Math.min(.06, h * .4);
+      const g = new THREE.ExtrudeGeometry(s, {depth: Math.max(h - 2 * b, .01), bevelEnabled: true, bevelThickness: b, bevelSize: b * .9, bevelSegments: 3, curveSegments: 40});
+      g.rotateX(-PI / 2); g.translate(0, b, 0); return g;
+    });
+  }
+  function add(geo, c, x, y, z, p, o) {
+    const m = new THREE.Mesh(geo, c && c.isMaterial ? c : M(c, o));
+    m.position.set(x, y, z); m.castShadow = CAST; m.receiveShadow = true;
+    (p || CUR).add(m); return m;
+  }
+  function grp(x, y, z, ry, p) { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry || 0; (p || CUR).add(g); return g; }
+  function CT(w, h, f) {
+    const c = document.createElement("canvas"); c.width = w; c.height = h; f(c.getContext("2d"), w, h);
+    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t;
+  }
+  function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+  function label(text, x, y, z, s, col, wide) {
+    const W = wide ? 1024 : 512;
+    const t = CT(W, 128, (g, w, h) => {
+      roundRect(g, 6, 14, w - 12, h - 28, 46); g.fillStyle = "rgba(8,20,58,.88)"; g.fill();
+      g.lineWidth = 5; g.strokeStyle = col || "#D4AF5A"; g.stroke();
+      g.fillStyle = col || "#F1D58A"; g.font = "800 50px 'Plus Jakarta Sans',system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText(text, w / 2, h / 2 + 2);
+    });
+    const m = new THREE.Sprite(new THREE.SpriteMaterial({map: t, transparent: true, depthWrite: false}));
+    m.position.set(x, y, z); m.scale.set((wide ? 8 : 4) * (s || 1), 1 * (s || 1), 1); m.renderOrder = 5; CUR.add(m); return m;
+  }
+  function plane(tex, w, h, x, y, z, ry, p) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({map: tex, toneMapped: false, transparent: true})); m.position.set(x, y, z); m.rotation.y = ry || 0; (p || CUR).add(m); return m; }
+
+  /* ---------- tekstur layar ---------- */
+  function screenTex(kind, ac) {
+    const t = CT(256, 256, (g, w, h) => {
+      g.fillStyle = "#06102a"; g.fillRect(0, 0, w, h);
+      const C = [ac, "#e6edf7", "#F1D58A", "#7aa2ff"];
+      if (kind === "code") {
+        for (let i = 0; i < 22; i++) { let x = 12 + (i % 5) * 9; const y = 6 + i * 11.4; const n = 2 + (Math.random() * 4 | 0);
+          for (let k = 0; k < n && x < w - 24; k++) { const ww = 14 + Math.random() * 46; g.fillStyle = C[Math.random() * 4 | 0]; g.globalAlpha = .9; g.fillRect(x, y, ww, 5); x += ww + 7; } }
+      } else if (kind === "chart") {
+        for (let r = 0; r < 2; r++) { const oy = r * 128; g.globalAlpha = .3; g.strokeStyle = "#7aa2ff";
+          for (let i = 0; i < 4; i++) { g.beginPath(); g.moveTo(10, oy + 20 + i * 26); g.lineTo(w - 10, oy + 20 + i * 26); g.stroke(); }
+          g.globalAlpha = 1; for (let i = 0; i < 8; i++) { const bh = 20 + Math.random() * 80; g.fillStyle = i % 3 ? ac : "#F1D58A"; g.fillRect(18 + i * 29, oy + 118 - bh, 18, bh); } }
+      } else if (kind === "list") {
+        for (let i = 0; i < 12; i++) { const y = 10 + i * 21; g.globalAlpha = 1; g.strokeStyle = ac; g.lineWidth = 2; g.strokeRect(14, y, 12, 12);
+          if (Math.random() < .6) { g.fillStyle = ac; g.fillRect(17, y + 3, 6, 6); } g.fillStyle = "#e6edf7"; g.globalAlpha = .85; g.fillRect(36, y + 3, 60 + Math.random() * 130, 6); }
+      } else if (kind === "wave") {
+        g.strokeStyle = "rgba(122,162,255,.25)"; for (let i = 0; i < 9; i++) { g.beginPath(); g.moveTo(i * 32, 0); g.lineTo(i * 32, h); g.stroke(); g.beginPath(); g.moveTo(0, i * 32); g.lineTo(w, i * 32); g.stroke(); }
+        g.strokeStyle = ac; g.lineWidth = 4; g.beginPath(); for (let x = 0; x <= w; x++) { const y = h / 2 + Math.sin(x / 16) * 58 * Math.sin(x / 90 + 1); x ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
+      } else if (kind === "map") {
+        g.fillStyle = ac; for (let i = 0; i < 260; i++) { const x = Math.random() * w, y = Math.random() * h; if (Math.sin(x / 30) + Math.cos(y / 25) > .5) { g.globalAlpha = .8; g.fillRect(x, y, 4, 4); } }
+        g.globalAlpha = 1; g.fillStyle = "#F1D58A"; [[60, 80], [150, 120], [200, 60]].forEach(p => { g.beginPath(); g.arc(p[0], p[1], 6, 0, 7); g.fill(); });
+      } else if (kind === "cal") {
+        g.fillStyle = ac; g.fillRect(0, 0, w, 40);
+        for (let i = 0; i < 35; i++) { const x = 12 + (i % 7) * 34, y = 52 + Math.floor(i / 7) * 40; g.globalAlpha = i % 9 === 3 ? 1 : .35; g.fillStyle = i % 9 === 3 ? "#F1D58A" : "#e6edf7"; g.fillRect(x, y, 26, 30); }
+      } else if (kind === "doc") {
+        g.fillStyle = "#f4f6fb"; g.fillRect(22, 0, w - 44, h); g.fillStyle = "#0A2A6B";
+        for (let i = 0; i < 20; i++) { g.globalAlpha = i % 6 === 0 ? 1 : .55; g.fillRect(36, 10 + i * 12.5, i % 6 === 0 ? 90 : 120 + Math.random() * 60, i % 6 === 0 ? 7 : 4); }
+      } else if (kind === "rack") {
+        for (let i = 0; i < 16; i++) { const y = 8 + i * 15.5; g.globalAlpha = 1; g.fillStyle = "#121c36"; g.fillRect(10, y, w - 20, 12);
+          for (let k = 0; k < 6; k++) { g.fillStyle = Math.random() < .5 ? ac : "#22c55e"; g.globalAlpha = .5 + Math.random() * .5; g.fillRect(20 + k * 12, y + 4, 6, 4); } }
+      }
+      g.globalAlpha = 1;
+    });
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, .62); return t;
+  }
+  function monitor(p, x, z, w, h, kind, ac, ag, ry, y0) {
+    const g = grp(x, (y0 == null ? TOP : y0) + .14 + h / 2, z, ry || 0, p);
+    add(PANEL(w, h, .045, .035), "#0c1426", 0, 0, 0, g, {roughness: .3, metalness: .4});
+    const mat = new THREE.MeshBasicMaterial({map: screenTex(kind, ac), toneMapped: false}); mat.color.set("#56658a");
+    const s = new THREE.Mesh(G(`pl${w},${h}`, () => new THREE.PlaneGeometry(w - .055, h - .055)), mat); s.position.z = .025; g.add(s);
+    add(CY(.016, .016, .14, 10), "#c9d2e3", 0, -h / 2 - .06, -.012, g, CHROME);
+    add(CY(.08, .095, .02), "#c9d2e3", 0, -h / 2 - .13, -.012, g, CHROME);
+    if (ag) ag.scr.push(mat); else { mat.color.set("#ffffff"); ANI.push({o: mat.map, k: "scroll"}); }
+    return g;
+  }
+
+  /* ---------- perabot umum ---------- */
+  function plant(x, z, s) {
+    const g = grp(x, 0, z, 0); g.scale.setScalar(s || 1); CAST = true;
+    add(G("pot", () => new THREE.LatheGeometry([[0, 0], [.2, 0], [.26, .42], [.28, .46], [0, .46]].map(a => new THREE.Vector2(a[0], a[1])), 24)), "#EEF2F9", 0, 0, 0, g, {roughness: .4});
+    add(TO(.27, .025), "#D4AF5A", 0, .45, 0, g, GOLD).rotation.x = PI / 2;
+    [[0, .85, 0, .36], [.18, .72, .1, .26], [-.16, .74, -.08, .28], [.05, 1.12, -.05, .24], [-.08, .98, .14, .22]].forEach(a => add(SP(a[3], 14, 10), "#2fa35e", a[0], a[1], a[2], g, {roughness: .8}));
+    CAST = false;
+  }
+  function lamp(x, z) {
+    const g = grp(x, 0, z, 0); CAST = true;
+    add(CY(.2, .24, .05), "#D4AF5A", 0, .025, 0, g, GOLD); add(CY(.02, .02, 1.6, 10), "#D4AF5A", 0, .82, 0, g, GOLD);
+    add(G("shade", () => new THREE.CylinderGeometry(.18, .3, .36, 28, 1, true)), "#fff1cf", 0, 1.72, 0, g, {emissive: "#ffd27a", emissiveIntensity: .8, side: THREE.DoubleSide});
+    CAST = false;
+  }
+  function shelf(x, z, ry, w) {
+    const g = grp(x, 0, z, ry); CAST = true;
+    add(PANEL(w, 2.0, .38, .08), "#EEF2F9", 0, 1.0, -.02, g);
+    CAST = false;
+    const cols = ["#1D4ED8", "#D4AF5A", "#0A2A6B", "#ef4444", "#10b981", "#8b5cf6", "#f59e0b"];
+    [.45, 1.05, 1.62].forEach(y => { add(PANEL(w - .12, .04, .34, .02), "#d7deea", 0, y - .2, .02, g);
+      let xx = -w / 2 + .15; while (xx < w / 2 - .2) { const bw = .06 + Math.random() * .06, bh = .26 + Math.random() * .12;
+        add(PANEL(bw, bh, .24, .015), cols[(Math.random() * cols.length) | 0], xx + bw / 2, y - .18 + bh / 2, .05, g); xx += bw + .015; } });
+  }
+  function chair(x, z, ry, col) {
+    const g = grp(x, 0, z, ry); CAST = true;
+    add(CY(.27, .25, .08, 28), col || "#14244d", 0, .4, 0, g, {roughness: .6});
+    add(G("chb", () => new THREE.CylinderGeometry(.28, .28, .42, 28, 1, true, PI - PI * .38, PI * .76)), col || "#14244d", 0, .68, 0, g, {side: THREE.DoubleSide, roughness: .6});
+    CAST = false;
+    add(CY(.035, .035, .34, 10), "#9aa6bb", 0, .2, 0, g, CHROME);
+    for (let i = 0; i < 5; i++) { const a = i * PI * 2 / 5, h = grp(0, .05, 0, a, g); add(CAP(.022, .2), "#9aa6bb", 0, 0, .13, h, CHROME).rotation.x = PI / 2; add(SP(.035, 10, 8), "#1b2433", 0, -.015, .25, h); }
+    return g;
+  }
+  function wall(cx, cz, len, ry, glassOnly) {
+    const g = grp(cx, 0, cz, ry);
+    if (!glassOnly) { add(PANEL(len, .82, .3, .08), "#EEF2F9", 0, .41, 0, g, {roughness: .5}); add(PANEL(len, .5, .3, .08), "#EEF2F9", 0, WH - .25, 0, g, {roughness: .5}); }
+    else add(PANEL(len, .3, .16, .06), "#EEF2F9", 0, .15, 0, g, {roughness: .5});
+    const y0 = glassOnly ? .3 : .82, y1 = glassOnly ? WH : WH - .5, gh = y1 - y0;
+    const gl = new THREE.Mesh(new THREE.PlaneGeometry(len, gh), new THREE.MeshStandardMaterial({color: LIN("#a9d2ff"), transparent: true, opacity: glassOnly ? .08 : .13, roughness: .05, metalness: .2, side: THREE.DoubleSide, depthWrite: false}));
+    gl.position.set(0, y0 + gh / 2, 0); g.add(gl);
+    const n = Math.round(len / 2.4);
+    for (let i = 0; i <= n; i++) add(CY(.035, .035, gh, 10), "#D4AF5A", -len / 2 + .15 + i * (len - .3) / n, y0 + gh / 2, 0, g, GOLD);
+    add(CAP(.035, len), "#D4AF5A", 0, y0 + .01, .1, g, GOLD).rotation.z = PI / 2;
+    if (glassOnly) add(CAP(.035, len), "#D4AF5A", 0, WH - .02, 0, g, GOLD).rotation.z = PI / 2;
+  }
+  function glassSeg(x0, z0, x1, z1) {
+    const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz);
+    const g = grp((x0 + x1) / 2, 0, (z0 + z1) / 2, Math.atan2(-dz, dx));
+    const gl = new THREE.Mesh(new THREE.PlaneGeometry(len, 2.5), new THREE.MeshStandardMaterial({color: LIN("#bfe0ff"), transparent: true, opacity: .16, roughness: .05, metalness: .1, side: THREE.DoubleSide, depthWrite: false}));
+    gl.position.y = 1.3; g.add(gl);
+    add(CAP(.03, len), "#D4AF5A", 0, .05, 0, g, GOLD).rotation.z = PI / 2;
+    add(CAP(.03, len), "#D4AF5A", 0, 2.57, 0, g, GOLD).rotation.z = PI / 2;
+    [-len / 2, len / 2].forEach(x => add(CY(.045, .045, 2.56, 12), "#D4AF5A", x, 1.3, 0, g, GOLD));
+  }
+  function roundTable(x, z, r, h, ring) {
+    CAST = true; add(CY(r, r, .08, 56), "#F4F6FB", x, h, z, null, {roughness: .3}); add(CY(r * .26, r * .36, h - .04, 32), "#20335f", x, (h - .04) / 2, z); CAST = false;
+    if (ring) add(TO(r - .01, .035), ring, x, h, z, null, {emissive: ring, emissiveIntensity: 1.6}).rotation.x = PI / 2;
+  }
+
+  /* ---------- meja & peralatan per divisi ---------- */
+  function desk(ag, x, z, ry, boss) {
+    const g = grp(x, 0, z, ry), w = boss ? 2.2 : 1.7, d = boss ? 1.0 : .86;
+    CAST = true;
+    add(SLAB(w, d, .06, boss ? .4 : .18), boss ? "#FBF6E8" : "#F4F6FB", 0, TOP - .03, 0, g, {roughness: .32});
+    add(SLAB(w + .04, d + .04, .025, boss ? .42 : .2), "#C9A24A", 0, TOP - .07, 0, g, GOLD);
+    if (boss || ry) {
+      add(PANEL(w - .1, TOP - .1, .08, .1), "#0A2A6B", 0, (TOP - .1) / 2, -d / 2 + .08, g);
+      [-1, 1].forEach(s => add(PANEL(.08, TOP - .1, d - .2, .04), "#0A2A6B", s * (w / 2 - .1), (TOP - .1) / 2, 0, g));
+    } else {
+      [-1, 1].forEach(s => add(PANEL(.06, TOP - .09, d - .16, .03), "#20335f", s * (w / 2 - .09), (TOP - .09) / 2, 0, g));
+      add(PANEL(w - .3, .3, .035, .03), "#20335f", 0, TOP - .3, -d / 2 + .1, g);
+    }
+    CAST = false;
+    add(SLAB(.46, .15, .025, .04), "#1b2540", 0, TOP + .012, .2, g);
+    add(SP(.035, 12, 8), "#1b2540", .36, TOP + .015, .22, g).scale.set(1, .5, 1.4);
+    (EQ[ag.key] || EQ._)(g, ag);
+    return g;
+  }
+  const T = TOP;
+  const EQ = {
+    _: (g, a) => monitor(g, 0, -.22, .62, .38, "code", "#5ee6ff", a),
+    apex: (g, a) => {
+      monitor(g, -.42, -.24, .66, .4, "chart", "#F1D58A", a, .12); monitor(g, .42, -.24, .66, .4, "list", "#5ee6ff", a, -.12);
+      const tr = grp(-.9, T, .05, 0, g); CAST = true;
+      add(G("cup", () => new THREE.LatheGeometry([[0, 0], [.09, 0], [.09, .02], [.03, .05], [.025, .12], [.1, .2], [.12, .3], [.0, .3]].map(p => new THREE.Vector2(p[0], p[1])), 28)), "#D4AF5A", 0, 0, 0, tr, GOLD); CAST = false;
+      [-1, 1].forEach(s => add(TO(.05, .012, PI), "#D4AF5A", s * .12, .24, 0, tr, GOLD).rotation.z = s * PI / 2);
+      add(SP(.13), "#1D4ED8", .9, T + .26, -.1, g); add(TO(.16, .01), "#D4AF5A", .9, T + .26, -.1, g, GOLD).rotation.x = 1.1; add(CY(.012, .012, .12, 8), "#D4AF5A", .9, T + .08, -.1, g, GOLD); add(CY(.07, .08, .025), "#D4AF5A", .9, T + .012, -.1, g, GOLD);
+      const np = CT(512, 128, (c, w, h) => { c.fillStyle = "#0A2A6B"; roundRect(c, 0, 0, w, h, 30); c.fill(); c.fillStyle = "#F1D58A"; c.font = "800 64px system-ui,sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("THE BOSS", w / 2, h / 2 + 4); });
+      plane(np, .7, .17, 0, T - .2, -.475, PI, g);
+      add(CY(.05, .05, .1, 16), "#0A2A6B", .6, T + .05, .25, g); [0, 1, 2].forEach(i => add(CY(.006, .006, .14, 6), ["#D4AF5A", "#1D4ED8", "#ef4444"][i], .6 + (i - 1) * .015, T + .13, .25, g));
+    },
+    devmatrix: (g, a) => {
+      monitor(g, -.32, -.22, .56, .36, "code", "#5ee6ff", a, .16); monitor(g, .32, -.22, .56, .36, "code", "#7CFFB2", a, -.16);
+      const b = grp(.62, T + .012, .06, -.2, g);
+      add(SLAB(.3, .14, .015, .02), "#141b2b", 0, 0, 0, b); add(SLAB(.12, .1, .02, .012), "#cfd6e3", -.06, .015, 0, b, CHROME);
+      for (let i = 0; i < 9; i++) { add(SP(.009, 6, 4), "#D4AF5A", -.12 + i * .03, .012, .055, b, GOLD); add(SP(.009, 6, 4), "#D4AF5A", -.12 + i * .03, .012, -.055, b, GOLD); }
+      add(SP(.012, 8, 6), "#38bdf8", .1, .016, 0, b, {emissive: "#38bdf8", emissiveIntensity: 2});
+      add(SLAB(.32, .12, .03, .015), "#f4f6fb", .58, T + .015, .28, g);
+      [["#ef4444", .02], ["#facc15", .05], ["#38bdf8", .08]].forEach(c => add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(.6 + c[1] - .05, T + .03, .1), new THREE.Vector3(.62 + c[1], T + .14, .18), new THREE.Vector3(.5 + c[1], T + .035, .27)]), 14, .008, 6), c[0], 0, 0, 0, g));
+      const m = grp(-.66, T, .12, 0, g); add(CY(.055, .05, .12, 20), "#1D4ED8", 0, .06, 0, m); add(TO(.035, .012), "#1D4ED8", .065, .065, 0, m).rotation.y = PI / 2;
+    },
+    nexus: (g, a) => {
+      monitor(g, -.25, -.22, .6, .38, "list", "#facc15", a);
+      const k = grp(.55, T + .02, -.25, -.35, g); add(CY(.012, .012, .5, 8), "#D4AF5A", 0, .25, -.05, k, GOLD);
+      add(PANEL(.56, .42, .03, .05), "#ffffff", 0, .42, 0, k);
+      ["#fde047", "#fb923c", "#86efac", "#93c5fd", "#f9a8d4", "#fde047"].forEach((c, i) => add(PANEL(.11, .11, .01, .015), c, -.18 + (i % 3) * .18, .5 - Math.floor(i / 3) * .15, .02, k));
+      [["#f59e0b", -.05], ["#1D4ED8", .1], ["#10b981", .25]].forEach(c => add(G("bin", () => new THREE.LatheGeometry([[0, 0], [.07, 0], [.085, .1], [.08, .1], [.065, .01], [0, .01]].map(p => new THREE.Vector2(p[0], p[1])), 20)), c[0], -.68, T, c[1], g, {side: THREE.DoubleSide}));
+      add(SLAB(.2, .28, .012, .03), "#92400e", .42, T + .008, .22, g); add(SLAB(.17, .22, .006, .01), "#ffffff", .42, T + .016, .23, g);
+    },
+    aegis: (g, a) => {
+      monitor(g, -.15, -.22, .62, .38, "list", "#ef4444", a);
+      const s = new THREE.Shape(); s.moveTo(0, .22); s.quadraticCurveTo(.12, .2, .17, .14); s.lineTo(.17, .02); s.quadraticCurveTo(.16, -.14, 0, -.24); s.quadraticCurveTo(-.16, -.14, -.17, .02); s.lineTo(-.17, .14); s.quadraticCurveTo(-.12, .2, 0, .22);
+      const sh = add(G("shield", () => { const q = new THREE.ExtrudeGeometry(s, {depth: .03, bevelEnabled: true, bevelSize: .02, bevelThickness: .02, bevelSegments: 4}); q.center(); return q; }), "#D4AF5A", .62, T + .28, -.18, g, GOLD);
+      sh.rotation.y = -.35; add(CY(.012, .012, .1, 8), "#D4AF5A", .62, T + .05, -.18, g, GOLD); add(CY(.06, .07, .02), "#0A2A6B", .62, T + .01, -.18, g);
+      add(CY(.07, .08, .05), "#1b2433", -.66, T + .025, -.2, g);
+      const bc = add(G("dome", () => new THREE.SphereGeometry(.07, 20, 10, 0, PI * 2, 0, PI / 2)), "#ef4444", -.66, T + .05, -.2, g, {emissive: "#ef4444", emissiveIntensity: 1.5, transparent: true, opacity: .9});
+      ANI.push({o: bc.material, k: "pulse"});
+      const mg = grp(.45, T + .015, .22, .6, g); add(TO(.06, .012), "#cbd5e1", 0, 0, 0, mg, CHROME).rotation.x = PI / 2; add(CAP(.015, .12), "#1b2433", .14, 0, 0, mg).rotation.z = PI / 2;
+    },
+    sentinel: (g, a) => {
+      monitor(g, -.5, -.16, .44, .32, "chart", "#a78bfa", a, .5); monitor(g, 0, -.26, .44, .32, "list", "#a78bfa", a); monitor(g, .5, -.16, .44, .32, "map", "#a78bfa", a, -.5);
+      const r = grp(.66, T, .22, 0, g); add(CY(.05, .06, .03), "#1b2433", 0, .015, 0, r); add(CY(.01, .01, .14, 8), "#cbd5e1", 0, .1, 0, r, CHROME);
+      const sp = grp(0, .18, 0, 0, r); sp.userData.dyn = true; const dish = add(G("dish", () => new THREE.SphereGeometry(.09, 20, 8, 0, PI * 2, 0, PI * .35)), "#e5e7eb", 0, 0, 0, sp, {side: THREE.DoubleSide, ...CHROME}); dish.rotation.x = -1.1; add(SP(.012, 8, 6), "#ef4444", 0, .04, .05, sp, {emissive: "#ef4444", emissiveIntensity: 2});
+      ANI.push({o: sp, k: "spin", s: 1.4});
+    },
+    pulse: (g, a) => {
+      monitor(g, .32, -.22, .5, .32, "wave", "#34d399", a, -.12);
+      const o = grp(-.42, T, -.12, .15, g); CAST = true; add(PANEL(.42, .28, .26, .06), "#1b2433", 0, .14, 0, o, {roughness: .4}); CAST = false;
+      const sc2 = plane(screenTex("wave", "#34d399"), .24, .16, -.05, .15, .132, 0, o); ANI.push({o: sc2.material.map, k: "scroll"});
+      [[.13, .19], [.13, .1], [.17, .145]].forEach(p => add(SP(.018, 10, 8), "#cbd5e1", p[0], p[1], .13, o, CHROME));
+      const mm = grp(.62, T + .02, .16, -.3, g); add(PANEL(.12, .2, .04, .03), "#facc15", 0, 0, 0, mm).rotation.x = -PI / 2 + .2; add(PANEL(.08, .05, .01, .01), "#0b1222", 0, .022, -.04, mm).rotation.x = -PI / 2;
+      add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(.6, T + .03, .1), new THREE.Vector3(.45, T + .05, .05), new THREE.Vector3(.3, T + .02, .22)]), 12, .007, 6), "#ef4444", 0, 0, 0, g);
+      add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(.64, T + .03, .1), new THREE.Vector3(.7, T + .05, -.02), new THREE.Vector3(.52, T + .02, -.06)]), 12, .007, 6), "#111827", 0, 0, 0, g);
+      add(TO(.09, .035), "#f97316", -.66, T + .035, .22, g).rotation.x = PI / 2; add(CY(.035, .035, .07, 16), "#1b2433", -.66, T + .035, .22, g);
+      add(CY(.06, .07, .04), "#1b2433", .15, T + .02, .3, g); add(CAP(.015, .18), "#38bdf8", .2, T + .07, .3, g).rotation.z = 1.1; add(CN(.01, .05, 8), "#cbd5e1", .29, T + .03, .3, g, CHROME).rotation.z = 2.0;
+    },
+    ledger: (g, a) => {
+      monitor(g, .22, -.22, .56, .34, "chart", "#D4AF5A", a, -.1);
+      const c = grp(-.55, T + .015, .14, .2, g); add(SLAB(.17, .24, .03, .025), "#1b2433", 0, 0, 0, c); add(SLAB(.13, .05, .006, .01), "#a7f3d0", 0, .018, -.075, c, {emissive: "#34d399", emissiveIntensity: .35});
+      for (let i = 0; i < 12; i++) add(SP(.012, 8, 6), i % 4 === 3 ? "#D4AF5A" : "#e5e7eb", -.05 + (i % 4) * .033, .018, -.025 + Math.floor(i / 4) * .045, c);
+      [3, 6, 4].forEach((n, j) => { for (let k = 0; k < n; k++) add(CY(.045, .045, .014, 24), "#D4AF5A", .62 + (j - 1) * .1, T + .008 + k * .015, .2 - j * .02, g, {metalness: .95, roughness: .25}); });
+      const pg = grp(-.66, T, -.2, .5, g); CAST = true; add(SP(.12), "#f9a8d4", 0, .13, 0, pg, {roughness: .4}).scale.set(1.2, 1, 1); CAST = false;
+      add(CY(.04, .045, .04, 16), "#f472b6", .15, .13, 0, pg).rotation.z = PI / 2; [-.05, .05].forEach(z => add(CN(.03, .05, 10), "#f472b6", .07, .24, z, pg));
+      [[-.06, -.06], [-.06, .06], [.07, -.06], [.07, .06]].forEach(l => add(CY(.022, .022, .06, 10), "#f472b6", l[0], .03, l[1], pg)); add(PANEL(.05, .008, .015, .004), "#1b2433", 0, .25, 0, pg);
+      add(SLAB(.26, .2, .04, .03), "#166534", .1, T + .02, .25, g);
+    },
+    scribe: (g, a) => {
+      monitor(g, 0, -.22, .48, .38, "doc", "#0A2A6B", a);
+      for (let i = 0; i < 8; i++) add(SLAB(.22, .3, .006, .012), "#ffffff", -.6 + Math.sin(i) * .01, T + .004 + i * .007, .08, g);
+      const l = grp(.66, T, -.24, -.6, g); add(CY(.06, .07, .02), "#D4AF5A", 0, .01, 0, l, GOLD);
+      add(CAP(.012, .3), "#D4AF5A", 0, .17, .04, l, GOLD).rotation.x = .3; add(CAP(.012, .22), "#D4AF5A", 0, .34, .14, l, GOLD).rotation.x = 1.4;
+      add(CN(.08, .11, 20), "#F1D58A", 0, .3, .25, l, {emissive: "#ffd27a", emissiveIntensity: .9}).rotation.x = PI * .9;
+      add(CY(.035, .04, .05, 16), "#0b1222", .45, T + .025, .2, g); const q = add(SP(.05, 12, 8), "#ffffff", .47, T + .12, .17, g); q.scale.set(.25, 1.6, .8); q.rotation.z = -.4;
+      ["#7c3aed", "#dc2626", "#1D4ED8"].forEach((c, i) => add(SLAB(.18, .25, .04, .02), c, -.62, T + .02 + i * .042, -.24, g).rotation.y = i * .2);
+    },
+    atlas: (g, a) => {
+      monitor(g, -.2, -.22, .56, .34, "map", "#38bdf8", a);
+      const gb = grp(.6, T, -.15, 0, g); add(CY(.07, .08, .025), "#D4AF5A", 0, .012, 0, gb, GOLD); add(CY(.012, .012, .1, 8), "#D4AF5A", 0, .07, 0, gb, GOLD);
+      const ball = grp(0, .26, 0, 0, gb); ball.userData.dyn = true; add(SP(.15), "#1D4ED8", 0, 0, 0, ball, {roughness: .35}); [[.08, .06, .1], [-.09, -.02, .1], [.02, -.1, -.1], [-.05, .09, -.11]].forEach(p => add(SP(.06, 10, 8), "#22c55e", p[0], p[1], p[2], ball).scale.set(1, .7, .5));
+      add(TO(.17, .008), "#D4AF5A", 0, .26, 0, gb, GOLD).rotation.x = 1.15; ANI.push({o: ball, k: "spin", s: .5});
+      [.14, .24, .18, .3].forEach((h, i) => { const c = add(CY(.03, .03, h, 16), ["#38bdf8", "#22c55e", "#facc15", "#a78bfa"][i], -.66 + i * .07, T + h / 2, .15, g); c.userData.dyn = true; ANI.push({o: c, k: "bar", i}); });
+      const tp = grp(1.08, 0, -.2, 0, g); [0, 1, 2].forEach(i => { const l = grp(0, .5, 0, i * PI * 2 / 3, tp); add(CAP(.015, 1.0), "#D4AF5A", 0, -.02, .16, l, GOLD).rotation.x = .33; });
+      const tube = add(CAP(.06, .8), "#0A2A6B", 0, .62, 0, tp, {roughness: .3, metalness: .4}); tube.rotation.set(-1.0, 0, .2); add(TO(.065, .015), "#D4AF5A", .06, .95, -.3, tp, GOLD).rotation.set(-1.0 + PI / 2, 0, .2);
+    },
+    herald: (g, a) => {
+      monitor(g, -.2, -.22, .52, .34, "cal", "#a3e635", a);
+      const mp = grp(.6, T + .09, .1, -.5, g); add(CN(.09, .26, 20), "#facc15", 0, 0, .1, mp).rotation.x = -PI / 2; add(CAP(.03, .1), "#1b2433", 0, 0, -.06, mp).rotation.x = PI / 2; add(CAP(.015, .06), "#1b2433", 0, -.05, -.02, mp);
+      const cal = CT(128, 160, (c, w, h) => { c.fillStyle = "#fff"; c.fillRect(0, 0, w, h); c.fillStyle = "#ef4444"; c.fillRect(0, 0, w, 40); c.fillStyle = "#fff"; c.font = "700 24px system-ui"; c.textAlign = "center"; c.fillText("OKT", w / 2, 29); c.fillStyle = "#0A2A6B"; c.font = "800 70px system-ui"; c.fillText("28", w / 2, 120); });
+      const cg = grp(.62, T + .12, -.26, -.4, g); add(PANEL(.2, .25, .02, .03), "#ffffff", 0, 0, 0, cg); plane(cal, .18, .22, 0, 0, .012, 0, cg); add(CY(.006, .006, .3, 6), "#94a3b8", 0, -.04, -.08, cg).rotation.x = .5;
+      add(G("bell", () => new THREE.LatheGeometry([[0, .16], [.03, .155], [.05, .12], [.07, .04], [.1, 0]].map(p => new THREE.Vector2(p[0], p[1])), 24)), "#D4AF5A", -.62, T, .16, g, {side: THREE.DoubleSide, ...GOLD}); add(SP(.022, 10, 8), "#D4AF5A", -.62, T + .17, .16, g, GOLD);
+      const mic = grp(-.62, T, -.22, 0, g); add(CY(.06, .07, .02), "#1b2433", 0, .01, 0, mic); add(CY(.01, .01, .24, 8), "#cbd5e1", 0, .13, 0, mic, CHROME); add(SP(.045, 14, 10), "#334155", 0, .27, .02, mic, {roughness: .9});
+    },
+  };
+
+  /* ---------- robot ---------- */
+  const BADGE = {apex: "#D4AF5A", devmatrix: "#3b82f6", nexus: "#f59e0b", aegis: "#ef4444", sentinel: "#8b5cf6", pulse: "#10b981", ledger: "#14b8a6", scribe: "#ec4899", atlas: "#0ea5e9", herald: "#a3e635"};
+  function mkBot(key, boss) {
+    const O = "#EA8A3C", CR = "#FFE4C7", N = "#0b1d4a";
+    const g = new THREE.Group(), body = grp(0, 0, 0, 0, g); CAST = true;
+    add(SP(.34, 26, 18), O, 0, .62, 0, body, {roughness: .45}).scale.set(1, 1.05, .92);
+    add(SP(.2, 20, 14), CR, 0, .57, .24, body, {roughness: .6}).scale.set(1, 1, .4);
+    const bc = BADGE[key] || "#38bdf8";
+    add(SP(.055, 14, 10), bc, .15, .76, .27, body, {emissive: bc, emissiveIntensity: 1.2}).scale.z = .4;
+    add(SP(.3, 26, 18), O, 0, 1.08, 0, body, {roughness: .45}).scale.set(1.12, .95, 1);
+    CAST = false;
+    add(SP(.24, 24, 16), N, 0, 1.07, .19, body, {roughness: .12, metalness: .3}).scale.set(1.15, .76, .55);
+    const eyes = [-1, 1].map(s => add(CAP(.034, .045), "#7ff3ff", s * .095, 1.09, .325, body, {emissive: "#5ee6ff", emissiveIntensity: 2.2}));
+    [-1, 1].forEach(s => add(SP(.035, 10, 8), "#ff9a8a", s * .2, .99, .26, body, {transparent: true, opacity: .8}));
+    [-1, 1].forEach(s => add(CY(.07, .07, .05, 20), "#D4AF5A", s * .335, 1.08, 0, body, GOLD).rotation.z = PI / 2);
+    const H = (geo, c, x, y, z, o) => add(geo, c, x, y, z, body, o), Y = 1.33;
+    if (!boss && key !== "herald") { H(CY(.013, .013, .13, 8), "#D4AF5A", 0, 1.42, 0, GOLD); H(SP(.04, 12, 10), "#F1D58A", 0, 1.5, 0, {emissive: "#D4AF5A", emissiveIntensity: 1}); }
+    CAST = true;
+    const lim = (x, y, r, L, c, hand) => { const p = grp(x, y, 0, 0, body); add(CAP(r, L), c, 0, -(L / 2 + r * .6), 0, p, {roughness: .45}); if (hand) add(SP(.075, 14, 10), CR, 0, -(L + r * 1.4), 0, p); return p; };
+    const aL = lim(-.38, .8, .065, .2, O, 1), aR = lim(.38, .8, .065, .2, O, 1);
+    const lL = lim(-.14, .32, .075, .12, O), lR = lim(.14, .32, .075, .12, O);
+    [lL, lR].forEach(l => add(SP(.095, 14, 10), N, 0, -.28, .04, l).scale.set(1, .55, 1.35));
+    CAST = false;
+    if (boss) { H(CY(.19, .21, .1, 28), "#D4AF5A", 0, Y + .03, 0, GOLD); for (let i = 0; i < 5; i++) { const a = i * PI * 2 / 5; H(CN(.05, .15, 14), "#D4AF5A", Math.sin(a) * .17, Y + .15, Math.cos(a) * .17, GOLD); H(SP(.025, 10, 8), "#ef4444", Math.sin(a) * .17, Y + .24, Math.cos(a) * .17, {emissive: "#ef4444", emissiveIntensity: .8}); } }
+    else if (key === "devmatrix" || key === "sentinel") { H(TO(.36, .03, PI), "#1b2433", 0, 1.08, 0).rotation.set(0, PI / 2, 0); [-1, 1].forEach(s => H(SP(.1, 14, 10), BADGE[key], s * .37, 1.08, 0).scale.set(.6, 1, 1)); if (key === "sentinel") { H(CAP(.012, .22), "#1b2433", .3, .96, .18).rotation.set(.2, 0, 1.2); H(SP(.025, 10, 8), "#1b2433", .2, .92, .3); } }
+    else if (key === "nexus" || key === "aegis" || key === "atlas") { const c = key === "nexus" ? "#facc15" : key === "aegis" ? "#ef4444" : "#d6b98c"; H(G("hat", () => new THREE.SphereGeometry(.33, 24, 12, 0, PI * 2, 0, PI / 2)), c, 0, 1.16, 0, {roughness: .4}); H(CY(.42, .42, .025, 32), c, 0, 1.17, key === "atlas" ? 0 : .07, {roughness: .4}); if (key === "aegis") H(TO(.31, .015, PI), "#ffffff", 0, 1.17, 0).rotation.set(0, PI / 2, 0); }
+    else if (key === "pulse") { [-1, 1].forEach(s => H(TO(.07, .02), "#10b981", s * .1, 1.1, .34)); H(TO(.34, .015), "#10b981", 0, 1.1, 0).rotation.x = PI / 2; }
+    else if (key === "ledger") { H(CY(.32, .32, .02, 32), "#16a34a", 0, 1.24, .1, {transparent: true, opacity: .85}).rotation.x = .3; H(TO(.31, .02), "#16a34a", 0, 1.26, 0).rotation.x = PI / 2; }
+    else if (key === "scribe") { const b = H(SP(.3, 22, 14), "#ec4899", -.05, 1.3, 0, {roughness: .8}); b.scale.set(1.05, .38, 1.05); b.rotation.z = .15; H(SP(.03, 8, 6), "#ec4899", -.05, 1.42, 0); }
+    else if (key === "herald") { [-1, 1].forEach(s => { H(CAP(.01, .2), "#1b2433", s * .14, 1.42, 0).rotation.z = -s * .4; H(SP(.045, 10, 8), "#a3e635", s * .2, 1.53, 0, {emissive: "#a3e635", emissiveIntensity: 1.2}); }); H(SP(.05, 10, 8), "#ef4444", 0, .9, .3).scale.set(1.6, .6, .5); }
+    const cup = grp(0, -.36, .05, 0, aR); add(CY(.05, .045, .1, 18), "#ffffff", 0, 0, 0, cup); add(TO(.032, .01), "#ffffff", .055, 0, 0, cup); add(TO(.05, .006), "#D4AF5A", 0, .05, 0, cup, GOLD).rotation.x = PI / 2;
+    const donut = add(TO(.055, .028), "#f472b6", 0, -.36, .06, aR); donut.rotation.x = PI / 2;
+    const paper = grp(0, .82, .44, 0, body); add(PANEL(.62, .44, .01, .02), "#f8fafc", 0, 0, 0, paper);
+    const pt = CT(256, 192, (c, w, h) => { c.fillStyle = "#f8fafc"; c.fillRect(0, 0, w, h); c.fillStyle = "#0A2A6B"; c.font = "800 34px serif"; c.fillText("KORAN MCI", 20, 40); c.fillStyle = "#94a3b8"; for (let i = 0; i < 9; i++) c.fillRect(20, 56 + i * 14, i % 3 ? 210 : 110, 6); });
+    const pm = new THREE.Mesh(new THREE.PlaneGeometry(.58, .4), new THREE.MeshBasicMaterial({map: pt})); pm.position.z = -.008; pm.rotation.y = PI; paper.add(pm); paper.rotation.x = -.25;
+    const paddle = grp(0, -.38, .06, 0, aR); add(CY(.09, .09, .015, 24), "#ef4444", 0, .02, .09, paddle).rotation.x = PI / 2; add(CAP(.015, .08), "#92400e", 0, 0, 0, paddle);
+    const club = grp(0, -.36, .04, 0, aR); add(CY(.01, .01, .7, 8), "#cbd5e1", 0, -.33, 0, club, CHROME); add(CAP(.03, .08), "#1b2433", 0, -.68, .04, club).rotation.x = PI / 2;
+    [cup, donut, paper, paddle, club].forEach(o => o.visible = false);
+    const disk = grp(0, 0, 0, 0, g); add(CY(.55, .55, .05, 32), "#D4AF5A", 0, .02, 0, disk, GOLD); add(TO(.56, .03), "#5ee6ff", 0, .04, 0, disk, {emissive: "#5ee6ff", emissiveIntensity: 1.6}).rotation.x = PI / 2; disk.visible = false;
+    if (boss) g.scale.setScalar(1.15);
+    return {g, body, aL, aR, lL, lR, eyes, disk, props: {cup, donut, paper, paddle, club}};
+  }
+
+  /* ---------- graf jalur 3D ---------- */
+  const N = (id, f, x, z) => { NODES[id] = [x, FY[f], z]; EDGES[id] = EDGES[id] || []; return id; };
+  const L = (a, b) => { if (!EDGES[a] || !EDGES[b]) { console.warn("node hilang", a, b); return; } EDGES[a].push(b); EDGES[b].push(a); };
+  const S = (id, f, x, z, face, node, seat) => { if (!EDGES[node]) console.warn("spot tanpa node", id, node); SPOTS[id] = {id, f, x, y: FY[f], z, face, node, seat: seat || 0}; };
+  function grid(f, spineZ, rows, lanes, extra) {
+    const xs = [...new Set([...lanes, ...(extra || [])])].sort((a, b) => a - b);
+    xs.forEach((x, k) => { N(`f${f}_sp${x}`, f, x, spineZ); if (k) L(`f${f}_sp${xs[k - 1]}`, `f${f}_sp${x}`); });
+    rows.forEach((r, ri) => {
+      const pts = [...lanes.map(x => ({x, id: `f${f}_r${ri}l${x}`})), ...r.xs.map(x => ({x, id: `f${f}_r${ri}a${x}`}))].sort((a, b) => a.x - b.x);
+      pts.forEach((p, k) => { N(p.id, f, p.x, r.z); if (k) L(pts[k - 1].id, p.id); });
+      lanes.forEach(x => L(`f${f}_r${ri}l${x}`, ri ? `f${f}_r${ri - 1}l${x}` : `f${f}_sp${x}`));
+    });
+  }
+  function lift(f, link) { N(`f${f}_lift`, f, LIFT[0], LIFT[1]); N(`f${f}_door`, f, LIFT[0], -3.7); L(`f${f}_lift`, `f${f}_door`); L(`f${f}_door`, link); for (let j = 0; j < f; j++) L(`f${j}_lift`, `f${f}_lift`); }
+  function ring(f, pre, cx, cz, r, n, a0, door, doorLinks) {
+    for (let k = 0; k < n; k++) { const th = a0 + k * PI * 2 / n; N(`${pre}r${k}`, f, cx + Math.cos(th) * r, cz + Math.sin(th) * r); }
+    for (let k = 0; k < n; k++) L(`${pre}r${k}`, `${pre}r${(k + 1) % n}`);
+    doorLinks.forEach(k => L(door, `${pre}r${k}`));
+  }
+  function route(from, to) {
+    const dist = {}, prev = {}, Q = new Set(Object.keys(NODES));
+    Q.forEach(k => dist[k] = Infinity); dist[from] = 0;
+    while (Q.size) {
+      let u = null; Q.forEach(k => { if (u === null || dist[k] < dist[u]) u = k; });
+      Q.delete(u); if (u === to || dist[u] === Infinity) break;
+      EDGES[u].forEach(v => { const A = NODES[u], B = NODES[v]; const d = dist[u] + Math.hypot(A[0] - B[0], A[2] - B[2]) + Math.abs(A[1] - B[1]) * .5; if (d < dist[v]) { dist[v] = d; prev[v] = u; } });
+    }
+    const out = []; let c = to; while (c && c !== from) { out.unshift(NODES[c]); c = prev[c]; }
+    return out;
+  }
+  function nearest(x, y, z) { let b = null, bd = Infinity; for (const k in NODES) { if (k.startsWith("s_") || k.startsWith("sa_")) continue; const n = NODES[k]; const d = Math.hypot(n[0] - x, n[2] - z) + Math.abs(n[1] - y) * 3; if (d < bd) { bd = d; b = k; } } return b; }
+  const SLOTS = [[], [], [], []];
+
+  /* ---------- lingkungan & gedung ---------- */
+  function world() {
+    sc.background = LIN("#0a1638");
+    sc.fog = new THREE.Fog(LIN("#0a1638"), 70, 160);
+    sc.add(new THREE.HemisphereLight(LIN("#c7d8ff"), LIN("#1a2a55"), .85));
+    const d = new THREE.DirectionalLight(LIN("#fff4e2"), .95);
+    d.position.set(12, 36, 20); d.castShadow = true; d.shadow.mapSize.set(2048, 2048);
+    Object.assign(d.shadow.camera, {left: -22, right: 22, top: 22, bottom: -22, near: 2, far: 110});
+    d.shadow.bias = -.0006; d.shadow.normalBias = .02; sc.add(d);
+    FY.forEach(y => { const l = new THREE.PointLight(LIN("#ffe2b0"), .7, 22, 1.6); l.position.set(-1, y + 3.4, 0); sc.add(l); });
+    const sky = CT(2048, 512, (g, W, H) => {
+      const q = g.createLinearGradient(0, 0, 0, H); q.addColorStop(0, "#050c26"); q.addColorStop(.6, "#13285e"); q.addColorStop(1, "#2a4a95");
+      g.fillStyle = q; g.fillRect(0, 0, W, H);
+      for (let i = 0; i < 260; i++) { g.fillStyle = "rgba(255,255,255," + (.3 + Math.random() * .6) + ")"; g.fillRect(Math.random() * W, Math.random() * H * .45, 2, 2); }
+      g.fillStyle = "#fff6d8"; g.beginPath(); g.arc(W * .78, H * .18, 26, 0, 7); g.fill();
+      [["#0f2152", 90, 300], ["#0b1a44", 60, 400]].forEach(([col, mn, mx]) => {
+        let x = 0; while (x < W) { const bw = 40 + Math.random() * 90, bh = mn + Math.random() * (mx - mn);
+          g.fillStyle = col; g.fillRect(x, H - bh, bw, bh);
+          for (let yy = H - bh + 10; yy < H - 6; yy += 14) for (let xx = x + 6; xx < x + bw - 8; xx += 12)
+            if (Math.random() < .38) { g.fillStyle = Math.random() < .25 ? "#ffd27a" : "#9fd0ff"; g.globalAlpha = .5 + Math.random() * .5; g.fillRect(xx, yy, 5, 7); g.globalAlpha = 1; }
+          x += bw + 4; } });
+    });
+    [[0, 14, -40, 0, 150], [-46, 14, 0, PI / 2, 120]].forEach(a => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(a[4], 48), new THREE.MeshBasicMaterial({map: sky, fog: false, toneMapped: false}));
+      m.position.set(a[0], a[1], a[2]); m.rotation.y = a[3]; sc.add(m);
+    });
+    BASE = new THREE.Group(); sc.add(BASE); CUR = BASE;
+    add(CY(34, 34, .2, 64), "#0d1c45", 0, -.5, 0, null, {roughness: .9});
+    add(TO(20, .06), "#D4AF5A", 0, -.39, 0, null, GOLD).rotation.x = PI / 2;
+    [[8.0, 7], [8.7, 8.4]].forEach((s, i) => add(SLAB(s[1], .8, .18, .2), "#EEF2F9", 0, -.24 - i * .1, s[0]));
+    [[-15.5, 6], [15.5, 6], [-15.5, -4], [15.5, -4], [-17, 1], [17, 1]].forEach(p => { const g = grp(p[0], -.4, p[1], 0); CAST = true; add(CY(.16, .22, 1.4, 12), "#6b4423", 0, .7, 0, g); add(SP(1.0, 18, 14), "#1f8f52", 0, 1.9, 0, g, {roughness: .8}); add(SP(.7, 16, 12), "#27a35f", .3, 2.6, .1, g, {roughness: .8}); CAST = false; });
+  }
+  const floorMat = {};
+  function floorBase(f, col) {
+    if (!floorMat[col]) {
+      const ft = CT(512, 512, (g, w, h) => { g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); g.strokeStyle = "rgba(0,0,0,.16)"; g.lineWidth = 3;
+        for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(i * w / 4, 0); g.lineTo(i * w / 4, h); g.stroke(); g.beginPath(); g.moveTo(0, i * h / 4); g.lineTo(w, i * h / 4); g.stroke(); } });
+      ft.wrapS = ft.wrapT = THREE.RepeatWrapping; ft.repeat.set(.25, .25);
+      floorMat[col] = new THREE.MeshStandardMaterial({color: LIN(col), map: ft, roughness: .3, metalness: .2});
+    }
+    add(SLAB(24.4, 14.4, .35, .5), floorMat[col], 0, -.175, 0);
+    add(CAP(.05, 24.2), "#D4AF5A", 0, -.17, 7.22, null, GOLD).rotation.z = PI / 2;
+    add(CAP(.025, 24.0), "#5ee6ff", 0, .02, 7.24, null, {emissive: "#5ee6ff", emissiveIntensity: 1.4}).rotation.z = PI / 2;
+    add(CAP(.05, 14.2), "#D4AF5A", 12.22, -.17, 0, null, GOLD).rotation.x = PI / 2;
+    wall(0, -7.05, 24.4, 0); wall(-12.05, 0, 14.4, PI / 2); wall(12.12, 0, 14.4, -PI / 2, true);
+    const tube = new THREE.Mesh(G("tube", () => new THREE.CylinderGeometry(.85, .85, FH, 40, 1, true, .55, PI * 2 - 1.1)), new THREE.MeshStandardMaterial({color: LIN("#bfe0ff"), transparent: true, opacity: .2, roughness: .05, metalness: .2, side: THREE.DoubleSide, depthWrite: false}));
+    tube.position.set(LIFT[0], FH / 2 - .3, LIFT[1]); CUR.add(tube);
+    [.02, WH - .05].forEach(y => add(TO(.87, .04), "#D4AF5A", LIFT[0], y, LIFT[1], null, GOLD).rotation.x = PI / 2);
+    add(CY(.8, .8, .03, 40), "#0A2A6B", LIFT[0], .012, LIFT[1]);
+    [-1, 1].forEach(s => add(CY(.05, .05, WH, 12), "#D4AF5A", LIFT[0] + Math.sin(.55 * s) * .87, WH / 2, LIFT[1] + Math.cos(.55 * s) * .87, null, GOLD));
+    label("LIFT · LT " + (f + 1), LIFT[0], 3.45, LIFT[1] + 1.3, .42);
+    FLAB.push(label(`LT ${f + 1} · ${(LANTAI[f + 1] || "").toUpperCase()}`, -7.2, 3.5, 6.6, .85, "#F1D58A", true));
+  }
+  function roof() {
+    ROOF = new THREE.Group(); ROOF.position.y = FY[3] + FH; sc.add(ROOF); CUR = ROOF;
+    add(SLAB(24.4, 14.4, .35, .5), new THREE.MeshStandardMaterial({color: LIN("#14295e"), roughness: .6}), 0, -.175, 0);
+    add(CAP(.05, 24.2), "#D4AF5A", 0, -.17, 7.22, null, GOLD).rotation.z = PI / 2;
+    [[0, -7.0, 24.2, 0], [-12.0, 0, 14.2, PI / 2], [12.0, 0, 14.2, PI / 2]].forEach(w => { const g = grp(w[0], 0, w[1], w[3]); add(PANEL(w[2], .55, .22, .1), "#EEF2F9", 0, .27, 0, g); add(CAP(.03, w[2]), "#F1D58A", 0, .57, 0, g, {emissive: "#D4AF5A", emissiveIntensity: 1}).rotation.z = PI / 2; });
+    add(CY(3, 3, .05, 56), "#0A2A6B", -4, .03, 0);
+    add(TO(2.9, .06), "#D4AF5A", -4, .07, 0, null, GOLD).rotation.x = PI / 2;
+    const hp = CT(512, 512, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = "#F1D58A"; g.font = "800 300px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("H", w / 2, h / 2 + 20); });
+    plane(hp, 3.6, 3.6, -4, .08, 0).rotation.x = -PI / 2;
+    const sg = CT(1024, 256, (g, w, h) => { g.fillStyle = "#0A2A6B"; roundRect(g, 0, 0, w, h, 60); g.fill(); g.strokeStyle = "#D4AF5A"; g.lineWidth = 12; roundRect(g, 10, 10, w - 20, h - 20, 52); g.stroke();
+      g.fillStyle = "#F1D58A"; g.font = "800 140px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("MCI  HQ", w / 2, h / 2 + 8); });
+    const sgn = grp(4.5, 0, 4.0, 0); [-3.2, 3.2].forEach(x => add(CY(.07, .07, 1.4, 12), "#D4AF5A", x, .7, 0, sgn, GOLD)); plane(sg, 8, 2, 0, 2.3, 0, 0, sgn);
+    const ant = grp(8.5, 0, -4.5, 0); add(CY(.08, .14, 4, 12), "#cbd5e1", 0, 2, 0, ant, CHROME); [1, 2, 3].forEach(y => add(TO(.25 - y * .05, .02), "#cbd5e1", 0, y, 0, ant, CHROME).rotation.x = PI / 2);
+    const bl = add(SP(.14), "#ef4444", 0, 4.1, 0, ant, {emissive: "#ef4444", emissiveIntensity: 2}); ANI.push({o: bl.material, k: "pulse"});
+    [[2, -4.5], [5, -4.5]].forEach(p => { add(SLAB(2.4, 1.4, .08, .12), "#1e3a8a", p[0], .9, p[1], null, {roughness: .2, metalness: .5}).rotation.x = -.5; add(CY(.04, .04, .8, 8), "#cbd5e1", p[0], .45, p[1] + .2, null, CHROME); });
+    plant(-10.8, 6, 1.2); plant(10.8, 6, 1.2); plant(-10.8, -6, 1); plant(10.8, 2, 1);
+  }
+
+  /* ---------- LANTAI 1: Lobby & Santai ---------- */
+  function lt1() {
+    const f = 0; floorBase(f, "#1b3a80");
+    [-6.6, -3.0, 0.4, 1.6, 4.8, 8.0].forEach((x, k, a) => { N(`f0_sp${x}`, f, x, -1.3); if (k) L(`f0_sp${a[k - 1]}`, `f0_sp${x}`); });
+    [1.6, 4.8, 8.0].forEach(x => { N(`f0_a${x}`, f, x, 1.4); L(`f0_a${x}`, `f0_sp${x}`); SLOTS[0].push({f, x, z: 3.0, ry: PI, link: `f0_a${x}`}); });
+    lift(f, "f0_sp8");
+    label("RESEPSIONIS", 4.8, 2.9, 3.3, .6);
+    const lg = CT(512, 512, (g, w, h) => { g.clearRect(0, 0, w, h); g.strokeStyle = "#D4AF5A"; g.lineWidth = 16; g.beginPath(); g.arc(w / 2, h / 2, 230, 0, 7); g.stroke(); g.lineWidth = 4; g.beginPath(); g.arc(w / 2, h / 2, 200, 0, 7); g.stroke();
+      g.fillStyle = "#F1D58A"; g.font = "800 150px 'Plus Jakarta Sans',system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("MCI", w / 2, h / 2 + 8); });
+    plane(lg, 2.6, 2.6, 4.8, .02, 5.6).rotation.x = -PI / 2;
+    /* PANTRY */
+    label("PANTRY", 4.0, 3.55, -5.2, .7);
+    CAST = true; add(SLAB(8.0, .82, .86, .12), "#EEF2F9", 4.0, .43, -6.45, null, {roughness: .45}); add(SLAB(8.1, .9, .06, .14), "#1f3f8a", 4.0, .9, -6.43, null, {roughness: .25, metalness: .3}); CAST = false;
+    for (let i = 0; i < 7; i++) add(CAP(.018, .22), "#D4AF5A", .35 + i * 1.2, .62, -6.02, null, GOLD).rotation.z = PI / 2;
+    const cm = grp(.7, .93, -6.55, 0); CAST = true; add(PANEL(.55, .62, .45, .12), "#1e293b", 0, .31, 0, cm, {roughness: .3, metalness: .4}); CAST = false;
+    add(PANEL(.4, .12, .05, .04), "#0b1222", 0, .48, .23, cm); add(SP(.03), "#ef4444", .14, .48, .26, cm, {emissive: "#ef4444", emissiveIntensity: 2});
+    add(CY(.06, .05, .1), "#ffffff", 0, .08, .16, cm); add(CY(.05, .05, .08, 16), "#C9A24A", 0, .22, .16, cm, GOLD); add(CY(.18, .14, .14), "#ef4444", -.12, .69, 0, cm, {roughness: .4});
+    add(SP(.15), "#cbd5e1", 1.8, 1.08, -6.5, null, CHROME).scale.set(1, 1.1, 1); add(TO(.08, .02), "#1e293b", 1.95, 1.15, -6.5);
+    add(PANEL(.42, .26, .28, .1), "#ef4444", 2.8, 1.06, -6.55, null, {roughness: .35});
+    add(G("bowl", () => new THREE.SphereGeometry(.24, 24, 12, 0, PI * 2, PI / 2, PI / 2)), "#EEF2F9", 3.8, 1.16, -6.5, null, {side: THREE.DoubleSide});
+    [[0, 0], [.1, .05], [-.09, .06], [.02, -.1]].forEach(o => add(SP(.08), "#fb923c", 3.8 + o[0], 1.06, -6.5 + o[1]));
+    add(G("sink", () => new THREE.CylinderGeometry(.3, .22, .02, 32)), "#94a3b8", 5.2, .935, -6.45, null, CHROME);
+    add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(5.2, .93, -6.75), new THREE.Vector3(5.2, 1.32, -6.75), new THREE.Vector3(5.2, 1.32, -6.55)]), 16, .025, 8), "#cbd5e1", 0, 0, 0, null, CHROME);
+    CAST = true; add(PANEL(1.0, 2.1, .85, .18), "#EEF2F9", 8.9, 1.05, -6.45, null, {roughness: .35}); CAST = false;
+    add(CAP(.025, .7), "#D4AF5A", 8.55, 1.35, -6.01, null, GOLD); add(PANEL(.9, .02, .02, .01), "#cbd5e1", 8.9, 1.62, -6.02);
+    const gl = grp(-.8, 0, -6.4, 0); CAST = true; add(PANEL(.45, 1.0, .45, .12), "#EEF2F9", 0, .5, 0, gl); CAST = false;
+    add(CY(.17, .17, .42, 24), "#7cc4ff", 0, 1.22, 0, gl, {transparent: true, opacity: .55, roughness: .05}); add(SP(.17), "#7cc4ff", 0, 1.43, 0, gl, {transparent: true, opacity: .55, roughness: .05});
+    const menu = CT(512, 256, (g, w, h) => { g.fillStyle = "#0A2A6B"; roundRect(g, 0, 0, w, h, 30); g.fill(); g.strokeStyle = "#D4AF5A"; g.lineWidth = 8; roundRect(g, 6, 6, w - 12, h - 12, 26); g.stroke();
+      g.fillStyle = "#F1D58A"; g.font = "800 46px system-ui,sans-serif"; g.fillText("MENU", 28, 64); g.font = "600 32px system-ui,sans-serif"; g.fillStyle = "#e6edf7";
+      ["Kopi susu", "Teh manis", "Donat", "Roti bakar"].forEach((t, i) => g.fillText("• " + t, 32, 110 + i * 36)); });
+    plane(menu, 1.5, .75, 3.0, 2.1, -6.88);
+    roundTable(4.0, -3.9, .7, .95);
+    [[3.05, -3.9], [4.95, -3.9], [4.0, -2.95]].forEach(p => { CAST = true; add(CY(.22, .2, .07, 28), "#1D4ED8", p[0], .64, p[1]); CAST = false; add(CY(.03, .03, .6, 10), "#D4AF5A", p[0], .32, p[1], null, GOLD); add(TO(.14, .015), "#D4AF5A", p[0], .25, p[1], null, GOLD).rotation.x = PI / 2; add(CY(.18, .2, .03, 24), "#D4AF5A", p[0], .015, p[1], null, GOLD); });
+    N("f0_p0", f, 1.8, -3.0); L("f0_p0", "f0_sp1.6"); N("f0_p1", f, 6.4, -3.0); L("f0_p1", "f0_sp4.8"); L("f0_p1", "f0_sp8");
+    S("f0_pk1", f, .7, -5.45, PI, "f0_p0"); S("f0_pk2", f, 1.8, -5.45, PI, "f0_p0"); S("f0_pt", f, 2.8, -5.45, PI, "f0_p0"); S("f0_pw", f, 5.2, -5.45, PI, "f0_p1"); S("f0_pf", f, 8.9, -5.3, PI, "f0_p1");
+    S("f0_ps1", f, 3.05, -3.9, PI / 2, "f0_p0", .68); S("f0_ps2", f, 4.95, -3.9, -PI / 2, "f0_p1", .68); S("f0_ps3", f, 4.0, -2.95, PI, "f0_p1", .68);
+    /* LOUNGE */
+    const lx = -8.2, lz = 3.0;
+    label("LOUNGE", lx, 3.0, lz, .7);
+    add(CY(2.6, 2.6, .02, 56), "#2a4a91", lx, .012, lz, null, {roughness: .95}); add(TO(2.58, .03), "#D4AF5A", lx, .025, lz, null, GOLD).rotation.x = PI / 2;
+    const t0 = 170 * PI / 180, t1 = 290 * PI / 180;
+    CAST = true; add(ARC(1.25, 2.05, t0, t1, .42), "#2b56c4", lx, 0, lz, null, {roughness: .75}); add(ARC(1.9, 2.28, t0, t1, .95), "#2449a8", lx, 0, lz, null, {roughness: .75}); CAST = false;
+    [t0, t1].forEach(t => add(SP(.3), "#2449a8", lx + Math.cos(t) * 1.7, .5, lz + Math.sin(t) * 1.7).scale.set(1, .9, 1));
+    CAST = true; add(CY(.6, .6, .06, 40), "#F4F6FB", lx, .46, lz, null, {roughness: .3}); CAST = false;
+    add(CY(.05, .05, .44, 10), "#D4AF5A", lx, .22, lz, null, GOLD); add(CY(.3, .3, .03, 28), "#D4AF5A", lx, .015, lz, null, GOLD);
+    add(PANEL(.36, .26, .02, .02), "#ffffff", lx + .15, .5, lz - .1).rotation.x = -PI / 2; add(CY(.06, .05, .1, 16), "#ffffff", lx - .2, .54, lz + .15);
+    [[-6.0, 5.9, "#D4AF5A"], [-7.4, 6.4, "#1D4ED8"]].forEach(b => { CAST = true; add(SP(.5, 24, 16), b[2], b[0], .3, b[1], null, {roughness: .85}).scale.set(1, .6, 1); CAST = false; });
+    shelf(-11.75, 5.6, PI / 2, 2.2); lamp(-11.3, .6); plant(-11.2, -6.2, 1);
+    N("f0_lg", f, -5.4, 1.6); L("f0_lg", "f0_sp-6.6"); L("f0_lg", "f0_sp-3");
+    [195, 232, 268].forEach((deg, i) => { const t = deg * PI / 180, x = lx + Math.cos(t) * 1.62, z = lz + Math.sin(t) * 1.62; N("f0_la" + i, f, lx + Math.cos(t) * .95, lz + Math.sin(t) * .95); L("f0_la" + i, "f0_lg"); S("f0_l" + i, f, x, z, Math.atan2(lx - x, lz - z), "f0_la" + i, .44); });
+    N("f0_lg2", f, -5.0, 4.6); L("f0_lg2", "f0_lg");
+    S("f0_bb1", f, -6.0, 5.9, Math.atan2(lx + 6.0, lz - 5.9), "f0_lg2", .3); S("f0_bb2", f, -7.4, 6.4, Math.atan2(lx + 7.4, lz - 6.4), "f0_lg2", .3);
+    N("f0_lw", f, -10.0, -2.6); L("f0_lw", "f0_sp-6.6"); S("f0_w1", f, -11.3, -2.0, -PI / 2, "f0_lw"); S("f0_w2", f, -11.3, -3.2, -PI / 2, "f0_lw");
+    /* GAME CORNER */
+    label("GAME CORNER", -1.4, 2.7, 4.6, .6);
+    CAST = true; add(SLAB(2.3, 1.3, .05, .1), "#1D4ED8", -1.4, .76, 4.6, null, {roughness: .4}); CAST = false;
+    add(SLAB(2.2, .02, .006, .005), "#ffffff", -1.4, .79, 4.6); add(SLAB(.02, 1.2, .006, .005), "#ffffff", -1.4, .79, 4.6);
+    add(PANEL(.03, .16, 1.32, .01), "#ffffff", -1.4, .86, 4.6, null, {transparent: true, opacity: .8});
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(s => add(CY(.035, .035, .74, 10), "#D4AF5A", -1.4 + s[0] * .95, .37, 4.6 + s[1] * .5, null, GOLD));
+    BALL = add(SP(.035, 12, 8), "#ffffff", -1.4, .9, 4.6, null, {emissive: "#ffffff", emissiveIntensity: .4}); BALL.userData.dyn = true;
+    N("f0_pa", f, -3.6, 2.6); L("f0_pa", "f0_sp-3"); N("f0_pb", f, 0.0, 1.6); L("f0_pb", "f0_sp0.4");
+    S("f0_ppA", f, -3.1, 4.6, PI / 2, "f0_pa"); S("f0_ppB", f, .3, 4.6, -PI / 2, "f0_pb");
+    const ar = grp(-3.4, 0, -6.35, 0); CAST = true; add(PANEL(.9, 1.7, .7, .18), "#0A2A6B", 0, .85, 0, ar, {roughness: .35}); CAST = false;
+    const as = plane(screenTex("map", "#f472b6"), .62, .5, 0, 1.25, .36, 0, ar); ANI.push({o: as.material.map, k: "scroll"});
+    add(SLAB(.8, .3, .06, .08), "#D4AF5A", 0, .92, .38, ar, GOLD); add(SP(.04), "#ef4444", -.15, .97, .42, ar, {emissive: "#ef4444", emissiveIntensity: 1}); add(SP(.04), "#38bdf8", .05, .97, .42, ar, {emissive: "#38bdf8", emissiveIntensity: 1});
+    add(CY(.012, .012, .1, 8), "#1b2433", .2, 1.0, .4, ar);
+    label("ARCADE", -3.4, 2.3, -5.9, .45);
+    S("f0_arc", f, -3.4, -5.2, PI, "f0_sp-3");
+    plant(11.2, 6.4, 1.1); plant(-11.2, 6.6, 1);
+  }
+
+  /* ---------- LANTAI 2: Divisi Teknik ---------- */
+  function lt2() {
+    const f = 1; floorBase(f, "#173273");
+    grid(f, -1.4, [{z: 2.9, xs: [-5.6, -1.6, 2.4, 6.4]}], [-7.6, -3.6, .4, 4.4, 8.0], [-9.4]);
+    [-5.6, -1.6, 2.4, 6.4].forEach(x => SLOTS[1].push({f, x, z: 1.4, ry: 0, link: `f1_r0a${x}`}));
+    lift(f, "f1_sp8");
+    label("LAB ELEKTRONIK", -6.0, 3.55, -5.4, .7);
+    CAST = true; add(SLAB(9.2, 1.0, .9, .14), "#EEF2F9", -6.0, .45, -6.35, null, {roughness: .45}); add(SLAB(9.3, 1.08, .06, .16), "#20335f", -6.0, .93, -6.33, null, {roughness: .3, metalness: .3}); CAST = false;
+    const os = grp(-9.6, .96, -6.4, 0); CAST = true; add(PANEL(.7, .45, .4, .08), "#1b2433", 0, .22, 0, os); CAST = false;
+    const oss = plane(screenTex("wave", "#34d399"), .42, .28, -.1, .25, .205, 0, os); ANI.push({o: oss.material.map, k: "scroll"});
+    const sd = grp(-7.8, .96, -6.3, 0); add(PANEL(.4, .16, .3, .06), "#1e293b", 0, .08, 0, sd); add(SP(.03), "#ef4444", .12, .12, .16, sd, {emissive: "#ef4444", emissiveIntensity: 1.5}); add(TO(.06, .012), "#cbd5e1", -.1, .22, 0, sd, CHROME); add(CAP(.02, .3), "#38bdf8", .1, .22, .05, sd).rotation.z = 1.2;
+    const pr = grp(-5.6, .96, -6.4, 0); CAST = true; add(PANEL(.8, .8, .7, .12), "#EEF2F9", 0, .4, 0, pr, {roughness: .35}); CAST = false; add(PANEL(.6, .5, .02, .06), "#0b1222", 0, .45, .35, pr, {transparent: true, opacity: .5}); add(SP(.08), "#f97316", 0, .3, 0, pr, {emissive: "#f97316", emissiveIntensity: .6}); add(CN(.05, .1, 12), "#D4AF5A", 0, .62, 0, pr, GOLD).rotation.x = PI;
+    [-3.9, -3.3].forEach(x => { add(SLAB(.5, .18, .04, .02), "#f4f6fb", x, .98, -6.2); for (let i = 0; i < 6; i++) add(SP(.02, 8, 6), ["#ef4444", "#facc15", "#38bdf8"][i % 3], x - .2 + i * .08, 1.02, -6.2, null, {emissive: "#ffffff", emissiveIntensity: .2}); });
+    const arm = grp(-2.1, .96, -6.4, 0); add(CY(.14, .16, .1, 24), "#D4AF5A", 0, .05, 0, arm, GOLD);
+    const j1 = grp(0, .1, 0, 0, arm); j1.userData.dyn = true; add(CAP(.06, .4), "#EA8A3C", 0, .26, 0, j1); const j2 = grp(0, .5, 0, 0, j1); add(SP(.08), "#D4AF5A", 0, 0, 0, j2, GOLD); add(CAP(.05, .32), "#EA8A3C", 0, .2, 0, j2); add(TO(.05, .015, PI), "#1b2433", 0, .42, 0, j2);
+    j2.rotation.z = .9; ANI.push({o: j1, k: "arm", j2});
+    [[3.4, "#5ee6ff"], [4.8, "#a78bfa"]].forEach(r => { const g = grp(r[0], 0, -6.45, 0); CAST = true; add(PANEL(1.1, 2.3, .8, .16), "#1b2433", 0, 1.15, 0, g, {roughness: .3, metalness: .4}); CAST = false; const rs = plane(screenTex("rack", r[1]), .86, 2.0, 0, 1.15, .405, 0, g); ANI.push({o: rs.material.map, k: "scroll"}); });
+    label("SERVER", 4.1, 3.1, -5.8, .45);
+    const wb = CT(512, 320, (g, w, h) => { g.fillStyle = "#ffffff"; g.fillRect(0, 0, w, h); g.strokeStyle = "#1D4ED8"; g.lineWidth = 5; g.strokeRect(60, 60, 140, 90); g.beginPath(); g.moveTo(200, 105); g.lineTo(330, 105); g.lineTo(330, 220); g.lineTo(130, 220); g.lineTo(130, 150); g.stroke();
+      g.strokeStyle = "#ef4444"; for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(330 + i * 14, 100); g.lineTo(337 + i * 14, i % 2 ? 90 : 110); g.stroke(); } g.fillStyle = "#0A2A6B"; g.font = "700 30px system-ui"; g.fillText("ESP32", 80, 112); g.fillText("V = I × R", 300, 280); });
+    const wbg = grp(-11.85, 1.9, 2.0, PI / 2); add(PANEL(3.0, 1.8, .06, .08), "#EEF2F9", 0, 0, 0, wbg); plane(wb, 2.8, 1.6, 0, 0, .035, 0, wbg);
+    N("f1_lw", f, -10.2, -2.8); L("f1_lw", "f1_sp-9.4"); S("f1_w1", f, -11.3, -2.2, -PI / 2, "f1_lw"); S("f1_w2", f, -11.3, -3.4, -PI / 2, "f1_lw");
+    S("f1_lb0", f, -9.0, -5.1, PI, "f1_sp-9.4"); S("f1_lb1", f, -6.0, -5.1, PI, "f1_sp-7.6"); S("f1_lb2", f, -3.0, -5.1, PI, "f1_sp-3.6");
+    plant(-11.2, 6.4, 1); plant(9.0, 6.4, 1.1); plant(-0.6, -6.4, .9);
+  }
+
+  /* ---------- LANTAI 3: Operasional & Keuangan ---------- */
+  function lt3() {
+    const f = 2; floorBase(f, "#173273");
+    grid(f, -.3, [{z: 2.1, xs: [-2.0, 2.2, 6.4]}, {z: 5.5, xs: [-2.0, 2.2, 6.4]}], [-4.4, .1, 4.3, 8.3], [-8.25]);
+    [[-2.0, .6, 0], [2.2, .6, 0], [-2.0, 4.0, 1], [2.2, 4.0, 1], [6.4, .6, 0], [6.4, 4.0, 1]].forEach(s => SLOTS[2].push({f, x: s[0], z: s[1], ry: 0, link: `f2_r${s[2]}a${s[0]}`}));
+    lift(f, "f2_sp8.3");
+    glassSeg(-5.2, -6.9, -5.2, -.9); glassSeg(-11.9, -.9, -8.9, -.9); glassSeg(-7.6, -.9, -5.2, -.9);
+    label("MEETING", -8.55, 3.55, -3.9, .7);
+    const mx = -8.55, mz = -3.9;
+    roundTable(mx, mz, 1.2, .74, "#5ee6ff"); add(CY(.5, .5, .01, 40), "#0A2A6B", mx, .785, mz);
+    for (let k = 0; k < 6; k++) { const th = k * PI / 3, x = mx + Math.cos(th) * 1.75, z = mz + Math.sin(th) * 1.75; chair(x, z, Math.atan2(mx - x, mz - z)); }
+    const sg = grp(mx, 1.9, -6.85, 0); add(PANEL(2.6, 1.5, .06, .08), "#0c1426", 0, 0, 0, sg); const ms = plane(screenTex("chart", "#5ee6ff"), 2.4, 1.3, 0, 0, .035, 0, sg); ANI.push({o: ms.material.map, k: "scroll"});
+    N("f2_min", f, -8.25, -1.4); L("f2_min", "f2_sp-8.25");
+    ring(f, "f2_m", mx, mz, 2.4, 6, 0, "f2_min", [1, 2]);
+    for (let k = 0; k < 6; k++) { const th = k * PI / 3, x = mx + Math.cos(th) * 1.75, z = mz + Math.sin(th) * 1.75; S("f2_m" + k, f, x, z, Math.atan2(mx - x, mz - z), `f2_mr${k}`, .44); }
+    const kb = CT(512, 288, (g, w, h) => { g.fillStyle = "#ffffff"; g.fillRect(0, 0, w, h); ["TODO", "PROSES", "SELESAI"].forEach((t, i) => { g.fillStyle = "#0A2A6B"; g.font = "800 26px system-ui"; g.fillText(t, 20 + i * 170, 36);
+      for (let k = 0; k < 3 + (i === 1 ? 1 : 0); k++) { g.fillStyle = ["#fde047", "#93c5fd", "#86efac", "#f9a8d4"][(i + k) % 4]; g.fillRect(20 + i * 170, 52 + k * 56, 140, 46); } }); });
+    const kg = grp(-1.4, 2.0, -6.86, 0); add(PANEL(2.8, 1.6, .05, .08), "#EEF2F9", 0, 0, 0, kg); plane(kb, 2.6, 1.46, 0, 0, .03, 0, kg);
+    const fn = grp(3.4, 2.0, -6.85, 0); add(PANEL(2.4, 1.4, .06, .08), "#0c1426", 0, 0, 0, fn); const fs = plane(screenTex("chart", "#D4AF5A"), 2.2, 1.2, 0, 0, .035, 0, fn); ANI.push({o: fs.material.map, k: "scroll"});
+    const sf = grp(6.6, 0, -6.3, 0); CAST = true; add(PANEL(1.0, 1.2, .8, .2), "#C9A24A", 0, .6, 0, sf, GOLD); CAST = false; add(TO(.16, .03), "#0A2A6B", 0, .7, .41, sf); add(CAP(.02, .2), "#0A2A6B", 0, .7, .42, sf).rotation.z = PI / 4; label("BRANKAS", 6.6, 1.7, -6.0, .35);
+    N("f2_lw", f, -2.4, -4.6); L("f2_lw", "f2_sp-4.4"); S("f2_w1", f, -2.0, -6.0, PI, "f2_lw"); S("f2_w2", f, -.8, -6.0, PI, "f2_lw");
+    plant(-4.6, -6.4, .9); plant(9.2, 6.4, 1.1); plant(-11.2, 6.4, 1); lamp(-11.3, 3.0);
+  }
+
+  /* ---------- LANTAI 4: Eksekutif ---------- */
+  function lt4() {
+    const f = 3; floorBase(f, "#13285e");
+    [-9.0, -6.25, -1.0, 1.5, 3.25, 8.3].forEach((x, k, a) => { N(`f3_sp${x}`, f, x, 2.6); if (k) L(`f3_sp${a[k - 1]}`, `f3_sp${x}`); });
+    N("f3_ln", f, 10.4, 1.0); L("f3_ln", "f3_sp8.3"); lift(f, "f3_ln");
+    glassSeg(-1.0, -6.9, -1.0, 1.4); glassSeg(-11.9, 1.4, -6.9, 1.4); glassSeg(-5.6, 1.4, -1.0, 1.4);
+    label("RUANG DEWAN", -6.45, 3.55, -2.8, .75);
+    const cx = -6.45, cz = -2.8;
+    add(CY(3.3, 3.3, .02, 64), "#2a2f6b", cx, .012, cz, null, {roughness: .9}); add(TO(3.28, .035), "#D4AF5A", cx, .025, cz, null, GOLD).rotation.x = PI / 2;
+    roundTable(cx, cz, 1.7, .74, "#a78bfa");
+    for (let k = 0; k < 10; k++) { const th = PI * 1.5 + k * PI / 5, x = cx + Math.cos(th) * 2.45, z = cz + Math.sin(th) * 2.45; chair(x, z, Math.atan2(cx - x, cz - z), k ? "#14244d" : "#0A2A6B"); }
+    const holo = grp(cx, 1.65, cz, 0); holo.userData.dyn = true;
+    add(SP(.32, 24, 16), "#a78bfa", 0, 0, 0, holo, {emissive: "#a78bfa", emissiveIntensity: 1.2, transparent: true, opacity: .55});
+    add(TO(.55, .02), "#5ee6ff", 0, 0, 0, holo, {emissive: "#5ee6ff", emissiveIntensity: 1.6}).rotation.x = PI / 2;
+    add(TO(.7, .015), "#F1D58A", 0, 0, 0, holo, {emissive: "#D4AF5A", emissiveIntensity: 1.4}).rotation.x = 1.1;
+    add(CN(.4, .9, 32), "#a78bfa", 0, -.55, 0, holo, {emissive: "#a78bfa", emissiveIntensity: .6, transparent: true, opacity: .15}).rotation.x = PI;
+    ANI.push({o: holo, k: "spin", s: .7});
+    N("f3_cin", f, -6.25, .9); L("f3_cin", "f3_sp-6.25");
+    ring(f, "f3_c", cx, cz, 3.1, 10, PI * 1.5, "f3_cin", [4, 5, 6]);
+    for (let k = 0; k < 10; k++) { const th = PI * 1.5 + k * PI / 5, x = cx + Math.cos(th) * 2.45, z = cz + Math.sin(th) * 2.45; S("f3_cs" + k, f, x, z, Math.atan2(cx - x, cz - z), `f3_cr${k}`, .44); }
+    glassSeg(.6, -6.9, .6, -.4); glassSeg(.6, -.4, 2.6, -.4); glassSeg(3.9, -.4, 9.3, -.4); glassSeg(9.3, -6.9, 9.3, -.4);
+    label("RUANG CEO", 5.0, 3.55, -3.6, .75);
+    add(CY(2.2, 2.2, .02, 56), "#2a4a91", 5.2, .012, -3.6, null, {roughness: .95}); add(TO(2.18, .03), "#D4AF5A", 5.2, .025, -3.6, null, GOLD).rotation.x = PI / 2;
+    SLOTS[3].push({f, x: 5.2, z: -3.2, ry: PI, boss: true});
+    shelf(5.2, -6.65, 0, 3.0);
+    add(SLAB(2.2, .55, .02, .26), "#2fa35e", 1.95, .02, -2.6, null, {roughness: .9}); add(CY(.06, .06, .025, 20), "#0b1530", 2.85, .03, -2.6); add(CY(.01, .01, .5, 8), "#e5e7eb", 2.85, .27, -2.6, null, CHROME); add(SP(.08), "#ef4444", 2.9, .48, -2.6).scale.set(1, .6, .2);
+    plant(8.7, -6.2, 1); plant(1.2, -6.2, .9);
+    N("f3_co", f, 3.25, 1.0); L("f3_co", "f3_sp3.25"); N("f3_ci", f, 3.25, -1.0); L("f3_ci", "f3_co");
+    N("f3_c1", f, 7.4, -1.4); L("f3_c1", "f3_ci"); N("f3_ca", f, 7.1, -4.4); L("f3_ca", "f3_c1");
+    S("f3_g1", f, 1.0, -2.6, PI / 2, "f3_ci"); S("f3_wc", f, 7.8, -6.1, PI, "f3_ca");
+    const bar = grp(-9.2, 0, 5.8, 0); CAST = true; add(SLAB(3.2, .7, 1.0, .3), "#0A2A6B", 0, .5, 0, bar); CAST = false; add(SLAB(3.3, .8, .06, .32), "#D4AF5A", 0, 1.02, 0, bar, GOLD);
+    [-1, 0, 1].forEach(i => add(CY(.06, .05, .2, 16), ["#ef4444", "#22c55e", "#f59e0b"][i + 1], i * .4, 1.15, .1, bar, {transparent: true, opacity: .8}));
+    label("MINI BAR", -9.2, 2.4, 5.8, .45);
+    S("f3_bar", f, -9.2, 4.85, 0, "f3_sp-9");
+    const sofa = grp(3.0, 0, 5.6, 0); CAST = true; add(SLAB(3.2, .9, .42, .3), "#2b56c4", 0, .21, 0, sofa); add(PANEL(3.2, .7, .3, .14), "#2449a8", 0, .55, .45, sofa); CAST = false;
+    add(CY(.5, .5, .05, 32), "#F4F6FB", 3.0, .42, 4.3); add(CY(.04, .04, .4, 8), "#D4AF5A", 3.0, .2, 4.3, null, GOLD);
+    plant(11.2, 6.4, 1.1); plant(-0.2, 6.4, 1); lamp(6.4, 6.3);
+    SLOTS[3].push({f, x: -3.6, z: 5.0, ry: PI, link: "f3_sp-1"});
+  }
+
+  /* ---------- kegiatan istirahat ---------- */
+  const ACT = {
+    kopi: {t: "Ngopi dulu", spots: ["f0_pk1", "f0_pk2", "f3_bar"], anim: "sip", prop: "cup", w: 5},
+    makan: {t: "Ngemil donat", spots: ["f0_ps1", "f0_ps2", "f0_ps3", "f0_pt"], anim: "eat", prop: "donut", w: 3},
+    kulkas: {t: "Cari camilan di kulkas", spots: ["f0_pf"], anim: "reach", w: 1.2},
+    cuci: {t: "Cuci gelas", spots: ["f0_pw"], anim: "wash", w: 1},
+    koran: {t: "Baca koran di lounge", spots: ["f0_l0", "f0_l1", "f0_l2"], anim: "read", prop: "paper", w: 3},
+    rebahan: {t: "Rebahan di beanbag", spots: ["f0_bb1", "f0_bb2"], anim: "lounge", w: 2},
+    pingpong: {t: "Main ping pong", spots: ["f0_ppA", "f0_ppB"], anim: "pong", prop: "paddle", w: 2},
+    arcade: {t: "Main arcade", spots: ["f0_arc"], anim: "arcade", w: 1.5},
+    jendela: {t: "Melamun lihat kota", own: 1, anim: "stare", w: 2},
+    rapat: {t: "Rapat dadakan", spots: ["f2_m0", "f2_m1", "f2_m2", "f2_m3", "f2_m4", "f2_m5"], anim: "talk", w: 2},
+    ngoprek: {t: "Ngoprek di lab", spots: ["f1_lb0", "f1_lb1", "f1_lb2"], anim: "tinker", w: 1.5},
+    muter: {t: "Muter-muter di kursi", desk: 1, anim: "spin", w: 2},
+    tidur: {t: "Tidur sebentar", desk: 1, anim: "doze", w: 1.4},
+    sibuk: {t: "Pura-pura sibuk", desk: 1, anim: "type", w: 1},
+    golf: {t: "Latihan golf", spots: ["f3_g1"], anim: "golf", prop: "club", w: 4, boss: 1},
+    visi: {t: "Merenungkan visi perusahaan", spots: ["f3_wc"], anim: "stare", w: 3, boss: 1},
+  };
+  const PREF = {apex: {golf: 1, visi: 1, kopi: 1, rapat: 1.5, tidur: .3, sibuk: .5}, devmatrix: {kopi: 3, ngoprek: 2}, nexus: {makan: 2, rapat: 2}, aegis: {koran: 3}, sentinel: {jendela: 3, arcade: 2},
+    pulse: {pingpong: 2, ngoprek: 3}, ledger: {makan: 2, rebahan: 1.5}, scribe: {koran: 2}, atlas: {jendela: 2, pingpong: 1.5}, herald: {rapat: 2, arcade: 1.5}};
+  const actSpots = (a, v) => v.own ? [`f${a.home}_w1`, `f${a.home}_w2`].filter(s => SPOTS[s]) : (v.spots || []);
+
+  /* ---------- agen ---------- */
+  let cIdx = 1;
+  function build(d) {
+    const boss = !!d.boss || d.key === "apex";
+    let f = Math.max(0, Math.min(3, (d.lantai || 1) - 1));
+    let slot = boss ? SLOTS[3].find(s => s.boss && !s.used) : null;
+    if (!slot) slot = SLOTS[f].find(s => !s.boss && !s.used);
+    for (let k = 0; k < 4 && !slot; k++) slot = SLOTS[k].find(s => !s.boss && !s.used);
+    if (!slot) return null;
+    slot.used = true; f = slot.f; CUR = FG[f];
+    const face = slot.ry ? 0 : PI, seat = [slot.x, slot.z + (slot.ry ? -.62 : .62)];
+    const a = {key: d.key, name: d.name, boss, home: f, floor: f, seat, face, scr: [], path: [], ph: "idle", t: 2 + Math.random() * 6, job: null, act: null, spot: null, where: "desk",
+      lift: .1, liftT: .1, seated: true, baseY: FY[f], anim: "sit", p: {aL: 0, aR: 0, lL: 0, lR: 0, lean: 0}, phase: Math.random() * 6, blink: 2 + Math.random() * 3, atDesk: true, rot: face, rotT: face};
+    a.deskG = desk(a, slot.x, slot.z, slot.ry, boss);
+    a.chair = chair(seat[0], seat[1], face, boss ? "#0A2A6B" : "#14244d");
+    a.node = N("s_" + d.key, f, seat[0], seat[1]);
+    if (boss) L(a.node, "f3_ca"); else if (slot.ry) { const ai = N("sa_" + d.key, f, slot.x, slot.z - 1.6); L(a.node, ai); L(ai, slot.link); } else L(a.node, slot.link);
+    a.cseat = boss ? "f3_cs0" : "f3_cs" + Math.min(9, cIdx++);
+    Object.assign(a, mkBot(d.key, boss)); a.g.position.set(seat[0], FY[f], seat[1]); a.g.rotation.y = face; sc.add(a.g);
+    CUR = sc; const z = label("Zzz", 0, 0, 0, .3, "#bfe0ff"); z.visible = false; a.zzz = z;
+    const el = document.createElement("button"); el.className = "chip" + (boss ? " boss" : ""); el.type = "button";
+    el.innerHTML = `<i></i><b>${esc(d.name.replace("MCI.", ""))}</b><span></span>`; el.onclick = () => setFollow(a);
+    chipsEl.appendChild(el); a.el = el; a.dot = el.querySelector("i"); a.txt = el.querySelector("span");
+    return a;
+  }
+
+  /* ---------- mesin status ---------- */
+  function status(a) {
+    if (a.where === "dewan" && a.job) return {c: "#a78bfa", t: a.ph === "urgent" ? "Menuju ruang dewan" : "Sidang dewan"};
+    if (a.ph === "work") return {c: "#ef4444", t: a.job || "Bekerja"};
+    if (a.ph === "think" || a.ph === "urgent") return {c: "#f59e0b", t: a.ph === "urgent" ? "Bergegas ke meja" : "Berpikir…"};
+    if (a.ph === "done") return {c: "#22c55e", t: "Selesai"};
+    if (a.act) return {c: "#38bdf8", t: ACT[a.act].t};
+    if (a.ph === "back") return {c: "#38bdf8", t: "Kembali ke meja"};
+    return {c: "#22c55e", t: "Siaga"};
+  }
+  const floorOf = y => Math.max(0, Math.min(3, Math.round(y / FH)));
+  function walkTo(a, pts, cb) { a.atDesk = false; a.seated = false; a.liftT = 0; a.anim = "walk"; a.path = pts.map(p => [p[0], p[1], p[2]]); a.cb = cb; a.t = Infinity; if (!a.path.length) { a.cb = null; cb && cb(); } }
+  function sitDesk(a) { a.atDesk = true; a.seated = true; a.liftT = .1; a.rotT = a.face; a.anim = "sit"; a.g.position.x = a.seat[0]; a.g.position.z = a.seat[1]; a.baseY = FY[a.home]; }
+  function release(a) { if (a.spot) { delete BUSY[a.spot]; a.spot = null; } a.act = null; showProp(a, null); }
+  function showProp(a, p) { for (const k in a.props) a.props[k].visible = k === p; }
+  function pathTo(a, node) {
+    let n;
+    if (a.atDesk && !a.path.length) n = a.node;
+    else if (a.spot && !a.path.length) n = SPOTS[a.spot].node;
+    else n = nearest(a.g.position.x, a.baseY, a.g.position.z);
+    return [NODES[n], ...route(n, node)];
+  }
+  function think(a) { a.ph = "think"; a.anim = "think"; a.t = 1.4; }
+  function toCouncil(a) {
+    const sp = SPOTS[a.cseat], pts = [...pathTo(a, sp.node), [sp.x, sp.y, sp.z]];
+    release(a); BUSY[a.cseat] = a.key; a.spot = a.cseat; a.ph = "urgent";
+    walkTo(a, pts, () => { a.seated = true; a.liftT = sp.seat - .32; a.rotT = sp.face; a.ph = "work"; a.anim = "talk"; a.t = Infinity; });
+  }
+  function assign(a, text, where) {
+    a.job = text || "Bekerja";
+    const target = where === "dewan" ? "dewan" : "desk";
+    if (a.where === target && ["think", "work", "done", "urgent"].includes(a.ph)) { if (a.ph === "done") think(a); return; }
+    a.where = target;
+    if (target === "dewan") return toCouncil(a);
+    if (a.atDesk && !a.path.length) { release(a); if (a.anim === "spin") a.chair.rotation.y = a.face; sitDesk(a); think(a); }
+    else { const pts = pathTo(a, a.node); release(a); a.ph = "urgent"; walkTo(a, pts, () => { sitDesk(a); think(a); }); }
+  }
+  function endWork(a) {
+    if (a.where === "dewan") {
+      a.where = "desk"; a.job = null; const pts = pathTo(a, a.node); release(a); a.ph = "back";
+      walkTo(a, pts, () => { sitDesk(a); a.ph = "idle"; a.t = 3 + Math.random() * 4; }); return;
+    }
+    if (a.ph === "work" || a.ph === "think") { a.ph = "done"; a.anim = "sit"; a.t = 2.2; }
+    a.job = null;
+  }
+  function startBreak(a) {
+    const pref = PREF[a.key] || {};
+    const opts = Object.entries(ACT).filter(([k, v]) => (!v.boss || a.boss) && (v.desk || actSpots(a, v).some(s => SPOTS[s] && !BUSY[s])))
+      .map(([k, v]) => [k, v.w * (pref[k] || (a.boss && !v.boss ? .4 : 1))]);
+    let r = Math.random() * opts.reduce((s, o) => s + o[1], 0), pick = opts[0][0];
+    for (const [k, w] of opts) { r -= w; if (r < 0) { pick = k; break; } }
+    const v = ACT[pick]; a.act = pick;
+    if (v.desk) { a.ph = "brk"; a.anim = v.anim; a.t = 7 + Math.random() * 8; return; }
+    const free = actSpots(a, v).filter(s => SPOTS[s] && !BUSY[s]), sid = free[(Math.random() * free.length) | 0], sp = SPOTS[sid];
+    BUSY[sid] = a.key; a.spot = sid; a.ph = "go";
+    walkTo(a, [...route(a.node, sp.node), [sp.x, sp.y, sp.z]], () => {
+      a.ph = "brk"; a.anim = v.anim; a.rotT = sp.face; a.seated = !!sp.seat; a.liftT = sp.seat ? sp.seat - .32 : 0; showProp(a, v.prop || null); a.t = 12 + Math.random() * 12;
+    });
+  }
+  function endBreak(a) {
+    if (a.atDesk) { if (a.anim === "spin") a.chair.rotation.y = a.face; release(a); sitDesk(a); a.ph = "idle"; a.t = 4 + Math.random() * 6; return; }
+    const pts = pathTo(a, a.node); release(a); a.ph = "back";
+    walkTo(a, pts, () => { sitDesk(a); if (a.job) think(a); else { a.ph = "idle"; a.t = 4 + Math.random() * 7; } });
+  }
+  function next(a) {
+    switch (a.ph) {
+      case "think": a.ph = "work"; a.anim = "type"; a.t = Infinity; break;
+      case "work": a.ph = "done"; a.anim = "sit"; a.t = 2.2; a.job = null; break;
+      case "done": if (a.job) think(a); else { a.ph = "idle"; a.anim = "sit"; a.t = 3 + Math.random() * 5; } break;
+      case "idle": startBreak(a); break;
+      case "brk": endBreak(a); break;
+    }
+  }
+  const wrap = x => { while (x > PI) x -= 2 * PI; while (x < -PI) x += 2 * PI; return x; };
+  const WHITE = new THREE.Color(1, 1, 1), DIM = new THREE.Color(LIN("#56658a"));
+
+  function step(a, dt, t) {
+    const g = a.g; a.riding = false;
+    if (a.path.length) {
+      const [tx, ty, tz] = a.path[0], dx = tx - g.position.x, dz = tz - g.position.z, dy = ty - a.baseY, dh = Math.hypot(dx, dz);
+      if (Math.abs(dy) > .01 && dh < .02) {
+        a.riding = true; const s = 3.2 * dt;
+        if (Math.abs(dy) <= s) { a.baseY = ty; a.path.shift(); if (!a.path.length) { const cb = a.cb; a.cb = null; cb && cb(); } } else a.baseY += Math.sign(dy) * s;
+      } else {
+        const s = (a.boss ? 1.9 : 2.2) * dt;
+        if (dh <= s) { g.position.x = tx; g.position.z = tz; a.baseY = ty; a.path.shift(); if (!a.path.length) { const cb = a.cb; a.cb = null; cb && cb(); } }
+        else { g.position.x += dx / dh * s; g.position.z += dz / dh * s; a.rotT = Math.atan2(dx, dz); }
+      }
+    }
+    if (a.anim === "spin") { a.rot += dt * 6; a.chair.rotation.y = a.rot; }
+    else a.rot += wrap(a.rotT - a.rot) * Math.min(1, dt * 9);
+    g.rotation.y = a.rot;
+    a.t -= dt; if (a.t <= 0) { a.t = Infinity; next(a); }
+    a.lift += (a.liftT - a.lift) * Math.min(1, dt * 8);
+    const k = a.riding ? "ride" : a.anim, ph = a.phase, seated = a.seated && k !== "walk";
+    let aL = 0, aR = 0, lL = 0, lR = 0, bob = 0, lean = 0, aLz = 0, aRz = 0;
+    if (seated) { lL = lR = k === "lounge" ? -1.2 : -1.45; }
+    if (k === "walk") { const s = Math.sin(t * 9 + ph); lL = s * .6; lR = -s * .6; aL = -s * .5; aR = s * .5; bob = Math.abs(s) * .045; }
+    else if (k === "ride") { aL = aR = .1; aLz = -.2; aRz = .2; bob = Math.sin(t * 3) * .01; }
+    else if (k === "type") { aL = -1.25 + Math.sin(t * 17 + ph) * .1; aR = -1.25 + Math.sin(t * 17 + ph + 2) * .1; lean = .08; }
+    else if (k === "think") { aL = -1.2; aR = -2.3 + Math.sin(t * 2) * .05; }
+    else if (k === "sit") { aL = aR = -.9; }
+    else if (k === "read") { aL = aR = -1.35; }
+    else if (k === "spin") { aL = aR = -.3; aLz = -.9; aRz = .9; }
+    else if (k === "doze") { aL = aR = -1.1; lean = .35 + Math.sin(t * 1.5) * .03; }
+    else if (k === "sip") { aR = -2.2 + Math.sin(t * 2 + ph) * .2; aL = -.3; }
+    else if (k === "eat") { aR = -2.3 + Math.abs(Math.sin(t * 3 + ph)) * .3; aL = -.6; }
+    else if (k === "talk") { aR = -1.1 + Math.sin(t * 4 + ph) * .5; aL = -.6; bob = Math.abs(Math.sin(t * 2 + ph)) * .02; }
+    else if (k === "stare") { aL = aR = .25; bob = Math.sin(t * 1.2 + ph) * .012; }
+    else if (k === "lounge") { aL = aR = -2.9; aLz = .3; aRz = -.3; lean = -.25; }
+    else if (k === "reach") { aR = -1.6 + Math.sin(t * 2 + ph) * .3; aL = -.2; }
+    else if (k === "wash") { aL = -1.1 + Math.sin(t * 6) * .15; aR = -1.1 + Math.cos(t * 6) * .15; aLz = Math.sin(t * 6) * .2; }
+    else if (k === "pong") { const s = Math.sin(t * 3.4 + (a.spot === "f0_ppB" ? PI : 0)); aR = -1.2 + s * .5; aRz = .3 + s * .4; aL = -.4; bob = Math.abs(s) * .03; }
+    else if (k === "golf") { const s = Math.sin(t * 1.6); aL = aR = -.4 + s * .7; aLz = .4; aRz = -.4; lean = .2; }
+    else if (k === "arcade") { aL = -1.3 + Math.sin(t * 14) * .12; aR = -1.3 + Math.cos(t * 11) * .15; bob = Math.abs(Math.sin(t * 5)) * .02; }
+    else if (k === "tinker") { aL = -1.2 + Math.sin(t * 3) * .1; aR = -1.4 + Math.sin(t * 7) * .2; lean = .15; }
+    const f = Math.min(1, dt * 10), p = a.p;
+    p.aL += (aL - p.aL) * f; p.aR += (aR - p.aR) * f; p.lL += (lL - p.lL) * f; p.lR += (lR - p.lR) * f; p.lean += (lean - p.lean) * f;
+    p.aLz = (p.aLz || 0) + (aLz - (p.aLz || 0)) * f; p.aRz = (p.aRz || 0) + (aRz - (p.aRz || 0)) * f;
+    a.aL.rotation.set(p.aL, 0, p.aLz); a.aR.rotation.set(p.aR, 0, p.aRz); a.lL.rotation.x = p.lL; a.lR.rotation.x = p.lR;
+    a.body.rotation.x = p.lean; g.position.y = a.baseY + a.lift + bob; a.disk.visible = a.riding;
+    a.body.scale.y = 1 + Math.sin(t * 2.2 + ph) * .012;
+    a.blink -= dt; const closed = k === "doze" || (a.blink < .12 && a.blink > 0);
+    if (a.blink <= 0) a.blink = 2.5 + Math.random() * 3.5;
+    a.eyes.forEach(e => e.scale.y += ((closed ? .12 : 1) - e.scale.y) * Math.min(1, dt * 25));
+    const working = a.ph === "work" || a.ph === "think" || (a.ph === "brk" && k === "type");
+    a.scr.forEach(m => { m.color.lerp(working && a.where === "desk" ? WHITE : DIM, Math.min(1, dt * 4)); if (working) m.map.offset.y += dt * .12; });
+    a.zzz.visible = k === "doze";
+    if (a.zzz.visible) a.zzz.position.set(g.position.x + .3, a.baseY + 2.0 + Math.sin(t * 2) * .08, g.position.z);
+    a.floor = floorOf(a.baseY);
+  }
+
+  /* ---------- tampilan & kamera ---------- */
+  const PRESET = {
+    gedung: {vis: {all: true}, r: 53, phi: 1.32, th: .12, t: [.6, 9.2, 0], tall: {r: 74, phi: 1.36, th: .12, t: [0, 9.6, 0]}, w: "Gedung MCI · tampak samping"},
+    f0: {vis: {floor: 0}, r: 34, phi: .92, th: .6, t: [0, 0, .3], tall: {r: 40, phi: .85, th: 1.35, t: [.5, 0, .5]}},
+    f1: {vis: {floor: 1}, r: 34, phi: .92, th: .6, t: [0, 4.4, .3], tall: {r: 40, phi: .85, th: 1.35, t: [.5, 4.4, .5]}},
+    f2: {vis: {floor: 2}, r: 34, phi: .92, th: .6, t: [0, 8.8, .3], tall: {r: 40, phi: .85, th: 1.35, t: [.5, 8.8, .5]}},
+    f3: {vis: {floor: 3}, r: 34, phi: .92, th: .6, t: [0, 13.2, .3], tall: {r: 40, phi: .85, th: 1.35, t: [.5, 13.2, .5]}},
+    lounge: {vis: {floor: 0}, r: 13, phi: .9, th: .75, t: [-8.2, .3, 3.2], w: "LT 1 · Lounge"},
+    pantry: {vis: {floor: 0}, r: 12.5, phi: .95, th: .2, t: [4.2, .5, -4.8], w: "LT 1 · Pantry"},
+    game: {vis: {floor: 0}, r: 11, phi: .95, th: .55, t: [-1.8, .3, 3.0], w: "LT 1 · Game Corner"},
+    lab: {vis: {floor: 1}, r: 12.5, phi: .92, th: .35, t: [-5.6, 4.9, -4.6], w: "LT 2 · Lab Elektronik"},
+    meeting: {vis: {floor: 2}, r: 12, phi: .9, th: .55, t: [-8.4, 9.1, -3.6], w: "LT 3 · Ruang Meeting"},
+    dewan: {vis: {floor: 3}, r: 14, phi: .88, th: .45, t: [-6.4, 13.5, -2.6], w: "LT 4 · Ruang Dewan"},
+    ceo: {vis: {floor: 3}, r: 12, phi: .9, th: -.25, t: [4.8, 13.5, -3.4], w: "LT 4 · Ruang CEO"},
+  };
+  const tall = () => stage.clientWidth / Math.max(1, stage.clientHeight) < .9;
+  function fitR(r) { const asp = stage.clientWidth / Math.max(1, stage.clientHeight); return r * Math.min(1.6, Math.max(1, 1.45 / asp)); }
+  function flyTo(name, instant) {
+    view = name; const P0 = PRESET[name], useTall = tall() && P0.tall, P = useTall ? P0.tall : P0;
+    VIS = P0.vis; if (VIS.floor != null) pipF = VIS.floor;
+    $$("[data-view]").forEach(b => b.classList.toggle("on", b.dataset.view === name));
+    $("#where").textContent = P0.w || `LT ${VIS.floor + 1} · ${LANTAI[VIS.floor + 1] || ""}`;
+    const off = cam.position.clone().sub(ctl.target), s0 = new THREE.Spherical().setFromVector3(off);
+    let th1 = P.th; while (th1 - s0.theta > PI) th1 -= 2 * PI; while (th1 - s0.theta < -PI) th1 += 2 * PI;
+    fly = {k: 0, d: instant ? .0001 : 1.0, t0: ctl.target.clone(), t1: new THREE.Vector3(...P.t), r0: s0.radius, r1: useTall ? P.r : fitR(P.r), p0: s0.phi, p1: P.phi, h0: s0.theta, h1: th1};
+    ctl.enabled = false; resize();
+  }
+  function setFollow(a) {
+    follow = a; $$(".chip").forEach(e => e.classList.toggle("on", e === (a && a.el)));
+    $("#follow").hidden = !a; if (a) $("#followTxt").textContent = "Mengikuti " + a.name.replace("MCI.", "");
+    $$("[data-view]").forEach(b => b.classList.toggle("on", !a && b.dataset.view === view));
+    if (a) { const off = cam.position.clone().sub(ctl.target), s0 = new THREE.Spherical().setFromVector3(off);
+      let h1 = a.rot + (a.face === 0 ? .5 : .95); while (h1 - s0.theta > PI) h1 -= 2 * PI; while (h1 - s0.theta < -PI) h1 += 2 * PI;
+      fly = {k: 0, d: .9, t0: ctl.target.clone(), t1: null, r0: s0.radius, r1: 7.5, p0: s0.phi, p1: 1.0, h0: s0.theta, h1}; ctl.enabled = false;
+      $("#where").textContent = "Mengikuti " + a.name.replace("MCI.", ""); }
+    else flyTo(view);
+  }
+  function zoom(f) { const off = cam.position.clone().sub(ctl.target); off.setLength(THREE.MathUtils.clamp(off.length() * f, ctl.minDistance, ctl.maxDistance)); cam.position.copy(ctl.target).add(off); }
+  function applyVis(v) {
+    FG.forEach((g, i) => g.visible = !!v.all || (v.below ? i <= v.floor : i === v.floor));
+    FLAB.forEach(l => l.visible = !!v.all); ROOF.visible = !!v.all; BASE.visible = !!v.all || v.floor === 0 || !!v.below;
+    AG.forEach(a => { const y = a.baseY; a.g.visible = !!v.all || (v.below ? y < FY[v.floor] + FH - .6 : (y > FY[v.floor] - .6 && y < FY[v.floor] + FH - .6)); if (!a.g.visible) a.zzz.visible = false; });
+  }
+
+  /* ---------- gabungkan mesh diam per material ---------- */
+  function bakeLocal(root, skip) {
+    root.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), groups = {}, rm = [], mtx = new THREE.Matrix4();
+    root.traverse(o => {
+      if (!o.isMesh || skip.has(o)) return;
+      for (let q = o.parent; q && q !== root; q = q.parent) if (skip.has(q) || q.userData.dyn) return;
+      if (o.userData.dyn) return;
+      const k = o.material.uuid + (o.castShadow ? "c" : "");
+      (groups[k] = groups[k] || {m: o.material, c: o.castShadow, list: []}).list.push(o); rm.push(o);
+    });
+    rm.forEach(o => o.parent.remove(o));
+    for (const k in groups) {
+      const {m, c, list} = groups[k]; let n = 0;
+      const parts = list.map(o => { const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); mtx.multiplyMatrices(inv, o.matrixWorld); g.applyMatrix4(mtx); n += g.attributes.position.count; return g; });
+      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2); let i = 0;
+      parts.forEach(g => { pos.set(g.attributes.position.array, i * 3); nor.set(g.attributes.normal.array, i * 3); if (g.attributes.uv) uv.set(g.attributes.uv.array, i * 2); i += g.attributes.position.count; g.dispose(); });
+      const bg = new THREE.BufferGeometry();
+      bg.setAttribute("position", new THREE.BufferAttribute(pos, 3)); bg.setAttribute("normal", new THREE.BufferAttribute(nor, 3)); bg.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+      bg.computeBoundingSphere();
+      const mesh = new THREE.Mesh(bg, m); mesh.castShadow = c; mesh.receiveShadow = true; root.add(mesh);
+    }
+  }
+
+  /* ---------- render ---------- */
+  function resize() {
+    if (!ready) return; const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return;
+    R.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix();
+    const pw = Math.round(w < 560 ? w * .46 : Math.min(w * .3, 320)), ph = Math.round(pw / 1.66);
+    pipEl.style.width = pw + "px"; pipEl.style.height = ph + "px"; pipEl.hidden = !pipOn;
+    $("#pipTxt").textContent = `PETA LT ${pipF + 1}`;
+  }
+  const V = new THREE.Vector3();
+  function frame() {
+    requestAnimationFrame(frame);
+    const dt = Math.min(clock.getDelta(), .1), t = clock.elapsedTime;
+    AG.forEach(a => step(a, dt, t));
+    if (!visible || document.hidden) return;
+    ANI.forEach(o => {
+      if (o.k === "spin") o.o.rotation.y += dt * (o.s || 1);
+      else if (o.k === "scroll") o.o.offset.y += dt * .05;
+      else if (o.k === "pulse") o.o.emissiveIntensity = 1 + Math.abs(Math.sin(t * 3)) * 2;
+      else if (o.k === "bar") o.o.scale.y = 1 + Math.sin(t * 2 + o.i) * .25;
+      else if (o.k === "arm") { o.o.rotation.y = Math.sin(t * .8) * 1.2; o.j2.rotation.z = .9 + Math.sin(t * 1.7) * .5; }
+    });
+    if (BALL) { BALL.visible = !!(BUSY.f0_ppA || BUSY.f0_ppB); if (BALL.visible) { const s = Math.sin(t * 3.4); BALL.position.set(-1.4 + s * 1.05, .85 + Math.abs(Math.cos(t * 3.4)) * .32, 4.6 + Math.sin(t * 1.7) * .2); } }
+    if (fly) {
+      fly.k = Math.min(1, fly.k + dt / fly.d); const e = fly.k < .5 ? 2 * fly.k * fly.k : 1 - Math.pow(-2 * fly.k + 2, 2) / 2;
+      const tgt = fly.t1 ? fly.t0.clone().lerp(fly.t1, e) : fly.t0.clone().lerp(follow ? follow.g.position.clone().add(new THREE.Vector3(0, .9, 0)) : fly.t0, e);
+      const s = new THREE.Spherical(THREE.MathUtils.lerp(fly.r0, fly.r1, e), THREE.MathUtils.lerp(fly.p0, fly.p1, e), THREE.MathUtils.lerp(fly.h0, fly.h1, e));
+      ctl.target.copy(tgt); cam.position.copy(tgt).add(new THREE.Vector3().setFromSpherical(s)); cam.lookAt(tgt);
+      if (fly.k >= 1) { fly = null; ctl.enabled = true; }
+    } else if (follow) {
+      const want = follow.g.position.clone().add(new THREE.Vector3(0, .9, 0)), d = want.sub(ctl.target).multiplyScalar(Math.min(1, dt * 4));
+      ctl.target.add(d); cam.position.add(d);
+    }
+    if (!fly) ctl.update();
+    const w = stage.clientWidth, h = stage.clientHeight;
+    const mainVis = follow ? {floor: follow.floor || 0, below: true} : VIS;
+    applyVis(mainVis);
+    R.shadowMap.needsUpdate = true;
+    R.setScissorTest(false); R.setViewport(0, 0, w, h); R.render(sc, cam);
+    let pr = null;
+    if (pipOn) pr = {x: pipEl.offsetLeft, y: pipEl.offsetTop, w: pipEl.offsetWidth, h: pipEl.offsetHeight};
+    for (const a of AG) {
+      V.set(a.g.position.x, a.g.position.y + (a.boss ? 2.05 : 1.82), a.g.position.z).project(cam);
+      const x = (V.x * .5 + .5) * w, y = (-V.y * .5 + .5) * h;
+      const hide = !a.g.visible || V.z > 1 || Math.abs(V.x) > 1.02 || Math.abs(V.y) > 1.02 || (pr && x > pr.x - 30 && x < pr.x + pr.w + 30 && y > pr.y - 6 && y < pr.y + pr.h + 34);
+      a.el.style.display = hide ? "none" : "flex";
+      if (!hide) a.el.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%)`;
+      const s = status(a); if (s.t !== a._t) { a._t = s.t; a.txt.textContent = s.t; } if (s.c !== a._c) { a._c = s.c; a.dot.style.background = s.c; a.dot.style.color = s.c; a.el.classList.toggle("busy", s.c === "#ef4444" || s.c === "#f59e0b" || s.c === "#a78bfa"); }
+    }
+    if (pr && pr.w) {
+      applyVis({floor: pipF});
+      topCam.position.set(0, FY[pipF] + 40, 0); topCam.lookAt(0, FY[pipF], 0);
+      const y = h - pr.y - pr.h;
+      R.setScissorTest(true); R.setScissor(pr.x, y, pr.w, pr.h); R.setViewport(pr.x, y, pr.w, pr.h); R.render(sc, topCam); R.setScissorTest(false);
+      applyVis(mainVis);
+    }
+  }
+  function init(list) {
+    stage = $("#stage"); chipsEl = $("#chips"); pipEl = $("#pip");
+    if (!window.THREE || !THREE.OrbitControls) { stage.insertAdjacentHTML("beforeend", '<p style="color:#fff;padding:60px 20px;text-align:center">Gagal memuat mesin 3D. Periksa koneksi internet.</p>'); return; }
+    R = new THREE.WebGLRenderer({antialias: true}); R.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+    R.outputEncoding = THREE.sRGBEncoding; R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 1.08;
+    R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap; R.shadowMap.autoUpdate = false;
+    stage.prepend(R.domElement);
+    sc = new THREE.Scene(); CUR = sc;
+    cam = new THREE.PerspectiveCamera(34, 1, .1, 320);
+    topCam = new THREE.OrthographicCamera(-12.7, 12.7, 7.65, -7.65, 1, 100); topCam.up.set(0, 0, -1);
+    ctl = new THREE.OrbitControls(cam, R.domElement);
+    Object.assign(ctl, {enableDamping: true, dampingFactor: .08, minDistance: 4, maxDistance: 120, maxPolarAngle: 1.5, screenSpacePanning: true, rotateSpeed: .7, zoomSpeed: .9});
+    world();
+    for (let i = 0; i < 4; i++) { const g = new THREE.Group(); g.position.y = FY[i]; sc.add(g); FG.push(g); }
+    [lt1, lt2, lt3, lt4].forEach((fn, i) => { CUR = FG[i]; fn(); });
+    roof(); CUR = sc;
+    const order = [...list].sort((a, b) => (b.boss ? 1 : 0) - (a.boss ? 1 : 0));
+    AG = order.map(build).filter(Boolean);
+    AG.forEach(a => { bakeLocal(a.body, new Set([a.aL, a.aR, a.lL, a.lR, a.props.paper, a.disk, ...a.eyes])); bakeLocal(a.chair, new Set()); a.g.userData.dyn = true; a.chair.userData.dyn = true; });
+    FG.forEach(g => bakeLocal(g, new Set())); bakeLocal(ROOF, new Set()); bakeLocal(BASE, new Set());
+    ready = true; clock = new THREE.Clock();
+    cam.position.set(10, 20, 50); ctl.target.set(0, 9, 0);
+    pipOn = false; $("#pipBtn").classList.remove("on"); $("#pipBtn").setAttribute("aria-pressed", "false");
+    resize(); flyTo("gedung", true);
+    new ResizeObserver(resize).observe(stage);
+    $$("[data-view]").forEach(b => b.onclick = () => { follow = null; $("#follow").hidden = true; $$(".chip").forEach(e => e.classList.remove("on")); flyTo(b.dataset.view); });
+    $("#pipBtn").onclick = () => { pipOn = !pipOn; $("#pipBtn").classList.toggle("on", pipOn); $("#pipBtn").setAttribute("aria-pressed", pipOn); resize(); };
+    pipEl.onclick = () => { pipF = (pipF + 1) % 4; resize(); };
+    $("#zIn").onclick = () => zoom(.8); $("#zOut").onclick = () => zoom(1.25);
+    $("#unfollow").onclick = () => setFollow(null);
+    frame();
+  }
+  return {
+    ensure(list) { if (!ready && visible) init(list); },
+    setVisible(v) { visible = v; if (v && ready) setTimeout(resize, 0); },
+    sync(list) {
+      if (!ready) return;
+      for (const d of list) { const a = AG.find(x => x.key === d.key); if (!a) continue;
+        const w = d.status === "WORKING", where = d.mode === "dewan" ? "dewan" : "desk", key = (w ? "1" : "0") + where;
+        if (last[a.key] !== key) { last[a.key] = key; if (w) assign(a, d.activity, where); else endWork(a); }
+        else if (w && a.job !== d.activity && (a.ph === "work" || a.ph === "think")) a.job = d.activity; }
+      renderList();
+    },
+    states() { const o = {}; AG.forEach(a => o[a.key] = status(a)); return o; },
+  };
+})();
+
+/* ================= MULAI ================= */
+(async () => {
+  if (DEMO) { $("#demoBanner").hidden = false; $("#csv").removeAttribute("href"); $("#csv").onclick = e => { e.preventDefault(); alert("Ekspor CSV aktif di versi server."); }; }
+  try { ME = await api("/api/me"); if (ME.lantai) LANTAI = ME.lantai; } catch (e) { return; }
+  if (ME.role !== "admin") $$(".nv").forEach(b => { if (b.dataset.p !== "office") b.style.display = "none"; });
+  await poll();
+  if (ME.role === "admin") { loadKas(true); loadUsage(); }
+  show(DEMO || ME.role !== "admin" ? "office" : "cmd");
+  OFFICE.ensure(DATA); OFFICE.sync(DATA);
+  setInterval(poll, 2000);
+  setInterval(() => { if (!$("#p-office").hidden) renderList(); }, 1000);
+  setInterval(() => { if (ME.role === "admin") loadUsage(); }, 15000);
+})();
+</script>
+</body>
+</html>
