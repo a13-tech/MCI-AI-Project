@@ -1,5 +1,8 @@
 flask
 python-telegram-bot>=21
 google-genai
+pydantic
 psutil
 pytz
+psycopg2-binary
+ mcp   <- hapus tanda # hanya jika memakai MCP_SERVERS
