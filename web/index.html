@@ -450,7 +450,7 @@ $("#skSave").onclick = async () => {
 const OFFICE = (() => {
   const PI = Math.PI, TOP = .68, FH = 4.4, FY = [0, 4.4, 8.8, 13.2], WH = 4.05, LIFT = [10.6, -5.4];
   let R, sc, cam, ctl, topCam, stage, chipsEl, pipEl, ready = false, visible = false, clock, CUR;
-  let AG = [], ANI = [], CAST = false, pipOn = true, pipF = 0, follow = null, fly = null, last = {}, BALL = null;
+  let AG = [], ANI = [], CAST = false, pipOn = true, pipF = 0, follow = null, fly = null, last = {}, BALL = null, PPM = null;
   let view = "gedung", VIS = {all: true};
   const FG = [], FLAB = [], NODES = {}, EDGES = {}, SPOTS = {}, BUSY = {};
   let ROOF, BASE;
@@ -954,6 +954,15 @@ const OFFICE = (() => {
     add(PANEL(.03, .16, 1.32, .01), "#ffffff", -1.4, .86, 4.6, null, {transparent: true, opacity: .8});
     [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(s => add(CY(.035, .035, .74, 10), "#D4AF5A", -1.4 + s[0] * .95, .37, 4.6 + s[1] * .5, null, GOLD));
     BALL = add(SP(.035, 12, 8), "#ffffff", -1.4, .9, 4.6, null, {emissive: "#ffffff", emissiveIntensity: .4}); BALL.userData.dyn = true;
+    /* robot pelontar bola: muncul kalau bot main ping pong sendirian */
+    PPM = grp(.05, 0, 4.6, -PI / 2); PPM.userData.dyn = true;
+    add(CY(.13, .19, .52, 18), "#0A2A6B", 0, .26, 0, PPM, {roughness: .35});
+    add(TO(.17, .025), "#D4AF5A", 0, .52, 0, PPM, GOLD).rotation.x = PI / 2;
+    add(SP(.19, 18, 12), "#bfe0ff", 0, .6, 0, PPM, {transparent: true, opacity: .4, roughness: .1});
+    [[.07, .56, .05], [-.06, .58, -.05], [.02, .66, -.01], [-.08, .55, .07], [.08, .6, -.07]].forEach(p => add(SP(.034, 10, 8), "#ffffff", p[0], p[1], p[2], PPM));
+    add(CY(.045, .055, .24, 14), "#D4AF5A", 0, .78, .12, PPM, GOLD).rotation.x = PI / 2.6;
+    PPM.userData.eye = add(SP(.035, 12, 8), "#22c55e", 0, .38, .16, PPM, {emissive: "#22c55e", emissiveIntensity: 1.6});
+    PPM.scale.setScalar(1.55); PPM.visible = false;
     N("f0_pa", f, -3.6, 2.6); L("f0_pa", "f0_sp-3"); N("f0_pb", f, 0.0, 1.6); L("f0_pb", "f0_sp0.4");
     S("f0_ppA", f, -3.1, 4.6, PI / 2, "f0_pa"); S("f0_ppB", f, .3, 4.6, -PI / 2, "f0_pb");
     const ar = grp(-3.4, 0, -6.35, 0); CAST = true; add(PANEL(.9, 1.7, .7, .18), "#0A2A6B", 0, .85, 0, ar, {roughness: .35}); CAST = false;
@@ -1110,6 +1119,7 @@ const OFFICE = (() => {
     if (a.ph === "work") return {c: "#ef4444", t: a.job || "Bekerja"};
     if (a.ph === "think" || a.ph === "urgent") return {c: "#f59e0b", t: a.ph === "urgent" ? "Bergegas ke meja" : "Berpikir…"};
     if (a.ph === "done") return {c: "#22c55e", t: "Selesai"};
+    if (a.act === "pingpong" && a.ph === "brk") return {c: "#38bdf8", t: a.anim === "pongwait" ? "Nunggu lawan ping pong" : a.mate ? "Ping pong lawan " + a.mate.name.replace("MCI.", "") : "Ping pong lawan mesin"};
     if (a.act) return {c: "#38bdf8", t: ACT[a.act].t};
     if (a.ph === "back") return {c: "#38bdf8", t: "Kembali ke meja"};
     return {c: "#22c55e", t: "Siaga"};
@@ -1117,7 +1127,11 @@ const OFFICE = (() => {
   const floorOf = y => Math.max(0, Math.min(3, Math.round(y / FH)));
   function walkTo(a, pts, cb) { a.atDesk = false; a.seated = false; a.liftT = 0; a.anim = "walk"; a.path = pts.map(p => [p[0], p[1], p[2]]); a.cb = cb; a.t = Infinity; if (!a.path.length) { a.cb = null; cb && cb(); } }
   function sitDesk(a) { a.atDesk = true; a.seated = true; a.liftT = .1; a.rotT = a.face; a.anim = "sit"; a.g.position.x = a.seat[0]; a.g.position.z = a.seat[1]; a.baseY = FY[a.home]; }
-  function release(a) { if (a.spot) { delete BUSY[a.spot]; a.spot = null; } a.act = null; showProp(a, null); }
+  function release(a) {
+    if (a.spot) { delete BUSY[a.spot]; a.spot = null; }
+    if (a.mate) { a.mate.mate = null; a.mate = null; }  // lawan ping pong lanjut main lawan mesin
+    a.act = null; showProp(a, null);
+  }
   function showProp(a, p) { for (const k in a.props) a.props[k].visible = k === p; }
   function pathTo(a, node) {
     let n;
@@ -1162,7 +1176,58 @@ const OFFICE = (() => {
     BUSY[sid] = a.key; a.spot = sid; a.ph = "go";
     walkTo(a, [...route(a.node, sp.node), [sp.x, sp.y, sp.z]], () => {
       a.ph = "brk"; a.anim = v.anim; a.rotT = sp.face; a.seated = !!sp.seat; a.liftT = sp.seat ? sp.seat - .32 : 0; showProp(a, v.prop || null); a.t = 12 + Math.random() * 12;
+      if (pick === "pingpong") pongArrive(a);
     });
+  }
+
+  /* ---------- ping pong: cari teman dulu, kalau tidak ada lawan mesin ---------- */
+  const PP_OTHER = {f0_ppA: "f0_ppB", f0_ppB: "f0_ppA"};
+  const pongPlaying = a => !!a && a.ph === "brk" && a.act === "pingpong";
+  function pongStart(b) {
+    const sp = SPOTS[b.spot];
+    b.ph = "brk"; b.anim = "pong"; b.rotT = sp.face; b.seated = false; b.liftT = 0; showProp(b, "paddle");
+    b.t = 14 + Math.random() * 10;
+    if (pongPlaying(b.mate)) b.mate.t = b.t;  // mulai dan selesai bareng
+  }
+  function pongArrive(a) {
+    const other = PP_OTHER[a.spot], owner = BUSY[other] && AG.find(x => x.key === BUSY[other]);
+    if (owner) {  // sudah ada bot di seberang (main atau sedang datang)
+      a.mate = owner; owner.mate = a;
+      if (pongPlaying(owner)) { a.t = owner.t = 14 + Math.random() * 10; }
+      return;
+    }
+    const cand = AG.filter(b => b !== a && !b.boss && !b.job && b.where === "desk" && !b.path.length &&
+      (b.ph === "idle" || (b.ph === "brk" && b.act && ACT[b.act].desk)));
+    if (!cand.length) return;  // tidak ada yang senggang: lawan robot pelontar
+    const b = cand[(Math.random() * cand.length) | 0], sp = SPOTS[other];
+    if (b.anim === "spin") b.chair.rotation.y = b.face;
+    const pts = [...pathTo(b, sp.node), [sp.x, sp.y, sp.z]];
+    release(b); BUSY[other] = b.key; b.spot = other; b.act = "pingpong"; b.ph = "go"; b.mate = a; a.mate = b;
+    a.t = Math.max(a.t, 45);  // tunggu teman datang (maks ±45 detik lalu bubar)
+    walkTo(b, pts, () => pongStart(b));
+  }
+  function pongTick(t) {
+    const A = BUSY.f0_ppA && AG.find(x => x.key === BUSY.f0_ppA), B = BUSY.f0_ppB && AG.find(x => x.key === BUSY.f0_ppB);
+    const pa = pongPlaying(A) ? A : null, pb = pongPlaying(B) ? B : null;
+    // bot yang sudah di meja tapi temannya masih jalan: main bola sendiri di bet
+    if (pa) pa.anim = B && !pb ? "pongwait" : "pong";
+    if (pb) pb.anim = A && !pa ? "pongwait" : "pong";
+    const solo = pa && !B ? "B" : pb && !A ? "A" : null;  // sisi seberang kosong: robot pelontar muncul
+    PPM.visible = !!solo;
+    if (solo) {
+      PPM.position.x = solo === "B" ? .2 : -3.0; PPM.rotation.y = solo === "B" ? -PI / 2 : PI / 2;
+      PPM.userData.eye.scale.setScalar(1 + Math.max(0, Math.sin(t * 3.4 * (solo === "B" ? 1 : -1))) * .5);
+    }
+    const waiter = (pa && pa.anim === "pongwait") ? pa : (pb && pb.anim === "pongwait") ? pb : null;
+    BALL.visible = !!(pa || pb);
+    if (!BALL.visible) return;
+    if (waiter) {  // juggling bola di atas bet sambil menunggu
+      const dir = waiter === pa ? 1 : -1, x0 = waiter === pa ? -2.75 : -.05;
+      BALL.position.set(x0 + dir * .1, .95 + Math.abs(Math.sin(t * 5)) * .35, 4.6 - .08);
+    } else {
+      const s = Math.sin(t * 3.4);
+      BALL.position.set(-1.4 + s * 1.05, .85 + Math.abs(Math.cos(t * 3.4)) * .32, 4.6 + Math.sin(t * 1.7) * .2);
+    }
   }
   function endBreak(a) {
     if (a.atDesk) { if (a.anim === "spin") a.chair.rotation.y = a.face; release(a); sitDesk(a); a.ph = "idle"; a.t = 4 + Math.random() * 6; return; }
@@ -1220,6 +1285,7 @@ const OFFICE = (() => {
     else if (k === "lounge") { aL = aR = -2.9; aLz = .3; aRz = -.3; lean = -.25; }
     else if (k === "reach") { aR = -1.6 + Math.sin(t * 2 + ph) * .3; aL = -.2; }
     else if (k === "wash") { aL = -1.1 + Math.sin(t * 6) * .15; aR = -1.1 + Math.cos(t * 6) * .15; aLz = Math.sin(t * 6) * .2; }
+    else if (k === "pongwait") { aR = -1.45 + Math.sin(t * 10 + ph) * .12; aRz = .25; aL = -.4; bob = Math.abs(Math.sin(t * 5)) * .015; }
     else if (k === "pong") { const s = Math.sin(t * 3.4 + (a.spot === "f0_ppB" ? PI : 0)); aR = -1.2 + s * .5; aRz = .3 + s * .4; aL = -.4; bob = Math.abs(s) * .03; }
     else if (k === "golf") { const s = Math.sin(t * 1.6); aL = aR = -.4 + s * .7; aLz = .4; aRz = -.4; lean = .2; }
     else if (k === "arcade") { aL = -1.3 + Math.sin(t * 14) * .12; aR = -1.3 + Math.cos(t * 11) * .15; bob = Math.abs(Math.sin(t * 5)) * .02; }
@@ -1329,7 +1395,7 @@ const OFFICE = (() => {
       else if (o.k === "bar") o.o.scale.y = 1 + Math.sin(t * 2 + o.i) * .25;
       else if (o.k === "arm") { o.o.rotation.y = Math.sin(t * .8) * 1.2; o.j2.rotation.z = .9 + Math.sin(t * 1.7) * .5; }
     });
-    if (BALL) { BALL.visible = !!(BUSY.f0_ppA || BUSY.f0_ppB); if (BALL.visible) { const s = Math.sin(t * 3.4); BALL.position.set(-1.4 + s * 1.05, .85 + Math.abs(Math.cos(t * 3.4)) * .32, 4.6 + Math.sin(t * 1.7) * .2); } }
+    if (BALL && PPM) pongTick(t);
     if (fly) {
       fly.k = Math.min(1, fly.k + dt / fly.d); const e = fly.k < .5 ? 2 * fly.k * fly.k : 1 - Math.pow(-2 * fly.k + 2, 2) / 2;
       const tgt = fly.t1 ? fly.t0.clone().lerp(fly.t1, e) : fly.t0.clone().lerp(follow ? follow.g.position.clone().add(new THREE.Vector3(0, .9, 0)) : fly.t0, e);
