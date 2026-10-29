@@ -12,7 +12,7 @@ Studio Gambar: Cloudflare Workers AI (FLUX schnell + img2img), gratis 10.000 neu
 """
 import os, io, csv, json, re, time, gzip, base64, asyncio, secrets, logging, sqlite3, threading, contextlib, hashlib
 from collections import deque, OrderedDict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import httpx, pytz, psutil
 from flask import Flask, jsonify, abort, request, send_from_directory, make_response, redirect, Response
@@ -405,12 +405,14 @@ def model_for(key):
 MIN_SHOW = 8  # detik minimal bot tampil "bekerja" di kantor 3D, supaya animasi lari selalu terlihat
 
 
-def _begin(k, act):
+def _begin(k, act, room=None):
     s = STATE[k]
     if not s["active"]:
         s["since"] = time.time()
     s["active"] += 1
     s["status"], s["activity"] = "WORKING", act
+    if room and not s.get("dw"):   # sidang dewan selalu menang
+        s["mode"] = room
 
 
 def _end(k):
@@ -419,6 +421,8 @@ def _end(k):
     if not s["active"]:
         s["hold"], s["last_act"], s["hold_mode"] = s.get("since", 0) + MIN_SHOW, s["activity"], s["mode"]
         s["status"], s["activity"] = "IDLE", "Siaga"
+        if s["mode"] in ROOMS:
+            s["mode"] = "meja"
 
 
 def office_status(s):
@@ -449,7 +453,7 @@ async def mcp_tools():
 
 
 async def ask(key, text, history=None, parts=None, schema=None, model=None, act="Memproses permintaan",
-              use_mcp=True, skill=None, brief=False, cache=True, show=None):
+              use_mcp=True, skill=None, brief=False, cache=True, show=None, room=None):
     cl = client(key)
     if not cl:
         raise RuntimeError(f"Key Gemini untuk {AGENTS[key]['nama']} belum diisi (GEMINI_{key.upper()} atau GEMINI_API_KEY).")
@@ -493,7 +497,7 @@ async def ask(key, text, history=None, parts=None, schema=None, model=None, act=
                 return await call(tools)
             raise
 
-    _begin(show or key, act)  # show = bot yang tampil bekerja di kantor 3D
+    _begin(show or key, act, room)  # show = bot yang tampil bekerja di kantor 3D
     try:
         async with (mcp_tools() if use_mcp and not schema else contextlib.nullcontext(None)) as tools:
             try:
@@ -577,7 +581,10 @@ async def run_task(bot, perintah, skill=None, jalur="boss", sem=None):
         try:
             need_kas = bot == "ledger" and re.search(r"\b(kas|saldo|uang|rekap|keuangan|pemasukan|pengeluaran)\b", perintah, re.I)
             ctx = await asyncio.to_thread(kas_context) if need_kas else ""
-            h = await ask(bot, ctx + perintah, skill=skill, act=("Skill " + skill) if skill else "Mengerjakan tugas")
+            room, rctx, note, ract = await room_prep(perintah, bot)
+            h = await ask(bot, ctx + rctx + perintah, skill=skill, act=("Skill " + skill) if skill else (ract or "Mengerjakan tugas"), room=room)
+            if note and h:
+                h += f"\n\n— {note}"
             e["status"] = "Selesai"
         except Exception as ex:
             log.exception("Tugas %s gagal", bot)
@@ -730,6 +737,17 @@ async def kas_parse(teks, foto=None, mime="image/jpeg"):
 
 
 # ---------- STUDIO GAMBAR (Cloudflare Workers AI) ----------
+GAL_IDS = []   # 4 gambar terbaru, dipajang di Galeri Karya LT 1 (kantor 3D, admin)
+
+
+def gal_load():
+    try:
+        with db() as c:
+            GAL_IDS[:] = [r[0] for r in sql(c, "SELECT id FROM gambar ORDER BY id DESC LIMIT 4").fetchall()]
+    except Exception:
+        log.exception("Gagal memuat galeri")
+
+
 def img_save(prompt, en, sumber, mime, data):
     now = datetime.now(WIB).isoformat(timespec="seconds")
     q = "INSERT INTO gambar (prompt,prompt_en,sumber,mime,data,dibuat) VALUES (?,?,?,?,?,?)"
@@ -738,6 +756,7 @@ def img_save(prompt, en, sumber, mime, data):
         gid = sql(c, q + " RETURNING id", p).fetchone()[0] if PG else sql(c, q, p).lastrowid
         # galeri dibatasi supaya database gratis (1 GB) tidak penuh
         sql(c, f"DELETE FROM gambar WHERE id NOT IN (SELECT id FROM gambar ORDER BY id DESC LIMIT {IMG_KEEP})")
+    GAL_IDS[:] = ([gid] + GAL_IDS)[:4]
     return gid
 
 
@@ -755,7 +774,9 @@ def img_get(i):
 
 def img_del(i):
     with db() as c:
-        return sql(c, "DELETE FROM gambar WHERE id=?", (i,)).rowcount
+        n = sql(c, "DELETE FROM gambar WHERE id=?", (i,)).rowcount
+    gal_load()
+    return n
 
 
 def img_today():
@@ -1061,6 +1082,197 @@ def iot_rules_check(pr, d):
                 asyncio.run_coroutine_threadsafe(iot_alert(pr, r, d[r["metrik"]]), LOOP)
 
 
+# ---------- RUANG KERJA SAYAP TIMUR ----------
+# Prompt yang cocok membuat bot bekerja di ruangan khusus DAN mendapat data asli:
+#   lab    = Lab Komputer & IoT : data sensor ESP32 live (nilai terakhir + tren)
+#   perpus = Perpustakaan       : arsip Memori, Skills, dan sejarah MCI (Tentang Kami)
+#   observ = Observatorium      : cuaca, laut, matahari & fase bulan (Open-Meteo, gratis tanpa key)
+ROOMS = ("lab", "perpus", "observ")
+ROOM_NAMA = {"lab": "Lab Komputer", "perpus": "Perpustakaan", "observ": "Observatorium"}
+R_IOT = re.compile(r"\b(sensor|iot|perangkat|device|jarak|suhu|temperatur|kelembap\w*|baterai|battery|tegangan|volt|rssi|sinyal|tangki|level air|ketinggian air|data (live|terakhir|terbaru)|alarm|pembacaan|bacaan|nilai terakhir|online|offline)\b", re.I)
+R_LAB = re.compile(r"\b(kode|coding|ngoding|program\w*|sketch|sketsa|script|skrip|debug|error|bug|compile|kompil\w*|upload|firmware|library|arduino|esp32|esp8266|nano|uno|raspberry|micropython|python|c\+\+|javascript|html|mqtt|wifi|bluetooth|lora|i2c|spi|uart|serial|gpio|pinout|pin|wiring|rangkaian|solder|pcb|servo|motor|relay|lcd|oled|printer 3d|3d print\w*|drone)\b", re.I)
+R_PERPUS = re.compile(r"\b(riset|research|rangkum\w*|ringkas\w*|resume|laporan|proposal|dokumen|referensi|jurnal|artikel|materi|belajar|pelajari|teori|definisi|apa itu|sejarah|histori|arsip|catatan|ingat|kemarin|sebelumnya|tadi|minggu lalu|bulan lalu|pernah|keputusan|putusan|hasil sidang|anggota|profil mci|tentang mci|semboyan)\b", re.I)
+R_OBSERV = re.compile(r"\b(cuaca|hujan|gerimis|badai|petir|angin|mendung|cerah|prakiraan|ramalan|ombak|gelombang|laut|pasang|surut|berlayar|pelayaran|kapal|roket|antariksa|radjawali|peluncuran|luncur\w*|bintang|fase bulan|bulan purnama|purnama|gerhana|matahari|sunrise|sunset|terbit|terbenam|astronomi|langit|satelit|orbit|gps|navigasi|koordinat|lintang|bujur|visi|strategi|jangka panjang|roadmap)\b", re.I)
+MCI_LAT = float(os.getenv("MCI_LAT", "-6.2088"))
+MCI_LON = float(os.getenv("MCI_LON", "106.8456"))
+MCI_LOKASI = os.getenv("MCI_LOKASI", "Jakarta")
+_WX = {}
+STOP = set("yang dan atau untuk dengan dari pada dalam akan sudah bisa tidak gimana bagaimana kenapa apakah tolong buat bikin kasih tentang lagi juga saja aja dong deh nya ini itu kita kamu saya aku".split())
+
+
+def room_for(text, bot=None):
+    """Pilih ruang kerja dari isi prompt. Ledger & Apex tetap di mejanya (ruang kas / CEO)."""
+    if bot in ("ledger",):
+        return None
+    t = text or ""
+    devs = [d for d in IOT_LAST if d in t.lower()]
+    sk = {"lab": len(R_LAB.findall(t)) + 2 * (len(R_IOT.findall(t)) if IOT_LAST else 0) + 3 * len(devs),
+          "perpus": len(R_PERPUS.findall(t)), "observ": len(R_OBSERV.findall(t))}
+    best = max(sk, key=sk.get)
+    if not sk[best]:
+        return None
+    if bot == "apex" and best != "observ":
+        return None
+    return best
+
+
+def _ago(ts):
+    s = max(0, int(time.time() - ts))
+    return f"{s} detik lalu" if s < 90 else f"{s // 60} menit lalu" if s < 5400 else f"{s // 3600} jam lalu"
+
+
+def lab_ctx(text):
+    if not IOT_LAST:
+        return "", ""
+    t = text.lower()
+    if not (R_IOT.search(t) or any(d in t for d in IOT_LAST) or any(re.search(rf"\b{re.escape(k)}\b", t) for v in IOT_LAST.values() for k in v["data"] if len(k) > 3)):
+        return "", ""
+    baris = []
+    for pr in sorted(IOT_LAST):
+        last = IOT_LAST[pr]
+        on = "online" if time.time() - last["ts"] < 60 else "OFFLINE"
+        nilai = ", ".join(f"{k}={v}" for k, v in last["data"].items())
+        baris.append(f"- {pr} ({on}, kirim terakhir {_ago(last['ts'])}, {datetime.fromtimestamp(last['ts'], WIB):%d/%m %H:%M} WIB): {nilai}")
+        hist = list(IOT_HIST.get(pr, []))[-120:]
+        if len(hist) > 2:
+            span = max(1, hist[-1][0] - hist[0][0])
+            for k in last["data"]:
+                vs = [d[k] for _, d in hist if isinstance(d.get(k), (int, float)) and not isinstance(d.get(k), bool)]
+                if len(vs) > 2:
+                    arah = "naik" if vs[-1] > vs[0] else "turun" if vs[-1] < vs[0] else "stabil"
+                    baris.append(f"    tren {k} ({span // 60} menit terakhir, {len(vs)} titik): min {min(vs):g}, maks {max(vs):g}, rata {sum(vs) / len(vs):.2f}, {arah}")
+    if IOT_RULES:
+        baris.append("Aturan alarm aktif: " + "; ".join(f"{r['perangkat']} {r['metrik']} {r['op']} {r['nilai']:g}" for r in IOT_RULES))
+    return ("[DATA SENSOR LIVE dari Lab IoT MCI]\n" + "\n".join(baris) +
+            "\nPakai data ini bila relevan: sebut angka, satuan, dan waktunya. Jangan mengarang nilai sensor lain.\n\n"), "📡 data sensor Lab IoT (live)"
+
+
+def _kata(t):
+    return {w for w in re.findall(r"[a-z0-9]{4,}", (t or "").lower()) if w not in STOP}
+
+
+def perpus_ctx(text):
+    q, parts, n = _kata(text), [], 0
+    try:
+        mem_clean()
+        with db() as c:
+            rows = sql(c, "SELECT waktu,bot,perintah,jawaban FROM memori ORDER BY id DESC LIMIT 300").fetchall()
+        hits = sorted(((len(q & _kata(r[2] + " " + r[3][:3000])), r) for r in rows), key=lambda x: -x[0])
+        top = [r for s, r in hits if s >= max(2, min(3, len(q) // 3))][:3]
+        for w, b, p, j in top:
+            parts.append(f"- [{w[:16].replace('T', ' ')}, {b}] Perintah: {p[:200]}\n  Jawaban: {j[:600]}")
+        n = len(top)
+    except Exception:
+        log.exception("Perpustakaan: gagal cari memori")
+    sk = [s for s in SKILLS.values() if len(q & _kata(s["nama"].replace("-", " ") + " " + s["deskripsi"] + " " + s.get("pemicu", ""))) >= 1][:3]
+    for s in sk:
+        parts.append(f"- Skill {s['nama']} ({s['bot']}): {s['deskripsi']}")
+    if re.search(r"\b(mci|mahardika|sejarah|histori|anggota|semboyan|founder|pendiri|tim kita)\b", text, re.I):
+        try:
+            tk = tentang_get()
+            sej = "; ".join(f"{x['tahun']} {x['judul']}" for x in sorted(tk.get("sejarah", []), key=lambda x: x.get("tahun", ""))[:20])
+            ang = ", ".join(f"{x['nama']} ({x['peran']})" if x.get("peran") else x["nama"] for x in tk.get("anggota", [])[:30])
+            parts.append(f"- Tentang MCI: {tk.get('judul')}. Semboyan: {tk.get('semboyan') or '-'}. {tk.get('deskripsi', '')[:500]}\n  Sejarah: {sej or '-'}\n  Anggota: {ang or '-'}")
+            n += 1
+        except Exception:
+            log.exception("Perpustakaan: gagal baca Tentang Kami")
+    if not parts:
+        return "", ""
+    note = f"📚 arsip Perpustakaan ({n} catatan)" if n else "📚 katalog skill Perpustakaan"
+    return ("[ARSIP PERPUSTAKAAN MCI: catatan lama yang mungkin relevan]\n" + "\n".join(parts) +
+            "\nGunakan bila relevan dan sebut kalau jawaban mengacu ke catatan lama. Abaikan bila tidak terkait.\n\n"), note
+
+
+def _fase_bulan(dt):
+    hari = (dt - datetime(2000, 1, 6, 18, 14, tzinfo=timezone.utc)).total_seconds() / 86400 % 29.530588853
+    nama = ["bulan baru", "sabit awal", "kuartal pertama", "cembung awal", "purnama", "cembung akhir", "kuartal akhir", "sabit akhir"]
+    return nama[int((hari / 29.530588853) * 8 + .5) % 8], hari
+
+
+def _lokasi():
+    for pr, v in IOT_LAST.items():
+        d = v["data"]
+        la = next((d[k] for k in d if re.fullmatch(r"lat\w*", k) and isinstance(d[k], (int, float))), None)
+        lo = next((d[k] for k in d if re.fullmatch(r"(lon|lng)\w*", k) and isinstance(d[k], (int, float))), None)
+        if la is not None and lo is not None and -90 <= la <= 90 and -180 <= lo <= 180 and (la or lo):
+            return la, lo, f"posisi GPS {pr}"
+    return MCI_LAT, MCI_LON, MCI_LOKASI
+
+
+WMO = {0: "cerah", 1: "cerah berawan", 2: "berawan sebagian", 3: "mendung", 45: "kabut", 48: "kabut", 51: "gerimis ringan", 53: "gerimis", 55: "gerimis lebat",
+       61: "hujan ringan", 63: "hujan sedang", 65: "hujan lebat", 80: "hujan lokal ringan", 81: "hujan lokal", 82: "hujan lokal lebat", 95: "badai petir", 96: "badai petir + es", 99: "badai petir + es"}
+
+
+async def observ_ctx(text):
+    la, lo, nama = _lokasi()
+    laut = bool(re.search(r"\b(ombak|gelombang|laut|pasang|surut|berlayar|pelayaran|kapal)\b", text, re.I))
+    key = (round(la, 2), round(lo, 2), laut)
+    if key in _WX and time.time() - _WX[key][0] < 600:
+        return _WX[key][1]
+    baris = []
+    try:
+        async with httpx.AsyncClient(timeout=8) as h:
+            r = await h.get("https://api.open-meteo.com/v1/forecast", params={
+                "latitude": la, "longitude": lo, "timezone": "Asia/Jakarta", "forecast_days": 2,
+                "current": "temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,wind_direction_10m,cloud_cover",
+                "hourly": "precipitation_probability,weather_code,temperature_2m",
+                "daily": "sunrise,sunset,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max"})
+            w = r.json()
+            c = w["current"]
+            baris.append(f"Sekarang ({c['time'].replace('T', ' ')} WIB): {WMO.get(c['weather_code'], 'kode ' + str(c['weather_code']))}, {c['temperature_2m']}°C, "
+                         f"lembap {c['relative_humidity_2m']}%, awan {c['cloud_cover']}%, hujan {c['precipitation']} mm, angin {c['wind_speed_10m']} km/j dari {c['wind_direction_10m']}°")
+            hr, now = w["hourly"], datetime.now(WIB).strftime("%Y-%m-%dT%H")
+            i0 = next((i for i, t in enumerate(hr["time"]) if t.startswith(now)), 0)
+            jam = [f"{hr['time'][i][11:16]} {WMO.get(hr['weather_code'][i], '?')} {hr['temperature_2m'][i]}°C hujan {hr['precipitation_probability'][i]}%"
+                   for i in range(i0, min(len(hr["time"]), i0 + 12), 3)]
+            baris.append("12 jam ke depan: " + "; ".join(jam))
+            d = w["daily"]
+            for i, lbl in enumerate(("Hari ini", "Besok")):
+                baris.append(f"{lbl}: matahari terbit {d['sunrise'][i][11:]}, terbenam {d['sunset'][i][11:]}, UV maks {d['uv_index_max'][i]}, "
+                             f"peluang hujan {d['precipitation_probability_max'][i]}%, total hujan {d['precipitation_sum'][i]} mm, angin maks {d['wind_speed_10m_max'][i]} km/j")
+            if laut:
+                m = (await h.get("https://marine-api.open-meteo.com/v1/marine", params={
+                    "latitude": la, "longitude": lo, "timezone": "Asia/Jakarta", "forecast_days": 1,
+                    "current": "wave_height,wave_direction,wave_period,swell_wave_height",
+                    "daily": "wave_height_max"})).json()
+                if "current" in m:
+                    mc = m["current"]
+                    baris.append(f"Laut: tinggi gelombang {mc.get('wave_height')} m (maks hari ini {m.get('daily', {}).get('wave_height_max', ['?'])[0]} m), "
+                                 f"periode {mc.get('wave_period')} dtk, arah {mc.get('wave_direction')}°, swell {mc.get('swell_wave_height')} m")
+                else:
+                    baris.append("Laut: data gelombang tidak tersedia untuk titik ini (mungkin di darat).")
+    except Exception as e:
+        log.warning("Observatorium: cuaca gagal diambil (%s)", e)
+        baris.append("(data cuaca sedang tidak bisa diambil)")
+    fase, umur = _fase_bulan(datetime.now(timezone.utc))
+    baris.append(f"Bulan: {fase} (umur {umur:.1f} hari dari 29,5)")
+    out = (f"[DATA OBSERVATORIUM MCI · {nama} ({la:.3f}, {lo:.3f}) · sumber Open-Meteo]\n" + "\n".join(baris) +
+           "\nPakai data ini bila relevan; sebut waktu dan lokasinya. Ini prakiraan, bukan kepastian.\n\n", f"🔭 data Observatorium (cuaca {nama})")
+    _WX[key] = (time.time(), out)
+    return out
+
+
+async def room_prep(text, bot):
+    """-> (ruang, konteks, catatan sumber, label aktivitas)"""
+    room = room_for(text, bot)
+    if not room:
+        return None, "", "", None
+    try:
+        if room == "lab":
+            ctx, note = await asyncio.to_thread(lab_ctx, text)
+            act = "Cek data sensor di Lab" if ctx else "Ngoding di Lab Komputer"
+        elif room == "perpus":
+            ctx, note = await asyncio.to_thread(perpus_ctx, text)
+            act = "Buka arsip di Perpustakaan"
+        else:
+            ctx, note = await observ_ctx(text)
+            act = "Analisis di Observatorium"
+    except Exception:
+        log.exception("Ruang %s gagal menyiapkan data", room)
+        ctx, note, act = "", "", "Bekerja di " + ROOM_NAMA[room]
+    return room, ctx, note, act
+
+
 # ---------- WEB ----------
 app = Flask(__name__, static_folder=None)
 
@@ -1205,7 +1417,7 @@ def api_office():
     ags.append({"key": "canvas", "name": CANVAS["nama"], "peran": CANVAS["peran"], "boss": False, "lantai": 1, "divisi": CANVAS["divisi"],
                 "status": o[0], "activity": o[1], "mode": o[2], "model": "cloudflare-flux", "gemini": bool(CF_TOKEN),
                 "telegram": bool(os.getenv("TOKEN_GAMBAR")), **({"calls": img_today(), "tokens": 0} if adm else {})})
-    body = json.dumps({"agents": ags, "log": list(TASKLOG) if adm else [], "lantai": LANTAI, "iot": iot_public(adm)})
+    body = json.dumps({"agents": ags, "log": list(TASKLOG) if adm else [], "lantai": LANTAI, "iot": iot_public(adm), **({"galeri": GAL_IDS[:4]} if adm else {})})
     _OFFICE_CACHE[adm] = (time.time(), body)
     return Response(body, mimetype="application/json")
 
@@ -1666,7 +1878,8 @@ def make_handlers(key):
         if not text:
             return
         t0 = time.time()
-        _begin(key, "Membaca pesan")  # bot langsung lari ke mejanya begitu pesan masuk
+        room = None if key in ("apex", "ledger") else room_for(text, key)
+        _begin(key, "Membaca pesan", room)  # bot langsung lari ke mejanya / ruang kerja begitu pesan masuk
         try:
             await c.bot.send_chat_action(chat_id=m.chat_id, action="typing")
             if key == "apex":
@@ -1674,14 +1887,18 @@ def make_handlers(key):
             elif key == "ledger":
                 ans = await ledger_msg(text)
             else:
+                room, rctx, note, ract = await room_prep(text, key)
+                act = ract or "Memproses permintaan"
                 sk = skill_match(text)
                 if sk and sk["bot"] == key:
-                    ans = await ask(key, text, skill=sk["nama"])
+                    ans = await ask(key, rctx + text, skill=sk["nama"], act=act, room=room)
                 else:
                     h = HIST.setdefault((key, m.chat_id), [])
-                    ans = await ask(key, text, history=h)
+                    ans = await ask(key, rctx + text, history=h, act=act, room=room)
                     h += [types.Content(role="user", parts=[types.Part(text=text)]), types.Content(role="model", parts=[types.Part(text=ans)])]
                     del h[:-6]
+                if note and ans:
+                    ans += f"\n\n— {note}"
         except Exception as e:
             log.exception("[%s] gagal", cfg["nama"])
             ans = str(e) if isinstance(e, RuntimeError) else "⚠️ Ada gangguan saat menghubungi Gemini. Coba lagi sebentar."
@@ -1847,6 +2064,7 @@ if __name__ == "__main__":
         db_init()
         usage_load()
         iot_load()
+        gal_load()
     except Exception:
         log.exception("Database gagal diinisialisasi (cek DATABASE_URL)")
     threading.Thread(target=run_flask, daemon=True).start()

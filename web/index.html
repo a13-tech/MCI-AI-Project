@@ -475,18 +475,18 @@ const num = n => Number(n || 0).toLocaleString("id-ID");
 let LANTAI = {1: "Lobby & Santai", 2: "Divisi Teknik", 3: "Operasional & Keuangan", 4: "Eksekutif"};
 
 /* ================= DATA DEMO (hanya jika DEMO) ================= */
-const MOCK_IMG = id => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0A2A6B"/><stop offset="1" stop-color="${["#D4AF5A", "#38bdf8", "#f472b6", "#22c55e"][id % 4]}"/></linearGradient></defs><rect width="512" height="512" fill="url(#g)"/><circle cx="256" cy="230" r="90" fill="#EA8A3C"/><circle cx="226" cy="215" r="14" fill="#0B1F4D"/><circle cx="286" cy="215" r="14" fill="#0B1F4D"/><text x="256" y="400" font-family="sans-serif" font-size="34" fill="#fff" text-anchor="middle">DEMO #${id}</text></svg>`);
+const MOCK_IMG = id => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0A2A6B"/><stop offset="1" stop-color="${["#D4AF5A", "#38bdf8", "#f472b6", "#22c55e"][id % 4]}"/></linearGradient></defs><rect width="512" height="512" fill="url(#g)"/><circle cx="256" cy="230" r="90" fill="#EA8A3C"/><circle cx="226" cy="215" r="14" fill="#0B1F4D"/><circle cx="286" cy="215" r="14" fill="#0B1F4D"/><text x="256" y="400" font-family="sans-serif" font-size="34" fill="#fff" text-anchor="middle">DEMO #${id}</text></svg>`);
 const MOCK = (() => {
   const pick = a => a[Math.floor(Math.random() * a.length)];
   const A = [
     ["herald","MCI.Herald","Jadwal, pengumuman, humas, caption",1,"Humas & Resepsionis",0,1,["Menyusun pengumuman","Membuat caption"]],
-    ["sentinel","MCI.Sentinel","Perangkum poin penting diskusi",1,"Humas & Resepsionis",0,1,["Merangkum diskusi grup"]],
+    ["sentinel","MCI.Sentinel","Perangkum poin penting diskusi",1,"Humas & Resepsionis",0,1,["Merangkum diskusi grup","Cek cuaca untuk uji kapal"]],
     ["devmatrix","MCI.DevMatrix","Koding & arsitek logika hardware (C/C++, Python, mikrokontroler)",2,"Divisi Teknik",0,0,["Menulis kode ESP32","Debug program C++"]],
     ["pulse","MCI.Pulse","Electrical Engineering (daya, pinout, I2C/SPI/LoRa)",2,"Divisi Teknik",0,0,["Menghitung kebutuhan daya","Skill pinout-esp32"]],
     ["aegis","MCI.Aegis","Verifikator kritis, risiko, safety checklist",2,"Divisi Teknik",0,0,["Skill cek-wiring","Memeriksa risiko"]],
     ["nexus","MCI.Nexus","Manajemen proyek, inventaris, tugas tim",3,"Operasional & Keuangan",0,1,["Mengecek stok inventaris"]],
     ["ledger","MCI.Ledger","Keuangan: kas masuk/keluar jadi tabel",3,"Operasional & Keuangan",0,1,["Skill rekap-kas","Mengolah kas"]],
-    ["scribe","MCI.Scribe","Dokumen, laporan, proposal",3,"Operasional & Keuangan",0,0,["Skill laporan-mingguan"]],
+    ["scribe","MCI.Scribe","Dokumen, laporan, proposal",3,"Operasional & Keuangan",0,0,["Skill laporan-mingguan","Buka arsip laporan lama"]],
     ["atlas","MCI.Atlas","Riset & olah data",3,"Operasional & Keuangan",0,0,["Mengumpulkan data riset"]],
     ["apex","MCI.Apex","Boss koordinator, membagi tugas ke tim",4,"Eksekutif",1,1,["Membagi tugas"]],
     ["canvas","MCI.Canvas","Pelukis AI: bikin dan ubah gambar",1,"Studio Gambar",0,1,["Menggambar","Mengedit foto"]]];
@@ -525,9 +525,9 @@ const MOCK = (() => {
         if (!w || n > w.u) w = W[a[0]] = Math.random() < .22 ? {on:1,u:n+9000+Math.random()*8000,t:pick(a[7])} : {on:0,u:n+22000+Math.random()*26000};
         const inC = council.on && (a[0] === "apex" || council.m.includes(a[0]));
         return {key:a[0],name:a[1],peran:a[2],lantai:a[3],divisi:a[4],boss:!!a[5],model:a[6]?"gemini-3.5-flash-lite":"gemini-3.8-flash",
-          status:(w.on||inC)?"WORKING":"IDLE",activity:inC?"Sidang dewan":w.on?w.t:"Siaga",mode:inC?"dewan":"meja",gemini:true,telegram:false,calls:12,tokens:4820};
+          status:(w.on||inC)?"WORKING":"IDLE",activity:inC?"Sidang dewan":w.on?w.t:"Siaga",mode:inC?"dewan":w.on?(/kode|esp32|debug|sensor/i.test(w.t)?"lab":/riset|arsip|laporan/i.test(w.t)?"perpus":/cuaca|bintang|roket/i.test(w.t)?"observ":"meja"):"meja",gemini:true,telegram:false,calls:12,tokens:4820};
       });
-      return {agents, lantai: LANTAI, iot: iotMock(false), log:[{t:"10:12",bot:"ledger",tugas:"rekap kas minggu ini",status:"Selesai",jalur:"skill"},{t:"10:11",bot:"devmatrix",tugas:"buat kode arduino sensor suhu",status:"Selesai",jalur:"langsung"},{t:"10:10",bot:"aegis",tugas:"cek risiko dari rekap kas",status:"Selesai",jalur:"boss"}]};
+      return {agents, lantai: LANTAI, iot: iotMock(false), galeri: GAL.map(g => g.id), log:[{t:"10:12",bot:"ledger",tugas:"rekap kas minggu ini",status:"Selesai",jalur:"skill"},{t:"10:11",bot:"devmatrix",tugas:"buat kode arduino sensor suhu",status:"Selesai",jalur:"langsung"},{t:"10:10",bot:"aegis",tugas:"cek risiko dari rekap kas",status:"Selesai",jalur:"boss"}]};
     }
     if (u === "/api/usage") return {tanggal:"2026-10-28",total:48200,batas:500000,rpm:60,model_utama:"gemini-3.8-flash",model_lite:"gemini-3.5-flash-lite",router_hemat:37,cache_hit:9,boss_dipanggil:6,
       model:{"gemini-3.5-flash-lite":{masuk:21000,keluar:6100,pikir:300,panggilan:41},"gemini-3.8-flash":{masuk:12800,keluar:6900,pikir:1100,panggilan:12}}};
@@ -628,7 +628,7 @@ async function loadUsage() {
 async function poll() {
   try {
     const d = await api("/api/office");
-    DATA = d.agents; LOG = d.log || []; if (d.lantai) LANTAI = d.lantai; IOTD = d.iot || []; OFFICE.iot(IOTD);
+    DATA = d.agents; LOG = d.log || []; if (d.lantai) LANTAI = d.lantai; IOTD = d.iot || []; OFFICE.iot(IOTD); if (d.galeri) OFFICE.galeri(d.galeri);
     renderCmd(); renderTim();
     if (!$("#p-office").hidden) OFFICE.ensure(DATA);
     OFFICE.sync(DATA);
@@ -1575,6 +1575,18 @@ const OFFICE = (() => {
     N(`f${f}_e0`, f, 12.2, -.4); L(`f${f}_e0`, `f${f}_door`);
     xs.forEach((x, k) => { N(`f${f}_e${x}`, f, x, -.4); L(`f${f}_e${x}`, k ? `f${f}_e${xs[k - 1]}` : `f${f}_e0`); });
   }
+  /* bingkai galeri: diisi gambar asli terbaru dari Studio Gambar (admin) */
+  const GALF = [], GALS = [], TL = new THREE.TextureLoader();
+  function galeriSet(ids) {
+    (ids || []).slice(0, GALF.length).forEach((id, i) => {
+      if (!id || GALS[i] === id) return; GALS[i] = id; const m = GALF[i];
+      TL.load(DEMO ? MOCK_IMG(id) : "/api/gambar/" + id, t => {
+        t.encoding = THREE.sRGBEncoding; const img = t.image, r = m.userData.ratio, ir = (img.width || 1) / (img.height || 1);
+        if (ir > r) { t.repeat.set(r / ir, 1); t.offset.set((1 - r / ir) / 2, 0); } else { t.repeat.set(1, ir / r); t.offset.set(0, (1 - ir / r) / 2); }
+        const old = m.material.map; m.material.map = t; m.material.needsUpdate = true; if (old) old.dispose();
+      });
+    });
+  }
   /* lukisan abstrak (karya Canvas) */
   function artTex(seed) {
     let r = seed * 9301 + 49297; const rnd = () => (r = (r * 9301 + 49297) % 233280) / 233280;
@@ -1587,7 +1599,7 @@ const OFFICE = (() => {
   }
   function frameArt(x, y, z, w, h, seed, ry) {
     const g = grp(x, y, z, ry || 0); CAST = true; add(PANEL(w + .16, h + .16, .06, .03), "#D4AF5A", 0, 0, 0, g, GOLD); CAST = false;
-    plane(artTex(seed), w, h, 0, 0, .04, 0, g); return g;
+    const m = plane(artTex(seed), w, h, 0, 0, .04, 0, g); m.userData.dyn = true; g.userData.pic = m; m.userData.ratio = w / h; return g;
   }
   /* model roket museum (sejarah proyek AntaRiksa & Radjawali) */
   function rocket(p, s, col) {
@@ -1608,7 +1620,7 @@ const OFFICE = (() => {
   function wing1() {
     const f = 0; wingBase(f, "GALERI KARYA", [14.2, 16.6, 19.0]);
     add(SLAB(8.2, 12.8, .02, .3), "#1a2d66", WC, .012, 0, null, {roughness: .95});
-    [14.2, 16.6, 19.0].forEach((x, i) => { frameArt(x, 2.05, -6.86, 1.8, 1.35, i + 1); add(CN(.12, .2, 16, 1, true), "#fff1cf", x, 3.05, -6.7, null, {emissive: "#ffd27a", emissiveIntensity: 1.2, side: THREE.DoubleSide}); });
+    [14.2, 16.6, 19.0].forEach((x, i) => { GALF.push(frameArt(x, 2.05, -6.86, 1.8, 1.35, i + 1).userData.pic); add(CN(.12, .2, 16, 1, true), "#fff1cf", x, 3.05, -6.7, null, {emissive: "#ffd27a", emissiveIntensity: 1.2, side: THREE.DoubleSide}); });
     label("KARYA MCI.CANVAS", WC, 3.35, -6.3, .5);
     [[14.2, "#ef4444", .9, "ANTARIKSA 7"], [16.6, "#D4AF5A", 1.05, "ANTARIKSA 10"], [19.0, "#38bdf8", .8, "RADJAWALI"]].forEach(v => vitrine(v[0], 3.4, v[1], v[2], v[3]));
     label("MUSEUM ROKET MCI", WC, 3.05, 4.9, .42);
@@ -1834,6 +1846,7 @@ const OFFICE = (() => {
   function status(a) {
     if (a.where === "dewan" && a.job) return {c: "#a78bfa", t: a.ph === "urgent" ? "Menuju ruang dewan" : "Sidang dewan"};
     if (a.ph === "work") return {c: "#ef4444", t: a.job || "Bekerja"};
+    if (ROOMW[a.where] && a.ph === "urgent" && a.job) return {c: "#f59e0b", t: "Bergegas ke " + ROOMW[a.where].n};
     if (a.ph === "think" || a.ph === "urgent") return {c: "#f59e0b", t: a.ph === "urgent" ? "Bergegas ke meja" : "Berpikir…"};
     if (a.ph === "done") return {c: "#22c55e", t: "Selesai"};
     if (a.act === "pingpong" && a.ph === "brk") return {c: "#38bdf8", t: a.anim === "pongwait" ? "Nunggu lawan ping pong" : a.mate ? "Ping pong lawan " + a.mate.name.replace("MCI.", "") : "Ping pong lawan mesin"};
@@ -1863,17 +1876,37 @@ const OFFICE = (() => {
     release(a); BUSY[a.cseat] = a.key; a.spot = a.cseat; a.ph = "urgent";
     walkTo(a, pts, () => { a.seated = true; a.liftT = sp.seat - .32; a.rotT = sp.face; a.ph = "work"; a.anim = "talk"; a.t = Infinity; });
   }
+  /* ruang kerja sayap timur: prompt yang cocok dikerjakan di sini (server kirim mode lab/perpus/observ) */
+  const ROOMW = {
+    lab: {n: "Lab Komputer", spots: ["f1_pa0", "f1_pa1", "f1_pa2", "f1_pa3", "f1_pb0", "f1_pb1", "f1_pb2", "f1_pb3"], anim: "type"},
+    perpus: {n: "Perpustakaan", spots: ["f2_rt0", "f2_rt1", "f2_ac0", "f2_ac1"], anim: "read", prop: "paper"},
+    observ: {n: "Observatorium", spots: ["f3_tel", "f3_or", "f3_bb0", "f3_bb1", "f3_bb2"], anim: "stare"},
+  };
+  function toRoom(a, room) {
+    const R = ROOMW[room], mine = a.spot && R.spots.includes(a.spot) ? a.spot : null;
+    const sid = mine || R.spots.find(s => !BUSY[s]) || R.spots.find(s => { const b = AG.find(x => x.key === BUSY[s]); return b && b.ph === "brk"; });
+    if (!sid) return false;
+    const other = AG.find(x => x !== a && x.key === BUSY[sid]);
+    if (other) { release(other); other.ph = "back"; const p = pathTo(other, other.node); walkTo(other, p, () => { sitDesk(other); other.ph = "idle"; other.t = 3 + Math.random() * 4; }); }
+    const sp = SPOTS[sid], pts = mine ? [] : [...pathTo(a, sp.node), [sp.x, sp.y, sp.z]];
+    if (!mine) { release(a); BUSY[sid] = a.key; a.spot = sid; }
+    a.act = null; a.ph = "urgent";
+    walkTo(a, pts, () => { a.seated = !!sp.seat; a.liftT = sp.seat ? sp.seat - .32 : 0; a.rotT = sp.face; showProp(a, R.prop || null);
+      a.anim = sid.includes("_bb") ? "lounge" : R.anim; if (a.job) { a.ph = "work"; a.t = Infinity; } else { a.ph = "done"; a.t = 2.2; } });
+    return true;
+  }
   function assign(a, text, where) {
     a.job = text || "Bekerja";
-    const target = where === "dewan" ? "dewan" : "desk";
-    if (a.where === target && ["think", "work", "done", "urgent"].includes(a.ph)) { if (a.ph === "done") think(a); return; }
+    let target = where === "dewan" || ROOMW[where] ? where : "desk";
+    if (a.where === target && ["think", "work", "done", "urgent"].includes(a.ph)) { if (a.ph === "done") { if (ROOMW[target]) { a.ph = "work"; a.t = Infinity; } else think(a); } return; }
+    if (ROOMW[target]) { a.where = target; if (toRoom(a, target)) return; target = "desk"; }
     a.where = target;
     if (target === "dewan") return toCouncil(a);
     if (a.atDesk && !a.path.length) { release(a); if (a.anim === "spin") a.chair.rotation.y = a.face; sitDesk(a); think(a); }
     else { const pts = pathTo(a, a.node); release(a); a.ph = "urgent"; walkTo(a, pts, () => { sitDesk(a); think(a); }); }
   }
   function endWork(a) {
-    if (a.where === "dewan") {
+    if (a.where === "dewan" || ROOMW[a.where]) {
       a.where = "desk"; a.job = null; const pts = pathTo(a, a.node); release(a); a.ph = "back";
       walkTo(a, pts, () => { sitDesk(a); a.ph = "idle"; a.t = 3 + Math.random() * 4; }); return;
     }
@@ -2196,13 +2229,14 @@ const OFFICE = (() => {
     sync(list) {
       if (!ready) return;
       for (const d of list) { const a = AG.find(x => x.key === d.key); if (!a) continue;
-        const w = d.status === "WORKING", where = d.mode === "dewan" ? "dewan" : "desk", key = (w ? "1" : "0") + where;
+        const w = d.status === "WORKING", where = ["dewan", ...Object.keys(ROOMW)].includes(d.mode) ? d.mode : "desk", key = (w ? "1" : "0") + where;
         if (last[a.key] !== key) { last[a.key] = key; if (w) assign(a, d.activity, where); else endWork(a); }
         else if (w && a.job !== d.activity && (a.ph === "work" || a.ph === "think")) a.job = d.activity; }
       renderList();
     },
     states() { const o = {}; AG.forEach(a => o[a.key] = status(a)); return o; },
     iot(list) { iotFeed(list); },
+    galeri(ids) { if (ready) galeriSet(ids); },
   };
 })();
 
