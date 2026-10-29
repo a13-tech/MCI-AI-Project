@@ -7,12 +7,14 @@ Prinsip hemat token (Gemini Tier 1):
 3. Boss & bot "cepat" memakai model Flash-Lite, thinking diset paling rendah.
 4. Hasil 1 tugas tidak dirangkum ulang; hasil pendek digabung tanpa AI.
 5. Cache jawaban identik 15 menit, pembatas RPM, dan batas token harian.
+
+Studio Gambar: Cloudflare Workers AI (FLUX schnell + img2img), gratis 10.000 neuron/hari.
 """
-import os, io, csv, json, re, time, asyncio, secrets, logging, sqlite3, threading, contextlib, hashlib
+import os, io, csv, json, re, time, base64, asyncio, secrets, logging, sqlite3, threading, contextlib, hashlib
 from collections import deque, OrderedDict
 from datetime import datetime
 
-import pytz, psutil
+import httpx, pytz, psutil
 from flask import Flask, jsonify, abort, request, send_from_directory, make_response, redirect, Response
 from pydantic import BaseModel
 from google import genai
@@ -48,6 +50,13 @@ DATABASE_URL = os.getenv("DATABASE_URL", "")
 PG = bool(DATABASE_URL and psycopg2)
 DB_PATH = os.getenv("DB_PATH", "mci.db")
 ALLOWED = {int(x) for x in os.getenv("ALLOWED_USER_IDS", "").replace(" ", "").split(",") if x.isdigit()}
+CF_ACCOUNT = os.getenv("CF_ACCOUNT_ID", "").strip()
+CF_TOKEN = os.getenv("CF_API_TOKEN", "").strip()
+CF_BASE = os.getenv("CF_API_BASE", "https://api.cloudflare.com/client/v4").rstrip("/")
+CF_MODEL = os.getenv("CF_IMAGE_MODEL", "@cf/black-forest-labs/flux-1-schnell")
+CF_EDIT_MODEL = os.getenv("CF_EDIT_MODEL", "@cf/runwayml/stable-diffusion-v1-5-img2img")
+IMG_DAILY = max(0, int(os.getenv("IMG_DAILY_LIMIT", "150")))   # FLUX 1024px ~58 neuron, jatah gratis 10.000/hari
+IMG_KEEP = max(10, int(os.getenv("IMG_KEEP", "60")))             # jumlah gambar yang disimpan di galeri
 try:
     MCP_SERVERS = json.loads(os.getenv("MCP_SERVERS", "[]"))
 except ValueError:
@@ -153,6 +162,7 @@ def db_init():
         sql(c, f"CREATE TABLE IF NOT EXISTS kas (id {pk}, tanggal TEXT NOT NULL, keterangan TEXT NOT NULL, kategori TEXT NOT NULL, masuk {big} NOT NULL DEFAULT 0, keluar {big} NOT NULL DEFAULT 0, sumber TEXT, dibuat TEXT)")
         sql(c, "CREATE TABLE IF NOT EXISTS pengaturan (k TEXT PRIMARY KEY, v TEXT)")
         sql(c, "CREATE TABLE IF NOT EXISTS skills (nama TEXT PRIMARY KEY, bot TEXT NOT NULL, deskripsi TEXT NOT NULL, pemicu TEXT, isi TEXT NOT NULL, dibuat TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS gambar (id {pk}, prompt TEXT NOT NULL, prompt_en TEXT, sumber TEXT, mime TEXT NOT NULL, data TEXT NOT NULL, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS pemakaian (tanggal TEXT NOT NULL, model TEXT NOT NULL, masuk {big} NOT NULL DEFAULT 0, keluar {big} NOT NULL DEFAULT 0, pikir {big} NOT NULL DEFAULT 0, panggilan {big} NOT NULL DEFAULT 0, PRIMARY KEY (tanggal, model))")
         r = sql(c, "SELECT v FROM pengaturan WHERE k=?", ("s",)).fetchone()
         if r:
@@ -695,6 +705,145 @@ async def kas_parse(teks, foto=None, mime="image/jpeg"):
     return out[:50]
 
 
+# ---------- STUDIO GAMBAR (Cloudflare Workers AI) ----------
+def img_save(prompt, en, sumber, mime, data):
+    now = datetime.now(WIB).isoformat(timespec="seconds")
+    q = "INSERT INTO gambar (prompt,prompt_en,sumber,mime,data,dibuat) VALUES (?,?,?,?,?,?)"
+    p = (prompt[:1000], en[:1500], sumber, mime, base64.b64encode(data).decode(), now)
+    with db() as c:
+        gid = sql(c, q + " RETURNING id", p).fetchone()[0] if PG else sql(c, q, p).lastrowid
+        # galeri dibatasi supaya database gratis (1 GB) tidak penuh
+        sql(c, f"DELETE FROM gambar WHERE id NOT IN (SELECT id FROM gambar ORDER BY id DESC LIMIT {IMG_KEEP})")
+    return gid
+
+
+def img_list():
+    with db() as c:
+        rows = sql(c, "SELECT id,prompt,prompt_en,sumber,mime,dibuat FROM gambar ORDER BY id DESC").fetchall()
+    return [{"id": i, "prompt": p, "prompt_en": e, "sumber": s, "mime": m, "dibuat": d} for i, p, e, s, m, d in rows]
+
+
+def img_get(i):
+    with db() as c:
+        r = sql(c, "SELECT mime,data FROM gambar WHERE id=?", (i,)).fetchone()
+    return (r[0], base64.b64decode(r[1])) if r else None
+
+
+def img_del(i):
+    with db() as c:
+        return sql(c, "DELETE FROM gambar WHERE id=?", (i,)).rowcount
+
+
+def img_today():
+    u = USAGE.get(today(), {})
+    return sum(u.get(m, {}).get("panggilan", 0) for m in {CF_MODEL, CF_EDIT_MODEL})
+
+
+def img_status():
+    return {"aktif": bool(CF_ACCOUNT and CF_TOKEN), "hari_ini": img_today(), "batas": IMG_DAILY, "model": CF_MODEL, "model_edit": CF_EDIT_MODEL}
+
+
+async def cf_run(model, payload):
+    if not (CF_ACCOUNT and CF_TOKEN):
+        raise RuntimeError("Studio Gambar belum aktif: isi CF_ACCOUNT_ID dan CF_API_TOKEN di Render.")
+    url = f"{CF_BASE}/accounts/{CF_ACCOUNT}/ai/run/{model}"
+    try:
+        async with httpx.AsyncClient(timeout=120) as h:
+            r = await h.post(url, headers={"Authorization": f"Bearer {CF_TOKEN}"}, json=payload)
+    except httpx.HTTPError:
+        log.exception("Cloudflare tidak bisa dihubungi")
+        raise RuntimeError("Server gambar Cloudflare tidak bisa dihubungi, coba lagi sebentar.")
+    ct = r.headers.get("content-type", "")
+    if r.status_code != 200:
+        try:
+            msg = "; ".join(str(e.get("message", "")) for e in r.json().get("errors", []))
+        except ValueError:
+            msg = r.text[:200]
+        log.warning("Cloudflare AI %s gagal: HTTP %s %s", model, r.status_code, msg)
+        low = msg.lower()
+        if r.status_code == 429 or "neuron" in low or "quota" in low or "limit" in low:
+            raise RuntimeError("Jatah gambar gratis Cloudflare hari ini habis. Reset tiap jam 07.00 WIB.")
+        if r.status_code in (401, 403):
+            raise RuntimeError("Token Cloudflare ditolak. Cek CF_ACCOUNT_ID, CF_API_TOKEN, dan izin Workers AI.")
+        if "nsfw" in low or "safety" in low or "flagged" in low:
+            raise RuntimeError("Prompt ditolak filter keamanan Cloudflare. Coba kata-kata lain.")
+        raise RuntimeError("Cloudflare gagal membuat gambar, coba lagi.")
+    if ct.startswith("image/"):
+        return r.content, ct.split(";")[0]
+    try:
+        img = (r.json().get("result") or {}).get("image")
+    except ValueError:
+        img = None
+    if not img:
+        raise RuntimeError("Cloudflare tidak mengirim gambar. Coba prompt lain.")
+    return base64.b64decode(img), "image/jpeg"
+
+
+_EN = re.compile(r"\b(the|a|an|of|with|in|on|and|is|are|style|wearing|holding|photo|portrait)\b", re.I)
+_ID = re.compile(r"\b(di|ke|dari|yang|dan|dengan|gaya|warna|lagi|sedang|untuk|pakai|sebuah|seekor|buat|gambar|jadikan|minum|makan)\b", re.I)
+
+
+def _english(p):
+    """Prompt dianggap sudah bahasa Inggris kalau ASCII, ada kata Inggris umum, dan tanpa kata Indonesia umum."""
+    return bool(re.fullmatch(r"[\x00-\x7F]*", p)) and bool(_EN.search(p)) and not _ID.search(p)
+
+
+async def img_prompt(p):
+    """FLUX paling paham bahasa Inggris: prompt Indonesia diterjemahkan dulu pakai model Lite (murah)."""
+    if _english(p):
+        return p
+    try:
+        out = await ask("herald", "Ubah deskripsi gambar berikut jadi prompt bahasa Inggris untuk AI pembuat gambar. "
+                        "Satu paragraf, maksimal 60 kata, jelaskan objek, gaya, warna, pencahayaan, dan komposisi. "
+                        "Tulis promptnya saja tanpa pembuka.\n\nDeskripsi: " + p,
+                        model=MODEL_LITE, act="Menyiapkan prompt gambar", use_mcp=False)
+        out = out.strip().strip('"').strip()
+        return out[:1500] or p
+    except Exception:
+        log.warning("Terjemah prompt gambar gagal, pakai prompt asli")
+        return p
+
+
+def _dim(v):
+    try:
+        return max(256, min(1024, int(int(v) // 64 * 64)))
+    except (TypeError, ValueError):
+        return None
+
+
+async def make_image(prompt, foto=None, kekuatan=0.6, w=None, h=None, sumber="web"):
+    prompt = (prompt or "").strip()[:1000]
+    if not prompt:
+        raise RuntimeError("Tulis dulu gambar yang mau dibuat.")
+    if IMG_DAILY and img_today() >= IMG_DAILY:
+        raise RuntimeError(f"Batas {IMG_DAILY} gambar per hari sudah tercapai. Coba lagi besok.")
+    if not (CF_ACCOUNT and CF_TOKEN):
+        raise RuntimeError("Studio Gambar belum aktif: isi CF_ACCOUNT_ID dan CF_API_TOKEN di Render.")
+    en = await img_prompt(prompt)
+    _begin("herald", "Mengedit foto" if foto else "Menggambar")
+    try:
+        if foto:
+            try:
+                k = max(0.1, min(1.0, float(kekuatan)))
+            except (TypeError, ValueError):
+                k = 0.6
+            body = {"prompt": en, "image_b64": base64.b64encode(foto).decode(), "strength": k, "num_steps": 20,
+                    "negative_prompt": "blurry, low quality, distorted, watermark"}
+            if _dim(w) and _dim(h):
+                body["width"], body["height"] = _dim(w), _dim(h)
+            model = CF_EDIT_MODEL
+        else:
+            body = {"prompt": en, "steps": 4, "seed": secrets.randbelow(2 ** 31)}
+            model = CF_MODEL
+        data, mime = await cf_run(model, body)
+    finally:
+        _end("herald")
+    await asyncio.to_thread(usage_add, model, 0, 0, 0)
+    gid = await asyncio.to_thread(img_save, prompt, en, sumber, mime, data)
+    _log("herald", ("Edit foto: " if foto else "Gambar: ") + prompt, "Selesai", "gambar")
+    return {"id": gid, "mime": mime, "data": data, "prompt": prompt, "prompt_en": en}
+
+
 # ---------- WEB ----------
 app = Flask(__name__, static_folder=None)
 FAILS = {}
@@ -734,7 +883,7 @@ LOGIN = """<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name
 form{width:min(360px,90vw);display:grid;gap:14px;padding:28px;border:1px solid #D4AF5A;border-radius:18px;background:rgba(255,255,255,.06)}
 b{font-size:28px;letter-spacing:.14em;color:#F1D58A}input,button{font:inherit;padding:13px;border-radius:12px;border:0;min-height:44px}
 button{background:#D4AF5A;color:#0A2A6B;font-weight:800;cursor:pointer}p{margin:0;color:#FFB4B4;font-size:14px}</style></head>
-<body><form method="post" action="/login"><b>MCI</b><label for="t">Token akses</label><input id="t" name="t" type="password" autocomplete="current-password" required>%s<button>Masuk</button></form></body></html>"""
+<body><form method="post" action="/login"><b>MCI</b><label for="t">Token akses (admin atau viewer)</label><input id="t" name="t" type="password" autocomplete="current-password" required>%s<button>Masuk</button></form></body></html>"""
 
 
 @app.before_request
@@ -759,6 +908,14 @@ def login():
     return LOGIN % ""
 
 
+@app.route("/logout")
+def logout():
+    """Hapus cookie login lalu kembali ke halaman login (misalnya untuk mencoba mode viewer)."""
+    resp = make_response(redirect("/login"))
+    resp.delete_cookie("mci_auth", samesite="Strict", secure=bool(os.getenv("RENDER")), httponly=True)
+    return resp
+
+
 @app.route("/")
 def index():
     k = request.args.get("k")
@@ -775,7 +932,8 @@ def healthz():
 @app.route("/api/me")
 def api_me():
     need("viewer")
-    return jsonify({"role": role(), **SET, "mcp_siap": bool(MCP_SERVERS and ClientSession), "db_permanen": PG, "lantai": LANTAI})
+    return jsonify({"role": role(), **SET, "mcp_siap": bool(MCP_SERVERS and ClientSession), "db_permanen": PG, "lantai": LANTAI,
+                    "gambar": img_status()})
 
 
 @app.route("/api/office")
@@ -914,6 +1072,45 @@ def api_skill_del(nama):
     return jsonify({"dihapus": skill_del(nama)})
 
 
+@app.route("/api/gambar", methods=["GET", "POST"])
+def api_gambar():
+    need("admin")
+    if request.method == "GET":
+        return jsonify({"items": img_list(), **img_status()})
+    f, foto = request.files.get("foto"), None
+    if f:
+        foto = f.read(4_000_001)
+        if len(foto) > 4_000_000 or not (f.mimetype or "").startswith("image/"):
+            return jsonify({"error": "Foto harus gambar, maksimal 4 MB"}), 400
+    if not LOOP:
+        return jsonify({"error": "Mesin AI belum siap"}), 503
+    coro = make_image(request.form.get("prompt", ""), foto, request.form.get("kekuatan", 0.6),
+                      request.form.get("w"), request.form.get("h"), "web")
+    try:
+        r = asyncio.run_coroutine_threadsafe(coro, LOOP).result(150)
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception:
+        log.exception("buat gambar gagal")
+        return jsonify({"error": "Gagal membuat gambar, coba lagi"}), 502
+    return jsonify({"id": r["id"], "prompt": r["prompt"], "prompt_en": r["prompt_en"], "url": f"/api/gambar/{r['id']}", **img_status()})
+
+
+@app.route("/api/gambar/<int:i>", methods=["GET", "DELETE"])
+def api_gambar_one(i):
+    need("admin")
+    if request.method == "DELETE":
+        return jsonify({"dihapus": img_del(i)})
+    g = img_get(i)
+    if not g:
+        abort(404)
+    ext = "png" if g[0] == "image/png" else "jpg"
+    h = {"Cache-Control": "private, max-age=86400"}
+    if request.args.get("unduh"):
+        h["Content-Disposition"] = f"attachment; filename=mci-gambar-{i}.{ext}"
+    return Response(g[1], mimetype=g[0], headers=h)
+
+
 @app.route("/api/usage")
 def api_usage():
     need("admin")
@@ -991,12 +1188,39 @@ def budget_text():
     return "\n".join(lines)
 
 
+def _tg_photo_pick(photos):
+    """Ambil ukuran foto Telegram terbesar yang masih <= 1024 px (img2img cepat dan stabil)."""
+    ok = [p for p in photos if max(p.width, p.height) <= 1024]
+    return (ok or list(photos[:1]))[-1]
+
+
+GAMBAR_HELP = ("Pakai: /gambar <deskripsi>\nContoh: /gambar robot oranye minum kopi di kantor futuristik, gaya 3D\n"
+               "Edit foto: kirim foto dengan caption /gambar <perubahan>, contoh: /gambar jadikan gaya kartun anime")
+
+
+async def tg_gambar(m, c, prompt, foto_msg=None):
+    await c.bot.send_chat_action(chat_id=m.chat_id, action="upload_photo")
+    try:
+        foto = w = h = None
+        if foto_msg is not None:
+            ps = _tg_photo_pick(foto_msg.photo)
+            f = await ps.get_file()
+            foto, w, h = bytes(await f.download_as_bytearray()), ps.width, ps.height
+        r = await make_image(prompt, foto, 0.6, w, h, "telegram")
+        await m.reply_photo(photo=r["data"], caption=("🎨 " + r["prompt"])[:1000])
+    except RuntimeError as e:
+        await m.reply_text(str(e))
+    except Exception:
+        log.exception("gambar telegram gagal")
+        await m.reply_text("⚠️ Gagal membuat gambar, coba lagi sebentar.")
+
+
 def make_handlers(key):
     cfg = AGENTS[key]
 
     async def start(u, c):
         await u.message.reply_text(f"Halo, saya {cfg['nama']} (Lantai {cfg['lantai']}, {cfg['divisi']}).\n{cfg['peran']}.\n\n"
-                                   "/status  /id  /budget\n/caveman on|off\n/council <pertanyaan>\n/skills  /skill <nama> <teks>")
+                                   "/status  /id  /budget\n/caveman on|off\n/council <pertanyaan>\n/skills  /skill <nama> <teks>\n/gambar <deskripsi>")
 
     async def myid(u, c):
         await u.message.reply_text(f"ID Telegram kamu: {u.effective_user.id}")
@@ -1095,8 +1319,29 @@ def make_handlers(key):
             ans = str(e) if isinstance(e, RuntimeError) else "⚠️ Ada gangguan saat menghubungi Gemini. Coba lagi sebentar."
         await _send(m, ans)
 
+    async def gambar(u, c):
+        if not _ok(u.effective_user):
+            return
+        q = " ".join(c.args or []).strip()
+        if not q:
+            await u.message.reply_text(GAMBAR_HELP)
+            return
+        await tg_gambar(u.message, c, q)
+
     async def photo(u, c):
         m = u.message
+        cap = (m.caption or "").strip()
+        if re.match(r"/gambar(@\w+)?(\s|$)", cap, re.I):  # foto + caption /gambar = edit foto, semua bot
+            if not _ok(u.effective_user):
+                return
+            if m.chat.type != "private" and key != "apex" and "@" not in cap.split()[0]:
+                return
+            q = re.sub(r"^/gambar(@\w+)?", "", cap, flags=re.I).strip()
+            if not q:
+                await m.reply_text(GAMBAR_HELP)
+                return
+            await tg_gambar(m, c, q, m)
+            return
         if key != "ledger" or m.chat.type != "private" or not ALLOWED or not _ok(u.effective_user):
             return
         try:
@@ -1108,7 +1353,7 @@ def make_handlers(key):
         await _send(m, ans)
 
     return {"start": start, "id": myid, "status": status, "tokens": status, "budget": budget, "caveman": caveman,
-            "hapus": hapus, "council": council, "dewan": council, "skills": skills, "skill": skill}, chat, photo
+            "hapus": hapus, "council": council, "dewan": council, "skills": skills, "skill": skill, "gambar": gambar}, chat, photo
 
 
 def _group_cmd(key, f):
@@ -1122,6 +1367,54 @@ def _group_cmd(key, f):
                 return
         return await f(u, c)
     return w
+
+
+def pixel_handlers():
+    """Bot Telegram terpisah khusus gambar (TOKEN_GAMBAR): setiap teks = prompt, foto + caption = edit."""
+    async def start(u, c):
+        await u.message.reply_text("Halo, saya MCI Studio Gambar.\nKirim deskripsi gambar, langsung saya buatkan.\n"
+                                   "Kirim foto + caption untuk mengedit foto.\n/sisa = jatah hari ini, /id = ID Telegram kamu")
+
+    async def myid(u, c):
+        await u.message.reply_text(f"ID Telegram kamu: {u.effective_user.id}")
+
+    async def sisa(u, c):
+        if _ok(u.effective_user):
+            s = img_status()
+            await u.message.reply_text(f"Gambar hari ini: {s['hari_ini']} dari {s['batas'] or 'tanpa batas'}\n"
+                                       f"Mesin: {'aktif' if s['aktif'] else 'BELUM aktif (isi CF_ACCOUNT_ID dan CF_API_TOKEN)'}")
+
+    async def gambar(u, c):
+        if not _ok(u.effective_user):
+            return
+        q = " ".join(c.args or []).strip()
+        if not q:
+            await u.message.reply_text(GAMBAR_HELP)
+            return
+        await tg_gambar(u.message, c, q)
+
+    async def teks(u, c):
+        m = u.message
+        if not m or not m.text or not _addressed(u, c):
+            return
+        if not _ok(u.effective_user):
+            await m.reply_text(f"Akses ditolak. ID kamu: {u.effective_user.id}")
+            return
+        q = m.text.replace(f"@{c.bot.username}", "").strip() if c.bot.username else m.text
+        if q:
+            await tg_gambar(m, c, q)
+
+    async def foto(u, c):
+        m = u.message
+        if not _ok(u.effective_user):
+            return
+        q = re.sub(r"^/gambar(@\w+)?", "", (m.caption or "").strip(), flags=re.I).strip()
+        if not q:
+            await m.reply_text("Tambahkan caption berisi perubahan yang kamu mau.\nContoh: jadikan gaya kartun anime")
+            return
+        await tg_gambar(m, c, q, m)
+
+    return {"start": start, "id": myid, "sisa": sisa, "gambar": gambar, "teks": teks, "foto": foto}
 
 
 async def on_error(update, context):
@@ -1156,6 +1449,20 @@ async def run_bots():
         except Exception:
             log.exception("[%s] gagal start", cfg["nama"])
     log.info("%d bot Telegram online dari %d agen. Model utama %s, model lite %s, RPM %d", on, len(AGENTS), MODEL, MODEL_LITE, RPM)
+    tok = os.getenv("TOKEN_GAMBAR")
+    if tok:
+        try:
+            tg = ApplicationBuilder().token(tok).build()
+            for n, f in pixel_handlers().items():
+                tg.add_handler(CommandHandler(n, f) if n not in ("teks", "foto") else
+                               MessageHandler(filters.PHOTO if n == "foto" else (filters.TEXT & ~filters.COMMAND), f))
+            tg.add_error_handler(on_error)
+            await tg.initialize()
+            await tg.start()
+            await tg.updater.start_polling(drop_pending_updates=True)
+            log.info("[MCI Studio Gambar] bot gambar terpisah online (aktif=%s)", bool(CF_ACCOUNT and CF_TOKEN))
+        except Exception:
+            log.exception("[MCI Studio Gambar] gagal start")
     await asyncio.Event().wait()
 
 

@@ -25,6 +25,10 @@ button,input,select,textarea{font:inherit}
 .nv:focus-visible{outline:2px solid var(--gold2)}
 .cv{margin-top:auto;padding:14px;border-radius:14px;background:rgba(255,255,255,.07);color:#DCE6FB;font-size:12px;line-height:1.5}
 .cv b{color:var(--gold2)}
+.who{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;padding:10px 12px;border-radius:12px;border:1px solid rgba(212,175,90,.35);color:#DCE6FB;font-size:12px}
+.who b{color:var(--gold2)}
+.lo{color:var(--navy);background:var(--gold);border-radius:10px;padding:8px 12px;font-weight:800;text-decoration:none;min-height:36px;display:inline-flex;align-items:center}
+.lo:focus-visible{outline:2px solid #fff}
 main{flex:1;min-width:0;padding:28px 32px;max-width:1300px}
 h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.01em}
 h2{margin:22px 0 10px;font-size:17px}
@@ -66,6 +70,18 @@ td{padding:10px;border-top:1px solid #E6EDFB;vertical-align:top}
 .sw input{width:22px;height:22px}
 .tm{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
 .fl{display:grid;gap:10px;grid-template-columns:1fr 1fr}
+/* ---------- Studio Gambar ---------- */
+.gup{display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#F3F7FF;border:1px dashed #BFD0F2;border-radius:14px;padding:12px;margin-bottom:12px}
+.gup img{width:96px;height:96px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.gup input[type=range]{width:min(260px,60vw);accent-color:var(--gold)}
+.gout{margin-top:6px}
+.gout img{display:block;width:100%;max-width:560px;border-radius:14px;border:1px solid var(--line);background:#EAF1FF}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:12px}
+.gal figure{margin:0;background:#F3F7FF;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.gal img{width:100%;aspect-ratio:1;object-fit:cover;cursor:zoom-in;display:block;background:#EAF1FF}
+.gal figcaption{padding:0 10px;margin:8px 0;font-size:12px;line-height:1.4;max-height:2.8em;color:var(--mute);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.gal .bar{padding:0 10px 10px;margin:0}
+.gal .bar a,.gal .bar button{padding:6px 10px;min-height:34px;font-size:12px;text-decoration:none;display:inline-flex;align-items:center}
 .fl label{display:grid;gap:5px;font-size:12.5px;font-weight:600;color:var(--mute)}
 .fl .full{grid-column:1/-1}
 
@@ -125,9 +141,11 @@ td{padding:10px;border-top:1px solid #E6EDFB;vertical-align:top}
  <button class="nv on" data-p="cmd">Command Center</button>
  <button class="nv" data-p="office">Virtual Office</button>
  <button class="nv" data-p="kas">Keuangan AI</button>
+ <button class="nv" data-p="gambar">Studio Gambar</button>
  <button class="nv" data-p="skills">Skills</button>
  <button class="nv" data-p="tim">Tim & Token</button>
  <div class="cv"><b>Hemat token</b><br>Router lokal, skill, model Lite, cache, dan mode Caveman.</div>
+ <div class="who"><span id="whoRole">Memuat…</span><a class="lo" id="logout" href="/logout">Keluar</a></div>
 </aside>
 <main>
  <div class="demo" id="demoBanner" hidden>DEMO: semua data contoh. Tanpa server dan tanpa AI sungguhan.</div>
@@ -194,6 +212,32 @@ td{padding:10px;border-top:1px solid #E6EDFB;vertical-align:top}
   </div>
  </section>
 
+ <section id="p-gambar" class="pg" hidden>
+  <h1>Studio Gambar</h1>
+  <p class="mu">Tulis gambar yang kamu mau, atau upload foto untuk diubah. Gratis lewat Cloudflare Workers AI; Herald yang menggambar di Lantai 1.</p>
+  <div class="cd" id="gmOff" hidden><b>Studio Gambar belum aktif.</b><div class="mu" style="margin-top:6px">Isi <code>CF_ACCOUNT_ID</code> dan <code>CF_API_TOKEN</code> di Render → Environment, lalu tunggu deploy selesai.</div></div>
+  <div class="cd"><b>Buat gambar</b>
+   <textarea id="gp" rows="3" aria-label="Deskripsi gambar" placeholder="Contoh: robot oranye lucu minum kopi di kantor futuristik biru emas, gaya 3D, cahaya hangat" style="margin:10px 0 12px"></textarea>
+   <div class="bar">
+    <label class="bt o" for="gf" style="display:inline-flex;align-items:center">Upload foto</label>
+    <input id="gf" type="file" accept="image/*" hidden>
+    <span class="mu" id="gfn">Tanpa foto = gambar baru dari teks</span>
+   </div>
+   <div class="gup" id="gfp" hidden>
+    <img id="gfi" alt="Foto yang diupload">
+    <div style="display:grid;gap:6px">
+     <label for="gk" style="font-weight:700;font-size:13px">Seberapa banyak diubah: <span id="gkv">60%</span></label>
+     <input type="range" id="gk" min="0.2" max="0.9" step="0.05" value="0.6">
+     <span class="mu" style="font-size:12px">Kecil = mirip foto asli, besar = lebih bebas mengikuti teks</span>
+    </div>
+    <button class="bt o" id="gfx" type="button">Hapus foto</button>
+   </div>
+   <div class="bar"><button class="bt g" id="gb">Buat gambar</button><span class="mu" id="gq"></span></div>
+   <div id="gr" class="gout"></div>
+  </div>
+  <div class="cd"><div class="bar" style="justify-content:space-between;margin:0"><b>Galeri</b><span class="mu" style="font-size:12px">Gambar terbaru disimpan permanen</span></div><div class="gal" id="gg"></div></div>
+ </section>
+
  <section id="p-skills" class="pg" hidden>
   <h1>Skills</h1>
   <p class="mu">Skill = instruksi siap pakai untuk satu bot. Dipicu kata kunci, jadi Boss tidak perlu dipanggil. Isi lengkapnya hanya dikirim ke AI saat skill dipakai.</p>
@@ -234,6 +278,7 @@ const num = n => Number(n || 0).toLocaleString("id-ID");
 let LANTAI = {1: "Lobby & Santai", 2: "Divisi Teknik", 3: "Operasional & Keuangan", 4: "Eksekutif"};
 
 /* ================= DATA DEMO (hanya jika DEMO) ================= */
+const MOCK_IMG = id => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0A2A6B"/><stop offset="1" stop-color="${["#D4AF5A", "#38bdf8", "#f472b6", "#22c55e"][id % 4]}"/></linearGradient></defs><rect width="512" height="512" fill="url(#g)"/><circle cx="256" cy="230" r="90" fill="#EA8A3C"/><circle cx="226" cy="215" r="14" fill="#0B1F4D"/><circle cx="286" cy="215" r="14" fill="#0B1F4D"/><text x="256" y="400" font-family="sans-serif" font-size="34" fill="#fff" text-anchor="middle">DEMO #${id}</text></svg>`);
 const MOCK = (() => {
   const pick = a => a[Math.floor(Math.random() * a.length)];
   const A = [
@@ -257,6 +302,7 @@ const MOCK = (() => {
     {nama:"laporan-mingguan",bot:"scribe",deskripsi:"Laporan mingguan format resmi MCI",pemicu:"laporan mingguan",isi:"Judul, ringkasan, pencapaian, kendala, rencana."},
     {nama:"cek-wiring",bot:"aegis",deskripsi:"Checklist keselamatan rangkaian",pemicu:"cek wiring, cek rangkaian",isi:"Tegangan, polaritas, ground, arus pin, korsleting."},
     {nama:"pinout-esp32",bot:"pulse",deskripsi:"Pemetaan pin ESP32 DevKit",pemicu:"pinout esp32",isi:"Tabel pin, hindari GPIO 6-11."}];
+  let gid = 3; const GAL = [{id: 2, prompt: "robot oranye minum kopi di kantor biru emas"}, {id: 1, prompt: "kapal monitoring otonom di laut saat senja"}];
   let nid = 5, pv = [], council = {u: Date.now() + 25000, on: false, m: []};
   const kas = () => { let s = 0; const rows = K.map(r => ({...r, saldo: s += r.masuk - r.keluar}));
     const m = K.reduce((a, r) => a + r.masuk, 0), x = K.reduce((a, r) => a + r.keluar, 0);
@@ -290,6 +336,9 @@ const MOCK = (() => {
     if (u === "/api/skills") return {skills: SK, bots: A.map(a => ({key: a[0], nama: a[1]}))};
     if (u.startsWith("/api/skills/")) { const n = decodeURIComponent(u.split("/").pop()), i = SK.findIndex(s => s.nama === n); if (i >= 0) SK.splice(i, 1); return {dihapus: 1}; }
     if (u === "/api/settings") return JSON.parse(o.body || "{}");
+    if (u === "/api/gambar" && o && o.method === "POST") { await sleep(900); const p = o.body.get("prompt"); GAL.unshift({id: gid, prompt: p, prompt_en: "(DEMO) " + p}); return {id: gid++, prompt: p, prompt_en: "(DEMO) " + p, aktif: true, hari_ini: GAL.length, batas: 150}; }
+    if (u === "/api/gambar") return {items: GAL, aktif: true, hari_ini: GAL.length, batas: 150};
+    if (u.startsWith("/api/gambar/")) { const i = +u.split("/").pop(), k = GAL.findIndex(g => g.id === i); if (k >= 0) GAL.splice(k, 1); return {dihapus: 1}; }
     return {};
   };
 })();
@@ -315,6 +364,7 @@ function show(p) {
   if (p === "kas") loadKas();
   if (p === "tim") { renderTim(); loadUsage(); }
   if (p === "skills") loadSkills();
+  if (p === "gambar") loadGambar();
 }
 $$(".nv").forEach(b => b.onclick = () => show(b.dataset.p));
 
@@ -398,6 +448,60 @@ $("#bs").onclick = async () => {
     if (!ok) throw new Error("Terlalu lama. Cek lagi nanti di daftar tugas.");
   } catch (e) { o.innerHTML = '<p style="color:#FFB4B4;font-weight:600">' + esc(e.message) + "</p>"; }
   b.disabled = false; loadKas(true); loadUsage();
+};
+
+/* Studio Gambar */
+let GFOTO = null;   // {blob, w, h} hasil resize di browser
+function gQuota(d) {
+  if (!d) return;
+  $("#gmOff").hidden = !!d.aktif;
+  $("#gq").textContent = d.batas ? `${d.hari_ini} dari ${d.batas} gambar hari ini` : `${d.hari_ini} gambar hari ini`;
+}
+function gImg(id) { return DEMO ? MOCK_IMG(id) : "/api/gambar/" + id; }
+async function loadGambar() {
+  if (ME.role !== "admin") return;
+  try {
+    const d = await api("/api/gambar"); gQuota(d);
+    $("#gg").innerHTML = d.items.map(g => `<figure><img src="${gImg(g.id)}" alt="${esc(g.prompt)}" loading="lazy" data-zoom="${g.id}"><figcaption title="${esc(g.prompt)}">${esc(g.prompt)}</figcaption><div class="bar"><a class="bt o" href="${gImg(g.id)}${DEMO ? "" : "?unduh=1"}" download="mci-gambar-${g.id}">Unduh</a><button class="bt o" data-gd="${g.id}" aria-label="Hapus gambar ${g.id}">Hapus</button></div></figure>`).join("") || '<div class="mu">Belum ada gambar. Coba buat yang pertama!</div>';
+    $$("[data-zoom]").forEach(i => i.onclick = () => window.open(i.src, "_blank"));
+    $$("[data-gd]").forEach(b => b.onclick = async () => { if (confirm("Hapus gambar ini?")) { await api("/api/gambar/" + b.dataset.gd, {method: "DELETE"}); loadGambar(); } });
+  } catch (e) { $("#gg").innerHTML = '<div class="er">' + esc(e.message) + "</div>"; }
+}
+function resizeFoto(file) {   // perkecil di browser (maks 768 px) supaya upload cepat dan img2img stabil
+  return new Promise((ok, no) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const s = Math.min(1, 768 / Math.max(img.width, img.height));
+      const w = Math.max(256, Math.round(img.width * s / 64) * 64), h = Math.max(256, Math.round(img.height * s / 64) * 64);
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h); URL.revokeObjectURL(url);
+      c.toBlob(b => b ? ok({blob: b, w, h, url: c.toDataURL("image/jpeg", .7)}) : no(new Error("Foto tidak bisa dibaca")), "image/jpeg", .9);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); no(new Error("File bukan gambar yang bisa dibaca")); };
+    img.src = url;
+  });
+}
+$("#gf").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { GFOTO = await resizeFoto(f); $("#gfi").src = GFOTO.url; $("#gfp").hidden = false; $("#gfn").textContent = f.name + " · akan diubah sesuai teks"; $("#gb").textContent = "Ubah foto"; }
+  catch (er) { GFOTO = null; $("#gfn").textContent = er.message; }
+};
+$("#gfx").onclick = () => { GFOTO = null; $("#gf").value = ""; $("#gfp").hidden = true; $("#gfn").textContent = "Tanpa foto = gambar baru dari teks"; $("#gb").textContent = "Buat gambar"; };
+$("#gk").oninput = e => $("#gkv").textContent = Math.round(e.target.value * 100) + "%";
+$("#gb").onclick = async () => {
+  const t = $("#gp").value.trim();
+  if (!t) { $("#gr").innerHTML = '<p class="er">Tulis dulu gambar yang mau dibuat.</p>'; return; }
+  const b = $("#gb"); b.disabled = true;
+  $("#gr").innerHTML = `<p class="mu">Herald sedang ${GFOTO ? "mengubah foto" : "menggambar"}… biasanya 5–20 detik.</p>`;
+  const fd = new FormData(); fd.append("prompt", t);
+  if (GFOTO) { fd.append("foto", GFOTO.blob, "foto.jpg"); fd.append("kekuatan", $("#gk").value); fd.append("w", GFOTO.w); fd.append("h", GFOTO.h); }
+  try {
+    const r = await api("/api/gambar", {method: "POST", body: fd}); gQuota(r);
+    const src = gImg(r.id);
+    $("#gr").innerHTML = `<img src="${src}" alt="${esc(r.prompt)}"><div class="bar" style="margin-top:10px"><a class="bt g" href="${src}${DEMO ? "" : "?unduh=1"}" download="mci-gambar-${r.id}" style="text-decoration:none;display:inline-flex;align-items:center">Unduh</a><span class="mu" style="font-size:12px">Prompt ke AI: ${esc(r.prompt_en)}</span></div>`;
+    loadGambar();
+  } catch (e) { $("#gr").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
+  b.disabled = false;
 };
 
 /* Kas */
@@ -1482,6 +1586,8 @@ const OFFICE = (() => {
   if (DEMO) { $("#demoBanner").hidden = false; $("#csv").removeAttribute("href"); $("#csv").onclick = e => { e.preventDefault(); alert("Ekspor CSV aktif di versi server."); }; }
   try { ME = await api("/api/me"); if (ME.lantai) LANTAI = ME.lantai; } catch (e) { return; }
   if (ME.role !== "admin") $$(".nv").forEach(b => { if (b.dataset.p !== "office") b.style.display = "none"; });
+  $("#whoRole").innerHTML = "Masuk sebagai <b>" + (ME.role === "admin" ? "Admin" : "Viewer") + "</b>";
+  if (DEMO) $("#logout").onclick = e => { e.preventDefault(); alert("Tombol Keluar aktif di versi server."); };
   await poll();
   if (ME.role === "admin") { loadKas(true); loadUsage(); }
   show(DEMO || ME.role !== "admin" ? "office" : "cmd");
