@@ -56,7 +56,9 @@ CF_BASE = os.getenv("CF_API_BASE", "https://api.cloudflare.com/client/v4").rstri
 CF_MODEL = os.getenv("CF_IMAGE_MODEL", "@cf/black-forest-labs/flux-1-schnell")
 CF_EDIT_MODEL = os.getenv("CF_EDIT_MODEL", "@cf/runwayml/stable-diffusion-v1-5-img2img")
 IMG_DAILY = max(0, int(os.getenv("IMG_DAILY_LIMIT", "150")))   # FLUX 1024px ~58 neuron, jatah gratis 10.000/hari
-IMG_KEEP = max(10, int(os.getenv("IMG_KEEP", "60")))             # jumlah gambar yang disimpan di galeri
+IMG_KEEP = max(10, int(os.getenv("IMG_KEEP", "60")))
+IOT_KEY = os.getenv("IOT_KEY", "").strip()                      # kunci rahasia perangkat ESP32 (header X-IOT-KEY)
+IOT_DAYS = max(1, int(os.getenv("IOT_DAYS", "7")))              # data sensor disimpan berapa hari             # jumlah gambar yang disimpan di galeri
 try:
     MCP_SERVERS = json.loads(os.getenv("MCP_SERVERS", "[]"))
 except ValueError:
@@ -165,6 +167,7 @@ def db_init():
         sql(c, "CREATE TABLE IF NOT EXISTS pengaturan (k TEXT PRIMARY KEY, v TEXT)")
         sql(c, "CREATE TABLE IF NOT EXISTS skills (nama TEXT PRIMARY KEY, bot TEXT NOT NULL, deskripsi TEXT NOT NULL, pemicu TEXT, isi TEXT NOT NULL, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS memori (id {pk}, waktu TEXT NOT NULL, sumber TEXT, bot TEXT, jalur TEXT, perintah TEXT NOT NULL, jawaban TEXT, kadaluarsa TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS iot (id {pk}, ts {big} NOT NULL, perangkat TEXT NOT NULL, data TEXT NOT NULL)")
         sql(c, f"CREATE TABLE IF NOT EXISTS gambar (id {pk}, prompt TEXT NOT NULL, prompt_en TEXT, sumber TEXT, mime TEXT NOT NULL, data TEXT NOT NULL, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS pemakaian (tanggal TEXT NOT NULL, model TEXT NOT NULL, masuk {big} NOT NULL DEFAULT 0, keluar {big} NOT NULL DEFAULT 0, pikir {big} NOT NULL DEFAULT 0, panggilan {big} NOT NULL DEFAULT 0, PRIMARY KEY (tanggal, model))")
         r = sql(c, "SELECT v FROM pengaturan WHERE k=?", ("s",)).fetchone()
@@ -957,6 +960,107 @@ def tentang_save(d):
     return out
 
 
+# ---------- LAB IOT (data sensor dari ESP32) ----------
+IOT_LAST, IOT_HIST, IOT_SEEN, RULE_HIT, TG_APPS = {}, {}, {}, {}, {}
+IOT_RULES = []
+_IOT_N = [0]
+PRIV = re.compile(r"(lat|lon|lng|gps)", re.I)   # data lokasi hanya untuk admin
+DEV_OK = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
+KEY_OK = re.compile(r"^[a-z0-9_]{1,24}$")
+
+
+def iot_clean(d):
+    out = {}
+    for k, v in list((d or {}).items())[:16]:
+        k = str(k).lower()
+        if not KEY_OK.match(k):
+            continue
+        if isinstance(v, bool) or isinstance(v, (int, float)):
+            if isinstance(v, float) and v != v:   # NaN
+                continue
+            out[k] = v if isinstance(v, bool) else round(float(v), 4)
+        elif isinstance(v, str):
+            out[k] = v[:40]
+    return out
+
+
+def iot_load():
+    """Saat start, isi grafik dari database (maks 240 titik terakhir per perangkat)."""
+    try:
+        with db() as c:
+            rows = sql(c, "SELECT ts,perangkat,data FROM iot ORDER BY id DESC LIMIT 3000").fetchall()
+            r = sql(c, "SELECT v FROM pengaturan WHERE k=?", ("iot_rules",)).fetchone()
+        for ts, pr, data in reversed(rows):
+            d = json.loads(data)
+            IOT_HIST.setdefault(pr, deque(maxlen=240)).append((ts, d))
+            IOT_LAST[pr] = {"ts": ts, "data": d}
+        IOT_RULES[:] = json.loads(r[0]) if r else []
+    except Exception:
+        log.exception("Gagal memuat data IoT")
+
+
+def iot_save(pr, ts, d):
+    with db() as c:
+        sql(c, "INSERT INTO iot (ts,perangkat,data) VALUES (?,?,?)", (ts, pr, json.dumps(d)))
+        _IOT_N[0] += 1
+        if _IOT_N[0] % 200 == 0:   # buang data lama supaya database gratis tidak penuh
+            sql(c, "DELETE FROM iot WHERE ts < ?", (int(time.time()) - IOT_DAYS * 86400,))
+
+
+def iot_public(admin, full=False):
+    now, out = time.time(), []
+    for pr in sorted(IOT_LAST):
+        last = IOT_LAST[pr]
+        hide = (lambda k: False) if admin else (lambda k: bool(PRIV.search(k)))
+        data = {k: v for k, v in last["data"].items() if not hide(k)}
+        item = {"perangkat": pr, "ts": last["ts"], "online": now - last["ts"] < 60, "data": data}
+        if full:
+            hist = {}
+            for ts, d in list(IOT_HIST.get(pr, []))[-120:]:
+                for k, v in d.items():
+                    if isinstance(v, (int, float)) and not isinstance(v, bool) and not hide(k):
+                        hist.setdefault(k, []).append([ts, v])
+            item["hist"] = hist
+        out.append(item)
+    return out
+
+
+def _cek(v, op, n):
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return False
+    return v < n if op == "<" else v > n if op == ">" else v == n
+
+
+async def iot_alert(pr, rule, val):
+    teks = f"⚠️ ALARM {pr}: {rule['metrik']} = {val} ({rule['op']} {rule['nilai']})" + (f"\n{rule['pesan']}" if rule.get("pesan") else "")
+    _begin("aegis", "Cek alarm IoT")
+    try:
+        _log("aegis", teks.replace("\n", " "), "Alarm", "iot")
+        app_ = TG_APPS.get("aegis") or next(iter(TG_APPS.values()), None)
+        for uid in ALLOWED if app_ else []:
+            try:
+                await app_.bot.send_message(chat_id=uid, text=teks)
+            except Exception:
+                log.warning("Alarm IoT tidak terkirim ke %s (sudah /start bot Aegis?)", uid)
+        await asyncio.sleep(2)
+    finally:
+        _end("aegis")
+
+
+def iot_rules_check(pr, d):
+    now = time.time()
+    for i, r in enumerate(IOT_RULES):
+        if r.get("perangkat") not in ("*", pr) or r.get("metrik") not in d:
+            continue
+        if _cek(d[r["metrik"]], r.get("op"), float(r.get("nilai", 0))):
+            key = (i, pr)
+            if now - RULE_HIT.get(key, 0) > 600 and LOOP:   # jeda 10 menit per aturan
+                RULE_HIT[key] = now
+                asyncio.run_coroutine_threadsafe(iot_alert(pr, r, d[r["metrik"]]), LOOP)
+
+
 # ---------- WEB ----------
 app = Flask(__name__, static_folder=None)
 
@@ -1101,7 +1205,7 @@ def api_office():
     ags.append({"key": "canvas", "name": CANVAS["nama"], "peran": CANVAS["peran"], "boss": False, "lantai": 1, "divisi": CANVAS["divisi"],
                 "status": o[0], "activity": o[1], "mode": o[2], "model": "cloudflare-flux", "gemini": bool(CF_TOKEN),
                 "telegram": bool(os.getenv("TOKEN_GAMBAR")), **({"calls": img_today(), "tokens": 0} if adm else {})})
-    body = json.dumps({"agents": ags, "log": list(TASKLOG) if adm else [], "lantai": LANTAI})
+    body = json.dumps({"agents": ags, "log": list(TASKLOG) if adm else [], "lantai": LANTAI, "iot": iot_public(adm)})
     _OFFICE_CACHE[adm] = (time.time(), body)
     return Response(body, mimetype="application/json")
 
@@ -1301,6 +1405,71 @@ def api_tentang():
         need("admin")
         return jsonify(tentang_save(request.get_json(silent=True) or {}))
     return jsonify(tentang_get())
+
+
+@app.route("/api/iot", methods=["GET", "POST"])
+def api_iot():
+    if request.method == "POST":   # dipanggil ESP32: header X-MCI: 1 dan X-IOT-KEY
+        if not (IOT_KEY and _eq(request.headers.get("X-IOT-KEY", ""), IOT_KEY)):
+            return jsonify({"error": "kunci IoT salah"}), 401
+        d = request.get_json(silent=True) or {}
+        pr = str(d.get("perangkat", "")).strip().lower()
+        if not DEV_OK.match(pr):
+            return jsonify({"error": "nama perangkat: huruf kecil, angka, minus, maks 32"}), 400
+        if pr not in IOT_LAST and len(IOT_LAST) >= 12:
+            return jsonify({"error": "maksimal 12 perangkat"}), 400
+        now = time.time()
+        if now - IOT_SEEN.get(pr, 0) < 1.0:
+            return jsonify({"error": "terlalu cepat, kirim maks 1x per detik"}), 429
+        IOT_SEEN[pr] = now
+        data = iot_clean(d.get("data") if isinstance(d.get("data"), dict) else {})
+        if not data:
+            return jsonify({"error": "data kosong"}), 400
+        ts = int(now)
+        IOT_LAST[pr] = {"ts": ts, "data": {**IOT_LAST.get(pr, {}).get("data", {}), **data}}   # nilai terakhir tiap metrik
+        IOT_HIST.setdefault(pr, deque(maxlen=240)).append((ts, data))
+        try:
+            iot_save(pr, ts, data)
+        except Exception:
+            log.exception("Gagal simpan data IoT")
+        iot_rules_check(pr, data)
+        return jsonify({"ok": True})
+    need("viewer")
+    adm = role() == "admin"
+    out = {"devices": iot_public(adm, full=True), "aktif": bool(IOT_KEY)}
+    if adm:
+        out.update(rules=IOT_RULES, key=IOT_KEY, endpoint=request.host_url.rstrip("/") + "/api/iot", hari=IOT_DAYS)
+    return jsonify(out)
+
+
+@app.route("/api/iot/rules", methods=["POST"])
+def api_iot_rules():
+    need("admin")
+    rules = []
+    for r in ((request.get_json(silent=True) or {}).get("rules") or [])[:30]:
+        try:
+            m = str(r.get("metrik", "")).lower()
+            if not KEY_OK.match(m) or r.get("op") not in ("<", ">", "="):
+                continue
+            pr = str(r.get("perangkat", "*")).lower() or "*"
+            rules.append({"perangkat": pr if pr == "*" or DEV_OK.match(pr) else "*", "metrik": m, "op": r["op"],
+                          "nilai": float(r.get("nilai", 0)), "pesan": str(r.get("pesan", ""))[:120]})
+        except (TypeError, ValueError, AttributeError):
+            continue
+    IOT_RULES[:] = rules
+    with db() as c:
+        sql(c, "INSERT INTO pengaturan (k,v) VALUES (?,?) ON CONFLICT (k) DO UPDATE SET v=excluded.v", ("iot_rules", json.dumps(rules)))
+    return jsonify({"rules": rules})
+
+
+@app.route("/api/iot/<perangkat>", methods=["DELETE"])
+def api_iot_del(perangkat):
+    need("admin")
+    pr = perangkat.lower()
+    IOT_LAST.pop(pr, None); IOT_HIST.pop(pr, None)
+    with db() as c:
+        n = sql(c, "DELETE FROM iot WHERE perangkat=?", (pr,)).rowcount
+    return jsonify({"dihapus": n})
 
 
 @app.route("/api/usage")
@@ -1648,6 +1817,7 @@ async def run_bots():
             await tg.initialize()
             await tg.start()
             await tg.updater.start_polling(drop_pending_updates=True)
+            TG_APPS[key] = tg
             on += 1
             log.info("[%s] online di Telegram (Lantai %s)", cfg["nama"], cfg["lantai"])
         except Exception:
@@ -1676,6 +1846,7 @@ if __name__ == "__main__":
     try:
         db_init()
         usage_load()
+        iot_load()
     except Exception:
         log.exception("Database gagal diinisialisasi (cek DATABASE_URL)")
     threading.Thread(target=run_flask, daemon=True).start()
