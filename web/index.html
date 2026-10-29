@@ -106,6 +106,16 @@ td{padding:10px;border-top:1px solid #E6EDFB;vertical-align:top}
 .clr{position:absolute;top:8px;right:8px;border:1px solid #BFD0F2;background:#fff;color:var(--navy);border-radius:99px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;min-height:28px;line-height:1}
 .clr:hover{background:#F3F7FF}.clr:focus-visible{outline:2px solid var(--gold)}
 .clr[hidden]{display:none!important}
+.iotg{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:16px}
+.iotg .cd{margin:0}
+.iotm{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:end;padding:10px 0;border-top:1px solid var(--line)}
+.iotm .k{font-size:12px;color:var(--mute)}.iotm .v{font-size:24px;font-weight:800;color:var(--navy)}
+.iotm svg{grid-column:1/3;width:100%;height:38px}
+.dotx{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.kv{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.kv span{min-width:80px;font-size:13px;color:var(--mute)}
+.kv code{background:#F3F7FF;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;word-break:break-all;flex:1;min-width:0}
+pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;padding-top:44px;font-size:12px;line-height:1.5;max-height:420px;overflow:auto;white-space:pre;margin:0}
+.iotr input,.iotr select{padding:7px 8px;min-width:70px}.iotr td{vertical-align:middle}
 /* ---------- Studio Gambar ---------- */
 .gup{display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#F3F7FF;border:1px dashed #BFD0F2;border-radius:14px;padding:12px;margin-bottom:12px}
 .gup img{width:96px;height:96px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
@@ -179,6 +189,7 @@ td{padding:10px;border-top:1px solid #E6EDFB;vertical-align:top}
  <button class="nv" data-p="kas">Keuangan AI</button>
  <button class="nv" data-p="gambar">Studio Gambar</button>
  <button class="nv" data-p="memori">Memori</button>
+ <button class="nv" data-p="iot">Lab IoT</button>
  <button class="nv" data-p="skills">Skills</button>
  <button class="nv" data-p="tim">Tim & Token</button>
  <button class="nv" data-p="tentang">Tentang Kami</button>
@@ -217,7 +228,7 @@ td{padding:10px;border-top:1px solid #E6EDFB;vertical-align:top}
   <div id="views">
    <div class="grp"><button class="vb on" data-view="gedung">Gedung</button></div>
    <div class="grp"><span class="lbl">LANTAI</span><button class="vb" data-view="f0">LT 1</button><button class="vb" data-view="f1">LT 2</button><button class="vb" data-view="f2">LT 3</button><button class="vb" data-view="f3">LT 4</button></div>
-   <div class="grp"><span class="lbl">RUANGAN</span><button class="vb" data-view="lounge">Lounge</button><button class="vb" data-view="pantry">Pantry</button><button class="vb" data-view="game">Game</button><button class="vb" data-view="lab">Lab Teknik</button><button class="vb" data-view="meeting">Meeting</button><button class="vb" data-view="dewan">Ruang Dewan</button><button class="vb" data-view="ceo">Ruang CEO</button></div>
+   <div class="grp"><span class="lbl">RUANGAN</span><button class="vb" data-view="lounge">Lounge</button><button class="vb" data-view="pantry">Pantry</button><button class="vb" data-view="game">Game</button><button class="vb" data-view="lab">Lab Teknik</button><button class="vb" data-view="meeting">Meeting</button><button class="vb" data-view="dewan">Ruang Dewan</button><button class="vb" data-view="ceo">Ruang CEO</button><button class="vb" data-view="galeri">Galeri</button><button class="vb" data-view="labiot">Lab IoT</button><button class="vb" data-view="perpus">Perpustakaan</button><button class="vb" data-view="observ">Observatorium</button></div>
   </div>
   <div id="stage">
    <div id="chips"></div>
@@ -297,6 +308,25 @@ td{padding:10px;border-top:1px solid #E6EDFB;vertical-align:top}
   <div id="ml"></div>
  </section>
 
+ <section id="p-iot" class="pg" hidden>
+  <h1>Lab IoT</h1>
+  <p class="mu">Data sensor ESP32 secara langsung. Nilai terbaru juga tampil di dinding layar Lab Komputer (LT 2) kantor 3D, dan Aegis mengirim alarm Telegram kalau ada aturan yang terlewati.</p>
+  <div id="iotWarn"></div>
+  <div class="iotg" id="iotDev"></div>
+  <div class="cd">
+   <div class="bar" style="justify-content:space-between;margin:0 0 6px"><b>Aturan alarm (Aegis)</b><span class="mu" style="font-size:12px">Jeda 10 menit per aturan supaya tidak spam</span></div>
+   <div class="tb"><table class="iotr"><thead><tr><th>Perangkat</th><th>Metrik</th><th>Kondisi</th><th>Nilai</th><th>Pesan</th><th></th></tr></thead><tbody id="iotRules"></tbody></table></div>
+   <div class="bar" style="margin:12px 0 0"><button class="bt o" id="iotAdd">+ Tambah aturan</button><button class="bt g" id="iotSave">Simpan aturan</button><span class="mu" id="iotMsg"></span></div>
+  </div>
+  <div class="cd">
+   <b>Sambungkan ESP32</b>
+   <div class="kv"><span>Endpoint</span><code id="iotEp">-</code><button class="clr" style="position:static" data-cp="iotEp">Salin</button></div>
+   <div class="kv"><span>Kunci IoT</span><code id="iotKey">-</code><button class="clr" style="position:static" id="iotShow">Lihat</button><button class="clr" style="position:static" data-cp="iotKey">Salin</button></div>
+   <p class="mu" style="font-size:12.5px;margin:10px 0">Kode di bawah sudah terisi endpoint dan kunci. Ganti nama & password WiFi, lalu upload ke ESP32 dari Arduino IDE (board "ESP32 Dev Module").</p>
+   <div class="tw"><pre class="code" id="iotCode"></pre><button class="clr" id="iotCopy">Salin kode</button></div>
+  </div>
+ </section>
+
  <section id="p-tentang" class="pg" hidden>
   <div class="bar" style="justify-content:space-between;margin:0 0 4px"><h1 style="margin:0">Tentang Kami</h1><button class="bt o" id="te" hidden>Edit halaman</button></div>
   <p class="mu">Kenalan dengan anggota dan perjalanan MCI.</p>
@@ -333,6 +363,107 @@ td{padding:10px;border-top:1px solid #E6EDFB;vertical-align:top}
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script type="text/plain" id="espTpl">/*
+  MCI HQ · Lab IoT — kirim data sensor ESP32 ke web MCI HQ
+  -------------------------------------------------------------
+  Data muncul di: halaman Lab IoT (admin) + dinding layar LT 2 di kantor 3D.
+  Aegis kirim alarm Telegram kalau nilai melewati aturan.
+
+  Rangkaian contoh:
+    HC-SR04  VCC -> 5V (VIN), GND -> GND
+             TRIG -> GPIO 5
+             ECHO -> pembagi tegangan (1k ke GPIO 18, 2k ke GND)  << WAJIB: ECHO keluar 5V, ESP32 cuma tahan 3.3V
+    Baterai  + -> resistor 100k -> GPIO 34 -> resistor 100k -> GND  (pembagi 1/2, maks 6.6V)
+             (lewati bagian baterai kalau tidak dipakai; nilainya jadi ~0)
+
+  Board: "ESP32 Dev Module". Tidak perlu library tambahan (WiFi, HTTPClient sudah bawaan).
+*/
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
+
+// ====== GANTI BAGIAN INI ======
+const char* WIFI_SSID = "NAMA_WIFI";
+const char* WIFI_PASS = "PASSWORD_WIFI";
+const char* ENDPOINT  = "https://URL-RENDER-KAMU/api/iot";   // lihat halaman Lab IoT
+const char* IOT_KEY   = "ISI_KUNCI_IOT";                     // lihat halaman Lab IoT
+const char* PERANGKAT = "esp32-lab";                         // huruf kecil, angka, minus
+const uint32_t JEDA_MS = 5000;                               // kirim tiap 5 detik (min 1 detik)
+// ==============================
+
+const int PIN_TRIG = 5, PIN_ECHO = 18, PIN_BAT = 34, PIN_LED = 2;
+uint32_t terakhir = 0, gagal = 0;
+
+float bacaJarakCm() {
+  digitalWrite(PIN_TRIG, LOW);  delayMicroseconds(2);
+  digitalWrite(PIN_TRIG, HIGH); delayMicroseconds(10);
+  digitalWrite(PIN_TRIG, LOW);
+  unsigned long us = pulseIn(PIN_ECHO, HIGH, 30000);   // batas 30 ms (~5 m)
+  if (us == 0) return -1;                              // tidak ada pantulan
+  return us * 0.0343f / 2.0f;
+}
+
+float bacaBateraiV() {
+  uint32_t mv = 0;
+  for (int i = 0; i < 16; i++) mv += analogReadMilliVolts(PIN_BAT);   // rata-rata 16 sampel
+  return (mv / 16.0f) * 2.0f / 1000.0f;                               // x2 karena pembagi 100k/100k
+}
+
+void sambungWiFi() {
+  if (WiFi.status() == WL_CONNECTED) return;
+  Serial.printf("Menyambung ke %s", WIFI_SSID);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  for (int i = 0; i < 40 && WiFi.status() != WL_CONNECTED; i++) { delay(500); Serial.print("."); }
+  Serial.println(WiFi.status() == WL_CONNECTED ? " OK" : " GAGAL");
+}
+
+bool kirim(float jarak, float bat) {
+  WiFiClientSecure tls;
+  tls.setInsecure();               // sederhana: tanpa cek sertifikat (cukup untuk data sensor)
+  HTTPClient http;
+  http.setTimeout(8000);
+  if (!http.begin(tls, ENDPOINT)) return false;
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-MCI", "1");
+  http.addHeader("X-IOT-KEY", IOT_KEY);
+
+  char body[256];
+  snprintf(body, sizeof(body),
+    "{\"perangkat\":\"%s\",\"data\":{\"jarak_cm\":%.1f,\"baterai_v\":%.2f,\"rssi\":%d,\"uptime_s\":%lu}}",
+    PERANGKAT, jarak, bat, WiFi.RSSI(), millis() / 1000UL);
+
+  int kode = http.POST((uint8_t*)body, strlen(body));
+  String balas = http.getString();
+  http.end();
+  Serial.printf("POST %d  %s  -> %s\n", kode, body, balas.c_str());
+  return kode == 200;
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(PIN_TRIG, OUTPUT);
+  pinMode(PIN_ECHO, INPUT);
+  pinMode(PIN_LED, OUTPUT);
+  analogSetPinAttenuation(PIN_BAT, ADC_11db);
+  sambungWiFi();
+}
+
+void loop() {
+  if (millis() - terakhir < JEDA_MS) { delay(20); return; }
+  terakhir = millis();
+  sambungWiFi();
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  float jarak = bacaJarakCm(), bat = bacaBateraiV();
+  digitalWrite(PIN_LED, HIGH);
+  bool ok = kirim(jarak, bat);
+  digitalWrite(PIN_LED, LOW);
+
+  gagal = ok ? 0 : gagal + 1;
+  if (gagal >= 10) { Serial.println("10x gagal, restart..."); delay(1000); ESP.restart(); }
+}
+</script>
 <script>
 "use strict";
 const DEMO = window.MCI_DEMO === true;
@@ -371,6 +502,13 @@ const MOCK = (() => {
     {nama:"pinout-esp32",bot:"pulse",deskripsi:"Pemetaan pin ESP32 DevKit",pemicu:"pinout esp32",isi:"Tabel pin, hindari GPIO 6-11."}];
   let TKM = {judul: "Tentang MCI", semboyan: "Rakit, uji, wujudkan.", deskripsi: "(DEMO) MCI adalah komunitas pembuat proyek elektronika dan AI.", sejarah: [{tahun: "2024", judul: "MCI berdiri", isi: "Dimulai dari proyek radar Arduino."}, {tahun: "2026", judul: "MCI HQ online", isi: "10 bot AI bekerja di kantor virtual."}], anggota: [{nama: "Alvaro", peran: "Founder", bio: "Hardware & AI."}]};
   let gid = 3; const GAL = [{id: 2, prompt: "robot oranye minum kopi di kantor biru emas"}, {id: 1, prompt: "kapal monitoring otonom di laut saat senja"}];
+  let IR = [{perangkat: "*", metrik: "jarak_cm", op: "<", nilai: 10, pesan: "Tangki air hampir penuh!"}];
+  const iotMock = full => { const now = Date.now() / 1000 | 0, t = Date.now() / 1000;
+    const mk = (pr, f) => { const d = f(t), it = {perangkat: pr, ts: now - 2, online: true, data: d};
+      if (full) { it.hist = {}; for (let i = 59; i >= 0; i--) { const q = f(t - i * 5); for (const k in q) if (typeof q[k] === "number") (it.hist[k] = it.hist[k] || []).push([now - i * 5, q[k]]); } }
+      return it; };
+    return [mk("esp32-lab", s => ({jarak_cm: +(42 + Math.sin(s / 20) * 18).toFixed(1), baterai_v: +(3.9 - (s % 600) / 6000).toFixed(2), rssi: -58 - Math.round(Math.abs(Math.sin(s / 13)) * 9)})),
+      mk("kapal-01", s => ({suhu_c: +(29 + Math.sin(s / 30) * 2).toFixed(1), kelembapan: Math.round(70 + Math.cos(s / 25) * 8), status: "berlayar"}))]; };
   let nid = 5, pv = [], council = {u: Date.now() + 25000, on: false, m: []};
   const kas = () => { let s = 0; const rows = K.map(r => ({...r, saldo: s += r.masuk - r.keluar}));
     const m = K.reduce((a, r) => a + r.masuk, 0), x = K.reduce((a, r) => a + r.keluar, 0);
@@ -389,7 +527,7 @@ const MOCK = (() => {
         return {key:a[0],name:a[1],peran:a[2],lantai:a[3],divisi:a[4],boss:!!a[5],model:a[6]?"gemini-3.5-flash-lite":"gemini-3.8-flash",
           status:(w.on||inC)?"WORKING":"IDLE",activity:inC?"Sidang dewan":w.on?w.t:"Siaga",mode:inC?"dewan":"meja",gemini:true,telegram:false,calls:12,tokens:4820};
       });
-      return {agents, lantai: LANTAI, log:[{t:"10:12",bot:"ledger",tugas:"rekap kas minggu ini",status:"Selesai",jalur:"skill"},{t:"10:11",bot:"devmatrix",tugas:"buat kode arduino sensor suhu",status:"Selesai",jalur:"langsung"},{t:"10:10",bot:"aegis",tugas:"cek risiko dari rekap kas",status:"Selesai",jalur:"boss"}]};
+      return {agents, lantai: LANTAI, iot: iotMock(false), log:[{t:"10:12",bot:"ledger",tugas:"rekap kas minggu ini",status:"Selesai",jalur:"skill"},{t:"10:11",bot:"devmatrix",tugas:"buat kode arduino sensor suhu",status:"Selesai",jalur:"langsung"},{t:"10:10",bot:"aegis",tugas:"cek risiko dari rekap kas",status:"Selesai",jalur:"boss"}]};
     }
     if (u === "/api/usage") return {tanggal:"2026-10-28",total:48200,batas:500000,rpm:60,model_utama:"gemini-3.8-flash",model_lite:"gemini-3.5-flash-lite",router_hemat:37,cache_hit:9,boss_dipanggil:6,
       model:{"gemini-3.5-flash-lite":{masuk:21000,keluar:6100,pikir:300,panggilan:41},"gemini-3.8-flash":{masuk:12800,keluar:6900,pikir:1100,panggilan:12}}};
@@ -407,6 +545,9 @@ const MOCK = (() => {
     if (u.startsWith("/api/memori")) { if (o && o.method === "DELETE") return {dihapus: 1}; if (o && o.method === "POST") return {permanen: 1};
       return {mem_tg: "tidak", items: [{id: 2, waktu: "2026-10-29T19:40:00+07:00", sumber: "web", bot: "devmatrix", jalur: "langsung", perintah: "buat kode esp32 blink", jawaban: "(DEMO) void setup(){ pinMode(2, OUTPUT); } ...", kadaluarsa: new Date(Date.now() + 50 * 36e5).toISOString()},
         {id: 1, waktu: "2026-10-28T10:12:00+07:00", sumber: "telegram", bot: "pulse, aegis, apex", jalur: "dewan", perintah: "LiPo atau 18650?", jawaban: "(DEMO) PUTUSAN DEWAN: pakai 18650 + BMS.", kadaluarsa: null}]}; }
+    if (u === "/api/iot/rules") { IR = JSON.parse(o.body).rules.map(r => ({...r, nilai: +r.nilai})); return {rules: IR}; }
+    if (u.startsWith("/api/iot/")) return {dihapus: 3};
+    if (u === "/api/iot") { const full = iotMock(true); return {devices: full, aktif: true, rules: IR, key: "demo-kunci-iot-1234567890", endpoint: "https://mci-hq.onrender.com/api/iot", hari: 7}; }
     if (u === "/api/tentang") { if (o && o.method === "POST") { TKM = JSON.parse(o.body); } return TKM; }
     if (u === "/api/gambar" && o && o.method === "POST") { await sleep(900); const p = o.body.get("prompt"); GAL.unshift({id: gid, prompt: p, prompt_en: "(DEMO) " + p}); return {id: gid++, prompt: p, prompt_en: "(DEMO) " + p, aktif: true, hari_ini: GAL.length, batas: 150}; }
     if (u === "/api/gambar") return {items: GAL, aktif: true, hari_ini: GAL.length, batas: 150};
@@ -427,6 +568,7 @@ async function api(u, o = {}) {
 }
 
 /* ================= HALAMAN ================= */
+let IOTD = [];
 let ME = {}, DATA = [], LOG = [], KAS = null, PV = [], USE = null, MODE = "boss", SKL = {skills: [], bots: []};
 function show(p) {
   $$(".pg").forEach(e => e.hidden = e.id !== "p-" + p);
@@ -439,6 +581,7 @@ function show(p) {
   if (p === "gambar") loadGambar();
   if (p === "memori") loadMemori();
   if (p === "tentang") loadTentang();
+  clearInterval(iotTimer); if (p === "iot") { loadIot(true); iotTimer = setInterval(() => { if (!document.hidden) loadIot(); }, 3000); }
 }
 $$(".nv").forEach(b => b.onclick = () => show(b.dataset.p));
 
@@ -485,12 +628,61 @@ async function loadUsage() {
 async function poll() {
   try {
     const d = await api("/api/office");
-    DATA = d.agents; LOG = d.log || []; if (d.lantai) LANTAI = d.lantai;
+    DATA = d.agents; LOG = d.log || []; if (d.lantai) LANTAI = d.lantai; IOTD = d.iot || []; OFFICE.iot(IOTD);
     renderCmd(); renderTim();
     if (!$("#p-office").hidden) OFFICE.ensure(DATA);
     OFFICE.sync(DATA);
   } catch (e) {}
 }
+
+/* Lab IoT */
+let IOTA = null, iotTimer = 0, iotKeyOn = false;
+const spark = (pts, col) => { if (!pts || pts.length < 2) return '<svg viewBox="0 0 100 30"></svg>'; const v = pts.map(p => p[1]), mn = Math.min(...v), mx = Math.max(...v);
+  const d = v.map((q, i) => `${(i / (v.length - 1) * 100).toFixed(1)},${(28 - (mx > mn ? (q - mn) / (mx - mn) : .5) * 26).toFixed(1)}`).join(" ");
+  return `<svg viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><polyline points="${d}" fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`; };
+const ago = ts => { const s = Math.max(0, Math.round(Date.now() / 1000 - ts)); return s < 60 ? s + " dtk lalu" : s < 3600 ? Math.round(s / 60) + " mnt lalu" : Math.round(s / 3600) + " jam lalu"; };
+function espCode() { return $("#espTpl").textContent.replace("https://URL-RENDER-KAMU/api/iot", IOTA && IOTA.endpoint || "https://URL-RENDER-KAMU/api/iot").replace("ISI_KUNCI_IOT", IOTA && IOTA.key || "ISI_KUNCI_IOT"); }
+function ruleRow(r) {
+  r = r || {perangkat: "*", metrik: "", op: ">", nilai: 0, pesan: ""};
+  const devs = ["*", ...((IOTA && IOTA.devices) || []).map(d => d.perangkat)];
+  if (!devs.includes(r.perangkat)) devs.push(r.perangkat);
+  return `<tr><td><select data-f="perangkat" aria-label="Perangkat">${devs.map(d => `<option value="${esc(d)}"${d === r.perangkat ? " selected" : ""}>${d === "*" ? "Semua" : esc(d)}</option>`).join("")}</select></td>
+    <td><input type="text" data-f="metrik" value="${esc(r.metrik)}" placeholder="jarak_cm" aria-label="Metrik"></td>
+    <td><select data-f="op" aria-label="Kondisi">${["<", ">", "="].map(o => `<option${o === r.op ? " selected" : ""}>${o}</option>`).join("")}</select></td>
+    <td><input type="text" inputmode="decimal" data-f="nilai" value="${esc(r.nilai)}" aria-label="Nilai"></td>
+    <td><input type="text" data-f="pesan" value="${esc(r.pesan || "")}" placeholder="Air hampir penuh!" aria-label="Pesan"></td>
+    <td><button class="clr" style="position:static" data-rdel aria-label="Hapus aturan">Hapus</button></td></tr>`;
+}
+function bindRules() { $$("[data-rdel]").forEach(b => b.onclick = () => b.closest("tr").remove()); }
+async function loadIot(first) {
+  if ($("#p-iot").hidden) return;
+  try { IOTA = await api("/api/iot"); } catch (e) { $("#iotDev").innerHTML = `<div class="cd mu">${esc(e.message)}</div>`; return; }
+  $("#iotWarn").innerHTML = IOTA.aktif ? "" : '<div class="cd" style="border-color:#F2C94C;background:#FFF8E1"><b>Lab IoT belum aktif.</b> <span class="mu">Tambahkan environment <code>IOT_KEY</code> di Render (isi bebas, minimal 16 karakter acak), lalu deploy ulang.</span></div>';
+  const cols = ["#1D4ED8", "#C9A24A", "#db2777", "#16a34a"];
+  $("#iotDev").innerHTML = IOTA.devices.map(d => `<div class="cd"><div class="bar" style="justify-content:space-between;margin:0"><b><span class="dotx" style="background:${d.online ? "#22c55e" : "#94a3b8"}"></span>${esc(d.perangkat)}</b><span class="ch ${d.online ? "g" : "n"}">${d.online ? "Online" : "Offline"}</span></div>
+    <div class="mu" style="font-size:12px;margin:4px 0 6px">Terakhir kirim ${ago(d.ts)}</div>
+    ${Object.entries(d.data).map(([k, v], i) => `<div class="iotm"><span class="k">${esc(k)}</span><span class="v">${typeof v === "number" ? v.toLocaleString("id-ID", {maximumFractionDigits: 2}) : esc(String(v))}</span>${typeof v === "number" ? spark((d.hist || {})[k], cols[i % 4]) : ""}</div>`).join("")}
+    <div class="bar" style="margin:10px 0 0"><button class="bt o" style="min-height:34px;padding:6px 12px;font-size:12px" data-idel="${esc(d.perangkat)}">Hapus data perangkat</button></div></div>`).join("") ||
+    '<div class="cd"><b>Belum ada perangkat.</b><div class="mu" style="margin-top:6px">Upload kode ESP32 di bawah. Setelah ESP32 tersambung WiFi, kartunya muncul di sini dalam 5 detik.</div></div>';
+  $$("[data-idel]").forEach(b => b.onclick = async () => { if (confirm("Hapus semua data " + b.dataset.idel + "?")) { await api("/api/iot/" + encodeURIComponent(b.dataset.idel), {method: "DELETE"}); loadIot(); } });
+  if (first) {
+    $("#iotRules").innerHTML = (IOTA.rules || []).map(ruleRow).join(""); bindRules();
+    $("#iotEp").textContent = IOTA.endpoint || "-";
+    $("#iotKey").textContent = IOTA.key ? (iotKeyOn ? IOTA.key : "•".repeat(Math.min(24, IOTA.key.length))) : "(belum diisi di Render)";
+    $("#iotCode").textContent = espCode().replace(IOTA.key || "\u0000", "•••• (tekan Salin kode)");
+  }
+}
+$("#iotAdd").onclick = () => { $("#iotRules").insertAdjacentHTML("beforeend", ruleRow()); bindRules(); };
+$("#iotSave").onclick = async () => {
+  const rules = $$("#iotRules tr").map(tr => { const o = {}; tr.querySelectorAll("[data-f]").forEach(e => o[e.dataset.f] = e.value.trim()); o.nilai = parseFloat(String(o.nilai).replace(",", ".")) || 0; return o; }).filter(r => r.metrik);
+  try { const r = await api("/api/iot/rules", {json: {rules}}); IOTA.rules = r.rules; $("#iotRules").innerHTML = r.rules.map(ruleRow).join(""); bindRules(); $("#iotMsg").textContent = r.rules.length + " aturan disimpan"; }
+  catch (e) { $("#iotMsg").textContent = e.message; }
+  setTimeout(() => $("#iotMsg").textContent = "", 3000);
+};
+$("#iotShow").onclick = () => { iotKeyOn = !iotKeyOn; $("#iotShow").textContent = iotKeyOn ? "Sembunyikan" : "Lihat"; if (IOTA && IOTA.key) $("#iotKey").textContent = iotKeyOn ? IOTA.key : "•".repeat(Math.min(24, IOTA.key.length)); };
+const copyTo = async (txt, btn) => { try { await navigator.clipboard.writeText(txt); } catch (e) { const t = document.createElement("textarea"); t.value = txt; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); } const o = btn.textContent; btn.textContent = "Tersalin ✓"; setTimeout(() => btn.textContent = o, 1500); };
+$$("[data-cp]").forEach(b => b.onclick = () => copyTo(b.dataset.cp === "iotKey" ? (IOTA && IOTA.key || "") : $("#" + b.dataset.cp).textContent, b));
+$("#iotCopy").onclick = () => copyTo(espCode(), $("#iotCopy"));
 
 /* Boss / Dewan */
 $$("[data-mode]").forEach(b => b.onclick = () => { MODE = b.dataset.mode; $$("[data-mode]").forEach(x => x.classList.toggle("on", x === b)); $("#pickWrap").hidden = MODE !== "dewan"; $("#bs").textContent = MODE === "dewan" ? "Mulai sidang" : "Kirim"; renderPicks(); });
@@ -1127,9 +1319,10 @@ const OFFICE = (() => {
     sc.add(new THREE.HemisphereLight(LIN("#c7d8ff"), LIN("#1a2a55"), .85));
     const d = new THREE.DirectionalLight(LIN("#fff4e2"), .95);
     d.position.set(12, 36, 20); d.castShadow = true; d.shadow.mapSize.set(2048, 2048);
-    Object.assign(d.shadow.camera, {left: -22, right: 22, top: 22, bottom: -22, near: 2, far: 110});
+    d.position.set(16.4, 36, 20); d.target.position.set(4.4, 0, 0); sc.add(d.target);
+    Object.assign(d.shadow.camera, {left: -26, right: 26, top: 24, bottom: -24, near: 2, far: 110});
     d.shadow.bias = -.0006; d.shadow.normalBias = .02; sc.add(d);
-    FY.forEach(y => { const l = new THREE.PointLight(LIN("#ffe2b0"), .7, 22, 1.6); l.position.set(-1, y + 3.4, 0); sc.add(l); });
+    FY.forEach(y => [-1, WC].forEach(x => { const l = new THREE.PointLight(LIN("#ffe2b0"), x < 0 ? .7 : .55, 22, 1.6); l.position.set(x, y + 3.4, 0); sc.add(l); }));
     const sky = CT(2048, 512, (g, W, H) => {
       const q = g.createLinearGradient(0, 0, 0, H); q.addColorStop(0, "#050c26"); q.addColorStop(.6, "#13285e"); q.addColorStop(1, "#2a4a95");
       g.fillStyle = q; g.fillRect(0, 0, W, H);
@@ -1142,17 +1335,19 @@ const OFFICE = (() => {
             if (Math.random() < .38) { g.fillStyle = Math.random() < .25 ? "#ffd27a" : "#9fd0ff"; g.globalAlpha = .5 + Math.random() * .5; g.fillRect(xx, yy, 5, 7); g.globalAlpha = 1; }
           x += bw + 4; } });
     });
-    [[0, 14, -40, 0, 150], [-46, 14, 0, PI / 2, 120]].forEach(a => {
+    [[BX, 14, -40, 0, 170], [-46, 14, 0, PI / 2, 120]].forEach(a => {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(a[4], 48), new THREE.MeshBasicMaterial({map: sky, fog: false, toneMapped: false}));
       m.position.set(a[0], a[1], a[2]); m.rotation.y = a[3]; sc.add(m);
     });
     BASE = new THREE.Group(); sc.add(BASE); CUR = BASE;
-    add(CY(34, 34, .2, 64), "#0d1c45", 0, -.5, 0, null, {roughness: .9});
-    add(TO(20, .06), "#D4AF5A", 0, -.39, 0, null, GOLD).rotation.x = PI / 2;
+    add(CY(40, 40, .2, 64), "#0d1c45", BX, -.5, 0, null, {roughness: .9});
+    add(TO(23.5, .06), "#D4AF5A", BX, -.39, 0, null, GOLD).rotation.x = PI / 2;
     [[8.0, 7], [8.7, 8.4]].forEach((s, i) => add(SLAB(s[1], .8, .18, .2), "#EEF2F9", 0, -.24 - i * .1, s[0]));
-    [[-15.5, 6], [15.5, 6], [-15.5, -4], [15.5, -4], [-17, 1], [17, 1]].forEach(p => { const g = grp(p[0], -.4, p[1], 0); CAST = true; add(CY(.16, .22, 1.4, 12), "#6b4423", 0, .7, 0, g); add(SP(1.0, 18, 14), "#1f8f52", 0, 1.9, 0, g, {roughness: .8}); add(SP(.7, 16, 12), "#27a35f", .3, 2.6, .1, g, {roughness: .8}); CAST = false; });
+    [[-15.5, 6], [24.3, 6], [-15.5, -4], [24.3, -4], [-17, 1], [25.8, 1]].forEach(p => { const g = grp(p[0], -.4, p[1], 0); CAST = true; add(CY(.16, .22, 1.4, 12), "#6b4423", 0, .7, 0, g); add(SP(1.0, 18, 14), "#1f8f52", 0, 1.9, 0, g, {roughness: .8}); add(SP(.7, 16, 12), "#27a35f", .3, 2.6, .1, g, {roughness: .8}); CAST = false; });
   }
   const floorMat = {};
+  /* lebar gedung: inti x -12.2..12.2 + sayap timur x 12.2..21 */
+  const EX = 21.0, BW = EX + 12.2, BX = (EX - 12.2) / 2, WC = 16.6;
   function floorBase(f, col) {
     if (!floorMat[col]) {
       const ft = CT(512, 512, (g, w, h) => { g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); g.strokeStyle = "rgba(0,0,0,.16)"; g.lineWidth = 3;
@@ -1160,11 +1355,11 @@ const OFFICE = (() => {
       ft.wrapS = ft.wrapT = THREE.RepeatWrapping; ft.repeat.set(.25, .25);
       floorMat[col] = new THREE.MeshStandardMaterial({color: LIN(col), map: ft, roughness: .3, metalness: .2});
     }
-    add(SLAB(24.4, 14.4, .35, .5), floorMat[col], 0, -.175, 0);
-    add(CAP(.05, 24.2), "#D4AF5A", 0, -.17, 7.22, null, GOLD).rotation.z = PI / 2;
-    add(CAP(.025, 24.0), "#5ee6ff", 0, .02, 7.24, null, {emissive: "#5ee6ff", emissiveIntensity: 1.4}).rotation.z = PI / 2;
-    add(CAP(.05, 14.2), "#D4AF5A", 12.22, -.17, 0, null, GOLD).rotation.x = PI / 2;
-    wall(0, -7.05, 24.4, 0); wall(-12.05, 0, 14.4, PI / 2); wall(12.12, 0, 14.4, -PI / 2, true);
+    add(SLAB(BW, 14.4, .35, .5), floorMat[col], BX, -.175, 0);
+    add(CAP(.05, BW - .2), "#D4AF5A", BX, -.17, 7.22, null, GOLD).rotation.z = PI / 2;
+    add(CAP(.025, BW - .4), "#5ee6ff", BX, .02, 7.24, null, {emissive: "#5ee6ff", emissiveIntensity: 1.4}).rotation.z = PI / 2;
+    add(CAP(.05, 14.2), "#D4AF5A", EX + .02, -.17, 0, null, GOLD).rotation.x = PI / 2;
+    wall(BX, -7.05, BW, 0); wall(-12.05, 0, 14.4, PI / 2); wall(EX - .08, 0, 14.4, -PI / 2, true);
     const tube = new THREE.Mesh(G("tube", () => new THREE.CylinderGeometry(.85, .85, FH, 40, 1, true, .55, PI * 2 - 1.1)), new THREE.MeshStandardMaterial({color: LIN("#bfe0ff"), transparent: true, opacity: .2, roughness: .05, metalness: .2, side: THREE.DoubleSide, depthWrite: false}));
     tube.position.set(LIFT[0], FH / 2 - .3, LIFT[1]); CUR.add(tube);
     [.02, WH - .05].forEach(y => add(TO(.87, .04), "#D4AF5A", LIFT[0], y, LIFT[1], null, GOLD).rotation.x = PI / 2);
@@ -1175,9 +1370,9 @@ const OFFICE = (() => {
   }
   function roof() {
     ROOF = new THREE.Group(); ROOF.position.y = FY[3] + FH; sc.add(ROOF); CUR = ROOF;
-    add(SLAB(24.4, 14.4, .35, .5), new THREE.MeshStandardMaterial({color: LIN("#14295e"), roughness: .6}), 0, -.175, 0);
-    add(CAP(.05, 24.2), "#D4AF5A", 0, -.17, 7.22, null, GOLD).rotation.z = PI / 2;
-    [[0, -7.0, 24.2, 0], [-12.0, 0, 14.2, PI / 2], [12.0, 0, 14.2, PI / 2]].forEach(w => { const g = grp(w[0], 0, w[1], w[3]); add(PANEL(w[2], .55, .22, .1), "#EEF2F9", 0, .27, 0, g); add(CAP(.03, w[2]), "#F1D58A", 0, .57, 0, g, {emissive: "#D4AF5A", emissiveIntensity: 1}).rotation.z = PI / 2; });
+    add(SLAB(BW, 14.4, .35, .5), new THREE.MeshStandardMaterial({color: LIN("#14295e"), roughness: .6}), BX, -.175, 0);
+    add(CAP(.05, BW - .2), "#D4AF5A", BX, -.17, 7.22, null, GOLD).rotation.z = PI / 2;
+    [[BX, -7.0, BW - .2, 0], [-12.0, 0, 14.2, PI / 2], [EX - .2, 0, 14.2, PI / 2]].forEach(w => { const g = grp(w[0], 0, w[1], w[3]); add(PANEL(w[2], .55, .22, .1), "#EEF2F9", 0, .27, 0, g); add(CAP(.03, w[2]), "#F1D58A", 0, .57, 0, g, {emissive: "#D4AF5A", emissiveIntensity: 1}).rotation.z = PI / 2; });
     add(CY(3, 3, .05, 56), "#0A2A6B", -4, .03, 0);
     add(TO(2.9, .06), "#D4AF5A", -4, .07, 0, null, GOLD).rotation.x = PI / 2;
     const hp = CT(512, 512, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = "#F1D58A"; g.font = "800 300px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("H", w / 2, h / 2 + 20); });
@@ -1188,7 +1383,16 @@ const OFFICE = (() => {
     const ant = grp(8.5, 0, -4.5, 0); add(CY(.08, .14, 4, 12), "#cbd5e1", 0, 2, 0, ant, CHROME); [1, 2, 3].forEach(y => add(TO(.25 - y * .05, .02), "#cbd5e1", 0, y, 0, ant, CHROME).rotation.x = PI / 2);
     const bl = add(SP(.14), "#ef4444", 0, 4.1, 0, ant, {emissive: "#ef4444", emissiveIntensity: 2}); ANI.push({o: bl.material, k: "pulse"});
     [[2, -4.5], [5, -4.5]].forEach(p => { add(SLAB(2.4, 1.4, .08, .12), "#1e3a8a", p[0], .9, p[1], null, {roughness: .2, metalness: .5}).rotation.x = -.5; add(CY(.04, .04, .8, 8), "#cbd5e1", p[0], .45, p[1] + .2, null, CHROME); });
-    plant(-10.8, 6, 1.2); plant(10.8, 6, 1.2); plant(-10.8, -6, 1); plant(10.8, 2, 1);
+    plant(-10.8, 6, 1.2); plant(10.8, 6, 1.2); plant(-10.8, -6, 1); plant(10.8, 2, 1); plant(20.2, 6, 1.1);
+    /* kubah observatorium di atas sayap timur */
+    const dm = grp(WC + .6, 0, -2.2, 0); CAST = true;
+    add(CY(3.0, 3.2, .7, 48), "#EEF2F9", 0, .35, 0, dm, {roughness: .4});
+    add(G("dome", () => new THREE.SphereGeometry(2.85, 40, 20, 0, PI * 2 - .55, 0, PI / 2)), "#cfd8ea", 0, .7, 0, dm, {roughness: .25, metalness: .5, side: THREE.DoubleSide});
+    CAST = false;
+    add(TO(3.05, .06), "#D4AF5A", 0, .72, 0, dm, GOLD).rotation.x = PI / 2;
+    const tl = grp(0, 1.2, 0, 0, dm); tl.rotation.set(0, -.27, -.7); add(CY(.32, .38, 3.2, 20), "#1e293b", 0, 1.2, 0, tl, {roughness: .3, metalness: .5}); add(TO(.34, .05), "#D4AF5A", 0, 2.8, 0, tl, GOLD).rotation.x = PI / 2;
+    label("OBSERVATORIUM", WC + .6, 4.4, -2.2, .6);
+    [[14.2, 4.4], [17.2, 4.4]].forEach(p => { add(SLAB(2.4, 1.4, .08, .12), "#1e3a8a", p[0], .9, p[1], null, {roughness: .2, metalness: .5}).rotation.x = -.5; add(CY(.04, .04, .8, 8), "#cbd5e1", p[0], .45, p[1] + .2, null, CHROME); });
   }
 
   /* ---------- LANTAI 1: Lobby & Santai ---------- */
@@ -1361,6 +1565,210 @@ const OFFICE = (() => {
     SLOTS[3].push({f, x: -3.6, z: 5.0, ry: PI, link: "f3_sp-1"});
   }
 
+  /* ---------- SAYAP TIMUR (x 12.2..21): pintu gerbang + jalur ---------- */
+  function wingBase(f, title, xs) {
+    glassSeg(12.2, -6.9, 12.2, -2.3); glassSeg(12.2, 2.3, 12.2, 6.9);
+    [-2.3, 2.3].forEach(z => add(CY(.11, .11, WH, 14), "#D4AF5A", 12.2, WH / 2, z, null, GOLD));
+    add(CAP(.07, 4.6), "#D4AF5A", 12.2, 3.1, 0, null, GOLD).rotation.x = PI / 2;
+    add(CAP(.03, 4.4), "#5ee6ff", 12.2, 2.98, 0, null, {emissive: "#5ee6ff", emissiveIntensity: 1.4}).rotation.x = PI / 2;
+    label(title, WC, 3.6, 6.4, .6, "#5ee6ff");
+    N(`f${f}_e0`, f, 12.2, -.4); L(`f${f}_e0`, `f${f}_door`);
+    xs.forEach((x, k) => { N(`f${f}_e${x}`, f, x, -.4); L(`f${f}_e${x}`, k ? `f${f}_e${xs[k - 1]}` : `f${f}_e0`); });
+  }
+  /* lukisan abstrak (karya Canvas) */
+  function artTex(seed) {
+    let r = seed * 9301 + 49297; const rnd = () => (r = (r * 9301 + 49297) % 233280) / 233280;
+    return CT(384, 288, (g, w, h) => {
+      const P = [["#0A2A6B", "#D4AF5A", "#5ee6ff", "#f472b6"], ["#1b0f3a", "#fb923c", "#facc15", "#38bdf8"], ["#06281f", "#22c55e", "#F1D58A", "#a78bfa"]][seed % 3];
+      const q = g.createLinearGradient(0, 0, w, h); q.addColorStop(0, P[0]); q.addColorStop(1, "#0b1530"); g.fillStyle = q; g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 14; i++) { g.globalAlpha = .35 + rnd() * .5; g.fillStyle = P[1 + (i % 3)]; g.beginPath(); g.arc(rnd() * w, rnd() * h, 14 + rnd() * 70, 0, 7); g.fill(); }
+      g.globalAlpha = .9; g.strokeStyle = "#ffffff"; g.lineWidth = 3; g.beginPath(); g.moveTo(0, h * .7); for (let x = 0; x <= w; x += 8) g.lineTo(x, h * .7 + Math.sin(x / 30 + seed) * 22); g.stroke(); g.globalAlpha = 1;
+    });
+  }
+  function frameArt(x, y, z, w, h, seed, ry) {
+    const g = grp(x, y, z, ry || 0); CAST = true; add(PANEL(w + .16, h + .16, .06, .03), "#D4AF5A", 0, 0, 0, g, GOLD); CAST = false;
+    plane(artTex(seed), w, h, 0, 0, .04, 0, g); return g;
+  }
+  /* model roket museum (sejarah proyek AntaRiksa & Radjawali) */
+  function rocket(p, s, col) {
+    const g = grp(0, 0, 0, 0, p); g.scale.setScalar(s);
+    add(CY(.11, .11, 1.1, 18), "#EEF2F9", 0, .7, 0, g, {roughness: .3}); add(CN(.11, .32, 18), col, 0, 1.41, 0, g, {roughness: .3});
+    add(CY(.112, .112, .12, 18), col, 0, .95, 0, g); add(CY(.08, .1, .1, 14), "#334155", 0, .1, 0, g, CHROME);
+    for (let i = 0; i < 4; i++) { const fg = grp(0, .28, 0, i * PI / 2, g); add(PANEL(.02, .3, .18, .01), col, 0, 0, .17, fg); }
+    return g;
+  }
+  function vitrine(x, z, col, s, name) {
+    CAST = true; add(PANEL(.9, .9, .9, .06), "#EEF2F9", x, .45, z, null, {roughness: .35}); CAST = false;
+    add(SLAB(.94, .94, .04, .04), "#D4AF5A", x, .91, z, null, GOLD);
+    add(PANEL(.86, 1.7, .86, .02), "#bfe0ff", x, 1.78, z, null, {transparent: true, opacity: .14, roughness: .05, depthWrite: false});
+    const sp = grp(x, .93, z, 0); sp.userData.dyn = true; rocket(sp, s, col); ANI.push({o: sp, k: "spin", s: .35});
+    label(name, x, 2.95, z, .32);
+  }
+  /* ===== LT 1 · Galeri Karya ===== */
+  function wing1() {
+    const f = 0; wingBase(f, "GALERI KARYA", [14.2, 16.6, 19.0]);
+    add(SLAB(8.2, 12.8, .02, .3), "#1a2d66", WC, .012, 0, null, {roughness: .95});
+    [14.2, 16.6, 19.0].forEach((x, i) => { frameArt(x, 2.05, -6.86, 1.8, 1.35, i + 1); add(CN(.12, .2, 16, 1, true), "#fff1cf", x, 3.05, -6.7, null, {emissive: "#ffd27a", emissiveIntensity: 1.2, side: THREE.DoubleSide}); });
+    label("KARYA MCI.CANVAS", WC, 3.35, -6.3, .5);
+    [[14.2, "#ef4444", .9, "ANTARIKSA 7"], [16.6, "#D4AF5A", 1.05, "ANTARIKSA 10"], [19.0, "#38bdf8", .8, "RADJAWALI"]].forEach(v => vitrine(v[0], 3.4, v[1], v[2], v[3]));
+    label("MUSEUM ROKET MCI", WC, 3.05, 4.9, .42);
+    [15.4, 17.8].forEach(x => { CAST = true; add(SLAB(1.3, .45, .1, .06), "#0A2A6B", x, .42, -2.6, null, {roughness: .5}); CAST = false; [-.5, .5].forEach(d => add(PANEL(.06, .38, .4, .02), "#D4AF5A", x + d, .19, -2.6, null, GOLD)); });
+    const tr = grp(20.3, 0, 5.6, -PI / 2); CAST = true; add(PANEL(1.6, 1.4, .4, .06), "#0A2A6B", 0, .7, 0, tr); CAST = false;
+    [[-.45, "#D4AF5A"], [0, "#cbd5e1"], [.45, "#c2773a"]].forEach((c, i) => { add(CY(.08, .1, .18, 16), c[1], c[0], 1.5, 0, tr, GOLD); add(SP(.12, 16, 12), c[1], c[0], 1.7 + (i === 0 ? .08 : 0), 0, tr, GOLD); });
+    label("PIALA", 20.3, 2.5, 5.6, .35);
+    plant(20.4, -6.3, 1); plant(12.9, 6.4, .9);
+    [14.2, 16.6, 19.0].forEach((x, i) => { N(`f0_gv${i}`, f, x, -4.7); L(`f0_gv${i}`, `f0_e${x}`); S(`f0_gp${i}`, f, x, -5.6, PI, `f0_gv${i}`); S(`f0_gc${i}`, f, x, 2.3, 0, `f0_e${x}`); });
+    [15.4, 17.8].forEach((x, i) => S(`f0_gb${i}`, f, x, -2.6, PI, i ? "f0_e16.6" : "f0_e14.2", .45));
+  }
+  /* ===== LT 2 · Lab Komputer & IoT (dinding layar data sensor live) ===== */
+  let IOTX = null, IOTT = null; const IOTH = {};
+  function iotDraw(list, t) {
+    if (!IOTX) return; const g = IOTX, W = 1024, H = 512;
+    g.fillStyle = "#040b22"; g.fillRect(0, 0, W, H);
+    g.strokeStyle = "rgba(94,230,255,.08)"; g.lineWidth = 1; for (let x = 0; x < W; x += 32) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); } for (let y = 0; y < H; y += 32) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+    g.fillStyle = "#F1D58A"; g.font = "800 34px system-ui,sans-serif"; g.textBaseline = "middle"; g.fillText("MCI LAB IoT", 28, 38);
+    const on = (list || []).filter(d => d.online).length;
+    g.fillStyle = on ? "#22c55e" : "#ef4444"; g.globalAlpha = .55 + Math.abs(Math.sin(t * 3)) * .45; g.beginPath(); g.arc(W - 150, 38, 9, 0, 7); g.fill(); g.globalAlpha = 1;
+    g.fillStyle = "#e6edf7"; g.font = "700 24px system-ui,sans-serif"; g.fillText(on ? "LIVE · " + on + " online" : "OFFLINE", W - 132, 39);
+    if (!list || !list.length) {
+      g.fillStyle = "#9fb4e6"; g.font = "700 30px system-ui,sans-serif"; g.textAlign = "center";
+      g.fillText("Menunggu data dari ESP32…", W / 2, H / 2 - 20); g.font = "500 22px system-ui,sans-serif"; g.fillText("Buka halaman Lab IoT untuk kode & kunci", W / 2, H / 2 + 22); g.textAlign = "left";
+      IOTT.needsUpdate = true; return;
+    }
+    const L = list.slice(0, 4), cw = (W - 40) / L.length;
+    L.forEach((d, i) => {
+      const x0 = 20 + i * cw, y0 = 72, w = cw - 16, h = H - 92;
+      g.fillStyle = "rgba(20,48,110,.75)"; roundRect(g, x0, y0, w, h, 18); g.fill(); g.strokeStyle = d.online ? "#5ee6ff" : "#64748b"; g.lineWidth = 3; roundRect(g, x0, y0, w, h, 18); g.stroke();
+      g.fillStyle = d.online ? "#22c55e" : "#64748b"; g.beginPath(); g.arc(x0 + 22, y0 + 28, 8, 0, 7); g.fill();
+      g.fillStyle = "#F1D58A"; g.font = "800 24px system-ui,sans-serif"; g.fillText(String(d.perangkat).slice(0, 16), x0 + 38, y0 + 29);
+      const ks = Object.keys(d.data || {}).filter(k => typeof d.data[k] !== "string").slice(0, L.length > 2 ? 3 : 4), rh = (h - 60) / Math.max(1, ks.length);
+      ks.forEach((k, j) => {
+        const y = y0 + 58 + j * rh, v = d.data[k], hs = (IOTH[d.perangkat] || {})[k] || [];
+        g.fillStyle = "#9fb4e6"; g.font = "600 18px system-ui,sans-serif"; g.fillText(k, x0 + 18, y + 10);
+        g.fillStyle = "#ffffff"; g.font = "800 " + (L.length > 2 ? 34 : 40) + "px system-ui,sans-serif"; g.fillText(typeof v === "boolean" ? (v ? "ON" : "OFF") : (+v).toLocaleString("id-ID", {maximumFractionDigits: 2}), x0 + 18, y + 42);
+        if (hs.length > 1) { const mn = Math.min(...hs), mx = Math.max(...hs), sx = x0 + w * .52, sw = w * .44, sy = y + 8, sh = rh - 26;
+          g.strokeStyle = ["#5ee6ff", "#F1D58A", "#f472b6", "#22c55e"][j % 4]; g.lineWidth = 3; g.beginPath();
+          hs.forEach((q, n) => { const px = sx + n * sw / (hs.length - 1), py = sy + sh - (mx > mn ? (q - mn) / (mx - mn) : .5) * sh; n ? g.lineTo(px, py) : g.moveTo(px, py); }); g.stroke(); }
+      });
+      if (!ks.length) { g.fillStyle = "#9fb4e6"; g.font = "600 20px system-ui,sans-serif"; g.fillText("(teks saja)", x0 + 18, y0 + 80); }
+    });
+    IOTT.needsUpdate = true;
+  }
+  function iotFeed(list) {
+    (list || []).forEach(d => { const h = IOTH[d.perangkat] = IOTH[d.perangkat] || {_ts: 0}; if (d.ts === h._ts) return; h._ts = d.ts;
+      Object.entries(d.data || {}).forEach(([k, v]) => { if (typeof v !== "number") return; (h[k] = h[k] || []).push(v); if (h[k].length > 40) h[k].shift(); }); });
+  }
+  function wing2() {
+    const f = 1, xs = [13.8, 15.2, 16.6, 18.0, 19.4]; wingBase(f, "LAB KOMPUTER & IoT", xs);
+    add(SLAB(8.2, 12.8, .02, .3), "#14244d", WC, .012, 0, null, {roughness: .9});
+    /* dinding video 4x3: tengah 2x2 = data sensor live */
+    const vw = grp(WC, 2.2, -6.83, 0); CAST = true; add(PANEL(7.7, 3.0, .12, .08), "#0b1222", 0, 0, 0, vw, {roughness: .3, metalness: .5}); CAST = false;
+    add(CAP(.03, 7.7), "#D4AF5A", 0, 1.52, .07, vw, GOLD).rotation.z = PI / 2; add(CAP(.03, 7.7), "#D4AF5A", 0, -1.52, .07, vw, GOLD).rotation.z = PI / 2;
+    const cw = 1.85, ch = .93, kinds = ["code", "chart", "wave", "map", "rack", "list", "cal", "wave"], acs = ["#5ee6ff", "#D4AF5A", "#34d399", "#f472b6", "#a78bfa", "#38bdf8", "#fb923c", "#22c55e"];
+    let n = 0;
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) {
+      if ((c === 1 || c === 2) && r < 2) continue;
+      const m = plane(screenTex(kinds[n], acs[n]), cw - .06, ch - .06, -2.775 + c * cw, .93 - r * ch, .07, 0, vw); ANI.push({o: m.material.map, k: "scroll"}); n++;
+    }
+    const cv = document.createElement("canvas"); cv.width = 1024; cv.height = 512; IOTX = cv.getContext("2d");
+    IOTT = new THREE.CanvasTexture(cv); IOTT.encoding = THREE.sRGBEncoding; IOTT.anisotropy = 4;
+    const big = new THREE.Mesh(new THREE.PlaneGeometry(cw * 2 - .06, ch * 2 - .06), new THREE.MeshBasicMaterial({map: IOTT, toneMapped: false}));
+    big.position.set(0, .465, .075); big.userData.dyn = true; vw.add(big); iotDraw([], 0);
+    label("DATA SENSOR LIVE", WC, 3.95, -6.4, .45, "#5ee6ff");
+    /* dua baris meja komputer, 3 monitor per stasiun */
+    [[14.5, -3.6, 0], [18.7, -3.6, 0], [14.5, 1.9, PI], [18.7, 1.9, PI]].forEach(dk => {
+      CAST = true; add(SLAB(2.6, .8, .06, .14), "#F4F6FB", dk[0], TOP - .03, dk[1], null, {roughness: .32}); CAST = false;
+      add(SLAB(2.64, .84, .025, .16), "#C9A24A", dk[0], TOP - .07, dk[1], null, GOLD);
+      [-1, 1].forEach(s => add(PANEL(.06, TOP - .09, .66, .03), "#20335f", dk[0] + s * 1.2, (TOP - .09) / 2, dk[1]));
+      add(PANEL(2.4, .26, .03, .03), "#5ee6ff", dk[0], .09, dk[1], null, {emissive: "#5ee6ff", emissiveIntensity: .8});
+    });
+    let mi = 0;
+    [[13.8, -3.6, 0], [15.2, -3.6, 0], [18.0, -3.6, 0], [19.4, -3.6, 0], [13.8, 1.9, PI], [15.2, 1.9, PI], [18.0, 1.9, PI], [19.4, 1.9, PI]].forEach(st => {
+      const back = st[2] ? 1 : -1;
+      [-.44, 0, .44].forEach((dx, j) => { monitor(CUR, st[0] + dx, st[1] + back * (j === 1 ? .2 : .13), .42, .28, ["code", "chart", "wave", "map", "list", "rack"][(mi++) % 6], acs[mi % 8], null, st[2] + (j - 1) * (st[2] ? .38 : -.38)); });
+      add(SLAB(.46, .15, .025, .04), "#1b2540", st[0], TOP + .012, st[1] - back * .2);
+      chair(st[0], st[1] - back * .85, st[2] ? 0 : PI);
+    });
+    /* printer 3D */
+    const p3 = grp(14.0, 0, 5.6, 0); CAST = true; add(PANEL(1.0, .8, .8, .1), "#EEF2F9", 0, .4, 0, p3); CAST = false;
+    [-.42, .42].forEach(x => add(PANEL(.05, .9, .05, .01), "#334155", x, 1.25, -.3, p3, CHROME)); add(PANEL(.9, .05, .05, .01), "#334155", 0, 1.7, -.3, p3, CHROME);
+    add(SLAB(.8, .6, .03, .02), "#1e293b", 0, .82, 0, p3); add(CY(.13, .16, .22, 20), "#f97316", 0, .94, 0, p3, {emissive: "#f97316", emissiveIntensity: .3});
+    const nz = grp(0, 1.28, -.25, 0, p3); nz.userData.dyn = true; add(PANEL(.16, .16, .12, .02), "#D4AF5A", 0, 0, 0, nz, GOLD); add(CN(.03, .08, 10), "#cbd5e1", 0, -.12, 0, nz, CHROME).rotation.x = PI;
+    ANI.push({o: nz, k: "nozzle"}); label("PRINTER 3D", 14.0, 2.4, 5.6, .35);
+    /* drone melayang di landasan */
+    add(CY(.75, .75, .03, 40), "#0A2A6B", WC, .02, 5.4); add(TO(.72, .03), "#D4AF5A", WC, .04, 5.4, null, GOLD).rotation.x = PI / 2;
+    const hp = CT(256, 256, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = "#F1D58A"; g.font = "800 150px system-ui"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("H", w / 2, h / 2 + 10); });
+    plane(hp, 1.0, 1.0, WC, .045, 5.4).rotation.x = -PI / 2;
+    const dr = grp(WC, 1.2, 5.4, 0); dr.userData.dyn = true; CAST = true; add(PANEL(.36, .1, .36, .04), "#1e293b", 0, 0, 0, dr, {roughness: .3, metalness: .4}); CAST = false;
+    add(SP(.05), "#22c55e", 0, .02, .19, dr, {emissive: "#22c55e", emissiveIntensity: 1.6});
+    const props = [];
+    [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(s => { const a = grp(s[0] * .26, 0, s[1] * .26, 0, dr); add(CAP(.018, .3), "#334155", -s[0] * .13, 0, -s[1] * .13, a).rotation.set(PI / 2, 0, Math.atan2(s[0], s[1])); add(CY(.03, .03, .06, 10), "#334155", 0, .04, 0, a);
+      const pr = grp(0, .08, 0, 0, a); add(PANEL(.32, .03, .006, .01), "#cbd5e1", 0, 0, 0, pr).rotation.x = -PI / 2; props.push(pr); });
+    ANI.push({o: dr, k: "drone", props}); label("DRONE LAB", WC, 2.5, 5.4, .35);
+    /* meja ESP32: papan sensor + LED berkedip */
+    CAST = true; add(SLAB(1.8, .8, .9, .12), "#EEF2F9", 19.3, .45, 5.8, null, {roughness: .45}); CAST = false; add(SLAB(1.84, .84, .05, .14), "#20335f", 19.3, .92, 5.8);
+    [[18.8, "#0b5"], [19.3, "#1D4ED8"], [19.8, "#0b5"]].forEach((b, i) => { add(SLAB(.32, .2, .03, .02), b[1] === "#0b5" ? "#0f766e" : b[1], b[0], .96, 5.7); const led = add(SP(.025, 8, 6), ["#ef4444", "#22c55e", "#38bdf8"][i], b[0] + .1, .99, 5.66, null, {emissive: ["#ef4444", "#22c55e", "#38bdf8"][i], emissiveIntensity: 2}); ANI.push({o: led.material, k: "pulse"}); });
+    add(CY(.06, .06, .05, 16), "#94a3b8", 18.9, .98, 5.95, null, CHROME); add(CY(.06, .06, .05, 16), "#94a3b8", 19.05, .98, 5.95, null, CHROME);
+    label("MEJA ESP32", 19.3, 2.2, 5.8, .35);
+    plant(20.4, -6.3, 1); plant(12.9, 6.4, .9);
+    /* titik duduk & berdiri */
+    [13.8, 15.2, 18.0, 19.4].forEach((x, i) => { S(`f1_pa${i}`, f, x, -2.75, PI, `f1_e${x}`, .44); S(`f1_pb${i}`, f, x, 1.05, 0, `f1_e${x}`, .44); });
+    N("f1_vw", f, WC, -4.9); L("f1_vw", "f1_e16.6"); S("f1_vw0", f, 16.0, -5.6, PI, "f1_vw"); S("f1_vw1", f, 17.2, -5.6, PI, "f1_vw");
+    N("f1_sz", f, WC, 3.3); L("f1_sz", "f1_e16.6");
+    S("f1_dr", f, WC, 4.0, 0, "f1_sz"); S("f1_3d", f, 14.2, 4.45, 0, "f1_sz"); S("f1_es", f, 19.2, 4.6, 0, "f1_sz");
+  }
+  /* ===== LT 3 · Perpustakaan ===== */
+  function wing3() {
+    const f = 2, xs = [14.2, 16.6, 19.0]; wingBase(f, "PERPUSTAKAAN", xs);
+    add(SLAB(8.2, 12.8, .02, .3), "#3b2a1a", WC, .012, 0, null, {roughness: .9});
+    xs.forEach(x => shelf(x, -6.7, 0, 2.2));
+    [14.2, 19.0].forEach(x => { shelf(x, 3.4, PI, 2.2); shelf(x, 3.84, 0, 2.2); });
+    const ld = grp(17.75, 0, -6.35, 0); [-.22, .22].forEach(x => add(PANEL(.05, 2.4, .05, .01), "#8b5a2b", x, 1.2, 0, ld)); for (let i = 0; i < 6; i++) add(PANEL(.44, .04, .04, .01), "#8b5a2b", 0, .3 + i * .38, 0, ld); ld.rotation.x = -.12;
+    CAST = true; add(SLAB(3.6, 1.2, .07, .1), "#7c4a24", WC, .76, -3.4, null, {roughness: .5}); CAST = false;
+    [[-1.6, -.45], [1.6, -.45], [-1.6, .45], [1.6, .45]].forEach(s => add(CY(.04, .04, .74, 10), "#D4AF5A", WC + s[0], .37, -3.4 + s[1], null, GOLD));
+    [15.4, 17.8].forEach(x => { add(CY(.08, .1, .04, 16), "#D4AF5A", x, .81, -3.6, null, GOLD); add(CY(.012, .012, .3, 8), "#D4AF5A", x, .96, -3.6, null, GOLD); add(G("bk", () => new THREE.CylinderGeometry(.06, .16, .14, 20, 1, true)), "#16a34a", x, 1.12, -3.6, null, {emissive: "#16a34a", emissiveIntensity: .35, side: THREE.DoubleSide}); });
+    [[15.0, -3.2], [18.0, -3.3]].forEach(b => add(PANEL(.3, .04, .22, .01), "#ef4444", b[0], .81, b[1]));
+    [15.6, 17.6].forEach(x => chair(x, -2.35, PI, "#5b3a1e"));
+    const gl = grp(WC, 0, 5.9, 0); add(CY(.2, .26, .05, 24), "#D4AF5A", 0, .03, 0, gl, GOLD); add(CY(.03, .03, .8, 10), "#D4AF5A", 0, .45, 0, gl, GOLD);
+    const gb = grp(0, 1.15, 0, 0, gl); gb.userData.dyn = true; gb.rotation.z = .41;
+    add(SP(.36, 28, 18), "#2563eb", 0, 0, 0, gb, {roughness: .4}); [[.2, .1, .2], [-.15, .2, .22], [.05, -.15, -.3]].forEach(p => add(SP(.14, 12, 10), "#22c55e", p[0] * 1.5, p[1], p[2], gb).scale.set(1, .5, .4));
+    add(TO(.4, .015, PI), "#D4AF5A", 0, 1.15, 0, gl, GOLD).rotation.y = PI / 2; ANI.push({o: gb, k: "spin", s: .4});
+    [[15.6, 4.8, Math.atan2(1, 1.1)], [17.6, 4.8, Math.atan2(-1, 1.1)]].forEach(a => { const g = grp(a[0], 0, a[1], a[2] + PI); CAST = true; add(SLAB(.85, .8, .42, .2), "#7c2d12", 0, .21, 0, g); add(PANEL(.85, .7, .2, .1), "#7c2d12", 0, .6, .32, g); [-.38, .38].forEach(x => add(PANEL(.12, .5, .7, .05), "#7c2d12", x, .45, 0, g)); CAST = false; });
+    lamp(20.4, 5.4); lamp(12.9, -6.2);
+    label("BACA & RISET", WC, 2.6, -3.4, .4);
+    S("f2_rt0", f, 15.6, -2.35, PI, "f2_e16.6", .44); S("f2_rt1", f, 17.6, -2.35, PI, "f2_e16.6", .44);
+    N("f2_sz", f, WC, 3.2); L("f2_sz", "f2_e16.6");
+    S("f2_ac0", f, 15.6, 4.8, Math.atan2(1, 1.1), "f2_sz", .44); S("f2_ac1", f, 17.6, 4.8, Math.atan2(-1, 1.1), "f2_sz", .44);
+    N("f2_sv0", f, 14.2, -4.9); L("f2_sv0", "f2_e14.2"); N("f2_sv1", f, 19.0, -4.9); L("f2_sv1", "f2_e19");
+    S("f2_rk0", f, 14.2, -5.85, PI, "f2_sv0"); S("f2_rk1", f, 19.0, -5.85, PI, "f2_sv1");
+  }
+  /* ===== LT 4 · Observatorium ===== */
+  function wing4() {
+    const f = 3, xs = [14.6, 16.6, 18.6]; wingBase(f, "OBSERVATORIUM", xs); L("f3_e0", "f3_ln");
+    add(CY(3.2, 3.2, .02, 64), "#1f2a6b", WC, .012, .6, null, {roughness: .9}); add(TO(3.18, .035), "#5ee6ff", WC, .025, .6, null, {emissive: "#5ee6ff", emissiveIntensity: 1}).rotation.x = PI / 2;
+    const st = CT(1024, 384, (g, w, h) => { g.fillStyle = "#030822"; g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 400; i++) { g.fillStyle = "rgba(255,255,255," + (.3 + Math.random() * .7) + ")"; const r = Math.random() * 1.8 + .4; g.beginPath(); g.arc(Math.random() * w, Math.random() * h, r, 0, 7); g.fill(); }
+      g.strokeStyle = "rgba(241,213,138,.8)"; g.lineWidth = 2; g.fillStyle = "#F1D58A";
+      [[[120, 90], [190, 130], [260, 110], [330, 170], [300, 250]], [[560, 80], [620, 150], [700, 140], [760, 220]], [[840, 260], [900, 200], [960, 230]]].forEach(c => { g.beginPath(); c.forEach((p, k) => k ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); c.forEach(p => { g.beginPath(); g.arc(p[0], p[1], 5, 0, 7); g.fill(); }); });
+      g.font = "700 26px system-ui"; g.fillText("ORION", 230, 300); g.fillText("CRUX", 640, 260); g.fillText("SCORPIUS", 840, 330); });
+    const sm = grp(WC, 2.15, -6.84, 0); add(PANEL(7.0, 2.6, .06, .06), "#D4AF5A", 0, 0, 0, sm, GOLD); plane(st, 6.85, 2.45, 0, 0, .04, 0, sm);
+    /* teleskop besar */
+    const tp = grp(19.0, 0, -3.4, 0); CAST = true; add(CY(.32, .45, .9, 24), "#EEF2F9", 0, .45, 0, tp); add(SP(.24), "#D4AF5A", 0, 1.0, 0, tp, GOLD);
+    const tb = grp(0, 1.05, 0, 0, tp); tb.userData.dyn = true; tb.rotation.set(0, -.6, -.75);
+    add(CY(.2, .25, 2.4, 24), "#0A2A6B", 0, .7, 0, tb, {roughness: .3, metalness: .4}); add(TO(.21, .04), "#D4AF5A", 0, 1.88, 0, tb, GOLD).rotation.x = PI / 2; add(CY(.04, .04, .3, 10), "#cbd5e1", .12, -.45, 0, tb, CHROME); CAST = false;
+    ANI.push({o: tb, k: "scope"}); label("TELESKOP", 19.0, 3.2, -3.4, .35);
+    /* planetarium mini (orrery) */
+    const orr = grp(14.6, 0, -3.4, 0); add(CY(.5, .6, .7, 24), "#0A2A6B", 0, .35, 0, orr); add(TO(.5, .03), "#D4AF5A", 0, .7, 0, orr, GOLD).rotation.x = PI / 2;
+    add(SP(.28, 24, 16), "#facc15", 0, 1.5, 0, orr, {emissive: "#f59e0b", emissiveIntensity: 1.8});
+    [[.6, .07, "#38bdf8", 1.2], [.95, .1, "#ef4444", .8], [1.35, .15, "#F1D58A", .5]].forEach(p => { const r = grp(0, 1.5, 0, Math.random() * 6, orr); r.userData.dyn = true; add(TO(p[0], .006), "#5ee6ff", 0, 0, 0, r, {emissive: "#5ee6ff", emissiveIntensity: .8, transparent: true, opacity: .5}).rotation.x = PI / 2; add(SP(p[1], 14, 10), p[2], p[0], 0, 0, r, {emissive: p[2], emissiveIntensity: .5}); ANI.push({o: r, k: "spin", s: p[3]}); });
+    label("PLANETARIUM", 14.6, 3.2, -3.4, .35);
+    [[14.8, 4.5, "#7c3aed"], [16.6, 5.1, "#D4AF5A"], [18.4, 4.5, "#1D4ED8"]].forEach(b => { CAST = true; add(SP(.5, 24, 16), b[2], b[0], .3, b[1], null, {roughness: .85}).scale.set(1, .6, 1); CAST = false; });
+    plant(20.4, 6.4, 1); plant(12.9, -6.3, .9);
+    N("f3_tl", f, 18.0, -1.6); L("f3_tl", "f3_e18.6"); S("f3_tel", f, 18.1, -2.5, Math.atan2(.9, -.9), "f3_tl");
+    S("f3_or", f, 14.6, -1.7, PI, "f3_e14.6");
+    [[14.8, 4.5], [16.6, 5.1], [18.4, 4.5]].forEach((b, i) => S(`f3_bb${i}`, f, b[0], b[1], PI, `f3_e${xs[i]}`, .3));
+  }
+
   /* ---------- kegiatan istirahat ---------- */
   const ACT = {
     kopi: {t: "Ngopi dulu", spots: ["f0_pk1", "f0_pk2", "f3_bar"], anim: "sip", prop: "cup", w: 5},
@@ -1379,9 +1787,21 @@ const OFFICE = (() => {
     sibuk: {t: "Pura-pura sibuk", desk: 1, anim: "type", w: 1},
     golf: {t: "Latihan golf", spots: ["f3_g1"], anim: "golf", prop: "club", w: 4, boss: 1},
     visi: {t: "Merenungkan visi perusahaan", spots: ["f3_wc"], anim: "stare", w: 3, boss: 1},
+    galeri: {t: "Lihat-lihat galeri", spots: ["f0_gp0", "f0_gp1", "f0_gp2", "f0_gb0", "f0_gb1"], anim: "stare", w: 1.6},
+    museum: {t: "Lihat museum roket", spots: ["f0_gc0", "f0_gc1", "f0_gc2"], anim: "stare", w: 1.4},
+    komputer: {t: "Main game di lab komputer", spots: ["f1_pa0", "f1_pa1", "f1_pa2", "f1_pa3", "f1_pb0", "f1_pb1", "f1_pb2", "f1_pb3"], anim: "arcade", w: 2},
+    pantau: {t: "Pantau sensor IoT di dinding layar", spots: ["f1_vw0", "f1_vw1"], anim: "stare", w: 1.5},
+    drone: {t: "Uji terbang drone", spots: ["f1_dr"], anim: "tinker", w: 1.2},
+    cetak3d: {t: "Ngecek printer 3D", spots: ["f1_3d"], anim: "reach", w: 1},
+    esp: {t: "Solder di meja ESP32", spots: ["f1_es"], anim: "tinker", w: 1},
+    baca: {t: "Baca buku di perpustakaan", spots: ["f2_rt0", "f2_rt1", "f2_ac0", "f2_ac1"], anim: "read", prop: "paper", w: 2},
+    rakbuku: {t: "Cari buku di rak", spots: ["f2_rk0", "f2_rk1"], anim: "reach", w: 1},
+    teropong: {t: "Neropong bintang", spots: ["f3_tel"], anim: "stare", w: 1.2},
+    planet: {t: "Lihat planetarium mini", spots: ["f3_or"], anim: "stare", w: 1},
+    bintang: {t: "Rebahan di observatorium", spots: ["f3_bb0", "f3_bb1", "f3_bb2"], anim: "lounge", w: 1.5},
   };
-  const PREF = {apex: {golf: 1, visi: 1, kopi: 1, rapat: 1.5, tidur: .3, sibuk: .5}, devmatrix: {kopi: 3, ngoprek: 2}, nexus: {makan: 2, rapat: 2}, aegis: {koran: 3}, sentinel: {jendela: 3, arcade: 2},
-    pulse: {pingpong: 2, ngoprek: 3}, ledger: {makan: 2, rebahan: 1.5}, scribe: {koran: 2}, atlas: {jendela: 2, pingpong: 1.5}, herald: {rapat: 2, arcade: 1.5}, canvas: {jendela: 3, kopi: 1.5, arcade: 1}};
+  const PREF = {apex: {golf: 1, visi: 1, kopi: 1, rapat: 1.5, tidur: .3, sibuk: .5, teropong: 1.5}, devmatrix: {kopi: 3, ngoprek: 2, komputer: 2, esp: 2}, nexus: {makan: 2, rapat: 2, cetak3d: 1.5}, aegis: {koran: 3, pantau: 3}, sentinel: {jendela: 3, arcade: 2, teropong: 2},
+    pulse: {pingpong: 2, ngoprek: 3, drone: 2.5, esp: 2}, ledger: {makan: 2, rebahan: 1.5}, scribe: {koran: 2, baca: 3, rakbuku: 2}, atlas: {jendela: 2, pingpong: 1.5, baca: 2, planet: 2}, herald: {rapat: 2, arcade: 1.5, museum: 1.5}, canvas: {jendela: 3, kopi: 1.5, arcade: 1, galeri: 4}};
   const actSpots = (a, v) => v.own ? [`f${a.home}_w1`, `f${a.home}_w2`].filter(s => SPOTS[s]) : (v.spots || []);
 
   /* ---------- agen ---------- */
@@ -1607,11 +2027,11 @@ const OFFICE = (() => {
 
   /* ---------- tampilan & kamera ---------- */
   const PRESET = {
-    gedung: {vis: {all: true}, r: 53, phi: 1.32, th: .12, t: [.6, 9.2, 0], tall: {r: 74, phi: 1.36, th: .12, t: [0, 9.6, 0]}, w: "Gedung MCI · tampak samping"},
-    f0: {vis: {floor: 0}, r: 34, phi: .92, th: .6, t: [0, 0, .3], tall: {r: 40, phi: .85, th: 1.35, t: [.5, 0, .5]}},
-    f1: {vis: {floor: 1}, r: 34, phi: .92, th: .6, t: [0, 4.4, .3], tall: {r: 40, phi: .85, th: 1.35, t: [.5, 4.4, .5]}},
-    f2: {vis: {floor: 2}, r: 34, phi: .92, th: .6, t: [0, 8.8, .3], tall: {r: 40, phi: .85, th: 1.35, t: [.5, 8.8, .5]}},
-    f3: {vis: {floor: 3}, r: 34, phi: .92, th: .6, t: [0, 13.2, .3], tall: {r: 40, phi: .85, th: 1.35, t: [.5, 13.2, .5]}},
+    gedung: {vis: {all: true}, r: 62, phi: 1.32, th: .12, t: [5.0, 9.2, 0], tall: {r: 92, phi: 1.36, th: .12, t: [4.4, 9.6, 0]}, w: "Gedung MCI · tampak samping"},
+    f0: {vis: {floor: 0}, r: 42, phi: .92, th: .55, t: [4.4, 0, .3], tall: {r: 50, phi: .85, th: 1.35, t: [4.6, 0, .5]}},
+    f1: {vis: {floor: 1}, r: 42, phi: .92, th: .55, t: [4.4, 4.4, .3], tall: {r: 50, phi: .85, th: 1.35, t: [4.6, 4.4, .5]}},
+    f2: {vis: {floor: 2}, r: 42, phi: .92, th: .55, t: [4.4, 8.8, .3], tall: {r: 50, phi: .85, th: 1.35, t: [4.6, 8.8, .5]}},
+    f3: {vis: {floor: 3}, r: 42, phi: .92, th: .55, t: [4.4, 13.2, .3], tall: {r: 50, phi: .85, th: 1.35, t: [4.6, 13.2, .5]}},
     lounge: {vis: {floor: 0}, r: 13, phi: .9, th: .75, t: [-8.2, .3, 3.2], w: "LT 1 · Lounge"},
     pantry: {vis: {floor: 0}, r: 12.5, phi: .95, th: .2, t: [4.2, .5, -4.8], w: "LT 1 · Pantry"},
     game: {vis: {floor: 0}, r: 11, phi: .95, th: .55, t: [-1.8, .3, 3.0], w: "LT 1 · Game Corner"},
@@ -1619,6 +2039,10 @@ const OFFICE = (() => {
     meeting: {vis: {floor: 2}, r: 12, phi: .9, th: .55, t: [-8.4, 9.1, -3.6], w: "LT 3 · Ruang Meeting"},
     dewan: {vis: {floor: 3}, r: 14, phi: .88, th: .45, t: [-6.4, 13.5, -2.6], w: "LT 4 · Ruang Dewan"},
     ceo: {vis: {floor: 3}, r: 12, phi: .9, th: -.25, t: [4.8, 13.5, -3.4], w: "LT 4 · Ruang CEO"},
+    galeri: {vis: {floor: 0}, r: 19, phi: .9, th: .32, t: [16.4, .6, -.2], w: "LT 1 · Galeri Karya"},
+    labiot: {vis: {floor: 1}, r: 19, phi: .88, th: .12, t: [16.6, 5.2, -1.0], w: "LT 2 · Lab Komputer & IoT"},
+    perpus: {vis: {floor: 2}, r: 19, phi: .9, th: .32, t: [16.4, 9.2, -.2], w: "LT 3 · Perpustakaan"},
+    observ: {vis: {floor: 3}, r: 19, phi: .9, th: .32, t: [16.4, 13.6, -.4], w: "LT 4 · Observatorium"},
   };
   const tall = () => stage.clientWidth / Math.max(1, stage.clientHeight) < .9;
   function fitR(r) { const asp = stage.clientWidth / Math.max(1, stage.clientHeight); return r * Math.min(1.6, Math.max(1, 1.45 / asp)); }
@@ -1692,9 +2116,13 @@ const OFFICE = (() => {
       else if (o.k === "scroll") o.o.offset.y += dt * .05;
       else if (o.k === "pulse") o.o.emissiveIntensity = 1 + Math.abs(Math.sin(t * 3)) * 2;
       else if (o.k === "bar") o.o.scale.y = 1 + Math.sin(t * 2 + o.i) * .25;
+      else if (o.k === "nozzle") { o.o.position.x = Math.sin(t * 1.3) * .3; o.o.position.z = -.25 + Math.cos(t * 2.1) * .2; }
+      else if (o.k === "drone") { o.o.position.y = 1.2 + Math.sin(t * 1.6) * .12; o.o.rotation.y = Math.sin(t * .4) * .6; o.props.forEach(p => p.rotation.y += dt * 40); }
+      else if (o.k === "scope") { o.o.rotation.y = -.6 + Math.sin(t * .15) * .35; }
       else if (o.k === "arm") { o.o.rotation.y = Math.sin(t * .8) * 1.2; o.j2.rotation.z = .9 + Math.sin(t * 1.7) * .5; }
     });
     if (BALL && PPM) pongTick(t);
+    if (IOTX && (VIS.all || VIS.floor === 1 || (follow && follow.floor === 1)) && t - (IOTX._t || 0) > .5) { IOTX._t = t; iotDraw(IOTD, t); }
     if (fly) {
       fly.k = Math.min(1, fly.k + dt / fly.d); const e = fly.k < .5 ? 2 * fly.k * fly.k : 1 - Math.pow(-2 * fly.k + 2, 2) / 2;
       const tgt = fly.t1 ? fly.t0.clone().lerp(fly.t1, e) : fly.t0.clone().lerp(follow ? follow.g.position.clone().add(new THREE.Vector3(0, .9, 0)) : fly.t0, e);
@@ -1723,7 +2151,7 @@ const OFFICE = (() => {
     }
     if (pr && pr.w) {
       applyVis({floor: pipF});
-      topCam.position.set(0, FY[pipF] + 40, 0); topCam.lookAt(0, FY[pipF], 0);
+      topCam.position.set(BX, FY[pipF] + 40, 0); topCam.lookAt(BX, FY[pipF], 0);
       const y = h - pr.y - pr.h;
       R.setScissorTest(true); R.setScissor(pr.x, y, pr.w, pr.h); R.setViewport(pr.x, y, pr.w, pr.h); R.render(sc, topCam); R.setScissorTest(false);
       applyVis(mainVis);
@@ -1738,12 +2166,13 @@ const OFFICE = (() => {
     stage.prepend(R.domElement);
     sc = new THREE.Scene(); CUR = sc;
     cam = new THREE.PerspectiveCamera(34, 1, .1, 320);
-    topCam = new THREE.OrthographicCamera(-12.7, 12.7, 7.65, -7.65, 1, 100); topCam.up.set(0, 0, -1);
+    topCam = new THREE.OrthographicCamera(-BW / 2 - .5, BW / 2 + .5, (BW + 1) / 3.32, -(BW + 1) / 3.32, 1, 100); topCam.up.set(0, 0, -1);
     ctl = new THREE.OrbitControls(cam, R.domElement);
     Object.assign(ctl, {enableDamping: true, dampingFactor: .08, minDistance: 4, maxDistance: 120, maxPolarAngle: 1.5, screenSpacePanning: true, rotateSpeed: .7, zoomSpeed: .9});
     world();
     for (let i = 0; i < 4; i++) { const g = new THREE.Group(); g.position.y = FY[i]; sc.add(g); FG.push(g); }
     [lt1, lt2, lt3, lt4].forEach((fn, i) => { CUR = FG[i]; fn(); });
+    [wing1, wing2, wing3, wing4].forEach((fn, i) => { CUR = FG[i]; fn(); });
     roof(); CUR = sc;
     const order = [...list].sort((a, b) => (b.boss ? 1 : 0) - (a.boss ? 1 : 0));
     AG = order.map(build).filter(Boolean);
@@ -1773,6 +2202,7 @@ const OFFICE = (() => {
       renderList();
     },
     states() { const o = {}; AG.forEach(a => o[a.key] = status(a)); return o; },
+    iot(list) { iotFeed(list); },
   };
 })();
 
