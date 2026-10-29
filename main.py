@@ -1331,6 +1331,10 @@ def laporan_data(hari=7):
         mm = sql(c, "SELECT COUNT(*) FROM memori WHERE waktu >= ?", (t0.isoformat(timespec="seconds"),)).fetchone()[0]
         iot = sql(c, "SELECT perangkat, COUNT(*) FROM iot WHERE ts >= ? GROUP BY perangkat", (int(t0.timestamp()),)).fetchall()
         ide_lama = sql(c, "SELECT data FROM laporan ORDER BY id DESC LIMIT 4").fetchall()
+    # Postgres mengembalikan SUM sebagai Decimal: ubah ke int supaya bisa dihitung & disimpan sebagai JSON
+    tot, pk = [int(x or 0) for x in tot], [int(x or 0) for x in pk]
+    gb, mm, iot = int(gb or 0), int(mm or 0), [(p, int(n)) for p, n in iot]
+    kas = [(t, k, g, int(m or 0), int(x or 0)) for t, k, g, m, x in kas]
     per_bot, per_jalur, gagal = {}, {}, 0
     for w, b, t, s, j in akt:
         nama = AGENTS[b]["nama"] if b in AGENTS else ("MCI.Canvas" if b == "canvas" else "Sidang Dewan" if b == "dewan" else b)
@@ -1418,7 +1422,7 @@ async def laporan_buat(kirim=True, sumber="otomatis"):
     simpan = {**{k2: v for k2, v in d.items() if k2 != "ide_lama"}, **naskah}
     with db() as c:
         q = "INSERT INTO laporan (minggu,dibuat,dari,sampai,sumber,isi,data) VALUES (?,?,?,?,?,?,?)"
-        p = (d["minggu"], _now(), d["dari"], d["sampai"], sumber, teks, json.dumps(simpan))
+        p = (d["minggu"], _now(), d["dari"], d["sampai"], sumber, teks, json.dumps(simpan, default=lambda o: float(o) if hasattr(o, "as_integer_ratio") else str(o)))
         lid = sql(c, q + " RETURNING id", p).fetchone()[0] if PG else sql(c, q, p).lastrowid
     terkirim = 0
     if kirim:
