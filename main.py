@@ -747,12 +747,20 @@ async def cf_run(model, payload):
     if not (CF_ACCOUNT and CF_TOKEN):
         raise RuntimeError("Studio Gambar belum aktif: isi CF_ACCOUNT_ID dan CF_API_TOKEN di Render.")
     url = f"{CF_BASE}/accounts/{CF_ACCOUNT}/ai/run/{model}"
-    try:
-        async with httpx.AsyncClient(timeout=120) as h:
-            r = await h.post(url, headers={"Authorization": f"Bearer {CF_TOKEN}"}, json=payload)
-    except httpx.HTTPError:
-        log.exception("Cloudflare tidak bisa dihubungi")
-        raise RuntimeError("Server gambar Cloudflare tidak bisa dihubungi, coba lagi sebentar.")
+    payload = dict(payload)
+    for _ in range(4):
+        try:
+            async with httpx.AsyncClient(timeout=120) as h:
+                r = await h.post(url, headers={"Authorization": f"Bearer {CF_TOKEN}"}, json=payload)
+        except httpx.HTTPError:
+            log.exception("Cloudflare tidak bisa dihubungi")
+            raise RuntimeError("Server gambar Cloudflare tidak bisa dihubungi, coba lagi sebentar.")
+        # model menolak parameter tertentu: buang parameter itu lalu ulangi (skema model bisa berubah)
+        bad = re.search(r"properties '/(\w+)'", r.text) if r.status_code == 400 else None
+        if not (bad and bad.group(1) in payload and bad.group(1) != "prompt"):
+            break
+        log.warning("Cloudflare menolak parameter %s, diulang tanpa parameter itu", bad.group(1))
+        payload.pop(bad.group(1))
     ct = r.headers.get("content-type", "")
     if r.status_code != 200:
         try:
@@ -833,7 +841,7 @@ async def make_image(prompt, foto=None, kekuatan=0.6, w=None, h=None, sumber="we
                 body["width"], body["height"] = _dim(w), _dim(h)
             model = CF_EDIT_MODEL
         else:
-            body = {"prompt": en, "steps": 4, "seed": secrets.randbelow(2 ** 31)}
+            body = {"prompt": en, "steps": 4}
             model = CF_MODEL
         data, mime = await cf_run(model, body)
     finally:

@@ -423,6 +423,8 @@ $$("[data-mode]").forEach(b => b.onclick = () => { MODE = b.dataset.mode; $$("[d
 function renderPicks() {
   if ($("#picks").dataset.r || !DATA.length) return; $("#picks").dataset.r = 1;
   $("#picks").innerHTML = DATA.filter(d => !d.boss).map(d => `<label><input type="checkbox" value="${esc(d.key)}">${esc(d.name.replace("MCI.",""))}</label>`).join("");
+  const lim = () => { const on = $$("#picks input:checked").length; $$("#picks input").forEach(x => { x.disabled = !x.checked && on >= 4; x.parentElement.style.opacity = x.disabled ? .45 : 1; }); };
+  $$("#picks input").forEach(x => x.onchange = lim);
 }
 $("#bs").onclick = async () => {
   const t = $("#bt").value.trim(); if (!t) return;
@@ -891,7 +893,11 @@ const OFFICE = (() => {
     [cup, donut, paper, paddle, club].forEach(o => o.visible = false);
     const disk = grp(0, 0, 0, 0, g); add(CY(.55, .55, .05, 32), "#D4AF5A", 0, .02, 0, disk, GOLD); add(TO(.56, .03), "#5ee6ff", 0, .04, 0, disk, {emissive: "#5ee6ff", emissiveIntensity: 1.6}).rotation.x = PI / 2; disk.visible = false;
     if (boss) g.scale.setScalar(1.15);
-    return {g, body, aL, aR, lL, lR, eyes, disk, props: {cup, donut, paper, paddle, club}};
+    /* jejak kilat saat bergegas kerja (gaya Flash) */
+    const trail = grp(0, .72, -.42, 0, g);
+    [0, 1, 2].forEach(i => add(SP(.17 - i * .04, 12, 8), "#F1D58A", 0, -i * .06, -i * .3, trail, {transparent: true, opacity: .5 - i * .14, emissive: "#F1D58A", emissiveIntensity: .9, depthWrite: false}).scale.set(1, .8, 2.4));
+    trail.visible = false;
+    return {g, body, aL, aR, lL, lR, eyes, disk, trail, props: {cup, donut, paper, paddle, club}};
   }
 
   /* ---------- graf jalur 3D ---------- */
@@ -1358,10 +1364,10 @@ const OFFICE = (() => {
     if (a.path.length) {
       const [tx, ty, tz] = a.path[0], dx = tx - g.position.x, dz = tz - g.position.z, dy = ty - a.baseY, dh = Math.hypot(dx, dz);
       if (Math.abs(dy) > .01 && dh < .02) {
-        a.riding = true; const s = 3.2 * dt;
+        a.riding = true; const s = (a.ph === "urgent" ? 8 : 3.2) * dt;
         if (Math.abs(dy) <= s) { a.baseY = ty; a.path.shift(); if (!a.path.length) { const cb = a.cb; a.cb = null; cb && cb(); } } else a.baseY += Math.sign(dy) * s;
       } else {
-        const s = (a.boss ? 1.9 : 2.2) * dt;
+        const s = (a.ph === "urgent" ? 7.5 : a.boss ? 1.9 : 2.2) * dt;  // ada kerjaan = lari secepat kilat
         if (dh <= s) { g.position.x = tx; g.position.z = tz; a.baseY = ty; a.path.shift(); if (!a.path.length) { const cb = a.cb; a.cb = null; cb && cb(); } }
         else { g.position.x += dx / dh * s; g.position.z += dz / dh * s; a.rotT = Math.atan2(dx, dz); }
       }
@@ -1374,7 +1380,9 @@ const OFFICE = (() => {
     const k = a.riding ? "ride" : a.anim, ph = a.phase, seated = a.seated && k !== "walk";
     let aL = 0, aR = 0, lL = 0, lR = 0, bob = 0, lean = 0, aLz = 0, aRz = 0;
     if (seated) { lL = lR = k === "lounge" ? -1.2 : -1.45; }
-    if (k === "walk") { const s = Math.sin(t * 9 + ph); lL = s * .6; lR = -s * .6; aL = -s * .5; aR = s * .5; bob = Math.abs(s) * .045; }
+    const rush = k === "walk" && a.ph === "urgent";
+    if (rush) { const s = Math.sin(t * 24 + ph); lL = s * 1.1; lR = -s * 1.1; aL = -1.3 + s * .3; aR = -1.3 - s * .3; aLz = -.5; aRz = .5; bob = Math.abs(s) * .07; lean = .38; }
+    else if (k === "walk") { const s = Math.sin(t * 9 + ph); lL = s * .6; lR = -s * .6; aL = -s * .5; aR = s * .5; bob = Math.abs(s) * .045; }
     else if (k === "ride") { aL = aR = .1; aLz = -.2; aRz = .2; bob = Math.sin(t * 3) * .01; }
     else if (k === "type") { aL = -1.25 + Math.sin(t * 17 + ph) * .1; aR = -1.25 + Math.sin(t * 17 + ph + 2) * .1; lean = .08; }
     else if (k === "think") { aL = -1.2; aR = -2.3 + Math.sin(t * 2) * .05; }
@@ -1398,7 +1406,7 @@ const OFFICE = (() => {
     p.aL += (aL - p.aL) * f; p.aR += (aR - p.aR) * f; p.lL += (lL - p.lL) * f; p.lR += (lR - p.lR) * f; p.lean += (lean - p.lean) * f;
     p.aLz = (p.aLz || 0) + (aLz - (p.aLz || 0)) * f; p.aRz = (p.aRz || 0) + (aRz - (p.aRz || 0)) * f;
     a.aL.rotation.set(p.aL, 0, p.aLz); a.aR.rotation.set(p.aR, 0, p.aRz); a.lL.rotation.x = p.lL; a.lR.rotation.x = p.lR;
-    a.body.rotation.x = p.lean; g.position.y = a.baseY + a.lift + bob; a.disk.visible = a.riding;
+    a.body.rotation.x = p.lean; g.position.y = a.baseY + a.lift + bob; a.disk.visible = a.riding; a.trail.visible = rush;
     a.body.scale.y = 1 + Math.sin(t * 2.2 + ph) * .012;
     a.blink -= dt; const closed = k === "doze" || (a.blink < .12 && a.blink > 0);
     if (a.blink <= 0) a.blink = 2.5 + Math.random() * 3.5;
