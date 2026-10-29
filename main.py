@@ -116,7 +116,7 @@ assert len(AGENTS) <= 10, "Maksimal 10 bot"
 STATE = {k: {"status": "IDLE", "activity": "Siaga", "active": 0, "calls": 0, "tokens": 0, "mode": "meja"} for k in [*AGENTS, "canvas"]}
 # Canvas = bot gambar (Cloudflare), tampil di kantor 3D lantai 1 tapi bukan agen Gemini (batas 10 agen tetap)
 CANVAS = {"nama": "MCI.Canvas", "lantai": 1, "divisi": "Studio Gambar", "peran": "Pelukis AI: bikin dan ubah gambar", "boss": False}
-SET = {"caveman": False, "mcp": False, "mem_tg": "tidak"}   # mem_tg: simpan chat Telegram (tidak / 72 / permanen)
+SET = {"caveman": False, "mcp": False, "mem_tg": "tidak", "laporan_on": True}   # mem_tg: simpan chat Telegram (tidak / 72 / permanen)
 TASKLOG = deque(maxlen=40)
 JOBS = {}
 LOOP = None
@@ -169,6 +169,8 @@ def db_init():
         sql(c, f"CREATE TABLE IF NOT EXISTS memori (id {pk}, waktu TEXT NOT NULL, sumber TEXT, bot TEXT, jalur TEXT, perintah TEXT NOT NULL, jawaban TEXT, kadaluarsa TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS iot (id {pk}, ts {big} NOT NULL, perangkat TEXT NOT NULL, data TEXT NOT NULL)")
         sql(c, f"CREATE TABLE IF NOT EXISTS gambar (id {pk}, prompt TEXT NOT NULL, prompt_en TEXT, sumber TEXT, mime TEXT NOT NULL, data TEXT NOT NULL, dibuat TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS aktivitas (id {pk}, waktu TEXT NOT NULL, bot TEXT, tugas TEXT, status TEXT, jalur TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS laporan (id {pk}, minggu TEXT, dibuat TEXT, dari TEXT, sampai TEXT, sumber TEXT, isi TEXT, data TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS pemakaian (tanggal TEXT NOT NULL, model TEXT NOT NULL, masuk {big} NOT NULL DEFAULT 0, keluar {big} NOT NULL DEFAULT 0, pikir {big} NOT NULL DEFAULT 0, panggilan {big} NOT NULL DEFAULT 0, PRIMARY KEY (tanggal, model))")
         r = sql(c, "SELECT v FROM pengaturan WHERE k=?", ("s",)).fetchone()
         if r:
@@ -572,6 +574,8 @@ class Rencana(BaseModel):
 def _log(bot, tugas, status, jalur):
     e = {"t": datetime.now(WIB).strftime("%H:%M"), "bot": bot, "tugas": tugas[:90], "status": status, "jalur": jalur}
     TASKLOG.appendleft(e)
+    if status in FINAL:
+        akt_save(e)
     return e
 
 
@@ -590,6 +594,7 @@ async def run_task(bot, perintah, skill=None, jalur="boss", sem=None):
             log.exception("Tugas %s gagal", bot)
             e["status"] = "Gagal"
             h = f"(gagal: {ex})" if isinstance(ex, RuntimeError) else "(gagal, cek log server)"
+        await asyncio.to_thread(akt_save, e)
     return {"bot": bot, "perintah": perintah, "skill": skill or "", "hasil": h}
 
 
@@ -683,9 +688,11 @@ async def council_run(pertanyaan, anggota=None):
                             "Tulis PUTUSAN DEWAN: 1) keputusan, 2) poin sepakat, 3) poin beda pendapat, 4) langkah berikut. Maksimal 150 kata.",
                             act="Membacakan putusan", use_mcp=False, cache=False)
         e["status"] = "Selesai"
+        await asyncio.to_thread(akt_save, e)
         return {"jalur": "dewan", "keterangan": "Sidang dewan: " + ", ".join(p["nama"] for p in pend), "pendapat": pend, "jawaban": putusan, "rencana": []}
     except Exception:
         e["status"] = "Gagal"
+        await asyncio.to_thread(akt_save, e)
         raise
     finally:
         for k in m + ["apex"]:
@@ -1273,6 +1280,199 @@ async def room_prep(text, bot):
     return room, ctx, note, act
 
 
+# ---------- LAPORAN MINGGUAN (otomatis tiap Jumat) ----------
+# Isi: kegiatan bot 7 hari terakhir, rekap kas minggu ini, pemakaian token/gambar/IoT, dan ide pengembangan baru.
+# Scribe menyusun naskahnya di Perpustakaan; Apex mengirim ke Telegram semua ALLOWED_USER_IDS.
+LAP_HARI = max(0, min(6, int(os.getenv("LAPORAN_HARI", "4"))))     # 0=Senin ... 4=Jumat
+LAP_JAM = max(0, min(23, int(os.getenv("LAPORAN_JAM", "17"))))     # jam WIB
+HARI_ID = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+FINAL = ("Selesai", "Gagal", "Alarm")
+
+
+class Ide(BaseModel):
+    judul: str
+    kenapa: str
+    langkah: str
+    level: str
+
+
+class NaskahLaporan(BaseModel):
+    ringkasan: str
+    catatan_kas: str
+    sorotan: list[str]
+    ide: list[Ide]
+
+
+def akt_save(e):
+    try:
+        with db() as c:
+            sql(c, "INSERT INTO aktivitas (waktu,bot,tugas,status,jalur) VALUES (?,?,?,?,?)",
+                (_now(), e["bot"], e["tugas"][:300], e["status"], e["jalur"]))
+    except Exception:
+        log.exception("Gagal menyimpan aktivitas")
+
+
+def _minggu_key(dt):
+    y, w, _ = dt.isocalendar()
+    return f"{y}-W{w:02d}"
+
+
+def laporan_data(hari=7):
+    now = datetime.now(WIB)
+    t0 = now - timedelta(days=hari)
+    d0, d1 = t0.strftime("%Y-%m-%d"), now.strftime("%Y-%m-%d")
+    out = {"dari": d0, "sampai": d1, "minggu": _minggu_key(now)}
+    with db() as c:
+        akt = sql(c, "SELECT waktu,bot,tugas,status,jalur FROM aktivitas WHERE waktu >= ? ORDER BY id DESC", (t0.isoformat(timespec="seconds"),)).fetchall()
+        kas = sql(c, "SELECT tanggal,keterangan,kategori,masuk,keluar FROM kas WHERE tanggal >= ? AND tanggal <= ? ORDER BY tanggal, id", (d0, d1)).fetchall()
+        tot = sql(c, "SELECT COALESCE(SUM(masuk),0), COALESCE(SUM(keluar),0) FROM kas").fetchone()
+        pk = sql(c, "SELECT COALESCE(SUM(masuk+keluar+pikir),0), COALESCE(SUM(panggilan),0) FROM pemakaian WHERE tanggal >= ? AND tanggal <= ?", (d0, d1)).fetchone()
+        gb = sql(c, "SELECT COUNT(*) FROM gambar WHERE dibuat >= ?", (t0.isoformat(timespec="seconds"),)).fetchone()[0]
+        mm = sql(c, "SELECT COUNT(*) FROM memori WHERE waktu >= ?", (t0.isoformat(timespec="seconds"),)).fetchone()[0]
+        iot = sql(c, "SELECT perangkat, COUNT(*) FROM iot WHERE ts >= ? GROUP BY perangkat", (int(t0.timestamp()),)).fetchall()
+        ide_lama = sql(c, "SELECT data FROM laporan ORDER BY id DESC LIMIT 4").fetchall()
+    per_bot, per_jalur, gagal = {}, {}, 0
+    for w, b, t, s, j in akt:
+        nama = AGENTS[b]["nama"] if b in AGENTS else ("MCI.Canvas" if b == "canvas" else "Sidang Dewan" if b == "dewan" else b)
+        per_bot[nama] = per_bot.get(nama, 0) + 1
+        per_jalur[j] = per_jalur.get(j, 0) + 1
+        gagal += s == "Gagal"
+    out["aktivitas"] = {"total": len(akt), "gagal": gagal, "per_bot": dict(sorted(per_bot.items(), key=lambda x: -x[1])), "per_jalur": per_jalur,
+                        "sidang": [t for w, b, t, s, j in akt if j == "dewan"][:8], "alarm": [t for w, b, t, s, j in akt if s == "Alarm"][:8],
+                        "contoh": [{"waktu": w[5:16].replace("T", " "), "bot": b, "tugas": t, "status": s} for w, b, t, s, j in akt[:40]]}
+    rows = [{"tanggal": t, "keterangan": k, "kategori": g, "masuk": m, "keluar": x} for t, k, g, m, x in kas]
+    s = kas_summary(rows)
+    out["kas"] = {**s, "transaksi": len(rows), "saldo_total": tot[0] - tot[1], "terbesar_keluar": sorted([r for r in rows if r["keluar"]], key=lambda r: -r["keluar"])[:3],
+                  "terbesar_masuk": sorted([r for r in rows if r["masuk"]], key=lambda r: -r["masuk"])[:3], "rows": rows[-30:]}
+    out["lain"] = {"token": pk[0], "panggilan_ai": pk[1], "gambar": gb, "memori": mm, "iot": {p: n for p, n in iot}}
+    lama = []
+    for (d,) in ide_lama:
+        try:
+            lama += [i["judul"] for i in json.loads(d).get("ide", [])]
+        except (ValueError, TypeError, KeyError):
+            pass
+    out["ide_lama"] = list(dict.fromkeys(lama))[:20]
+    return out
+
+
+def laporan_teks(d, n):
+    a, k, l = d["aktivitas"], d["kas"], d["lain"]
+    T = [f"📋 LAPORAN MINGGUAN MCI HQ", f"Periode {d['dari']} s/d {d['sampai']} ({d['minggu']})", ""]
+    if n.get("ringkasan"):
+        T += ["📝 RINGKASAN", n["ringkasan"], ""]
+    T += ["🤖 KEGIATAN BOT", f"Total {a['total']} tugas · {a['gagal']} gagal"]
+    T += [f"• {b}: {c}" for b, c in list(a["per_bot"].items())[:11]]
+    if a["sidang"]:
+        T += ["", "🏛 Sidang dewan:"] + [f"• {x[:90]}" for x in a["sidang"]]
+    if a["alarm"]:
+        T += ["", "⚠️ Alarm IoT:"] + [f"• {x[:90]}" for x in a["alarm"]]
+    if n.get("sorotan"):
+        T += ["", "✨ Sorotan:"] + [f"• {x}" for x in n["sorotan"][:6]]
+    T += ["", "💰 REKAP KAS MINGGU INI", f"Masuk {rp(k['masuk'])} · Keluar {rp(k['keluar'])} · Selisih {rp(k['saldo'])}",
+          f"Saldo total kas sekarang: {rp(k['saldo_total'])} ({k['transaksi']} transaksi minggu ini)"]
+    for g, v in sorted(k["kategori"].items(), key=lambda x: -(x[1]["masuk"] + x[1]["keluar"]))[:6]:
+        T.append(f"• {g}: " + " / ".join(x for x in (f"+{rp(v['masuk'])}" if v["masuk"] else "", f"-{rp(v['keluar'])}" if v["keluar"] else "") if x))
+    if k["terbesar_keluar"]:
+        T.append("Pengeluaran terbesar: " + "; ".join(f"{r['keterangan']} {rp(r['keluar'])}" for r in k["terbesar_keluar"]))
+    if n.get("catatan_kas"):
+        T += [f"💡 {n['catatan_kas']}"]
+    T += ["", "📊 PEMAKAIAN", f"Token AI {l['token']:,} ({l['panggilan_ai']} panggilan) · Gambar {l['gambar']} · Memori disimpan {l['memori']}".replace(",", ".")]
+    if l["iot"]:
+        T.append("Data IoT: " + ", ".join(f"{p} {c} kiriman" for p, c in l["iot"].items()))
+    if n.get("ide"):
+        T += ["", "🚀 IDE PENGEMBANGAN BARU"]
+        for i, x in enumerate(n["ide"][:5], 1):
+            T += [f"{i}. {x['judul']} [{x['level']}]", f"   Kenapa: {x['kenapa']}", f"   Mulai dari: {x['langkah']}"]
+    return "\n".join(T)
+
+
+async def laporan_buat(kirim=True, sumber="otomatis"):
+    d = await asyncio.to_thread(laporan_data)
+    a, k = d["aktivitas"], d["kas"]
+    ringkas = (f"Periode {d['dari']} s/d {d['sampai']}.\nKegiatan: {a['total']} tugas, {a['gagal']} gagal. Per bot: {a['per_bot']}. Jalur: {a['per_jalur']}.\n"
+               f"Contoh tugas: " + "; ".join(f"{x['bot']}: {x['tugas'][:80]} ({x['status']})" for x in a["contoh"][:25]) +
+               f"\nSidang dewan: {a['sidang']}\nAlarm IoT: {a['alarm']}\n"
+               f"Kas minggu ini: masuk {k['masuk']}, keluar {k['keluar']}, selisih {k['saldo']}, saldo total {k['saldo_total']}, per kategori {k['kategori']}.\n"
+               f"Transaksi: " + "; ".join(f"{r['tanggal']} {r['keterangan']} +{r['masuk']} -{r['keluar']}" for r in k["rows"]) +
+               f"\nLain: {d['lain']}\nIde minggu-minggu lalu (JANGAN diulang): {d['ide_lama'] or '-'}")
+    try:
+        tk = await asyncio.to_thread(tentang_get)
+        profil = f"{tk.get('judul')}: {tk.get('deskripsi', '')[:600]} Sejarah: " + "; ".join(f"{x['tahun']} {x['judul']}" for x in tk.get("sejarah", [])[:15])
+    except Exception:
+        profil = ""
+    naskah = {}
+    try:
+        raw = await ask("scribe", f"[LAPORAN MINGGUAN MCI]\nProfil MCI: {profil}\nData minggu ini:\n{ringkas}\n\n"
+                        "Tulis dalam bahasa Indonesia santai tapi rapi:\n"
+                        "- ringkasan: 3-4 kalimat apa yang terjadi minggu ini (pakai angka asli, jangan mengarang).\n"
+                        "- catatan_kas: 1-2 kalimat insight kas (pola, risiko, saran hemat). Kalau tidak ada transaksi, bilang begitu.\n"
+                        "- sorotan: 2-4 poin pencapaian/temuan penting dari data.\n"
+                        "- ide: TEPAT 5 ide pengembangan BARU untuk MCI (hardware/IoT/AI/web/kapal monitoring/radar/roket/komunitas), "
+                        "beda dari ide minggu lalu, konkret dan bisa dikerjakan tim kecil dengan budget pelajar. "
+                        "Tiap ide: judul singkat, kenapa (manfaat), langkah (langkah pertama yang bisa dimulai minggu ini), level (Mudah/Sedang/Menantang).",
+                        schema=NaskahLaporan, model=MODEL, act="Menyusun laporan mingguan", use_mcp=False, cache=False, room="perpus")
+        naskah = json.loads(raw)
+    except Exception:
+        log.exception("Naskah laporan AI gagal, laporan tetap dibuat dari data")
+    teks = laporan_teks(d, naskah)
+    simpan = {**{k2: v for k2, v in d.items() if k2 != "ide_lama"}, **naskah}
+    with db() as c:
+        q = "INSERT INTO laporan (minggu,dibuat,dari,sampai,sumber,isi,data) VALUES (?,?,?,?,?,?,?)"
+        p = (d["minggu"], _now(), d["dari"], d["sampai"], sumber, teks, json.dumps(simpan))
+        lid = sql(c, q + " RETURNING id", p).fetchone()[0] if PG else sql(c, q, p).lastrowid
+    terkirim = 0
+    if kirim:
+        terkirim = await laporan_kirim(teks)
+    _log("scribe", f"Laporan mingguan {d['minggu']}" + (f" (terkirim ke {terkirim} orang)" if kirim else ""), "Selesai", "laporan")
+    return {"id": lid, "minggu": d["minggu"], "isi": teks, "terkirim": terkirim}
+
+
+async def laporan_kirim(teks):
+    app_ = TG_APPS.get("apex") or TG_APPS.get("scribe") or next(iter(TG_APPS.values()), None)
+    n = 0
+    if not app_:
+        return 0
+    for uid in ALLOWED:
+        try:
+            for i in range(0, len(teks), 4000):
+                await app_.bot.send_message(chat_id=uid, text=teks[i:i + 4000])
+            n += 1
+        except Exception:
+            log.warning("Laporan tidak terkirim ke %s (sudah /start bot Apex?)", uid)
+    return n
+
+
+def laporan_list():
+    with db() as c:
+        rows = sql(c, "SELECT id,minggu,dibuat,dari,sampai,sumber,isi FROM laporan ORDER BY id DESC LIMIT 30").fetchall()
+    return [dict(zip(("id", "minggu", "dibuat", "dari", "sampai", "sumber", "isi"), r)) for r in rows]
+
+
+def _lap_jatuh_tempo(now):
+    """True kalau minggu ini sudah lewat jadwal (mis. Jumat 17:00) dan laporan otomatis belum dibuat.
+    Kalau server sempat mati saat jadwal, laporan tetap dibuat begitu server hidup lagi (Sabtu/Minggu)."""
+    if not SET.get("laporan_on", True):
+        return False
+    if now.weekday() < LAP_HARI or (now.weekday() == LAP_HARI and now.hour < LAP_JAM):
+        return False
+    return SET.get("laporan_terakhir") != _minggu_key(now)
+
+
+async def laporan_jadwal():
+    await asyncio.sleep(60)
+    while True:
+        try:
+            now = datetime.now(WIB)
+            if _lap_jatuh_tempo(now):
+                SET["laporan_terakhir"] = _minggu_key(now)   # tandai dulu supaya tidak dobel
+                await asyncio.to_thread(set_save)
+                log.info("Membuat laporan mingguan %s", SET["laporan_terakhir"])
+                await laporan_buat(kirim=True, sumber="otomatis")
+        except Exception:
+            log.exception("Jadwal laporan mingguan gagal")
+        await asyncio.sleep(300)
+
+
 # ---------- WEB ----------
 app = Flask(__name__, static_folder=None)
 
@@ -1684,6 +1884,31 @@ def api_iot_del(perangkat):
     return jsonify({"dihapus": n})
 
 
+@app.route("/api/laporan", methods=["GET", "POST"])
+def api_laporan():
+    need("admin")
+    if request.method == "POST":
+        d = request.get_json(silent=True) or {}
+        return jsonify({"job": start_job(laporan_buat(kirim=bool(d.get("kirim")), sumber="web"))})
+    return jsonify({"items": laporan_list(), "aktif": SET.get("laporan_on", True), "hari": HARI_ID[LAP_HARI], "jam": LAP_JAM,
+                    "terakhir": SET.get("laporan_terakhir"), "penerima": len(ALLOWED), "telegram": bool(TG_APPS)})
+
+
+@app.route("/api/laporan/atur", methods=["POST"])
+def api_laporan_atur():
+    need("admin")
+    SET["laporan_on"] = bool((request.get_json(silent=True) or {}).get("aktif"))
+    set_save()
+    return jsonify({"aktif": SET["laporan_on"]})
+
+
+@app.route("/api/laporan/<int:i>", methods=["DELETE"])
+def api_laporan_del(i):
+    need("admin")
+    with db() as c:
+        return jsonify({"dihapus": sql(c, "DELETE FROM laporan WHERE id=?", (i,)).rowcount})
+
+
 @app.route("/api/usage")
 def api_usage():
     need("admin")
@@ -1795,7 +2020,7 @@ def make_handlers(key):
 
     async def start(u, c):
         await u.message.reply_text(f"Halo, saya {cfg['nama']} (Lantai {cfg['lantai']}, {cfg['divisi']}).\n{cfg['peran']}.\n\n"
-                                   "/status  /id  /budget\n/caveman on|off\n/council <pertanyaan>\n/skills  /skill <nama> <teks>\n/gambar <deskripsi>")
+                                   "/status  /id  /budget\n/caveman on|off\n/council <pertanyaan>\n/skills  /skill <nama> <teks>\n/gambar <deskripsi>\n/laporan (laporan mingguan, ke Apex)")
 
     async def myid(u, c):
         await u.message.reply_text(f"ID Telegram kamu: {u.effective_user.id}")
@@ -1899,11 +2124,15 @@ def make_handlers(key):
                     del h[:-6]
                 if note and ans:
                     ans += f"\n\n— {note}"
+            ok = True
         except Exception as e:
             log.exception("[%s] gagal", cfg["nama"])
             ans = str(e) if isinstance(e, RuntimeError) else "⚠️ Ada gangguan saat menghubungi Gemini. Coba lagi sebentar."
+            ok = False
         finally:
             _end(key)
+        if key != "apex":   # Apex sudah tercatat lewat run_task / sidang
+            await asyncio.to_thread(_log, key, text, "Selesai" if ok else "Gagal", "telegram")
         await asyncio.sleep(max(0.0, 1.5 - (time.time() - t0)))  # beri waktu animasi lari terlihat dulu
         await _send(m, ans)
         if SET.get("mem_tg", "tidak") != "tidak":
@@ -1942,8 +2171,24 @@ def make_handlers(key):
             ans = "⚠️ Gagal membaca foto."
         await _send(m, ans)
 
+    async def laporan(u, c):
+        if not (ALLOWED and _ok(u.effective_user)):
+            await u.message.reply_text("Isi ALLOWED_USER_IDS dulu untuk memakai perintah ini.")
+            return
+        if key != "apex":
+            await u.message.reply_text("Laporan mingguan dibuat oleh MCI.Apex. Kirim /laporan ke bot Apex ya.")
+            return
+        await u.message.reply_text("📋 Scribe sedang menyusun laporan 7 hari terakhir di Perpustakaan, tunggu sebentar…")
+        await c.bot.send_chat_action(chat_id=u.message.chat_id, action="typing")
+        try:
+            r = await laporan_buat(kirim=False, sumber="telegram")
+            await _send(u.message, r["isi"])
+        except Exception as e:
+            log.exception("laporan gagal")
+            await u.message.reply_text(str(e) if isinstance(e, RuntimeError) else "⚠️ Laporan gagal dibuat, cek log server.")
+
     return {"start": start, "id": myid, "status": status, "tokens": status, "budget": budget, "caveman": caveman,
-            "hapus": hapus, "council": council, "dewan": council, "skills": skills, "skill": skill, "gambar": gambar}, chat, photo
+            "hapus": hapus, "council": council, "dewan": council, "skills": skills, "skill": skill, "gambar": gambar, "laporan": laporan}, chat, photo
 
 
 def _group_cmd(key, f):
@@ -2054,6 +2299,8 @@ async def run_bots():
             log.info("[MCI Studio Gambar] bot gambar terpisah online (aktif=%s)", bool(CF_ACCOUNT and CF_TOKEN))
         except Exception:
             log.exception("[MCI Studio Gambar] gagal start")
+    asyncio.create_task(laporan_jadwal())
+    log.info("Laporan mingguan otomatis: setiap %s %02d:00 WIB (%s)", HARI_ID[LAP_HARI], LAP_JAM, "aktif" if SET.get("laporan_on", True) else "nonaktif")
     await asyncio.Event().wait()
 
 

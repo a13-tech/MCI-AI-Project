@@ -106,6 +106,10 @@ td{padding:10px;border-top:1px solid #E6EDFB;vertical-align:top}
 .clr{position:absolute;top:8px;right:8px;border:1px solid #BFD0F2;background:#fff;color:var(--navy);border-radius:99px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;min-height:28px;line-height:1}
 .clr:hover{background:#F3F7FF}.clr:focus-visible{outline:2px solid var(--gold)}
 .clr[hidden]{display:none!important}
+.lp{white-space:pre-wrap;font-size:14px;line-height:1.6;margin:12px 0 0;color:var(--ink)}
+details.cd>summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}
+details.cd>summary::-webkit-details-marker{display:none}
+details.cd>summary::after{content:"Lihat ▾";font-size:12.5px;color:var(--mute);font-weight:700}details.cd[open]>summary::after{content:"Tutup ▴"}
 .iotg{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:16px}
 .iotg .cd{margin:0}
 .iotm{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:end;padding:10px 0;border-top:1px solid var(--line)}
@@ -190,6 +194,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
  <button class="nv" data-p="gambar">Studio Gambar</button>
  <button class="nv" data-p="memori">Memori</button>
  <button class="nv" data-p="iot">Lab IoT</button>
+ <button class="nv" data-p="laporan">Laporan</button>
  <button class="nv" data-p="skills">Skills</button>
  <button class="nv" data-p="tim">Tim & Token</button>
  <button class="nv" data-p="tentang">Tentang Kami</button>
@@ -325,6 +330,23 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
    <p class="mu" style="font-size:12.5px;margin:10px 0">Kode di bawah sudah terisi endpoint dan kunci. Ganti nama & password WiFi, lalu upload ke ESP32 dari Arduino IDE (board "ESP32 Dev Module").</p>
    <div class="tw"><pre class="code" id="iotCode"></pre><button class="clr" id="iotCopy">Salin kode</button></div>
   </div>
+ </section>
+
+ <section id="p-laporan" class="pg" hidden>
+  <h1>Laporan Mingguan</h1>
+  <p class="mu">Rangkuman kegiatan bot 7 hari terakhir, rekap kas minggu ini, pemakaian, dan 5 ide pengembangan baru. Disusun MCI.Scribe di Perpustakaan, dikirim MCI.Apex ke Telegram.</p>
+  <div class="cd">
+   <div class="bar" style="justify-content:space-between;margin:0">
+    <div><b id="lpJadwal">Otomatis setiap Jumat 17:00 WIB</b><div class="mu" id="lpInfo" style="font-size:12.5px;margin-top:4px"></div></div>
+    <label class="mu" style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="lpOn" style="width:18px;height:18px"> Kirim otomatis</label>
+   </div>
+   <div class="bar" style="margin:14px 0 0">
+    <button class="bt g" id="lpBuat">Buat laporan sekarang</button>
+    <label class="mu" style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="lpKirim" style="width:18px;height:18px"> Kirim juga ke Telegram</label>
+    <span class="mu" id="lpMsg"></span>
+   </div>
+  </div>
+  <div id="lpList"></div>
  </section>
 
  <section id="p-tentang" class="pg" hidden>
@@ -502,6 +524,9 @@ const MOCK = (() => {
     {nama:"pinout-esp32",bot:"pulse",deskripsi:"Pemetaan pin ESP32 DevKit",pemicu:"pinout esp32",isi:"Tabel pin, hindari GPIO 6-11."}];
   let TKM = {judul: "Tentang MCI", semboyan: "Rakit, uji, wujudkan.", deskripsi: "(DEMO) MCI adalah komunitas pembuat proyek elektronika dan AI.", sejarah: [{tahun: "2024", judul: "MCI berdiri", isi: "Dimulai dari proyek radar Arduino."}, {tahun: "2026", judul: "MCI HQ online", isi: "10 bot AI bekerja di kantor virtual."}], anggota: [{nama: "Alvaro", peran: "Founder", bio: "Hardware & AI."}]};
   let gid = 3; const GAL = [{id: 2, prompt: "robot oranye minum kopi di kantor biru emas"}, {id: 1, prompt: "kapal monitoring otonom di laut saat senja"}];
+  const LPX = {id: 1, minggu: "2026-W43", dari: "2026-10-16", sampai: "2026-10-23", dibuat: "2026-10-23T17:00:12+07:00", sumber: "otomatis",
+    isi: "📋 LAPORAN MINGGUAN MCI HQ\nPeriode 2026-10-16 s/d 2026-10-23 (2026-W43)\n\n📝 RINGKASAN\n(DEMO) Minggu ini tim fokus di radar dan kapal monitoring: 42 tugas selesai, 1 sidang dewan soal baterai.\n\n🤖 KEGIATAN BOT\nTotal 42 tugas · 1 gagal\n• MCI.DevMatrix: 14\n• MCI.Pulse: 9\n• MCI.Ledger: 6\n\n💰 REKAP KAS MINGGU INI\nMasuk Rp 3.100.000 · Keluar Rp 125.000 · Selisih Rp 2.975.000\nSaldo total kas sekarang: Rp 2.975.000 (4 transaksi minggu ini)\n• Jasa: +Rp 2.500.000\n• Komponen: -Rp 85.000\n💡 Pemasukan jasa radar dominan; sisihkan 20% untuk stok komponen.\n\n🚀 IDE PENGEMBANGAN BARU\n1. Dashboard radar live di web [Sedang]\n   Kenapa: hasil radar bisa dipantau dari HP\n   Mulai dari: kirim sudut + jarak ke /api/iot tiap detik\n2. Sensor pH & kekeruhan air untuk kapal [Sedang]\n   Kenapa: kapal monitoring jadi bisa ukur kualitas air\n   Mulai dari: beli sensor pH analog + TDS"};
+  let LP = [LPX], LPON = true;
   let IR = [{perangkat: "*", metrik: "jarak_cm", op: "<", nilai: 10, pesan: "Tangki air hampir penuh!"}];
   const iotMock = full => { const now = Date.now() / 1000 | 0, t = Date.now() / 1000;
     const mk = (pr, f) => { const d = f(t), it = {perangkat: pr, ts: now - 2, online: true, data: d};
@@ -545,6 +570,11 @@ const MOCK = (() => {
     if (u.startsWith("/api/memori")) { if (o && o.method === "DELETE") return {dihapus: 1}; if (o && o.method === "POST") return {permanen: 1};
       return {mem_tg: "tidak", items: [{id: 2, waktu: "2026-10-29T19:40:00+07:00", sumber: "web", bot: "devmatrix", jalur: "langsung", perintah: "buat kode esp32 blink", jawaban: "(DEMO) void setup(){ pinMode(2, OUTPUT); } ...", kadaluarsa: new Date(Date.now() + 50 * 36e5).toISOString()},
         {id: 1, waktu: "2026-10-28T10:12:00+07:00", sumber: "telegram", bot: "pulse, aegis, apex", jalur: "dewan", perintah: "LiPo atau 18650?", jawaban: "(DEMO) PUTUSAN DEWAN: pakai 18650 + BMS.", kadaluarsa: null}]}; }
+    if (u === "/api/laporan/atur") { LPON = JSON.parse(o.body).aktif; return {aktif: LPON}; }
+    if (u.startsWith("/api/laporan/")) { const i = +u.split("/").pop(); LP = LP.filter(r => r.id !== i); return {dihapus: 1}; }
+    if (u === "/api/laporan" && o && o.method === "POST") { await sleep(600); LP.unshift({...LP[LP.length - 1] || LPX, id: Date.now(), sumber: "web", dibuat: new Date().toISOString()}); return {job: "laporan"}; }
+    if (u === "/api/job/laporan") return {status: "selesai", hasil: {terkirim: 0}};
+    if (u === "/api/laporan") return {items: LP, aktif: LPON, hari: "Jumat", jam: 17, terakhir: "2026-W43", penerima: 1, telegram: true};
     if (u === "/api/iot/rules") { IR = JSON.parse(o.body).rules.map(r => ({...r, nilai: +r.nilai})); return {rules: IR}; }
     if (u.startsWith("/api/iot/")) return {dihapus: 3};
     if (u === "/api/iot") { const full = iotMock(true); return {devices: full, aktif: true, rules: IR, key: "demo-kunci-iot-1234567890", endpoint: "https://mci-ai-hq.onrender.com/api/iot", hari: 7}; }
@@ -581,6 +611,7 @@ function show(p) {
   if (p === "gambar") loadGambar();
   if (p === "memori") loadMemori();
   if (p === "tentang") loadTentang();
+  if (p === "laporan") loadLaporan();
   clearInterval(iotTimer); if (p === "iot") { loadIot(true); iotTimer = setInterval(() => { if (!document.hidden) loadIot(); }, 3000); }
 }
 $$(".nv").forEach(b => b.onclick = () => show(b.dataset.p));
@@ -683,6 +714,35 @@ $("#iotShow").onclick = () => { iotKeyOn = !iotKeyOn; $("#iotShow").textContent 
 const copyTo = async (txt, btn) => { try { await navigator.clipboard.writeText(txt); } catch (e) { const t = document.createElement("textarea"); t.value = txt; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); } const o = btn.textContent; btn.textContent = "Tersalin ✓"; setTimeout(() => btn.textContent = o, 1500); };
 $$("[data-cp]").forEach(b => b.onclick = () => copyTo(b.dataset.cp === "iotKey" ? (IOTA && IOTA.key || "") : $("#" + b.dataset.cp).textContent, b));
 $("#iotCopy").onclick = () => copyTo(espCode(), $("#iotCopy"));
+
+/* Laporan mingguan */
+async function loadLaporan() {
+  try {
+    const d = await api("/api/laporan");
+    $("#lpJadwal").textContent = `Otomatis setiap ${d.hari} ${String(d.jam).padStart(2, "0")}:00 WIB`;
+    $("#lpOn").checked = d.aktif;
+    $("#lpInfo").textContent = (d.penerima ? `Dikirim Apex ke ${d.penerima} akun Telegram (ALLOWED_USER_IDS).` : "Isi ALLOWED_USER_IDS di Render supaya laporan bisa dikirim ke Telegram.") + (d.terakhir ? ` Terakhir otomatis: ${d.terakhir}.` : "");
+    $("#lpList").innerHTML = d.items.map((r, i) => `<details class="cd"${i ? "" : " open"}><summary><span><b>Minggu ${esc(r.minggu)}</b> <span class="mu" style="font-size:12.5px">· ${esc(r.dari)} s/d ${esc(r.sampai)} · dibuat ${esc(String(r.dibuat).slice(0, 16).replace("T", " "))}</span> <span class="ch ${r.sumber === "otomatis" ? "g" : "n"}">${r.sumber === "otomatis" ? "Otomatis" : "Manual"}</span></span></summary>
+      <div class="lp">${esc(r.isi)}</div><div class="bar" style="margin:12px 0 0"><button class="bt o" style="min-height:34px;padding:6px 12px;font-size:12px" data-lc="${r.id}">Salin</button><button class="bt o" style="min-height:34px;padding:6px 12px;font-size:12px" data-ld="${r.id}">Hapus</button></div></details>`).join("") ||
+      '<div class="cd mu">Belum ada laporan. Tekan "Buat laporan sekarang" untuk mencoba.</div>';
+    $$("[data-lc]").forEach(b => b.onclick = () => copyTo(d.items.find(r => r.id == b.dataset.lc).isi, b));
+    $$("[data-ld]").forEach(b => b.onclick = async () => { if (confirm("Hapus laporan ini?")) { await api("/api/laporan/" + b.dataset.ld, {method: "DELETE"}); loadLaporan(); } });
+  } catch (e) { $("#lpList").innerHTML = `<div class="cd mu">${esc(e.message)}</div>`; }
+}
+$("#lpOn").onchange = async e => { await api("/api/laporan/atur", {json: {aktif: e.target.checked}}); loadLaporan(); };
+$("#lpBuat").onclick = async () => {
+  const b = $("#lpBuat"); b.disabled = true; $("#lpMsg").textContent = "Scribe lari ke Perpustakaan, menyusun laporan…";
+  try {
+    const {job} = await api("/api/laporan", {json: {kirim: $("#lpKirim").checked}});
+    for (let i = 0; i < 80; i++) {
+      await sleep(1500); const j = await api("/api/job/" + job);
+      if (j.status === "gagal") throw new Error(j.error);
+      if (j.status === "selesai") { $("#lpMsg").textContent = "Selesai" + (j.hasil.terkirim ? `, terkirim ke ${j.hasil.terkirim} akun Telegram` : ""); break; }
+    }
+    loadLaporan();
+  } catch (e) { $("#lpMsg").textContent = e.message; }
+  b.disabled = false; setTimeout(() => $("#lpMsg").textContent = "", 6000);
+};
 
 /* Boss / Dewan */
 $$("[data-mode]").forEach(b => b.onclick = () => { MODE = b.dataset.mode; $$("[data-mode]").forEach(x => x.classList.toggle("on", x === b)); $("#pickWrap").hidden = MODE !== "dewan"; $("#bs").textContent = MODE === "dewan" ? "Mulai sidang" : "Kirim"; renderPicks(); });
