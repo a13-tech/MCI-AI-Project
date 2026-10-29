@@ -70,6 +70,12 @@ td{padding:10px;border-top:1px solid #E6EDFB;vertical-align:top}
 .sw input{width:22px;height:22px}
 .tm{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
 .fl{display:grid;gap:10px;grid-template-columns:1fr 1fr}
+/* ---------- Tombol hapus teks di setiap kolom prompt ---------- */
+.tw{position:relative}
+.tw textarea{padding-right:84px}
+.clr{position:absolute;top:8px;right:8px;border:1px solid #BFD0F2;background:#fff;color:var(--navy);border-radius:99px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;min-height:28px;line-height:1}
+.clr:hover{background:#F3F7FF}.clr:focus-visible{outline:2px solid var(--gold)}
+.clr[hidden]{display:none!important}
 /* ---------- Studio Gambar ---------- */
 .gup{display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#F3F7FF;border:1px dashed #BFD0F2;border-radius:14px;padding:12px;margin-bottom:12px}
 .gup img{width:96px;height:96px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
@@ -451,6 +457,19 @@ $("#bs").onclick = async () => {
   } catch (e) { o.innerHTML = '<p style="color:#FFB4B4;font-weight:600">' + esc(e.message) + "</p>"; }
   b.disabled = false; loadKas(true); loadUsage();
 };
+
+/* Tombol "Hapus" untuk mengosongkan semua kolom prompt */
+$$("textarea").forEach(t => {
+  const w = document.createElement("div"); w.className = "tw";
+  w.style.margin = t.style.margin || ""; if (t.style.marginTop) w.style.marginTop = t.style.marginTop;
+  t.style.margin = "0"; t.parentNode.insertBefore(w, t); w.appendChild(t);
+  const b = document.createElement("button"); b.type = "button"; b.className = "clr"; b.textContent = "✕ Hapus";
+  b.setAttribute("aria-label", "Hapus semua teks di kolom " + (t.getAttribute("aria-label") || "ini")); b.hidden = true;
+  b.onclick = e => { e.preventDefault(); t.value = ""; t.dispatchEvent(new Event("input", {bubbles: true})); b.hidden = true; t.focus(); };
+  w.appendChild(b);
+  const upd = () => b.hidden = !t.value;
+  t.addEventListener("input", upd); setInterval(upd, 800);   // ikut sembunyi kalau teks dikosongkan oleh kode
+});
 
 /* Studio Gambar */
 let GFOTO = null;   // {blob, w, h} hasil resize di browser
