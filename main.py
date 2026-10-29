@@ -111,7 +111,9 @@ AGENTS = {
                 "Kamu MCI.Apex, boss AI yang mengoordinasi tim MCI. Ringkas dan tegas.", [], boss=True, cepat=True),
 }
 assert len(AGENTS) <= 10, "Maksimal 10 bot"
-STATE = {k: {"status": "IDLE", "activity": "Siaga", "active": 0, "calls": 0, "tokens": 0, "mode": "meja"} for k in AGENTS}
+STATE = {k: {"status": "IDLE", "activity": "Siaga", "active": 0, "calls": 0, "tokens": 0, "mode": "meja"} for k in [*AGENTS, "canvas"]}
+# Canvas = bot gambar (Cloudflare), tampil di kantor 3D lantai 1 tapi bukan agen Gemini (batas 10 agen tetap)
+CANVAS = {"nama": "MCI.Canvas", "lantai": 1, "divisi": "Studio Gambar", "peran": "Pelukis AI: bikin dan ubah gambar", "boss": False}
 SET = {"caveman": False, "mcp": False, "mem_tg": "tidak"}   # mem_tg: simpan chat Telegram (tidak / 72 / permanen)
 TASKLOG = deque(maxlen=40)
 JOBS = {}
@@ -444,7 +446,7 @@ async def mcp_tools():
 
 
 async def ask(key, text, history=None, parts=None, schema=None, model=None, act="Memproses permintaan",
-              use_mcp=True, skill=None, brief=False, cache=True):
+              use_mcp=True, skill=None, brief=False, cache=True, show=None):
     cl = client(key)
     if not cl:
         raise RuntimeError(f"Key Gemini untuk {AGENTS[key]['nama']} belum diisi (GEMINI_{key.upper()} atau GEMINI_API_KEY).")
@@ -488,7 +490,7 @@ async def ask(key, text, history=None, parts=None, schema=None, model=None, act=
                 return await call(tools)
             raise
 
-    _begin(key, act)
+    _begin(show or key, act)  # show = bot yang tampil bekerja di kantor 3D
     try:
         async with (mcp_tools() if use_mcp and not schema else contextlib.nullcontext(None)) as tools:
             try:
@@ -514,7 +516,7 @@ async def ask(key, text, history=None, parts=None, schema=None, model=None, act=
             cache_put(ck, out)
         return out
     finally:
-        _end(key)
+        _end(show or key)
 
 
 # ---------- ROUTER LOKAL (tanpa token) ----------
@@ -823,7 +825,7 @@ async def img_prompt(p):
         out = await ask("herald", "Ubah deskripsi gambar berikut jadi prompt bahasa Inggris untuk AI pembuat gambar. "
                         "Satu paragraf, maksimal 60 kata, jelaskan objek, gaya, warna, pencahayaan, dan komposisi. "
                         "Tulis promptnya saja tanpa pembuka.\n\nDeskripsi: " + p,
-                        model=MODEL_LITE, act="Menyiapkan prompt gambar", use_mcp=False)
+                        model=MODEL_LITE, act="Menyiapkan prompt gambar", use_mcp=False, show="canvas")
         out = out.strip().strip('"').strip()
         return out[:1500] or p
     except Exception:
@@ -847,7 +849,7 @@ async def make_image(prompt, foto=None, kekuatan=0.6, w=None, h=None, sumber="we
     if not (CF_ACCOUNT and CF_TOKEN):
         raise RuntimeError("Studio Gambar belum aktif: isi CF_ACCOUNT_ID dan CF_API_TOKEN di Render.")
     en = await img_prompt(prompt)
-    _begin("herald", "Mengedit foto" if foto else "Menggambar")
+    _begin("canvas", "Mengedit foto" if foto else "Menggambar")
     try:
         if foto:
             try:
@@ -864,10 +866,10 @@ async def make_image(prompt, foto=None, kekuatan=0.6, w=None, h=None, sumber="we
             model = CF_MODEL
         data, mime = await cf_run(model, body)
     finally:
-        _end("herald")
+        _end("canvas")
     await asyncio.to_thread(usage_add, model, 0, 0, 0)
     gid = await asyncio.to_thread(img_save, prompt, en, sumber, mime, data)
-    _log("herald", ("Edit foto: " if foto else "Gambar: ") + prompt, "Selesai", "gambar")
+    _log("canvas", ("Edit foto: " if foto else "Gambar: ") + prompt, "Selesai", "gambar")
     return {"id": gid, "mime": mime, "data": data, "prompt": prompt, "prompt_en": en}
 
 
@@ -1095,6 +1097,10 @@ def api_office():
             "status": o[0], "activity": o[1], "mode": o[2], "model": model_for(k),
             "gemini": bool(gkey(k)), "telegram": bool(os.getenv(f"TOKEN_{k.upper()}")),
             **({"calls": s["calls"], "tokens": s["tokens"]} if adm else {})} for k, a in AGENTS.items() for s in [STATE[k]] for o in [office_status(s)]]
+    s, o = STATE["canvas"], office_status(STATE["canvas"])
+    ags.append({"key": "canvas", "name": CANVAS["nama"], "peran": CANVAS["peran"], "boss": False, "lantai": 1, "divisi": CANVAS["divisi"],
+                "status": o[0], "activity": o[1], "mode": o[2], "model": "cloudflare-flux", "gemini": bool(CF_TOKEN),
+                "telegram": bool(os.getenv("TOKEN_GAMBAR")), **({"calls": img_today(), "tokens": 0} if adm else {})})
     body = json.dumps({"agents": ags, "log": list(TASKLOG) if adm else [], "lantai": LANTAI})
     _OFFICE_CACHE[adm] = (time.time(), body)
     return Response(body, mimetype="application/json")
@@ -1570,7 +1576,7 @@ def _group_cmd(key, f):
 def pixel_handlers():
     """Bot Telegram terpisah khusus gambar (TOKEN_GAMBAR): setiap teks = prompt, foto + caption = edit."""
     async def start(u, c):
-        await u.message.reply_text("Halo, saya MCI Studio Gambar.\nKirim deskripsi gambar, langsung saya buatkan.\n"
+        await u.message.reply_text("Halo, saya MCI.Canvas, pelukis di Studio Gambar lantai 1.\nKirim deskripsi gambar, langsung saya buatkan.\n"
                                    "Kirim foto + caption untuk mengedit foto.\n/sisa = jatah hari ini, /id = ID Telegram kamu")
 
     async def myid(u, c):

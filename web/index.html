@@ -255,7 +255,7 @@ td{padding:10px;border-top:1px solid #E6EDFB;vertical-align:top}
 
  <section id="p-gambar" class="pg" hidden>
   <h1>Studio Gambar</h1>
-  <p class="mu">Tulis gambar yang kamu mau, atau upload foto untuk diubah. Gratis lewat Cloudflare Workers AI; Herald yang menggambar di Lantai 1.</p>
+  <p class="mu">Tulis gambar yang kamu mau, atau upload foto untuk diubah. Gratis lewat Cloudflare Workers AI; Canvas yang menggambar di Studio lantai 1.</p>
   <div class="cd" id="gmOff" hidden><b>Studio Gambar belum aktif.</b><div class="mu" style="margin-top:6px">Isi <code>CF_ACCOUNT_ID</code> dan <code>CF_API_TOKEN</code> di Render → Environment, lalu tunggu deploy selesai.</div></div>
   <div class="cd"><b>Buat gambar</b>
    <textarea id="gp" rows="3" aria-label="Deskripsi gambar" placeholder="Contoh: robot oranye lucu minum kopi di kantor futuristik biru emas, gaya 3D, cahaya hangat" style="margin:10px 0 12px"></textarea>
@@ -357,7 +357,8 @@ const MOCK = (() => {
     ["ledger","MCI.Ledger","Keuangan: kas masuk/keluar jadi tabel",3,"Operasional & Keuangan",0,1,["Skill rekap-kas","Mengolah kas"]],
     ["scribe","MCI.Scribe","Dokumen, laporan, proposal",3,"Operasional & Keuangan",0,0,["Skill laporan-mingguan"]],
     ["atlas","MCI.Atlas","Riset & olah data",3,"Operasional & Keuangan",0,0,["Mengumpulkan data riset"]],
-    ["apex","MCI.Apex","Boss koordinator, membagi tugas ke tim",4,"Eksekutif",1,1,["Membagi tugas"]]];
+    ["apex","MCI.Apex","Boss koordinator, membagi tugas ke tim",4,"Eksekutif",1,1,["Membagi tugas"]],
+    ["canvas","MCI.Canvas","Pelukis AI: bikin dan ubah gambar",1,"Studio Gambar",0,1,["Menggambar","Mengedit foto"]]];
   const W = {}, K = [
     {id:1,tanggal:"2026-10-24",keterangan:"Jasa pasang radar, klien",kategori:"Jasa",masuk:2500000,keluar:0},
     {id:2,tanggal:"2026-10-24",keterangan:"Beli sensor HC-SR04 x10",kategori:"Komponen",masuk:0,keluar:85000},
@@ -495,7 +496,7 @@ async function poll() {
 $$("[data-mode]").forEach(b => b.onclick = () => { MODE = b.dataset.mode; $$("[data-mode]").forEach(x => x.classList.toggle("on", x === b)); $("#pickWrap").hidden = MODE !== "dewan"; $("#bs").textContent = MODE === "dewan" ? "Mulai sidang" : "Kirim"; renderPicks(); });
 function renderPicks() {
   if ($("#picks").dataset.r || !DATA.length) return; $("#picks").dataset.r = 1;
-  $("#picks").innerHTML = DATA.filter(d => !d.boss).map(d => `<label><input type="checkbox" value="${esc(d.key)}">${esc(d.name.replace("MCI.",""))}</label>`).join("");
+  $("#picks").innerHTML = DATA.filter(d => !d.boss && d.key !== "canvas").map(d => `<label><input type="checkbox" value="${esc(d.key)}">${esc(d.name.replace("MCI.",""))}</label>`).join("");
   const lim = () => { const on = $$("#picks input:checked").length; $$("#picks input").forEach(x => { x.disabled = !x.checked && on >= 4; x.parentElement.style.opacity = x.disabled ? .45 : 1; }); };
   $$("#picks input").forEach(x => x.onchange = lim);
 }
@@ -662,7 +663,7 @@ $("#gb").onclick = async () => {
   const t = $("#gp").value.trim();
   if (!t) { $("#gr").innerHTML = '<p class="er">Tulis dulu gambar yang mau dibuat.</p>'; return; }
   const b = $("#gb"); b.disabled = true;
-  $("#gr").innerHTML = `<p class="mu">Herald sedang ${GFOTO ? "mengubah foto" : "menggambar"}… biasanya 5–20 detik.</p>`;
+  $("#gr").innerHTML = `<p class="mu">Canvas sedang ${GFOTO ? "mengubah foto" : "menggambar"}… biasanya 5–20 detik.</p>`;
   const fd = new FormData(); fd.append("prompt", t);
   if (GFOTO) { fd.append("foto", GFOTO.blob, "foto.jpg"); fd.append("kekuatan", $("#gk").value); fd.append("w", GFOTO.w); fd.append("h", GFOTO.h); }
   try {
@@ -993,6 +994,23 @@ const OFFICE = (() => {
       [[-.06, -.06], [-.06, .06], [.07, -.06], [.07, .06]].forEach(l => add(CY(.022, .022, .06, 10), "#f472b6", l[0], .03, l[1], pg)); add(PANEL(.05, .008, .015, .004), "#1b2433", 0, .25, 0, pg);
       add(SLAB(.26, .2, .04, .03), "#166534", .1, T + .02, .25, g);
     },
+    canvas: (g, a) => {
+      monitor(g, -.36, -.22, .5, .34, "map", "#f472b6", a, .12);
+      /* easel dengan kanvas lukisan */
+      const e = grp(.55, T, -.1, 2.95, g);
+      [-1, 1].forEach(s => add(CY(.012, .012, .62, 8), "#92400e", s * .13, .3, 0, e).rotation.z = s * .14);
+      add(CY(.012, .012, .6, 8), "#92400e", 0, .28, -.12, e).rotation.x = -.3;
+      add(SLAB(.34, .03, .02, .01), "#92400e", 0, .16, .02, e);
+      const cv = CT(256, 200, (c, w, h) => { c.fillStyle = "#fbfbf8"; c.fillRect(0, 0, w, h); const gr = c.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "#38bdf8"); gr.addColorStop(1, "#f9a8d4"); c.fillStyle = gr; c.fillRect(10, 10, w - 20, h - 20); c.fillStyle = "#facc15"; c.beginPath(); c.arc(180, 60, 26, 0, 7); c.fill(); c.fillStyle = "#0A2A6B"; c.beginPath(); c.moveTo(10, 170); c.lineTo(90, 90); c.lineTo(160, 170); c.fill(); c.fillStyle = "#1D4ED8"; c.beginPath(); c.moveTo(100, 170); c.lineTo(170, 110); c.lineTo(246, 170); c.fill(); });
+      add(PANEL(.36, .28, .02, .015), "#fbfbf8", 0, .34, .03, e).rotation.x = -.18;
+      plane(cv, .32, .25, 0, .345, .045, 0, e).rotation.x = -.18;
+      plane(cv, .32, .25, 0, .345, .015, PI, e).rotation.x = .18;   // lukisan terlihat dari dua sisi
+      /* palet cat */
+      const pl = grp(-.6, T + .01, .2, .4, g);
+      add(CY(.13, .13, .012, 24), "#d6b98c", 0, 0, 0, pl).scale.set(1.2, 1, .85);
+      ["#ef4444", "#facc15", "#22c55e", "#3b82f6", "#a855f7"].forEach((c, i) => add(SP(.02, 8, 6), c, -.08 + i * .04, .012, -.05 + (i % 2) * .05, pl).scale.y = .4);
+      add(CAP(.008, .18), "#1b2433", .14, .02, .06, pl).rotation.z = PI / 2;
+    },
     scribe: (g, a) => {
       monitor(g, 0, -.22, .48, .38, "doc", "#0A2A6B", a);
       for (let i = 0; i < 8; i++) add(SLAB(.22, .3, .006, .012), "#ffffff", -.6 + Math.sin(i) * .01, T + .004 + i * .007, .08, g);
@@ -1022,7 +1040,7 @@ const OFFICE = (() => {
   };
 
   /* ---------- robot ---------- */
-  const BADGE = {apex: "#D4AF5A", devmatrix: "#3b82f6", nexus: "#f59e0b", aegis: "#ef4444", sentinel: "#8b5cf6", pulse: "#10b981", ledger: "#14b8a6", scribe: "#ec4899", atlas: "#0ea5e9", herald: "#a3e635"};
+  const BADGE = {apex: "#D4AF5A", devmatrix: "#3b82f6", nexus: "#f59e0b", aegis: "#ef4444", sentinel: "#8b5cf6", pulse: "#10b981", ledger: "#14b8a6", scribe: "#ec4899", atlas: "#0ea5e9", herald: "#a3e635", canvas: "#a855f7"};
   function mkBot(key, boss) {
     const O = "#EA8A3C", CR = "#FFE4C7", N = "#0b1d4a";
     const g = new THREE.Group(), body = grp(0, 0, 0, 0, g); CAST = true;
@@ -1037,7 +1055,7 @@ const OFFICE = (() => {
     [-1, 1].forEach(s => add(SP(.035, 10, 8), "#ff9a8a", s * .2, .99, .26, body, {transparent: true, opacity: .8}));
     [-1, 1].forEach(s => add(CY(.07, .07, .05, 20), "#D4AF5A", s * .335, 1.08, 0, body, GOLD).rotation.z = PI / 2);
     const H = (geo, c, x, y, z, o) => add(geo, c, x, y, z, body, o), Y = 1.33;
-    if (!boss && key !== "herald") { H(CY(.013, .013, .13, 8), "#D4AF5A", 0, 1.42, 0, GOLD); H(SP(.04, 12, 10), "#F1D58A", 0, 1.5, 0, {emissive: "#D4AF5A", emissiveIntensity: 1}); }
+    if (!boss && key !== "herald" && key !== "canvas") { H(CY(.013, .013, .13, 8), "#D4AF5A", 0, 1.42, 0, GOLD); H(SP(.04, 12, 10), "#F1D58A", 0, 1.5, 0, {emissive: "#D4AF5A", emissiveIntensity: 1}); }
     CAST = true;
     const lim = (x, y, r, L, c, hand) => { const p = grp(x, y, 0, 0, body); add(CAP(r, L), c, 0, -(L / 2 + r * .6), 0, p, {roughness: .45}); if (hand) add(SP(.075, 14, 10), CR, 0, -(L + r * 1.4), 0, p); return p; };
     const aL = lim(-.38, .8, .065, .2, O, 1), aR = lim(.38, .8, .065, .2, O, 1);
@@ -1050,6 +1068,7 @@ const OFFICE = (() => {
     else if (key === "pulse") { [-1, 1].forEach(s => H(TO(.07, .02), "#10b981", s * .1, 1.1, .34)); H(TO(.34, .015), "#10b981", 0, 1.1, 0).rotation.x = PI / 2; }
     else if (key === "ledger") { H(CY(.32, .32, .02, 32), "#16a34a", 0, 1.24, .1, {transparent: true, opacity: .85}).rotation.x = .3; H(TO(.31, .02), "#16a34a", 0, 1.26, 0).rotation.x = PI / 2; }
     else if (key === "scribe") { const b = H(SP(.3, 22, 14), "#ec4899", -.05, 1.3, 0, {roughness: .8}); b.scale.set(1.05, .38, 1.05); b.rotation.z = .15; H(SP(.03, 8, 6), "#ec4899", -.05, 1.42, 0); }
+    else if (key === "canvas") { const b = H(SP(.31, 22, 14), "#7c3aed", .06, 1.31, -.02, {roughness: .85}); b.scale.set(1.08, .34, 1.08); b.rotation.z = -.22; H(SP(.035, 8, 6), "#7c3aed", .1, 1.42, -.02); [["#ef4444", -.16], ["#facc15", .02], ["#22c55e", .2]].forEach(c => H(SP(.03, 8, 6), c[0], c[1], 1.36, .22, {emissive: c[0], emissiveIntensity: .4})); }
     else if (key === "herald") { [-1, 1].forEach(s => { H(CAP(.01, .2), "#1b2433", s * .14, 1.42, 0).rotation.z = -s * .4; H(SP(.045, 10, 8), "#a3e635", s * .2, 1.53, 0, {emissive: "#a3e635", emissiveIntensity: 1.2}); }); H(SP(.05, 10, 8), "#ef4444", 0, .9, .3).scale.set(1.6, .6, .5); }
     const cup = grp(0, -.36, .05, 0, aR); add(CY(.05, .045, .1, 18), "#ffffff", 0, 0, 0, cup); add(TO(.032, .01), "#ffffff", .055, 0, 0, cup); add(TO(.05, .006), "#D4AF5A", 0, .05, 0, cup, GOLD).rotation.x = PI / 2;
     const donut = add(TO(.055, .028), "#f472b6", 0, -.36, .06, aR); donut.rotation.x = PI / 2;
@@ -1362,7 +1381,7 @@ const OFFICE = (() => {
     visi: {t: "Merenungkan visi perusahaan", spots: ["f3_wc"], anim: "stare", w: 3, boss: 1},
   };
   const PREF = {apex: {golf: 1, visi: 1, kopi: 1, rapat: 1.5, tidur: .3, sibuk: .5}, devmatrix: {kopi: 3, ngoprek: 2}, nexus: {makan: 2, rapat: 2}, aegis: {koran: 3}, sentinel: {jendela: 3, arcade: 2},
-    pulse: {pingpong: 2, ngoprek: 3}, ledger: {makan: 2, rebahan: 1.5}, scribe: {koran: 2}, atlas: {jendela: 2, pingpong: 1.5}, herald: {rapat: 2, arcade: 1.5}};
+    pulse: {pingpong: 2, ngoprek: 3}, ledger: {makan: 2, rebahan: 1.5}, scribe: {koran: 2}, atlas: {jendela: 2, pingpong: 1.5}, herald: {rapat: 2, arcade: 1.5}, canvas: {jendela: 3, kopi: 1.5, arcade: 1}};
   const actSpots = (a, v) => v.own ? [`f${a.home}_w1`, `f${a.home}_w2`].filter(s => SPOTS[s]) : (v.spots || []);
 
   /* ---------- agen ---------- */
