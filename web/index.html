@@ -547,7 +547,7 @@ const MOCK = (() => {
         {id: 1, waktu: "2026-10-28T10:12:00+07:00", sumber: "telegram", bot: "pulse, aegis, apex", jalur: "dewan", perintah: "LiPo atau 18650?", jawaban: "(DEMO) PUTUSAN DEWAN: pakai 18650 + BMS.", kadaluarsa: null}]}; }
     if (u === "/api/iot/rules") { IR = JSON.parse(o.body).rules.map(r => ({...r, nilai: +r.nilai})); return {rules: IR}; }
     if (u.startsWith("/api/iot/")) return {dihapus: 3};
-    if (u === "/api/iot") { const full = iotMock(true); return {devices: full, aktif: true, rules: IR, key: "demo-kunci-iot-1234567890", endpoint: "https://mci-hq.onrender.com/api/iot", hari: 7}; }
+    if (u === "/api/iot") { const full = iotMock(true); return {devices: full, aktif: true, rules: IR, key: "demo-kunci-iot-1234567890", endpoint: "https://mci-ai-hq.onrender.com/api/iot", hari: 7}; }
     if (u === "/api/tentang") { if (o && o.method === "POST") { TKM = JSON.parse(o.body); } return TKM; }
     if (u === "/api/gambar" && o && o.method === "POST") { await sleep(900); const p = o.body.get("prompt"); GAL.unshift({id: gid, prompt: p, prompt_en: "(DEMO) " + p}); return {id: gid++, prompt: p, prompt_en: "(DEMO) " + p, aktif: true, hari_ini: GAL.length, batas: 150}; }
     if (u === "/api/gambar") return {items: GAL, aktif: true, hari_ini: GAL.length, batas: 150};
