@@ -1387,7 +1387,7 @@ const OFFICE = (() => {
     /* kubah observatorium di atas sayap timur */
     const dm = grp(WC + .6, 0, -2.2, 0); CAST = true;
     add(CY(3.0, 3.2, .7, 48), "#EEF2F9", 0, .35, 0, dm, {roughness: .4});
-    add(G("dome", () => new THREE.SphereGeometry(2.85, 40, 20, 0, PI * 2 - .55, 0, PI / 2)), "#cfd8ea", 0, .7, 0, dm, {roughness: .25, metalness: .5, side: THREE.DoubleSide});
+    add(G("obsdome", () => new THREE.SphereGeometry(2.85, 40, 20, 0, PI * 2 - .55, 0, PI / 2)), "#cfd8ea", 0, .7, 0, dm, {roughness: .25, metalness: .5, side: THREE.DoubleSide});
     CAST = false;
     add(TO(3.05, .06), "#D4AF5A", 0, .72, 0, dm, GOLD).rotation.x = PI / 2;
     const tl = grp(0, 1.2, 0, 0, dm); tl.rotation.set(0, -.27, -.7); add(CY(.32, .38, 3.2, 20), "#1e293b", 0, 1.2, 0, tl, {roughness: .3, metalness: .5}); add(TO(.34, .05), "#D4AF5A", 0, 2.8, 0, tl, GOLD).rotation.x = PI / 2;
