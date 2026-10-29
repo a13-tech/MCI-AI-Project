@@ -10,9 +10,9 @@ Prinsip hemat token (Gemini Tier 1):
 
 Studio Gambar: Cloudflare Workers AI (FLUX schnell + img2img), gratis 10.000 neuron/hari.
 """
-import os, io, csv, json, re, time, base64, asyncio, secrets, logging, sqlite3, threading, contextlib, hashlib
+import os, io, csv, json, re, time, gzip, base64, asyncio, secrets, logging, sqlite3, threading, contextlib, hashlib
 from collections import deque, OrderedDict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import httpx, pytz, psutil
 from flask import Flask, jsonify, abort, request, send_from_directory, make_response, redirect, Response
@@ -112,7 +112,7 @@ AGENTS = {
 }
 assert len(AGENTS) <= 10, "Maksimal 10 bot"
 STATE = {k: {"status": "IDLE", "activity": "Siaga", "active": 0, "calls": 0, "tokens": 0, "mode": "meja"} for k in AGENTS}
-SET = {"caveman": False, "mcp": False}
+SET = {"caveman": False, "mcp": False, "mem_tg": "tidak"}   # mem_tg: simpan chat Telegram (tidak / 72 / permanen)
 TASKLOG = deque(maxlen=40)
 JOBS = {}
 LOOP = None
@@ -162,6 +162,7 @@ def db_init():
         sql(c, f"CREATE TABLE IF NOT EXISTS kas (id {pk}, tanggal TEXT NOT NULL, keterangan TEXT NOT NULL, kategori TEXT NOT NULL, masuk {big} NOT NULL DEFAULT 0, keluar {big} NOT NULL DEFAULT 0, sumber TEXT, dibuat TEXT)")
         sql(c, "CREATE TABLE IF NOT EXISTS pengaturan (k TEXT PRIMARY KEY, v TEXT)")
         sql(c, "CREATE TABLE IF NOT EXISTS skills (nama TEXT PRIMARY KEY, bot TEXT NOT NULL, deskripsi TEXT NOT NULL, pemicu TEXT, isi TEXT NOT NULL, dibuat TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS memori (id {pk}, waktu TEXT NOT NULL, sumber TEXT, bot TEXT, jalur TEXT, perintah TEXT NOT NULL, jawaban TEXT, kadaluarsa TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS gambar (id {pk}, prompt TEXT NOT NULL, prompt_en TEXT, sumber TEXT, mime TEXT NOT NULL, data TEXT NOT NULL, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS pemakaian (tanggal TEXT NOT NULL, model TEXT NOT NULL, masuk {big} NOT NULL DEFAULT 0, keluar {big} NOT NULL DEFAULT 0, pikir {big} NOT NULL DEFAULT 0, panggilan {big} NOT NULL DEFAULT 0, PRIMARY KEY (tanggal, model))")
         r = sql(c, "SELECT v FROM pengaturan WHERE k=?", ("s",)).fetchone()
@@ -870,8 +871,119 @@ async def make_image(prompt, foto=None, kekuatan=0.6, w=None, h=None, sumber="we
     return {"id": gid, "mime": mime, "data": data, "prompt": prompt, "prompt_en": en}
 
 
+# ---------- MEMORI (riwayat chat yang dipilih untuk disimpan) ----------
+SIMPAN = ("tidak", "72", "permanen")
+
+
+def _now():
+    return datetime.now(WIB).isoformat(timespec="seconds")
+
+
+def mem_clean():
+    with db() as c:
+        sql(c, "DELETE FROM memori WHERE kadaluarsa IS NOT NULL AND kadaluarsa < ?", (_now(),))
+
+
+def mem_save(sumber, bot, jalur, perintah, jawaban, simpan):
+    if simpan not in ("72", "permanen") or not perintah:
+        return None
+    exp = None if simpan == "permanen" else (datetime.now(WIB) + timedelta(hours=72)).isoformat(timespec="seconds")
+    q = "INSERT INTO memori (waktu,sumber,bot,jalur,perintah,jawaban,kadaluarsa) VALUES (?,?,?,?,?,?,?)"
+    p = (_now(), sumber, bot[:200], jalur, perintah[:4000], (jawaban or "")[:20000], exp)
+    try:
+        with db() as c:
+            return sql(c, q + " RETURNING id", p).fetchone()[0] if PG else sql(c, q, p).lastrowid
+    except Exception:
+        log.exception("Gagal menyimpan memori")
+        return None
+
+
+def mem_list(q="", sumber=""):
+    mem_clean()
+    where, args = [], []
+    if sumber in ("web", "telegram"):
+        where.append("sumber=?"); args.append(sumber)
+    if q:
+        where.append("(LOWER(perintah) LIKE ? OR LOWER(jawaban) LIKE ? OR LOWER(bot) LIKE ?)"); args += ["%" + q.lower()[:100] + "%"] * 3
+    sqlq = "SELECT id,waktu,sumber,bot,jalur,perintah,jawaban,kadaluarsa FROM memori" + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY id DESC LIMIT 300"
+    with db() as c:
+        rows = sql(c, sqlq, tuple(args)).fetchall()
+    return [dict(zip(("id", "waktu", "sumber", "bot", "jalur", "perintah", "jawaban", "kadaluarsa"), r)) for r in rows]
+
+
+def mem_keep(i):
+    with db() as c:
+        return sql(c, "UPDATE memori SET kadaluarsa=NULL WHERE id=?", (i,)).rowcount
+
+
+def mem_del(i=None):
+    with db() as c:
+        return sql(c, "DELETE FROM memori" + ("" if i is None else " WHERE id=?"), () if i is None else (i,)).rowcount
+
+
+def mem_from_result(h):
+    """Ubah hasil Boss/Dewan jadi teks jawaban yang enak dibaca di halaman Memori."""
+    if h.get("jalur") == "dewan":
+        isi = "\n\n".join(f"[{p['nama']}]\n{p['isi']}" for p in h.get("pendapat", []))
+        return ", ".join(p["bot"] for p in h.get("pendapat", [])) + ", apex", (isi + "\n\nPUTUSAN DEWAN\n" + h.get("jawaban", "")).strip()
+    bots = ", ".join(r["bot"] for r in h.get("rencana", [])) or "apex"
+    return bots, h.get("jawaban", "")
+
+
+# ---------- TENTANG KAMI (konten diedit admin dari web) ----------
+TENTANG_DEFAULT = {"judul": "Tentang MCI", "deskripsi": "Cerita singkat tentang MCI akan ditulis di sini.", "sejarah": [], "anggota": []}
+
+
+def tentang_get():
+    with db() as c:
+        r = sql(c, "SELECT v FROM pengaturan WHERE k=?", ("tentang",)).fetchone()
+    try:
+        return {**TENTANG_DEFAULT, **json.loads(r[0])} if r else dict(TENTANG_DEFAULT)
+    except ValueError:
+        return dict(TENTANG_DEFAULT)
+
+
+def tentang_save(d):
+    t = lambda v, n: str(v or "").strip()[:n]
+    out = {"judul": t(d.get("judul"), 100) or "Tentang MCI", "deskripsi": t(d.get("deskripsi"), 4000),
+           "sejarah": [{"tahun": t(x.get("tahun"), 20), "judul": t(x.get("judul"), 120), "isi": t(x.get("isi"), 1500)}
+                       for x in (d.get("sejarah") or [])[:60] if isinstance(x, dict) and (x.get("judul") or x.get("isi"))],
+           "anggota": [{"nama": t(x.get("nama"), 80), "peran": t(x.get("peran"), 80), "bio": t(x.get("bio"), 600)}
+                       for x in (d.get("anggota") or [])[:80] if isinstance(x, dict) and x.get("nama")]}
+    with db() as c:
+        sql(c, "INSERT INTO pengaturan (k,v) VALUES (?,?) ON CONFLICT (k) DO UPDATE SET v=excluded.v", ("tentang", json.dumps(out)))
+    return out
+
+
 # ---------- WEB ----------
 app = Flask(__name__, static_folder=None)
+
+
+@app.after_request
+def _gzip(resp):
+    """Kompres JSON besar: hemat kuota bandwidth Render (5 GB/bulan) saat banyak viewer membuka web."""
+    if (resp.status_code == 200 and not resp.direct_passthrough and resp.mimetype == "application/json"
+            and "gzip" in request.headers.get("Accept-Encoding", "") and "Content-Encoding" not in resp.headers):
+        data = resp.get_data()
+        if len(data) > 800:
+            resp.set_data(gzip.compress(data, 5))
+            resp.headers["Content-Encoding"] = "gzip"
+            resp.headers["Vary"] = "Accept-Encoding"
+    return resp
+
+
+_PAGE = {}
+
+
+def page_bytes():
+    """index.html dibaca sekali lalu disimpan versi asli + gzip di memori."""
+    if not _PAGE:
+        raw = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "index.html"), "rb").read()
+        _PAGE.update(raw=raw, gz=gzip.compress(raw, 6), etag='"' + hashlib.md5(raw).hexdigest()[:16] + '"')
+    return _PAGE
+
+
+_OFFICE_CACHE = {}
 FAILS = {}
 
 
@@ -947,7 +1059,17 @@ def index():
     k = request.args.get("k")
     if k:
         return _try_login(k) or abort(404)
-    return send_from_directory("web", "index.html") if role() else redirect("/login")
+    if not role():
+        return redirect("/login")
+    pg = page_bytes()
+    if request.headers.get("If-None-Match") == pg["etag"]:
+        return Response(status=304, headers={"ETag": pg["etag"]})
+    gz = "gzip" in request.headers.get("Accept-Encoding", "")
+    r = Response(pg["gz"] if gz else pg["raw"], mimetype="text/html")
+    r.headers.update({"ETag": pg["etag"], "Cache-Control": "no-cache", "Vary": "Accept-Encoding"})
+    if gz:
+        r.headers["Content-Encoding"] = "gzip"
+    return r
 
 
 @app.route("/healthz")
@@ -966,11 +1088,16 @@ def api_me():
 def api_office():
     need("viewer")
     adm = role() == "admin"
+    c = _OFFICE_CACHE.get(adm)
+    if c and time.time() - c[0] < 0.8:   # banyak viewer = satu hitungan per 0,8 detik
+        return Response(c[1], mimetype="application/json")
     ags = [{"key": k, "name": a["nama"], "peran": a["peran"], "boss": a["boss"], "lantai": a["lantai"], "divisi": a["divisi"],
             "status": o[0], "activity": o[1], "mode": o[2], "model": model_for(k),
             "gemini": bool(gkey(k)), "telegram": bool(os.getenv(f"TOKEN_{k.upper()}")),
             **({"calls": s["calls"], "tokens": s["tokens"]} if adm else {})} for k, a in AGENTS.items() for s in [STATE[k]] for o in [office_status(s)]]
-    return jsonify({"agents": ags, "log": list(TASKLOG) if adm else [], "lantai": LANTAI})
+    body = json.dumps({"agents": ags, "log": list(TASKLOG) if adm else [], "lantai": LANTAI})
+    _OFFICE_CACHE[adm] = (time.time(), body)
+    return Response(body, mimetype="application/json")
 
 
 def start_job(coro):
@@ -1000,11 +1127,19 @@ def api_boss():
     teks = str(d.get("perintah", "")).strip()[:3000]
     if not teks:
         return jsonify({"error": "Perintah kosong"}), 400
+    simpan = str(d.get("simpan", "72"))
+    simpan = simpan if simpan in SIMPAN else "72"
+
+    async def jalan(coro):
+        h = await coro
+        bots, jawab = mem_from_result(h)
+        h["memori"] = await asyncio.to_thread(mem_save, "web", bots, h.get("jalur", ""), teks, jawab, simpan)
+        return h
     try:
         if d.get("mode") == "dewan":
             ang = [str(x).lower() for x in (d.get("anggota") or [])][:COUNCIL_MAX]
-            return jsonify({"job": start_job(council_run(teks, ang or None))})
-        return jsonify({"job": start_job(smart_run(teks))})
+            return jsonify({"job": start_job(jalan(council_run(teks, ang or None)))})
+        return jsonify({"job": start_job(jalan(smart_run(teks)))})
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 503
 
@@ -1137,6 +1272,31 @@ def api_gambar_one(i):
     return Response(g[1], mimetype=g[0], headers=h)
 
 
+@app.route("/api/memori", methods=["GET", "DELETE"])
+def api_memori():
+    need("admin")
+    if request.method == "DELETE":
+        return jsonify({"dihapus": mem_del()})
+    return jsonify({"items": mem_list(request.args.get("q", "").strip(), request.args.get("sumber", "")), "mem_tg": SET.get("mem_tg", "tidak")})
+
+
+@app.route("/api/memori/<int:i>", methods=["POST", "DELETE"])
+def api_memori_one(i):
+    need("admin")
+    if request.method == "DELETE":
+        return jsonify({"dihapus": mem_del(i)})
+    return jsonify({"permanen": mem_keep(i)})
+
+
+@app.route("/api/tentang", methods=["GET", "POST"])
+def api_tentang():
+    need("viewer")
+    if request.method == "POST":
+        need("admin")
+        return jsonify(tentang_save(request.get_json(silent=True) or {}))
+    return jsonify(tentang_get())
+
+
 @app.route("/api/usage")
 def api_usage():
     need("admin")
@@ -1150,6 +1310,8 @@ def api_settings():
     for k in ("caveman", "mcp"):
         if k in d:
             SET[k] = bool(d[k])
+    if str(d.get("mem_tg", "")) in SIMPAN:
+        SET["mem_tg"] = str(d["mem_tg"])
     set_save()
     return jsonify(SET)
 
@@ -1290,6 +1452,9 @@ def make_handlers(key):
         try:
             h = await council_run(q[:2000])
             await _send(u.message, fmt_result(h))
+            if SET.get("mem_tg", "tidak") != "tidak":
+                bots, jawab = mem_from_result(h)
+                await asyncio.to_thread(mem_save, "telegram", bots, "dewan", q[:2000], jawab, SET["mem_tg"])
         except Exception as e:
             log.exception("council gagal")
             await u.message.reply_text(str(e) if isinstance(e, RuntimeError) else "⚠️ Sidang dewan gagal.")
@@ -1349,6 +1514,8 @@ def make_handlers(key):
             _end(key)
         await asyncio.sleep(max(0.0, 1.5 - (time.time() - t0)))  # beri waktu animasi lari terlihat dulu
         await _send(m, ans)
+        if SET.get("mem_tg", "tidak") != "tidak":
+            await asyncio.to_thread(mem_save, "telegram", key, "chat", text, ans, SET["mem_tg"])
 
     async def gambar(u, c):
         if not _ok(u.effective_user):

@@ -70,6 +70,35 @@ td{padding:10px;border-top:1px solid #E6EDFB;vertical-align:top}
 .sw input{width:22px;height:22px}
 .tm{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
 .fl{display:grid;gap:10px;grid-template-columns:1fr 1fr}
+/* ---------- Memori & Tentang Kami ---------- */
+.sv{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 12px;font-size:12.5px;color:#AFC2EA}
+.sv .seg{margin-top:0}
+.sv .seg button{padding:7px 12px;font-size:12.5px}
+.mem{border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;background:#fff}
+.mem .hd{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--mute)}
+.mem .q{font-weight:700;margin:8px 0 4px;white-space:pre-wrap}
+.mem details summary{cursor:pointer;color:var(--navy);font-weight:600;font-size:13px;margin:4px 0}
+.mem .a{white-space:pre-wrap;background:#F3F7FF;border-radius:10px;padding:10px 12px;margin-top:6px;font-size:13.5px}
+.mem .bar{margin:10px 0 0}
+.mem .bar .bt{padding:6px 12px;min-height:34px;font-size:12px}
+.hero{background:var(--navy);color:#fff;border-radius:20px;padding:28px;margin-bottom:16px;border:1px solid var(--gold)}
+.hero h2{margin:0 0 10px;color:var(--gold2);font-size:26px;letter-spacing:.02em}
+.hero p{margin:0;color:#DCE6FB;white-space:pre-wrap;line-height:1.6}
+.tl{position:relative;padding-left:22px;margin-top:12px}
+.tl:before{content:"";position:absolute;left:6px;top:4px;bottom:4px;width:2px;background:var(--gold)}
+.tl .it{position:relative;margin-bottom:16px}
+.tl .it:before{content:"";position:absolute;left:-21px;top:4px;width:12px;height:12px;border-radius:50%;background:var(--gold);border:2px solid #fff;box-shadow:0 0 0 1px var(--gold)}
+.tl .it b{display:block}.tl .it .y{font-size:12px;font-weight:800;color:#8A6A1A;letter-spacing:.04em}
+.tl .it p{margin:4px 0 0;color:var(--mute);white-space:pre-wrap}
+.ag{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:12px}
+.ag .cd{margin:0;text-align:center}
+.ag .av{width:64px;height:64px;border-radius:50%;margin:0 auto 10px;display:grid;place-items:center;background:var(--navy);color:var(--gold2);font-weight:800;font-size:24px;border:2px solid var(--gold)}
+.ag .pr{font-size:12px;color:#8A6A1A;font-weight:700;margin-top:2px}
+.ag p{font-size:13px;color:var(--mute);margin:8px 0 0;white-space:pre-wrap}
+.ed{display:grid;gap:8px;border:1px dashed #BFD0F2;border-radius:12px;padding:12px;margin-bottom:10px;background:#F8FAFF}
+.ed .row{display:grid;grid-template-columns:110px 1fr;gap:8px}
+@media(max-width:640px){.ed .row{grid-template-columns:1fr}}
+.ed input{width:100%;border-radius:10px;border:1px solid #BFD0F2;padding:9px 10px}
 /* ---------- Tombol hapus teks di setiap kolom prompt ---------- */
 .tw{position:relative}
 .tw textarea{padding-right:84px}
@@ -148,8 +177,10 @@ td{padding:10px;border-top:1px solid #E6EDFB;vertical-align:top}
  <button class="nv" data-p="office">Virtual Office</button>
  <button class="nv" data-p="kas">Keuangan AI</button>
  <button class="nv" data-p="gambar">Studio Gambar</button>
+ <button class="nv" data-p="memori">Memori</button>
  <button class="nv" data-p="skills">Skills</button>
  <button class="nv" data-p="tim">Tim & Token</button>
+ <button class="nv" data-p="tentang">Tentang Kami</button>
  <div class="cv"><b>Hemat token</b><br>Router lokal, skill, model Lite, cache, dan mode Caveman.</div>
  <div class="who"><span id="whoRole">Memuat…</span><a class="lo" id="logout" href="/logout">Keluar</a></div>
 </aside>
@@ -164,6 +195,9 @@ td{padding:10px;border-top:1px solid #E6EDFB;vertical-align:top}
    <div class="seg" role="group" aria-label="Mode perintah"><button class="on" data-mode="boss">Boss bagi tugas</button><button data-mode="dewan">Sidang Dewan</button></div>
    <textarea id="bt" rows="3" aria-label="Perintah" placeholder="Contoh: rekap kas minggu ini lalu minta Aegis cek risikonya."></textarea>
    <div id="pickWrap" hidden><div class="mu" style="color:#AFC2EA;font-size:12.5px">Anggota dewan (kosongkan untuk dipilih otomatis, maksimal 4):</div><div class="picks" id="picks"></div></div>
+   <div class="sv">Simpan ke Memori:
+    <div class="seg" role="group" aria-label="Simpan riwayat"><button data-sv="permanen">Permanen</button><button data-sv="72" class="on">72 jam</button><button data-sv="tidak">Jangan simpan</button></div>
+   </div>
    <button class="bt g" id="bs">Kirim</button>
    <div id="br" style="margin-top:14px"></div>
   </div>
@@ -244,6 +278,31 @@ td{padding:10px;border-top:1px solid #E6EDFB;vertical-align:top}
   <div class="cd"><div class="bar" style="justify-content:space-between;margin:0"><b>Galeri</b><span class="mu" style="font-size:12px">Gambar terbaru disimpan permanen</span></div><div class="gal" id="gg"></div></div>
  </section>
 
+ <section id="p-memori" class="pg" hidden>
+  <h1>Memori</h1>
+  <p class="mu">Riwayat perintah dan jawaban yang kamu pilih untuk disimpan. Yang bertanda 72 jam terhapus otomatis.</p>
+  <div class="cd">
+   <div class="bar" style="margin:0">
+    <input type="text" id="mq" placeholder="Cari kata di perintah, jawaban, atau nama bot" aria-label="Cari memori" style="flex:1;min-width:200px">
+    <select id="ms" aria-label="Sumber" style="width:auto"><option value="">Semua sumber</option><option value="web">Web</option><option value="telegram">Telegram</option></select>
+    <button class="bt o" id="mr">Cari</button>
+   </div>
+   <div class="bar" style="margin:12px 0 0;justify-content:space-between">
+    <label class="mu" style="font-size:12.5px;display:flex;gap:8px;align-items:center">Simpan chat Telegram:
+     <select id="mt" style="width:auto"><option value="tidak">Tidak</option><option value="72">72 jam</option><option value="permanen">Permanen</option></select></label>
+    <button class="bt o" id="mx">Hapus semua memori</button>
+   </div>
+  </div>
+  <div id="ml"></div>
+ </section>
+
+ <section id="p-tentang" class="pg" hidden>
+  <div class="bar" style="justify-content:space-between;margin:0 0 4px"><h1 style="margin:0">Tentang Kami</h1><button class="bt o" id="te" hidden>Edit halaman</button></div>
+  <p class="mu">Kenalan dengan anggota dan perjalanan MCI.</p>
+  <div id="tv"></div>
+  <div id="tf" hidden></div>
+ </section>
+
  <section id="p-skills" class="pg" hidden>
   <h1>Skills</h1>
   <p class="mu">Skill = instruksi siap pakai untuk satu bot. Dipicu kata kunci, jadi Boss tidak perlu dipanggil. Isi lengkapnya hanya dikirim ke AI saat skill dipakai.</p>
@@ -308,6 +367,7 @@ const MOCK = (() => {
     {nama:"laporan-mingguan",bot:"scribe",deskripsi:"Laporan mingguan format resmi MCI",pemicu:"laporan mingguan",isi:"Judul, ringkasan, pencapaian, kendala, rencana."},
     {nama:"cek-wiring",bot:"aegis",deskripsi:"Checklist keselamatan rangkaian",pemicu:"cek wiring, cek rangkaian",isi:"Tegangan, polaritas, ground, arus pin, korsleting."},
     {nama:"pinout-esp32",bot:"pulse",deskripsi:"Pemetaan pin ESP32 DevKit",pemicu:"pinout esp32",isi:"Tabel pin, hindari GPIO 6-11."}];
+  let TKM = {judul: "Tentang MCI", deskripsi: "(DEMO) MCI adalah komunitas pembuat proyek elektronika dan AI.", sejarah: [{tahun: "2024", judul: "MCI berdiri", isi: "Dimulai dari proyek radar Arduino."}, {tahun: "2026", judul: "MCI HQ online", isi: "10 bot AI bekerja di kantor virtual."}], anggota: [{nama: "Alvaro", peran: "Founder", bio: "Hardware & AI."}]};
   let gid = 3; const GAL = [{id: 2, prompt: "robot oranye minum kopi di kantor biru emas"}, {id: 1, prompt: "kapal monitoring otonom di laut saat senja"}];
   let nid = 5, pv = [], council = {u: Date.now() + 25000, on: false, m: []};
   const kas = () => { let s = 0; const rows = K.map(r => ({...r, saldo: s += r.masuk - r.keluar}));
@@ -342,6 +402,10 @@ const MOCK = (() => {
     if (u === "/api/skills") return {skills: SK, bots: A.map(a => ({key: a[0], nama: a[1]}))};
     if (u.startsWith("/api/skills/")) { const n = decodeURIComponent(u.split("/").pop()), i = SK.findIndex(s => s.nama === n); if (i >= 0) SK.splice(i, 1); return {dihapus: 1}; }
     if (u === "/api/settings") return JSON.parse(o.body || "{}");
+    if (u.startsWith("/api/memori")) { if (o && o.method === "DELETE") return {dihapus: 1}; if (o && o.method === "POST") return {permanen: 1};
+      return {mem_tg: "tidak", items: [{id: 2, waktu: "2026-10-29T19:40:00+07:00", sumber: "web", bot: "devmatrix", jalur: "langsung", perintah: "buat kode esp32 blink", jawaban: "(DEMO) void setup(){ pinMode(2, OUTPUT); } ...", kadaluarsa: new Date(Date.now() + 50 * 36e5).toISOString()},
+        {id: 1, waktu: "2026-10-28T10:12:00+07:00", sumber: "telegram", bot: "pulse, aegis, apex", jalur: "dewan", perintah: "LiPo atau 18650?", jawaban: "(DEMO) PUTUSAN DEWAN: pakai 18650 + BMS.", kadaluarsa: null}]}; }
+    if (u === "/api/tentang") { if (o && o.method === "POST") { TKM = JSON.parse(o.body); } return TKM; }
     if (u === "/api/gambar" && o && o.method === "POST") { await sleep(900); const p = o.body.get("prompt"); GAL.unshift({id: gid, prompt: p, prompt_en: "(DEMO) " + p}); return {id: gid++, prompt: p, prompt_en: "(DEMO) " + p, aktif: true, hari_ini: GAL.length, batas: 150}; }
     if (u === "/api/gambar") return {items: GAL, aktif: true, hari_ini: GAL.length, batas: 150};
     if (u.startsWith("/api/gambar/")) { const i = +u.split("/").pop(), k = GAL.findIndex(g => g.id === i); if (k >= 0) GAL.splice(k, 1); return {dihapus: 1}; }
@@ -371,6 +435,8 @@ function show(p) {
   if (p === "tim") { renderTim(); loadUsage(); }
   if (p === "skills") loadSkills();
   if (p === "gambar") loadGambar();
+  if (p === "memori") loadMemori();
+  if (p === "tentang") loadTentang();
 }
 $$(".nv").forEach(b => b.onclick = () => show(b.dataset.p));
 
@@ -438,7 +504,7 @@ $("#bs").onclick = async () => {
   const ang = $$("#picks input:checked").map(x => x.value).slice(0, 4);
   o.innerHTML = MODE === "dewan" ? "<p>Dewan sedang bersidang di lantai 4…</p>" : "<p>Mencari jalur termurah…</p>";
   try {
-    const {job} = await api("/api/boss", {json: {perintah: t, mode: MODE, anggota: ang}});
+    const {job} = await api("/api/boss", {json: {perintah: t, mode: MODE, anggota: ang, simpan: SIMPAN}});
     let ok = false;
     for (let i = 0; i < 100 && !ok; i++) {
       await sleep(1500);
@@ -459,7 +525,8 @@ $("#bs").onclick = async () => {
 };
 
 /* Tombol "Hapus" untuk mengosongkan semua kolom prompt */
-$$("textarea").forEach(t => {
+function addClear(t) {
+  if (t.dataset.clr) return; t.dataset.clr = 1;
   const w = document.createElement("div"); w.className = "tw";
   w.style.margin = t.style.margin || ""; if (t.style.marginTop) w.style.marginTop = t.style.marginTop;
   t.style.margin = "0"; t.parentNode.insertBefore(w, t); w.appendChild(t);
@@ -469,7 +536,88 @@ $$("textarea").forEach(t => {
   w.appendChild(b);
   const upd = () => b.hidden = !t.value;
   t.addEventListener("input", upd); setInterval(upd, 800);   // ikut sembunyi kalau teks dikosongkan oleh kode
-});
+}
+$$("textarea").forEach(addClear);
+
+/* Pilihan simpan ke Memori (diingat di browser ini) */
+let SIMPAN = "72";
+try { const v = localStorage.getItem("mci_simpan"); if (["permanen", "72", "tidak"].includes(v)) SIMPAN = v; } catch (e) {}
+function svRender() { $$("[data-sv]").forEach(b => b.classList.toggle("on", b.dataset.sv === SIMPAN)); }
+$$("[data-sv]").forEach(b => b.onclick = () => { SIMPAN = b.dataset.sv; svRender(); try { localStorage.setItem("mci_simpan", SIMPAN); } catch (e) {} });
+svRender();
+
+/* Memori */
+const SUMBER = {web: ["Web", ""], telegram: ["Telegram", "g"]};
+function sisa(exp) {
+  if (!exp) return '<span class="ch y">Permanen</span>';
+  const h = Math.max(0, (new Date(exp) - new Date()) / 36e5);
+  return `<span class="ch n">Terhapus ${h >= 1 ? "dalam " + Math.round(h) + " jam" : "kurang dari 1 jam"}</span>`;
+}
+async function loadMemori() {
+  if (ME.role !== "admin") return;
+  const q = encodeURIComponent($("#mq").value.trim()), so = $("#ms").value;
+  $("#ml").innerHTML = '<p class="mu">Memuat…</p>';
+  try {
+    const d = await api(`/api/memori?q=${q}&sumber=${so}`);
+    $("#mt").value = d.mem_tg || "tidak";
+    $("#ml").innerHTML = d.items.map(m => { const s = SUMBER[m.sumber] || [m.sumber, "n"];
+      return `<div class="mem"><div class="hd"><span>${esc(String(m.waktu).replace("T", " ").slice(0, 16))}</span><span class="ch ${s[1]}">${esc(s[0])}</span>${m.jalur ? `<span class="ch n">${esc(m.jalur)}</span>` : ""}<span>${esc(m.bot || "")}</span>${sisa(m.kadaluarsa)}</div>
+      <div class="q">${esc(m.perintah)}</div>
+      <details><summary>Lihat jawaban</summary><div class="a">${esc(m.jawaban || "(kosong)")}</div></details>
+      <div class="bar">${m.kadaluarsa ? `<button class="bt o" data-mk="${m.id}">Jadikan permanen</button>` : ""}<button class="bt o" data-md="${m.id}" aria-label="Hapus memori ${m.id}">Hapus</button></div></div>`; }).join("")
+      || '<div class="cd mu">Belum ada memori. Pilih "Permanen" atau "72 jam" di Command Center sebelum kirim perintah.</div>';
+    $$("[data-mk]").forEach(b => b.onclick = async () => { await api("/api/memori/" + b.dataset.mk, {method: "POST"}); loadMemori(); });
+    $$("[data-md]").forEach(b => b.onclick = async () => { if (confirm("Hapus memori ini?")) { await api("/api/memori/" + b.dataset.md, {method: "DELETE"}); loadMemori(); } });
+  } catch (e) { $("#ml").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
+}
+$("#mr").onclick = loadMemori;
+$("#mq").onkeydown = e => { if (e.key === "Enter") loadMemori(); };
+$("#ms").onchange = loadMemori;
+$("#mt").onchange = e => api("/api/settings", {json: {mem_tg: e.target.value}});
+$("#mx").onclick = async () => { if (confirm("Hapus SEMUA memori? Tidak bisa dibatalkan.")) { await api("/api/memori", {method: "DELETE"}); loadMemori(); } };
+
+/* Tentang Kami */
+let TK = null;
+const ini = n => esc(String(n || "?").trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase());
+function renderTentang() {
+  const t = TK;
+  $("#tv").innerHTML = `<div class="hero"><h2>${esc(t.judul)}</h2><p>${esc(t.deskripsi)}</p></div>
+   <div class="cd"><b>Sejarah MCI</b>${t.sejarah.length ? `<div class="tl">${[...t.sejarah].sort((x, y) => (parseInt(x.tahun) || 0) - (parseInt(y.tahun) || 0)).map(x => `<div class="it"><span class="y">${esc(x.tahun)}</span><b>${esc(x.judul)}</b>${x.isi ? `<p>${esc(x.isi)}</p>` : ""}</div>`).join("")}</div>` : '<p class="mu">Sejarah belum diisi.</p>'}</div>
+   <div class="cd"><b>Anggota</b>${t.anggota.length ? `<div class="ag">${t.anggota.map(a => `<div class="cd"><div class="av">${ini(a.nama)}</div><b>${esc(a.nama)}</b><div class="pr">${esc(a.peran)}</div>${a.bio ? `<p>${esc(a.bio)}</p>` : ""}</div>`).join("")}</div>` : '<p class="mu">Daftar anggota belum diisi.</p>'}</div>`;
+}
+async function loadTentang() {
+  try { TK = await api("/api/tentang"); renderTentang(); $("#te").hidden = ME.role !== "admin"; }
+  catch (e) { $("#tv").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
+}
+function edRow(kind, x = {}) {
+  const d = document.createElement("div"); d.className = "ed"; d.dataset.k = kind;
+  d.innerHTML = kind === "sejarah"
+    ? `<div class="row"><input data-f="tahun" placeholder="Tahun" value="${esc(x.tahun || "")}"><input data-f="judul" placeholder="Peristiwa, contoh: MCI berdiri" value="${esc(x.judul || "")}"></div><textarea data-f="isi" rows="2" placeholder="Cerita singkat (opsional)">${esc(x.isi || "")}</textarea><div><button class="bt o" type="button" data-rm>Hapus baris</button></div>`
+    : `<div class="row"><input data-f="nama" placeholder="Nama" value="${esc(x.nama || "")}"><input data-f="peran" placeholder="Peran, contoh: Ketua" value="${esc(x.peran || "")}"></div><textarea data-f="bio" rows="2" placeholder="Bio singkat (opsional)">${esc(x.bio || "")}</textarea><div><button class="bt o" type="button" data-rm>Hapus baris</button></div>`;
+  d.querySelector("[data-rm]").onclick = () => d.remove();
+  d.querySelectorAll("textarea").forEach(addClear);
+  return d;
+}
+$("#te").onclick = () => {
+  const f = $("#tf"), t = TK; f.hidden = false; $("#tv").hidden = true; $("#te").hidden = true;
+  f.innerHTML = `<div class="cd fl"><label>Judul<input type="text" id="tj" value="${esc(t.judul)}"></label><label class="full">Deskripsi / cerita MCI<textarea id="td" rows="5">${esc(t.deskripsi)}</textarea></label></div>
+   <div class="cd"><b>Sejarah</b><p class="mu" style="font-size:12px">Otomatis diurutkan berdasarkan tahun.</p><div id="ts"></div><button class="bt o" type="button" id="tsa">+ Tambah peristiwa</button></div>
+   <div class="cd"><b>Anggota</b><div id="ta"></div><button class="bt o" type="button" id="taa">+ Tambah anggota</button></div>
+   <div class="bar"><button class="bt g" id="tsv">Simpan</button><button class="bt o" id="tbl">Batal</button><span class="mu" id="tmsg"></span></div>`;
+  addClear($("#td"));
+  t.sejarah.forEach(x => $("#ts").appendChild(edRow("sejarah", x))); t.anggota.forEach(x => $("#ta").appendChild(edRow("anggota", x)));
+  $("#tsa").onclick = () => $("#ts").appendChild(edRow("sejarah"));
+  $("#taa").onclick = () => $("#ta").appendChild(edRow("anggota"));
+  const tutup = () => { f.hidden = true; $("#tv").hidden = false; $("#te").hidden = false; };
+  $("#tbl").onclick = tutup;
+  $("#tsv").onclick = async () => {
+    const rows = k => $$(`#tf .ed[data-k="${k}"]`).map(d => Object.fromEntries([...d.querySelectorAll("[data-f]")].map(i => [i.dataset.f, i.value])));
+    $("#tsv").disabled = true;
+    try { TK = await api("/api/tentang", {json: {judul: $("#tj").value, deskripsi: $("#td").value, sejarah: rows("sejarah"), anggota: rows("anggota")}}); renderTentang(); tutup(); }
+    catch (e) { $("#tmsg").textContent = e.message; }
+    $("#tsv").disabled = false;
+  };
+};
 
 /* Studio Gambar */
 let GFOTO = null;   // {blob, w, h} hasil resize di browser
@@ -1612,14 +1760,16 @@ const OFFICE = (() => {
 (async () => {
   if (DEMO) { $("#demoBanner").hidden = false; $("#csv").removeAttribute("href"); $("#csv").onclick = e => { e.preventDefault(); alert("Ekspor CSV aktif di versi server."); }; }
   try { ME = await api("/api/me"); if (ME.lantai) LANTAI = ME.lantai; } catch (e) { return; }
-  if (ME.role !== "admin") $$(".nv").forEach(b => { if (b.dataset.p !== "office") b.style.display = "none"; });
+  if (ME.role !== "admin") $$(".nv").forEach(b => { if (!["office", "tentang"].includes(b.dataset.p)) b.style.display = "none"; });
   $("#whoRole").innerHTML = "Masuk sebagai <b>" + (ME.role === "admin" ? "Admin" : "Viewer") + "</b>";
   if (DEMO) $("#logout").onclick = e => { e.preventDefault(); alert("Tombol Keluar aktif di versi server."); };
   await poll();
   if (ME.role === "admin") { loadKas(true); loadUsage(); }
   show(DEMO || ME.role !== "admin" ? "office" : "cmd");
   OFFICE.ensure(DATA); OFFICE.sync(DATA);
-  setInterval(poll, 1000);  // 1 detik: bot langsung bereaksi begitu ada pesan
+  // admin 1 detik, viewer 3 detik; berhenti saat tab tidak dilihat (hemat server & kuota bandwidth)
+  setInterval(() => { if (!document.hidden) poll(); }, ME.role === "admin" ? 1000 : 3000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
   setInterval(() => { if (!$("#p-office").hidden) renderList(); }, 1000);
   setInterval(() => { if (ME.role === "admin") loadUsage(); }, 15000);
 })();
