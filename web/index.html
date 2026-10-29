@@ -84,6 +84,7 @@ td{padding:10px;border-top:1px solid #E6EDFB;vertical-align:top}
 .hero{background:var(--navy);color:#fff;border-radius:20px;padding:28px;margin-bottom:16px;border:1px solid var(--gold)}
 .hero h2{margin:0 0 10px;color:var(--gold2);font-size:26px;letter-spacing:.02em}
 .hero p{margin:0;color:#DCE6FB;white-space:pre-wrap;line-height:1.6}
+.hero .moto{font-size:17px;font-style:italic;font-weight:700;color:#fff;margin:0 0 14px;padding-left:12px;border-left:3px solid var(--gold)}
 .tl{position:relative;padding-left:22px;margin-top:12px}
 .tl:before{content:"";position:absolute;left:6px;top:4px;bottom:4px;width:2px;background:var(--gold)}
 .tl .it{position:relative;margin-bottom:16px}
@@ -367,7 +368,7 @@ const MOCK = (() => {
     {nama:"laporan-mingguan",bot:"scribe",deskripsi:"Laporan mingguan format resmi MCI",pemicu:"laporan mingguan",isi:"Judul, ringkasan, pencapaian, kendala, rencana."},
     {nama:"cek-wiring",bot:"aegis",deskripsi:"Checklist keselamatan rangkaian",pemicu:"cek wiring, cek rangkaian",isi:"Tegangan, polaritas, ground, arus pin, korsleting."},
     {nama:"pinout-esp32",bot:"pulse",deskripsi:"Pemetaan pin ESP32 DevKit",pemicu:"pinout esp32",isi:"Tabel pin, hindari GPIO 6-11."}];
-  let TKM = {judul: "Tentang MCI", deskripsi: "(DEMO) MCI adalah komunitas pembuat proyek elektronika dan AI.", sejarah: [{tahun: "2024", judul: "MCI berdiri", isi: "Dimulai dari proyek radar Arduino."}, {tahun: "2026", judul: "MCI HQ online", isi: "10 bot AI bekerja di kantor virtual."}], anggota: [{nama: "Alvaro", peran: "Founder", bio: "Hardware & AI."}]};
+  let TKM = {judul: "Tentang MCI", semboyan: "Rakit, uji, wujudkan.", deskripsi: "(DEMO) MCI adalah komunitas pembuat proyek elektronika dan AI.", sejarah: [{tahun: "2024", judul: "MCI berdiri", isi: "Dimulai dari proyek radar Arduino."}, {tahun: "2026", judul: "MCI HQ online", isi: "10 bot AI bekerja di kantor virtual."}], anggota: [{nama: "Alvaro", peran: "Founder", bio: "Hardware & AI."}]};
   let gid = 3; const GAL = [{id: 2, prompt: "robot oranye minum kopi di kantor biru emas"}, {id: 1, prompt: "kapal monitoring otonom di laut saat senja"}];
   let nid = 5, pv = [], council = {u: Date.now() + 25000, on: false, m: []};
   const kas = () => { let s = 0; const rows = K.map(r => ({...r, saldo: s += r.masuk - r.keluar}));
@@ -581,7 +582,7 @@ let TK = null;
 const ini = n => esc(String(n || "?").trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase());
 function renderTentang() {
   const t = TK;
-  $("#tv").innerHTML = `<div class="hero"><h2>${esc(t.judul)}</h2><p>${esc(t.deskripsi)}</p></div>
+  $("#tv").innerHTML = `<div class="hero"><h2>${esc(t.judul)}</h2>${t.semboyan ? `<div class="moto">“${esc(t.semboyan)}”</div>` : ""}<p>${esc(t.deskripsi)}</p></div>
    <div class="cd"><b>Sejarah MCI</b>${t.sejarah.length ? `<div class="tl">${[...t.sejarah].sort((x, y) => (parseInt(x.tahun) || 0) - (parseInt(y.tahun) || 0)).map(x => `<div class="it"><span class="y">${esc(x.tahun)}</span><b>${esc(x.judul)}</b>${x.isi ? `<p>${esc(x.isi)}</p>` : ""}</div>`).join("")}</div>` : '<p class="mu">Sejarah belum diisi.</p>'}</div>
    <div class="cd"><b>Anggota</b>${t.anggota.length ? `<div class="ag">${t.anggota.map(a => `<div class="cd"><div class="av">${ini(a.nama)}</div><b>${esc(a.nama)}</b><div class="pr">${esc(a.peran)}</div>${a.bio ? `<p>${esc(a.bio)}</p>` : ""}</div>`).join("")}</div>` : '<p class="mu">Daftar anggota belum diisi.</p>'}</div>`;
 }
@@ -600,7 +601,7 @@ function edRow(kind, x = {}) {
 }
 $("#te").onclick = () => {
   const f = $("#tf"), t = TK; f.hidden = false; $("#tv").hidden = true; $("#te").hidden = true;
-  f.innerHTML = `<div class="cd fl"><label>Judul<input type="text" id="tj" value="${esc(t.judul)}"></label><label class="full">Deskripsi / cerita MCI<textarea id="td" rows="5">${esc(t.deskripsi)}</textarea></label></div>
+  f.innerHTML = `<div class="cd fl"><label>Judul<input type="text" id="tj" value="${esc(t.judul)}"></label><label>Semboyan<input type="text" id="tsb" maxlength="150" value="${esc(t.semboyan || "")}" placeholder="Contoh: Rakit, uji, wujudkan."></label><label class="full">Deskripsi / cerita MCI<textarea id="td" rows="5">${esc(t.deskripsi)}</textarea></label></div>
    <div class="cd"><b>Sejarah</b><p class="mu" style="font-size:12px">Otomatis diurutkan berdasarkan tahun.</p><div id="ts"></div><button class="bt o" type="button" id="tsa">+ Tambah peristiwa</button></div>
    <div class="cd"><b>Anggota</b><div id="ta"></div><button class="bt o" type="button" id="taa">+ Tambah anggota</button></div>
    <div class="bar"><button class="bt g" id="tsv">Simpan</button><button class="bt o" id="tbl">Batal</button><span class="mu" id="tmsg"></span></div>`;
@@ -613,7 +614,7 @@ $("#te").onclick = () => {
   $("#tsv").onclick = async () => {
     const rows = k => $$(`#tf .ed[data-k="${k}"]`).map(d => Object.fromEntries([...d.querySelectorAll("[data-f]")].map(i => [i.dataset.f, i.value])));
     $("#tsv").disabled = true;
-    try { TK = await api("/api/tentang", {json: {judul: $("#tj").value, deskripsi: $("#td").value, sejarah: rows("sejarah"), anggota: rows("anggota")}}); renderTentang(); tutup(); }
+    try { TK = await api("/api/tentang", {json: {judul: $("#tj").value, semboyan: $("#tsb").value, deskripsi: $("#td").value, sejarah: rows("sejarah"), anggota: rows("anggota")}}); renderTentang(); tutup(); }
     catch (e) { $("#tmsg").textContent = e.message; }
     $("#tsv").disabled = false;
   };

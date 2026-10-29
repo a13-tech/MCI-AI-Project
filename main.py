@@ -931,7 +931,7 @@ def mem_from_result(h):
 
 
 # ---------- TENTANG KAMI (konten diedit admin dari web) ----------
-TENTANG_DEFAULT = {"judul": "Tentang MCI", "deskripsi": "Cerita singkat tentang MCI akan ditulis di sini.", "sejarah": [], "anggota": []}
+TENTANG_DEFAULT = {"judul": "Tentang MCI", "semboyan": "", "deskripsi": "Cerita singkat tentang MCI akan ditulis di sini.", "sejarah": [], "anggota": []}
 
 
 def tentang_get():
@@ -945,7 +945,7 @@ def tentang_get():
 
 def tentang_save(d):
     t = lambda v, n: str(v or "").strip()[:n]
-    out = {"judul": t(d.get("judul"), 100) or "Tentang MCI", "deskripsi": t(d.get("deskripsi"), 4000),
+    out = {"judul": t(d.get("judul"), 100) or "Tentang MCI", "semboyan": t(d.get("semboyan"), 150), "deskripsi": t(d.get("deskripsi"), 4000),
            "sejarah": [{"tahun": t(x.get("tahun"), 20), "judul": t(x.get("judul"), 120), "isi": t(x.get("isi"), 1500)}
                        for x in (d.get("sejarah") or [])[:60] if isinstance(x, dict) and (x.get("judul") or x.get("isi"))],
            "anggota": [{"nama": t(x.get("nama"), 80), "peran": t(x.get("peran"), 80), "bio": t(x.get("bio"), 600)}
