@@ -1619,7 +1619,7 @@ const OFFICE = (() => {
   if (ME.role === "admin") { loadKas(true); loadUsage(); }
   show(DEMO || ME.role !== "admin" ? "office" : "cmd");
   OFFICE.ensure(DATA); OFFICE.sync(DATA);
-  setInterval(poll, 2000);
+  setInterval(poll, 1000);  // 1 detik: bot langsung bereaksi begitu ada pesan
   setInterval(() => { if (!$("#p-office").hidden) renderList(); }, 1000);
   setInterval(() => { if (ME.role === "admin") loadUsage(); }, 15000);
 })();

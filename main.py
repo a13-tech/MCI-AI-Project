@@ -396,8 +396,13 @@ def model_for(key):
     return MODEL_LITE if (a["cepat"] or a["boss"]) else MODEL
 
 
+MIN_SHOW = 8  # detik minimal bot tampil "bekerja" di kantor 3D, supaya animasi lari selalu terlihat
+
+
 def _begin(k, act):
     s = STATE[k]
+    if not s["active"]:
+        s["since"] = time.time()
     s["active"] += 1
     s["status"], s["activity"] = "WORKING", act
 
@@ -406,7 +411,17 @@ def _end(k):
     s = STATE[k]
     s["active"] = max(0, s["active"] - 1)
     if not s["active"]:
+        s["hold"], s["last_act"], s["hold_mode"] = s.get("since", 0) + MIN_SHOW, s["activity"], s["mode"]
         s["status"], s["activity"] = "IDLE", "Siaga"
+
+
+def office_status(s):
+    """Status untuk web: tugas yang selesai sangat cepat tetap tampil WORKING minimal MIN_SHOW detik."""
+    if s["active"]:
+        return "WORKING", s["activity"], s["mode"]
+    if time.time() < s.get("hold", 0):
+        return "WORKING", s.get("last_act") or "Bekerja", s.get("hold_mode", s["mode"])
+    return "IDLE", "Siaga", s["mode"]
 
 
 @contextlib.asynccontextmanager
@@ -638,6 +653,8 @@ async def council_run(pertanyaan, anggota=None):
     for k in m + ["apex"]:
         STATE[k]["dw"] = STATE[k].get("dw", 0) + 1  # hitung sidang yang sedang berjalan
         STATE[k]["mode"] = "dewan"
+    for k in m + ["apex"]:
+        _begin(k, "Menuju sidang dewan")  # semua langsung lari ke ruang dewan, tetap di sana sampai putusan
     e = _log("dewan", pertanyaan, "Sidang", "dewan")
     try:
         async def one(k):
@@ -659,6 +676,7 @@ async def council_run(pertanyaan, anggota=None):
         raise
     finally:
         for k in m + ["apex"]:
+            _end(k)
             STATE[k]["dw"] = max(0, STATE[k].get("dw", 0) - 1)
             STATE[k]["mode"] = "dewan" if STATE[k]["dw"] else "meja"
 
@@ -949,9 +967,9 @@ def api_office():
     need("viewer")
     adm = role() == "admin"
     ags = [{"key": k, "name": a["nama"], "peran": a["peran"], "boss": a["boss"], "lantai": a["lantai"], "divisi": a["divisi"],
-            "status": s["status"], "activity": s["activity"], "mode": s["mode"], "model": model_for(k),
+            "status": o[0], "activity": o[1], "mode": o[2], "model": model_for(k),
             "gemini": bool(gkey(k)), "telegram": bool(os.getenv(f"TOKEN_{k.upper()}")),
-            **({"calls": s["calls"], "tokens": s["tokens"]} if adm else {})} for k, a in AGENTS.items() for s in [STATE[k]]]
+            **({"calls": s["calls"], "tokens": s["tokens"]} if adm else {})} for k, a in AGENTS.items() for s in [STATE[k]] for o in [office_status(s)]]
     return jsonify({"agents": ags, "log": list(TASKLOG) if adm else [], "lantai": LANTAI})
 
 
@@ -1307,6 +1325,8 @@ def make_handlers(key):
         text = m.text.replace(f"@{c.bot.username}", "").strip() if c.bot.username else m.text
         if not text:
             return
+        t0 = time.time()
+        _begin(key, "Membaca pesan")  # bot langsung lari ke mejanya begitu pesan masuk
         try:
             await c.bot.send_chat_action(chat_id=m.chat_id, action="typing")
             if key == "apex":
@@ -1325,6 +1345,9 @@ def make_handlers(key):
         except Exception as e:
             log.exception("[%s] gagal", cfg["nama"])
             ans = str(e) if isinstance(e, RuntimeError) else "⚠️ Ada gangguan saat menghubungi Gemini. Coba lagi sebentar."
+        finally:
+            _end(key)
+        await asyncio.sleep(max(0.0, 1.5 - (time.time() - t0)))  # beri waktu animasi lari terlihat dulu
         await _send(m, ans)
 
     async def gambar(u, c):
