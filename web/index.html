@@ -106,6 +106,14 @@ td{padding:10px;border-top:1px solid #E6EDFB;vertical-align:top}
 .clr{position:absolute;top:8px;right:8px;border:1px solid #BFD0F2;background:#fff;color:var(--navy);border-radius:99px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;min-height:28px;line-height:1}
 .clr:hover{background:#F3F7FF}.clr:focus-visible{outline:2px solid var(--gold)}
 .clr[hidden]{display:none!important}
+.glive{display:flex;gap:18px;align-items:center;flex-wrap:wrap;background:linear-gradient(135deg,#0B1F4D,#14306E);border-radius:16px;padding:16px 20px;margin-top:14px;color:#F3F7FF}
+.glive[hidden]{display:none}.glive svg{width:220px;max-width:100%;height:auto;flex:none}.glive .mu{color:#AFC2EA}.glive .gtx{flex:1;min-width:200px}
+.gs{fill:none;stroke-width:6;stroke-linecap:round;stroke-dasharray:120;stroke-dashoffset:120;animation:gpaint 6s ease-in-out infinite}
+.gs2{animation-delay:1.2s}.gs3{animation-delay:2.4s}.gs4{animation-delay:3.4s}
+@keyframes gpaint{0%{stroke-dashoffset:120}55%,85%{stroke-dashoffset:0}100%{stroke-dashoffset:0;opacity:0}}
+.garm{transform-origin:88px 108px;animation:garm .7s ease-in-out infinite alternate}@keyframes garm{from{transform:rotate(-14deg)}to{transform:rotate(10deg)}}
+.gbot{animation:gbob 1.4s ease-in-out infinite}@keyframes gbob{50%{transform:translateY(-2px)}}
+@media (prefers-reduced-motion:reduce){.gs,.garm,.gbot{animation:none}.gs{stroke-dashoffset:0}}
 .lp{white-space:pre-wrap;font-size:14px;line-height:1.6;margin:12px 0 0;color:var(--ink)}
 details.cd>summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}
 details.cd>summary::-webkit-details-marker{display:none}
@@ -136,8 +144,8 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 .fl .full{grid-column:1/-1}
 
 /* ---------- Virtual Office ---------- */
-#views{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:thin}
-#views .grp{display:flex;gap:6px;align-items:center;flex:none}
+#views{display:flex;flex-wrap:wrap;gap:8px 14px;padding:2px 0 12px}
+#views .grp{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 #views .lbl{font-size:11.5px;font-weight:700;color:var(--mute);letter-spacing:.06em;margin:0 2px 0 8px}
 .vb{border:1px solid #BFD0F2;background:#fff;color:var(--navy);border-radius:10px;padding:8px 13px;font-weight:700;font-size:13px;min-height:40px;cursor:pointer;white-space:nowrap}
 .vb.on{background:var(--navy);color:var(--gold2);border-color:var(--navy)}
@@ -233,7 +241,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
   <div id="views">
    <div class="grp"><button class="vb on" data-view="gedung">Gedung</button></div>
    <div class="grp"><span class="lbl">LANTAI</span><button class="vb" data-view="f0">LT 1</button><button class="vb" data-view="f1">LT 2</button><button class="vb" data-view="f2">LT 3</button><button class="vb" data-view="f3">LT 4</button></div>
-   <div class="grp"><span class="lbl">RUANGAN</span><button class="vb" data-view="lounge">Lounge</button><button class="vb" data-view="pantry">Pantry</button><button class="vb" data-view="game">Game</button><button class="vb" data-view="lab">Lab Teknik</button><button class="vb" data-view="meeting">Meeting</button><button class="vb" data-view="dewan">Ruang Dewan</button><button class="vb" data-view="ceo">Ruang CEO</button><button class="vb" data-view="galeri">Galeri</button><button class="vb" data-view="labiot">Lab IoT</button><button class="vb" data-view="perpus">Perpustakaan</button><button class="vb" data-view="observ">Observatorium</button></div>
+   <div class="grp"><span class="lbl">RUANGAN</span><button class="vb" data-view="dewan">Ruang Dewan</button><button class="vb" data-view="studio">Studio Canvas</button><button class="vb" data-view="ceo">Ruang CEO</button><button class="vb" data-view="meeting">Meeting</button><button class="vb" data-view="labiot">Lab IoT</button><button class="vb" data-view="lab">Lab Teknik</button><button class="vb" data-view="perpus">Perpustakaan</button><button class="vb" data-view="observ">Observatorium</button><button class="vb" data-view="galeri">Galeri</button><button class="vb" data-view="lounge">Lounge</button><button class="vb" data-view="pantry">Pantry</button><button class="vb" data-view="game">Game</button></div>
   </div>
   <div id="stage">
    <div id="chips"></div>
@@ -290,6 +298,30 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
     <button class="bt o" id="gfx" type="button">Hapus foto</button>
    </div>
    <div class="bar"><button class="bt g" id="gb">Buat gambar</button><span class="mu" id="gq"></span></div>
+   <div id="gLive" class="glive" hidden>
+    <svg viewBox="0 0 240 170" role="img" aria-label="MCI.Canvas sedang melukis di easel">
+     <rect x="0" y="150" width="240" height="20" rx="6" fill="#1b3a80"/>
+     <g stroke="#8b5a2b" stroke-width="5" stroke-linecap="round"><line x1="150" y1="40" x2="128" y2="150"/><line x1="200" y1="40" x2="222" y2="150"/><line x1="175" y1="40" x2="175" y2="150"/></g>
+     <rect x="130" y="28" width="90" height="72" rx="4" fill="#fff" stroke="#D4AF5A" stroke-width="4"/>
+     <path class="gs gs1" d="M140 80 Q160 50 180 70 T212 52" stroke="#38bdf8"/>
+     <path class="gs gs2" d="M142 92 Q168 74 190 88 T214 80" stroke="#f472b6"/>
+     <circle class="gs gs3" cx="196" cy="48" r="8" stroke="#F1D58A"/>
+     <path class="gs gs4" d="M146 60 l10 -12 l10 12" stroke="#22c55e"/>
+     <g class="gbot">
+      <ellipse cx="68" cy="150" rx="30" ry="5" fill="#0b1a44" opacity=".35"/>
+      <rect x="44" y="96" width="48" height="52" rx="18" fill="#EA8A3C"/>
+      <circle cx="68" cy="80" r="24" fill="#EA8A3C"/>
+      <rect x="52" y="72" width="34" height="16" rx="8" fill="#0B1F4D"/>
+      <circle class="geye" cx="62" cy="80" r="3.5" fill="#5ee6ff"/><circle class="geye" cx="76" cy="80" r="3.5" fill="#5ee6ff"/>
+      <ellipse cx="66" cy="58" rx="24" ry="9" fill="#7c3aed"/><circle cx="74" cy="50" r="5" fill="#7c3aed"/>
+      <circle cx="56" cy="57" r="2.5" fill="#f472b6"/><circle cx="80" cy="60" r="2" fill="#facc15"/>
+      <g class="garm"><rect x="86" y="104" width="34" height="9" rx="4.5" fill="#EA8A3C"/><line x1="118" y1="108" x2="138" y2="92" stroke="#8b5a2b" stroke-width="4" stroke-linecap="round"/><circle cx="139" cy="91" r="4" fill="#38bdf8"/></g>
+      <ellipse cx="44" cy="116" rx="12" ry="8" fill="#F4F6FB" stroke="#D4AF5A" stroke-width="2"/><circle cx="40" cy="114" r="2.4" fill="#ef4444"/><circle cx="46" cy="112" r="2.4" fill="#22c55e"/><circle cx="48" cy="118" r="2.4" fill="#38bdf8"/>
+     </g>
+    </svg>
+    <div class="gtx"><b>MCI.Canvas sedang <span id="gAct">menggambar</span>…</b><div class="mu" id="gSec">0 detik · biasanya 5–20 detik</div>
+     <button class="bt o" id="gWatch" style="margin-top:10px">Lihat Canvas di kantor 3D</button></div>
+   </div>
    <div id="gr" class="gout"></div>
   </div>
   <div class="cd"><div class="bar" style="justify-content:space-between;margin:0"><b>Galeri</b><span class="mu" style="font-size:12px">Gambar terbaru disimpan permanen</span></div><div class="gal" id="gg"></div></div>
@@ -375,7 +407,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 
  <section id="p-tim" class="pg" hidden>
   <h1>Tim & Token</h1>
-  <p class="mu">Maksimal 10 bot di 4 lantai. Bot "cepat" memakai model Lite yang lebih murah.</p>
+  <p class="mu">11 bot di 4 lantai: 10 agen AI (Gemini) + MCI.Canvas si pelukis (Cloudflare). Bot "cepat" memakai model Lite yang lebih murah.</p>
   <div class="cd" id="tg"></div>
   <div class="cd" id="usage"></div>
   <div id="tl"></div>
@@ -522,7 +554,7 @@ const MOCK = (() => {
     {nama:"laporan-mingguan",bot:"scribe",deskripsi:"Laporan mingguan format resmi MCI",pemicu:"laporan mingguan",isi:"Judul, ringkasan, pencapaian, kendala, rencana."},
     {nama:"cek-wiring",bot:"aegis",deskripsi:"Checklist keselamatan rangkaian",pemicu:"cek wiring, cek rangkaian",isi:"Tegangan, polaritas, ground, arus pin, korsleting."},
     {nama:"pinout-esp32",bot:"pulse",deskripsi:"Pemetaan pin ESP32 DevKit",pemicu:"pinout esp32",isi:"Tabel pin, hindari GPIO 6-11."}];
-  let TKM = {judul: "Tentang MCI", semboyan: "Rakit, uji, wujudkan.", deskripsi: "(DEMO) MCI adalah komunitas pembuat proyek elektronika dan AI.", sejarah: [{tahun: "2024", judul: "MCI berdiri", isi: "Dimulai dari proyek radar Arduino."}, {tahun: "2026", judul: "MCI HQ online", isi: "10 bot AI bekerja di kantor virtual."}], anggota: [{nama: "Alvaro", peran: "Founder", bio: "Hardware & AI."}]};
+  let TKM = {judul: "Tentang MCI", semboyan: "Rakit, uji, wujudkan.", deskripsi: "(DEMO) MCI adalah komunitas pembuat proyek elektronika dan AI.", sejarah: [{tahun: "2024", judul: "MCI berdiri", isi: "Dimulai dari proyek radar Arduino."}, {tahun: "2026", judul: "MCI HQ online", isi: "11 bot AI bekerja di kantor virtual."}], anggota: [{nama: "Alvaro", peran: "Founder", bio: "Hardware & AI."}]};
   let gid = 3; const GAL = [{id: 2, prompt: "robot oranye minum kopi di kantor biru emas"}, {id: 1, prompt: "kapal monitoring otonom di laut saat senja"}];
   const LPX = {id: 1, minggu: "2026-W43", dari: "2026-10-16", sampai: "2026-10-23", dibuat: "2026-10-23T17:00:12+07:00", sumber: "otomatis",
     isi: "📋 LAPORAN MINGGUAN MCI HQ\nPeriode 2026-10-16 s/d 2026-10-23 (2026-W43)\n\n📝 RINGKASAN\n(DEMO) Minggu ini tim fokus di radar dan kapal monitoring: 42 tugas selesai, 1 sidang dewan soal baterai.\n\n🤖 KEGIATAN BOT\nTotal 42 tugas · 1 gagal\n• MCI.DevMatrix: 14\n• MCI.Pulse: 9\n• MCI.Ledger: 6\n\n💰 REKAP KAS MINGGU INI\nMasuk Rp 3.100.000 · Keluar Rp 125.000 · Selisih Rp 2.975.000\nSaldo total kas sekarang: Rp 2.975.000 (4 transaksi minggu ini)\n• Jasa: +Rp 2.500.000\n• Komponen: -Rp 85.000\n💡 Pemasukan jasa radar dominan; sisihkan 20% untuk stok komponen.\n\n🚀 IDE PENGEMBANGAN BARU\n1. Dashboard radar live di web [Sedang]\n   Kenapa: hasil radar bisa dipantau dari HP\n   Mulai dari: kirim sudut + jarak ke /api/iot tiap detik\n2. Sensor pH & kekeruhan air untuk kapal [Sedang]\n   Kenapa: kapal monitoring jadi bisa ukur kualitas air\n   Mulai dari: beli sensor pH analog + TDS"};
@@ -915,7 +947,8 @@ $("#gb").onclick = async () => {
   const t = $("#gp").value.trim();
   if (!t) { $("#gr").innerHTML = '<p class="er">Tulis dulu gambar yang mau dibuat.</p>'; return; }
   const b = $("#gb"); b.disabled = true;
-  $("#gr").innerHTML = `<p class="mu">Canvas sedang ${GFOTO ? "mengubah foto" : "menggambar"}… biasanya 5–20 detik.</p>`;
+  $("#gr").innerHTML = ""; $("#gAct").textContent = GFOTO ? "mengubah foto" : "menggambar"; $("#gLive").hidden = false;
+  const t0 = Date.now(), tick = setInterval(() => $("#gSec").textContent = Math.round((Date.now() - t0) / 1000) + " detik · biasanya 5–20 detik", 500);
   const fd = new FormData(); fd.append("prompt", t);
   if (GFOTO) { fd.append("foto", GFOTO.blob, "foto.jpg"); fd.append("kekuatan", $("#gk").value); fd.append("w", GFOTO.w); fd.append("h", GFOTO.h); }
   try {
@@ -924,8 +957,9 @@ $("#gb").onclick = async () => {
     $("#gr").innerHTML = `<img src="${src}" alt="${esc(r.prompt)}"><div class="bar" style="margin-top:10px"><a class="bt g" href="${src}${DEMO ? "" : "?unduh=1"}" download="mci-gambar-${r.id}" style="text-decoration:none;display:inline-flex;align-items:center">Unduh</a><span class="mu" style="font-size:12px">Prompt ke AI: ${esc(r.prompt_en)}</span></div>`;
     loadGambar();
   } catch (e) { $("#gr").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
-  b.disabled = false;
+  clearInterval(tick); $("#gLive").hidden = true; b.disabled = false;
 };
+$("#gWatch").onclick = () => { show("office"); setTimeout(() => OFFICE.follow("canvas"), 400); };
 
 /* Kas */
 async function loadKas(quiet) {
@@ -2049,7 +2083,7 @@ const OFFICE = (() => {
       case "think":
         // tugas sudah selesai di server saat bot masih jalan ke meja: jangan kerja selamanya
         if (!a.job) { a.ph = "done"; a.anim = "sit"; a.t = 1.2; break; }
-        a.ph = "work"; a.anim = "type"; a.t = Infinity; break;
+        a.ph = "work"; a.anim = a.key === "canvas" ? "paint" : "type"; a.t = Infinity; break;
       case "work": a.ph = "done"; a.anim = "sit"; a.t = 2.2; a.job = null; break;
       case "done": if (a.job) think(a); else { a.ph = "idle"; a.anim = "sit"; a.t = 3 + Math.random() * 5; } break;
       case "idle": startBreak(a); break;
@@ -2101,6 +2135,7 @@ const OFFICE = (() => {
     else if (k === "pong") { const s = Math.sin(t * 3.4 + (a.spot === "f0_ppB" ? PI : 0)); aR = -1.2 + s * .5; aRz = .3 + s * .4; aL = -.4; bob = Math.abs(s) * .03; }
     else if (k === "golf") { const s = Math.sin(t * 1.6); aL = aR = -.4 + s * .7; aLz = .4; aRz = -.4; lean = .2; }
     else if (k === "arcade") { aL = -1.3 + Math.sin(t * 14) * .12; aR = -1.3 + Math.cos(t * 11) * .15; bob = Math.abs(Math.sin(t * 5)) * .02; }
+    else if (k === "paint") { const s = Math.sin(t * 6 + ph); aR = -2.1 + s * .35; aRz = .25 + Math.cos(t * 6) * .2; aL = -.5; lean = .06; bob = Math.abs(s) * .012; }
     else if (k === "tinker") { aL = -1.2 + Math.sin(t * 3) * .1; aR = -1.4 + Math.sin(t * 7) * .2; lean = .15; }
     const f = Math.min(1, dt * 10), p = a.p;
     p.aL += (aL - p.aL) * f; p.aR += (aR - p.aR) * f; p.lL += (lL - p.lL) * f; p.lR += (lR - p.lR) * f; p.lean += (lean - p.lean) * f;
@@ -2111,7 +2146,7 @@ const OFFICE = (() => {
     a.blink -= dt; const closed = k === "doze" || (a.blink < .12 && a.blink > 0);
     if (a.blink <= 0) a.blink = 2.5 + Math.random() * 3.5;
     a.eyes.forEach(e => e.scale.y += ((closed ? .12 : 1) - e.scale.y) * Math.min(1, dt * 25));
-    const working = a.ph === "work" || a.ph === "think" || (a.ph === "brk" && k === "type");
+    const working = a.ph === "work" || a.ph === "think" || (a.ph === "brk" && k === "type") || k === "paint";
     a.scr.forEach(m => { m.color.lerp(working && a.where === "desk" ? WHITE : DIM, Math.min(1, dt * 4)); if (working) m.map.offset.y += dt * .12; });
     a.zzz.visible = k === "doze";
     if (a.zzz.visible) a.zzz.position.set(g.position.x + .3, a.baseY + 2.0 + Math.sin(t * 2) * .08, g.position.z);
@@ -2132,6 +2167,7 @@ const OFFICE = (() => {
     meeting: {vis: {floor: 2}, r: 12, phi: .9, th: .55, t: [-8.4, 9.1, -3.6], w: "LT 3 · Ruang Meeting"},
     dewan: {vis: {floor: 3}, r: 14, phi: .88, th: .45, t: [-6.4, 13.5, -2.6], w: "LT 4 · Ruang Dewan"},
     ceo: {vis: {floor: 3}, r: 12, phi: .9, th: -.25, t: [4.8, 13.5, -3.4], w: "LT 4 · Ruang CEO"},
+    studio: {vis: {floor: 0}, r: 6.5, phi: .9, th: .45, t: [8.0, .9, 2.7], w: "LT 1 · Studio Canvas"},
     galeri: {vis: {floor: 0}, r: 19, phi: .9, th: .32, t: [16.4, .6, -.2], w: "LT 1 · Galeri Karya"},
     labiot: {vis: {floor: 1}, r: 19, phi: .88, th: .12, t: [16.6, 5.2, -1.0], w: "LT 2 · Lab Komputer & IoT"},
     perpus: {vis: {floor: 2}, r: 19, phi: .9, th: .32, t: [16.4, 9.2, -.2], w: "LT 3 · Perpustakaan"},
@@ -2296,6 +2332,7 @@ const OFFICE = (() => {
     },
     states() { const o = {}; AG.forEach(a => o[a.key] = status(a)); return o; },
     iot(list) { iotFeed(list); },
+    follow(k) { if (!ready) return; const a = AG.find(x => x.key === k); if (a) setFollow(a); },
     galeri(ids) { if (ready) galeriSet(ids); },
   };
 })();

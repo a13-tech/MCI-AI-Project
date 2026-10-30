@@ -1,4 +1,4 @@
-"""MCI HQ: 10 agen AI (Gemini) di 4 lantai, Boss pembagi tugas, Sidang Dewan, Skills,
+"""MCI HQ: 11 bot di 4 lantai (10 agen AI Gemini + MCI.Canvas pelukis Cloudflare), Boss pembagi tugas, Sidang Dewan, Skills,
 mode Caveman, MCP, keuangan AI, dan web kantor virtual 3D.
 
 Prinsip hemat token (Gemini Tier 1):
@@ -2288,7 +2288,7 @@ async def run_bots():
             log.info("[%s] online di Telegram (Lantai %s)", cfg["nama"], cfg["lantai"])
         except Exception:
             log.exception("[%s] gagal start", cfg["nama"])
-    log.info("%d bot Telegram online dari %d agen. Model utama %s, model lite %s, RPM %d", on, len(AGENTS), MODEL, MODEL_LITE, RPM)
+    log.info("%d bot Telegram online dari %d agen AI (+ MCI.Canvas = 11 bot). Model utama %s, model lite %s, RPM %d", on, len(AGENTS), MODEL, MODEL_LITE, RPM)
     tok = os.getenv("TOKEN_GAMBAR")
     if tok:
         try:
