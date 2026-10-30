@@ -57,7 +57,7 @@ h2{margin:22px 0 10px;font-size:17px}
 .seg{display:inline-flex;background:rgba(255,255,255,.1);border-radius:12px;padding:4px;gap:4px;margin-top:12px}
 .seg button{border:0;background:transparent;color:#DCE6FB;border-radius:9px;padding:8px 14px;font-weight:700;cursor:pointer;min-height:38px}
 .seg button.on{background:var(--gold);color:var(--navy)}
-textarea,input[type=text],select{width:100%;border-radius:12px;border:1px solid #BFD0F2;padding:11px 12px;color:var(--ink);background:#fff}
+textarea,input[type=text],input[type=number],input[type=search],input[type=file],select{width:100%;border-radius:12px;border:1px solid #BFD0F2;padding:11px 12px;color:var(--ink);background:#fff}
 textarea{resize:vertical}
 .boss textarea{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.3);color:#fff;margin:10px 0}
 .boss textarea::placeholder{color:#AFC2EA}
@@ -140,6 +140,13 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 .gup input[type=range]{width:min(260px,60vw);accent-color:var(--gold)}
 .gout{margin-top:6px}
 .gout img{display:block;width:100%;max-width:560px;border-radius:14px;border:1px solid var(--line);background:#EAF1FF}
+.sk{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-top:12px}
+.sk .it{background:#F3F7FF;border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.sk .ph{aspect-ratio:4/3;background:linear-gradient(135deg,#d9b48a,#b98a5c);display:grid;place-items:center;position:relative}
+.sk .ph img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+.sk .ph span{font-size:42px}.sk .low{position:absolute;top:8px;left:8px;background:#ef4444;color:#fff;font-size:11px;font-weight:800;padding:3px 8px;border-radius:999px}
+.sk .bd{padding:10px 12px 12px;display:grid;gap:4px}.sk .bd b{font-size:14px}.sk .q{font-size:22px;font-weight:800;color:var(--navy,#0A2A6B)}
+.sk .bd .bar{margin:6px 0 0;gap:6px}.sk .bd .bar button{padding:5px 10px;min-height:34px;font-size:12px}
 .gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:12px}
 .gal figure{margin:0;background:#F3F7FF;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
 .gal img{width:100%;aspect-ratio:1;object-fit:cover;cursor:zoom-in;display:block;background:#EAF1FF}
@@ -212,12 +219,13 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
  <button class="nv" data-p="laporan">Laporan</button>
  <button class="nv" data-p="skills">Skills</button>
  <button class="nv" data-p="tim">Tim & Token</button>
+ <button class="nv" data-p="stok">Stok Barang</button>
  <button class="nv" data-p="tentang">Tentang Kami</button>
  <div class="cv"><b>Hemat token</b><br>Router lokal, skill, model Lite, cache, dan mode Caveman.</div>
  <div class="who"><span id="whoRole">Memuat…</span><a class="lo" id="logout" href="/logout">Keluar</a></div>
 </aside>
-<div class="adm" id="adm" hidden><form id="admF"><b>MODE ADMIN</b><p>Masukkan token admin untuk membuka semua fitur.</p>
- <input type="password" id="admT" autocomplete="current-password" aria-label="Token admin" placeholder="Token admin">
+<div class="adm" id="adm" hidden><form id="admF"><b>MASUK</b><p>Masukkan token admin atau token divisi (Bendahara, Designer, Anggota).</p>
+ <input type="password" id="admT" autocomplete="current-password" aria-label="Token akses" placeholder="Token akses">
  <div class="er" id="admE" role="alert"></div><div class="bar"><button type="button" class="bt o" id="admX">Batal</button><button class="bt g">Masuk</button></div></form></div>
 <div class="tst" id="tst" hidden></div>
 <main>
@@ -234,7 +242,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
    <div class="sv">Simpan ke Memori:
     <div class="seg" role="group" aria-label="Simpan riwayat"><button data-sv="permanen">Permanen</button><button data-sv="72" class="on">72 jam</button><button data-sv="tidak">Jangan simpan</button></div>
    </div>
-   <button class="bt g" id="bs">Kirim</button>
+   <button class="bt g" id="bs">Kirim</button> <span id="bq" class="mu" style="color:#C9D7F5;font-size:12.5px;margin-left:8px" hidden></span>
    <div id="br" style="margin-top:14px"></div>
   </div>
   <div class="gr">
@@ -252,7 +260,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
   <div id="views">
    <div class="grp"><button class="vb on" data-view="gedung">Gedung</button></div>
    <div class="grp"><span class="lbl">LANTAI</span><button class="vb" data-view="f0">LT 1</button><button class="vb" data-view="f1">LT 2</button><button class="vb" data-view="f2">LT 3</button><button class="vb" data-view="f3">LT 4</button></div>
-   <div class="grp"><span class="lbl">RUANGAN</span><button class="vb" data-view="dewan">Ruang Dewan</button><button class="vb" data-view="studio">Studio Canvas</button><button class="vb" data-view="kamar1">Kamar Bot LT1</button><button class="vb" data-view="kamar2">Kamar Bot LT2</button><button class="vb" data-view="kamar3">Kamar Bot LT3</button><button class="vb" data-view="gym">Kebugaran</button><button class="vb" data-view="ceo">Ruang CEO</button><button class="vb" data-view="meeting">Meeting</button><button class="vb" data-view="labiot">Lab IoT</button><button class="vb" data-view="lab">Lab Teknik</button><button class="vb" data-view="perpus">Perpustakaan</button><button class="vb" data-view="observ">Observatorium</button><button class="vb" data-view="galeri">Galeri</button><button class="vb" data-view="lounge">Lounge</button><button class="vb" data-view="pantry">Pantry</button><button class="vb" data-view="game">Game</button></div>
+   <div class="grp"><span class="lbl">RUANGAN</span><button class="vb" data-view="dewan">Ruang Dewan</button><button class="vb" data-view="studio">Studio Canvas</button><button class="vb" data-view="kamar1">Kamar Bot LT1</button><button class="vb" data-view="kamar2">Kamar Bot LT2</button><button class="vb" data-view="kamar3">Kamar Bot LT3</button><button class="vb" data-view="storage">Storage Barang</button><button class="vb" data-view="gym">Kebugaran</button><button class="vb" data-view="ceo">Ruang CEO</button><button class="vb" data-view="meeting">Meeting</button><button class="vb" data-view="labiot">Lab IoT</button><button class="vb" data-view="lab">Lab Teknik</button><button class="vb" data-view="perpus">Perpustakaan</button><button class="vb" data-view="observ">Observatorium</button><button class="vb" data-view="galeri">Galeri</button><button class="vb" data-view="lounge">Lounge</button><button class="vb" data-view="pantry">Pantry</button><button class="vb" data-view="game">Game</button></div>
   </div>
   <div id="stage">
    <div id="chips"></div>
@@ -273,7 +281,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
    <div class="cd"><div class="k">Total keluar</div><div class="v" id="s2">-</div></div>
    <div class="cd"><div class="k">Saldo</div><div class="v" id="s3">-</div></div>
   </div>
-  <div class="cd"><b>Catat kas</b>
+  <div class="cd" id="kCatat"><b>Catat kas</b>
    <textarea id="kt" rows="3" aria-label="Catatan kas" placeholder="Terima transfer Rp 2.500.000 dari klien untuk jasa pasang radar, 24 Okt." style="margin-top:10px"></textarea>
    <div class="bar" style="margin:10px 0 0">
     <button class="bt g" id="ko">Olah dengan AI</button>
@@ -292,7 +300,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
   <h1>Studio Gambar</h1>
   <p class="mu">Tulis gambar yang kamu mau, atau upload foto untuk diubah. Gratis lewat Cloudflare Workers AI; Canvas yang menggambar di Studio lantai 1.</p>
   <div class="cd" id="gmOff" hidden><b>Studio Gambar belum aktif.</b><div class="mu" style="margin-top:6px">Isi <code>CF_ACCOUNT_ID</code> dan <code>CF_API_TOKEN</code> di Render → Environment, lalu tunggu deploy selesai.</div></div>
-  <div class="cd"><b>Buat gambar</b>
+  <div class="cd" id="gBuat"><b>Buat gambar</b>
    <textarea id="gp" rows="3" aria-label="Deskripsi gambar" placeholder="Contoh: robot oranye lucu minum kopi di kantor futuristik biru emas, gaya 3D, cahaya hangat" style="margin:10px 0 12px"></textarea>
    <div class="bar">
     <label class="bt o" for="gf" style="display:inline-flex;align-items:center">Upload foto</label>
@@ -392,6 +400,33 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
   <div id="lpList"></div>
  </section>
 
+ <section id="p-stok" class="pg" hidden>
+  <h1>Stok Barang</h1>
+  <p class="mu">Persediaan barang MCI, dijaga <b>MCI.Nexus</b> di ruang <b>Storage Barang</b> (LT 3, sayap barat). Foto barang ikut ditempel di kardusnya di kantor 3D. Semua orang bisa melihat; yang bisa mengubah hanya dev.</p>
+  <div class="gr">
+   <div class="cd"><div class="k">Jenis barang</div><div class="v" id="st1">-</div></div>
+   <div class="cd"><div class="k">Total unit</div><div class="v" id="st2">-</div></div>
+   <div class="cd"><div class="k">Perlu restock</div><div class="v" id="st3">-</div></div>
+  </div>
+  <div class="cd" id="stForm" hidden><b id="stTitle">Tambah barang</b>
+   <div class="fl" style="margin-top:12px">
+    <label>Nama barang<input type="text" id="stNama" maxlength="80" placeholder="contoh: ESP32 DevKit V4"></label>
+    <label>Kategori<input type="text" id="stKat" maxlength="40" placeholder="Mikrokontroler, Sensor, Kabel…" list="stKats"></label>
+    <label>Jumlah<input type="number" id="stJml" min="0" value="0"></label>
+    <label>Satuan<input type="text" id="stSat" maxlength="20" value="pcs"></label>
+    <label>Batas minimum (peringatan restock)<input type="number" id="stMin" min="0" value="0"></label>
+    <label>Foto (opsional)<input type="file" id="stFoto" accept="image/*"></label>
+    <label class="full">Catatan<input type="text" id="stCat" maxlength="300" placeholder="Lokasi rak, kondisi, link beli…"></label>
+   </div>
+   <datalist id="stKats"></datalist>
+   <div class="bar" style="margin:12px 0 0"><button class="bt g" id="stSave">Simpan barang</button><button class="bt o" id="stReset">Kosongkan</button><label class="mu" id="stHfW" hidden style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="stHf">Hapus foto lama</label><span id="stMsg" class="mu"></span></div>
+  </div>
+  <div class="cd">
+   <div class="bar" style="justify-content:space-between;margin:0"><b>Daftar stok</b><div class="bar" style="margin:0"><input type="search" id="stQ" placeholder="Cari barang…" style="width:auto;min-width:180px"><button class="bt o" id="stView">Lihat ruang Storage 3D</button></div></div>
+   <div class="sk" id="stList"></div>
+  </div>
+ </section>
+
  <section id="p-tentang" class="pg" hidden>
   <div class="bar" style="justify-content:space-between;margin:0 0 4px"><h1 style="margin:0">Tentang Kami</h1><button class="bt o" id="te" hidden>Edit halaman</button></div>
   <p class="mu">Kenalan dengan anggota dan perjalanan MCI.</p>
@@ -402,7 +437,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
  <section id="p-skills" class="pg" hidden>
   <h1>Skills</h1>
   <p class="mu">Skill = instruksi siap pakai untuk satu bot. Dipicu kata kunci, jadi Boss tidak perlu dipanggil. Isi lengkapnya hanya dikirim ke AI saat skill dipakai.</p>
-  <div class="cd">
+  <div class="cd" id="skForm">
    <b id="skTitle">Tambah skill</b>
    <div class="fl" style="margin-top:12px">
     <label>Nama (huruf kecil, pakai minus)<input type="text" id="skNama" placeholder="contoh: laporan-proyek"></label>
@@ -420,6 +455,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
   <h1>Tim & Token</h1>
   <p class="mu">11 bot di 4 lantai: 10 agen AI (Gemini) + MCI.Canvas si pelukis (Cloudflare). Bot "cepat" memakai model Lite yang lebih murah.</p>
   <div class="cd" id="tg"></div>
+  <div class="cd" id="tgu" hidden></div>
   <div class="cd" id="usage"></div>
   <div id="tl"></div>
  </section>
@@ -642,6 +678,16 @@ async function api(u, o = {}) {
 
 /* ================= HALAMAN ================= */
 let IOTD = [];
+const ADM = () => ME.role === "admin";
+const can = p => { if (ME.role === "admin") return true; const z = ME.izin || []; return z.includes("*") || z.includes(p); };
+const PAGE_PERM = {cmd: "boss", kas: "kas", gambar: "gambar_lihat", memori: "memori", iot: "iot", laporan: "laporan", skills: "skills", tim: "tim"};
+function kuotaTxt(j) { return j ? `${j.pakai} dari ${j.batas} hari ini` : ""; }
+async function refreshMe() { try { const m = await api("/api/me"); ME = Object.assign(ME, m); renderKuota(); } catch (e) {} }
+function renderKuota() {
+  const k = ME.kuota || {};
+  $("#bq").textContent = k.boss ? `Jatah Boss divisi ${ME.nama_peran}: ${kuotaTxt(k.boss)} (reset 00.00 WIB)` : "";
+  $("#bq").hidden = !k.boss;
+}
 let ME = {}, DATA = [], LOG = [], KAS = null, PV = [], USE = null, MODE = "boss", SKL = {skills: [], bots: []};
 function show(p) {
   $$(".pg").forEach(e => e.hidden = e.id !== "p-" + p);
@@ -655,6 +701,7 @@ function show(p) {
   if (p === "memori") loadMemori();
   if (p === "tentang") loadTentang();
   if (p === "laporan") loadLaporan();
+  if (p === "stok") loadStok();
   clearInterval(iotTimer); if (p === "iot") { loadIot(true); iotTimer = setInterval(() => { if (!document.hidden) loadIot(); }, 3000); }
 }
 $$(".nv").forEach(b => b.onclick = () => show(b.dataset.p));
@@ -685,13 +732,29 @@ function renderTim() {
       <div class="sw mu">Database: ${ME.db_permanen?"permanen":"SEMENTARA, isi DATABASE_URL"}</div>`;
       $("#cvm").onchange = e => api("/api/settings", {json: {caveman: e.target.checked}});
       $("#mcm").onchange = e => api("/api/settings", {json: {mcp: e.target.checked}});
+      loadTg();
     }
+  } else if (can("tim")) {
+    t.innerHTML = `<b>Pengaturan</b> <span class="ch n">lihat saja</span><div class="sw mu">Mode Caveman: <b>${ME.caveman ? "ON" : "OFF"}</b> · MCP: <b>${ME.mcp ? "ON" : "OFF"}</b> · Database: <b>${ME.db_permanen ? "permanen" : "sementara"}</b></div>`;
   } else t.style.display = "none";
   const by = {}; DATA.forEach(d => (by[d.lantai] = by[d.lantai] || []).push(d));
   $("#tl").innerHTML = Object.keys(LANTAI).map(f => `<h2>Lantai ${f} · ${esc(LANTAI[f])}</h2><div class="tm">${(by[f] || []).map(d => `<div class="cd" style="margin:0"><b>${esc(d.name)}</b>${d.boss?' <span class="ch y">Boss</span>':""}<div class="mu" style="font-size:12px">${esc(d.divisi)}</div><div class="mu" style="margin:6px 0 10px">${esc(d.peran)}</div><span class="ch ${String(d.model).includes("lite")?"g":""}">${esc(d.model)}</span> <span class="ch ${d.gemini?"":"r"}">Gemini ${d.gemini?"siap":"belum"}</span> <span class="ch ${d.telegram?"":"n"}">Telegram ${d.telegram?"online":"tidak"}</span>${d.tokens!=null?`<div class="mu" style="margin-top:8px;font-size:12px">${d.calls} panggilan · ${num(d.tokens)} token</div>`:""}</div>`).join("")}</div>`).join("");
 }
+async function loadTg() {
+  const el = $("#tgu"); if (!ADM() || DEMO) return; el.hidden = false;
+  try {
+    const d = await api("/api/tg");
+    const peran = {bendahara: "Bendahara", designer: "Designer", anggota: "Anggota"};
+    const row = (id, x, wait) => `<tr><td>${esc(x.nama)}${x.user ? ` <span class="mu">@${esc(x.user)}</span>` : ""}<div class="mu" style="font-size:12px">ID ${esc(id)} · ${esc(wait ? x.waktu : "sejak " + x.sejak)}</div></td><td>${wait ? '<span class="ch y">Menunggu</span>' : `<span class="ch">${esc(peran[x.peran] || x.peran)}</span>`}</td>
+      <td class="rt">${wait ? Object.keys(peran).map(p => `<button class="bt o" data-tgid="${esc(id)}" data-tgp="${p}" style="padding:5px 10px;min-height:34px">${peran[p]}</button>`).join(" ") + ` <button class="bt o" data-tgid="${esc(id)}" data-tgp="tolak" style="padding:5px 10px;min-height:34px">Tolak</button>` : `<button class="bt o" data-tgid="${esc(id)}" data-tgp="cabut" style="padding:5px 10px;min-height:34px">Cabut</button>`}</td></tr>`;
+    const rows = Object.entries(d.menunggu).map(([i, x]) => row(i, x, true)).concat(Object.entries(d.users).map(([i, x]) => row(i, x, false))).join("");
+    el.innerHTML = `<b>Izin Telegram (!izin)</b><div class="mu" style="margin:4px 0 10px;font-size:12.5px">Orang baru kirim <code>!izin</code> ke bot mana saja → notif ke admin Telegram${d.email ? " + email" : " (email belum aktif: isi MAIL_WEBHOOK)"}. Admin (${d.admin} ID) diatur lewat ALLOWED_USER_IDS.</div>
+      <div class="tb"><table><thead><tr><th>Nama</th><th>Divisi</th><th class="rt">Aksi</th></tr></thead><tbody>${rows || '<tr><td colspan="3" class="mu">Belum ada.</td></tr>'}</tbody></table></div>`;
+    $$("[data-tgid]").forEach(b => b.onclick = async () => { if (["cabut", "tolak"].includes(b.dataset.tgp) && !confirm("Yakin?")) return; await api("/api/tg", {json: {id: b.dataset.tgid, peran: b.dataset.tgp}}); loadTg(); });
+  } catch (e) { el.innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
+}
 async function loadUsage() {
-  if (ME.role !== "admin") return;
+  if (!can("tim")) return;
   try {
     USE = await api("/api/usage"); renderCmd();
     if ($("#p-tim").hidden) return;
@@ -702,7 +765,7 @@ async function loadUsage() {
 async function poll() {
   try {
     const d = await api("/api/office");
-    DATA = d.agents; LOG = d.log || []; if (d.lantai) LANTAI = d.lantai; IOTD = d.iot || []; OFFICE.iot(IOTD); if (d.galeri) OFFICE.galeri(d.galeri);
+    DATA = d.agents; LOG = d.log || []; if (d.lantai) LANTAI = d.lantai; IOTD = d.iot || []; OFFICE.iot(IOTD); if (d.galeri) OFFICE.galeri(d.galeri); if (d.stok) OFFICE.stok(d.stok);
     renderCmd(); renderTim();
     if (!$("#p-office").hidden) OFFICE.ensure(DATA);
     OFFICE.sync(DATA);
@@ -792,7 +855,7 @@ $("#lpBuat").onclick = async () => {
   let n = 0, last = 0, tt, opened = 0;
   const toast = m => { const e = $("#tst"); e.textContent = m; e.hidden = false; clearTimeout(tt); tt = setTimeout(() => e.hidden = true, 1200); };
   const tap = () => {
-    if (ME.role === "admin") return;
+    if (ADM()) return;
     const now = Date.now(); n = now - last < 1500 ? n + 1 : 1; last = now;
     if (n >= 4 && n < 7) toast(`${7 - n} ketukan lagi`);
     if (n >= 7) { n = 0; opened = Date.now(); clearTimeout(tt); $("#tst").hidden = true; $("#adm").hidden = false; $("#admE").textContent = ""; $("#admT").value = ""; setTimeout(() => $("#admT").focus(), 50); }
@@ -805,10 +868,10 @@ $("#lpBuat").onclick = async () => {
   $("#adm").onclick = e => { if (e.target.id === "adm" && Date.now() - opened > 600) $("#adm").hidden = true; }; /* abaikan "klik hantu" sisa ketukan ke-7 di HP */
   $("#admF").onsubmit = async e => {
     e.preventDefault(); const t = $("#admT").value.trim(); if (!t) return;
-    if (DEMO) { $("#admE").textContent = "(DEMO) Di server asli, token yang benar langsung membuka mode admin."; return; }
+    if (DEMO) { $("#admE").textContent = "(DEMO) Di server asli, token yang benar langsung membuka mode admin/divisi."; return; }
     try { const r = await fetch("/api/masuk", {method: "POST", headers: {"X-MCI": "1", "Content-Type": "application/json"}, body: JSON.stringify({token: t})});
       const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || "Gagal masuk");
-      $("#admE").textContent = ""; toast("Mode admin aktif"); setTimeout(() => location.replace("/"), 400);
+      $("#admE").textContent = ""; toast("Masuk sebagai " + ({admin: "Admin", bendahara: "Bendahara", designer: "Designer", anggota: "Anggota"}[d.role] || d.role)); setTimeout(() => location.replace("/"), 400);
     } catch (er) { $("#admE").textContent = er.message; }
   };
 })();
@@ -844,7 +907,7 @@ $("#bs").onclick = async () => {
     }
     if (!ok) throw new Error("Terlalu lama. Cek lagi nanti di daftar tugas.");
   } catch (e) { o.innerHTML = '<p style="color:#FFB4B4;font-weight:600">' + esc(e.message) + "</p>"; }
-  b.disabled = false; loadKas(true); loadUsage();
+  b.disabled = false; loadKas(true); loadUsage(); refreshMe();
 };
 
 /* Tombol "Hapus" untuk mengosongkan semua kolom prompt */
@@ -877,7 +940,7 @@ function sisa(exp) {
   return `<span class="ch n">Terhapus ${h >= 1 ? "dalam " + Math.round(h) + " jam" : "kurang dari 1 jam"}</span>`;
 }
 async function loadMemori() {
-  if (ME.role !== "admin") return;
+  if (!can("memori")) return;
   const q = encodeURIComponent($("#mq").value.trim()), so = $("#ms").value;
   $("#ml").innerHTML = '<p class="mu">Memuat…</p>';
   try {
@@ -887,7 +950,7 @@ async function loadMemori() {
       return `<div class="mem"><div class="hd"><span>${esc(String(m.waktu).replace("T", " ").slice(0, 16))}</span><span class="ch ${s[1]}">${esc(s[0])}</span>${m.jalur ? `<span class="ch n">${esc(m.jalur)}</span>` : ""}<span>${esc(m.bot || "")}</span>${sisa(m.kadaluarsa)}</div>
       <div class="q">${esc(m.perintah)}</div>
       <details><summary>Lihat jawaban</summary><div class="a">${esc(m.jawaban || "(kosong)")}</div></details>
-      <div class="bar">${m.kadaluarsa ? `<button class="bt o" data-mk="${m.id}">Jadikan permanen</button>` : ""}<button class="bt o" data-md="${m.id}" aria-label="Hapus memori ${m.id}">Hapus</button></div></div>`; }).join("")
+      ${ADM() ? `<div class="bar">${m.kadaluarsa ? `<button class="bt o" data-mk="${m.id}">Jadikan permanen</button>` : ""}<button class="bt o" data-md="${m.id}" aria-label="Hapus memori ${m.id}">Hapus</button></div>` : ""}</div>`; }).join("")
       || '<div class="cd mu">Belum ada memori. Pilih "Permanen" atau "72 jam" di Command Center sebelum kirim perintah.</div>';
     $$("[data-mk]").forEach(b => b.onclick = async () => { await api("/api/memori/" + b.dataset.mk, {method: "POST"}); loadMemori(); });
     $$("[data-md]").forEach(b => b.onclick = async () => { if (confirm("Hapus memori ini?")) { await api("/api/memori/" + b.dataset.md, {method: "DELETE"}); loadMemori(); } });
@@ -942,28 +1005,68 @@ $("#te").onclick = () => {
   };
 };
 
+/* Stok Barang (semua bisa lihat, edit khusus admin/dev) */
+let STK = {items: []};
+const stImg = x => DEMO ? MOCK_IMG(x.id) : `/api/stok/${x.id}/gambar?v=${x.v}`;
+function stReset() { $("#stTitle").textContent = "Tambah barang"; $("#stForm").dataset.id = ""; ["#stNama", "#stKat", "#stCat"].forEach(q => $(q).value = ""); $("#stJml").value = 0; $("#stMin").value = 0; $("#stSat").value = "pcs"; $("#stFoto").value = ""; $("#stHf").checked = false; $("#stHfW").hidden = true; $("#stMsg").textContent = ""; }
+function renderStok() {
+  const it = STK.items || [], q = $("#stQ").value.trim().toLowerCase(), low = x => x.minimum && x.jumlah <= x.minimum;
+  $("#st1").textContent = num(it.length); $("#st2").textContent = num(it.reduce((a, x) => a + x.jumlah, 0)); $("#st3").textContent = num(it.filter(low).length);
+  $("#stKats").innerHTML = [...new Set(it.map(x => x.kategori))].map(k => `<option value="${esc(k)}">`).join("");
+  const ed = ADM() && !DEMO;
+  $("#stList").innerHTML = it.filter(x => !q || (x.nama + " " + x.kategori + " " + x.catatan).toLowerCase().includes(q)).map(x => `<div class="it"><div class="ph">${x.foto ? `<img src="${stImg(x)}" alt="${esc(x.nama)}" loading="lazy" data-stz>` : "<span>📦</span>"}${low(x) ? '<i class="low">MENIPIS</i>' : ""}</div>
+    <div class="bd"><b>${esc(x.nama)}</b><span class="q">${num(x.jumlah)} <small class="mu" style="font-size:13px">${esc(x.satuan)}</small></span><span class="ch">${esc(x.kategori)}</span>${x.minimum ? `<span class="mu" style="font-size:12px">Minimum ${num(x.minimum)}</span>` : ""}${x.catatan ? `<span class="mu" style="font-size:12px">${esc(x.catatan)}</span>` : ""}
+    ${ed ? `<div class="bar"><button class="bt o" data-sm="${x.id}" aria-label="Kurangi ${esc(x.nama)}">−1</button><button class="bt o" data-sp="${x.id}" aria-label="Tambah ${esc(x.nama)}">+1</button><button class="bt o" data-se="${x.id}">Ubah</button><button class="bt o" data-sd="${x.id}">Hapus</button></div>` : ""}</div></div>`).join("")
+    || `<p class="mu">${it.length ? "Tidak ada yang cocok." : "Belum ada barang." + (ed ? " Tambah lewat formulir di atas." : "")}</p>`;
+  $$("[data-stz]").forEach(i => i.onclick = () => window.open(i.src, "_blank"));
+  const one = id => it.find(x => x.id == id);
+  $$("[data-sm],[data-sp]").forEach(b => b.onclick = async () => { const x = one(b.dataset.sm || b.dataset.sp); try { STK = Object.assign(STK, await api("/api/stok/" + x.id, {json: {jumlah: Math.max(0, x.jumlah + (b.dataset.sp ? 1 : -1))}})); renderStok(); } catch (e) { alert(e.message); } });
+  $$("[data-sd]").forEach(b => b.onclick = async () => { const x = one(b.dataset.sd); if (!confirm("Hapus " + x.nama + " dari stok?")) return; STK = Object.assign(STK, await api("/api/stok/" + x.id, {method: "DELETE"})); renderStok(); });
+  $$("[data-se]").forEach(b => b.onclick = () => { const x = one(b.dataset.se); $("#stForm").dataset.id = x.id; $("#stTitle").textContent = "Ubah " + x.nama; $("#stNama").value = x.nama; $("#stKat").value = x.kategori; $("#stJml").value = x.jumlah; $("#stSat").value = x.satuan; $("#stMin").value = x.minimum; $("#stCat").value = x.catatan; $("#stFoto").value = ""; $("#stHfW").hidden = !x.foto; $("#stHf").checked = false; scrollTo({top: 0, behavior: "smooth"}); });
+}
+async function loadStok() {
+  $("#stForm").hidden = !ADM();
+  try { STK = await api("/api/stok"); renderStok(); } catch (e) { $("#stList").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
+}
+$("#stQ").oninput = renderStok;
+$("#stReset").onclick = stReset;
+$("#stView").onclick = () => { show("office"); setTimeout(() => { const b = $('[data-view="storage"]'); if (b) b.click(); }, 300); };
+$("#stSave").onclick = async () => {
+  const fd = new FormData(), id = $("#stForm").dataset.id;
+  if (id) fd.append("id", id);
+  [["nama", "#stNama"], ["kategori", "#stKat"], ["jumlah", "#stJml"], ["satuan", "#stSat"], ["minimum", "#stMin"], ["catatan", "#stCat"]].forEach(([k, q]) => fd.append(k, $(q).value));
+  if ($("#stHf").checked) fd.append("hapus_foto", "1");
+  const f = $("#stFoto").files[0];
+  $("#stSave").disabled = true; $("#stMsg").textContent = "Menyimpan…";
+  try {
+    if (f) { const r = await resizeFoto(f, 512); fd.append("foto", r.blob, "foto.jpg"); }
+    STK = Object.assign(STK, await api("/api/stok", {method: "POST", body: fd})); renderStok(); stReset(); $("#stMsg").textContent = "Tersimpan.";
+  } catch (e) { $("#stMsg").textContent = e.message; }
+  $("#stSave").disabled = false;
+};
+
 /* Studio Gambar */
 let GFOTO = null;   // {blob, w, h} hasil resize di browser
 function gQuota(d) {
   if (!d) return;
   $("#gmOff").hidden = !!d.aktif;
-  $("#gq").textContent = d.batas ? `${d.hari_ini} dari ${d.batas} gambar hari ini` : `${d.hari_ini} gambar hari ini`;
+  $("#gq").textContent = d.kuota ? `Jatah divisi Designer: ${kuotaTxt(d.kuota)}` : d.batas ? `${d.hari_ini} dari ${d.batas} gambar hari ini` : `${d.hari_ini} gambar hari ini`;
 }
 function gImg(id) { return DEMO ? MOCK_IMG(id) : "/api/gambar/" + id; }
 async function loadGambar() {
-  if (ME.role !== "admin") return;
+  if (!can("gambar_lihat")) return;
   try {
     const d = await api("/api/gambar"); gQuota(d);
-    $("#gg").innerHTML = d.items.map(g => `<figure><img src="${gImg(g.id)}" alt="${esc(g.prompt)}" loading="lazy" data-zoom="${g.id}"><figcaption title="${esc(g.prompt)}">${esc(g.prompt)}</figcaption><div class="bar"><a class="bt o" href="${gImg(g.id)}${DEMO ? "" : "?unduh=1"}" download="mci-gambar-${g.id}">Unduh</a><button class="bt o" data-gd="${g.id}" aria-label="Hapus gambar ${g.id}">Hapus</button></div></figure>`).join("") || '<div class="mu">Belum ada gambar. Coba buat yang pertama!</div>';
+    $("#gg").innerHTML = d.items.map(g => `<figure><img src="${gImg(g.id)}" alt="${esc(g.prompt)}" loading="lazy" data-zoom="${g.id}"><figcaption title="${esc(g.prompt)}">${esc(g.prompt)}</figcaption><div class="bar"><a class="bt o" href="${gImg(g.id)}${DEMO ? "" : "?unduh=1"}" download="mci-gambar-${g.id}">Unduh</a>${ADM() ? `<button class="bt o" data-gd="${g.id}" aria-label="Hapus gambar ${g.id}">Hapus</button>` : ""}</div></figure>`).join("") || '<div class="mu">Belum ada gambar. Coba buat yang pertama!</div>';
     $$("[data-zoom]").forEach(i => i.onclick = () => window.open(i.src, "_blank"));
     $$("[data-gd]").forEach(b => b.onclick = async () => { if (confirm("Hapus gambar ini?")) { await api("/api/gambar/" + b.dataset.gd, {method: "DELETE"}); loadGambar(); } });
   } catch (e) { $("#gg").innerHTML = '<div class="er">' + esc(e.message) + "</div>"; }
 }
-function resizeFoto(file) {   // perkecil di browser (maks 768 px) supaya upload cepat dan img2img stabil
+function resizeFoto(file, MAX = 768) {   // perkecil di browser (maks 768 px) supaya upload cepat dan img2img stabil
   return new Promise((ok, no) => {
     const img = new Image(), url = URL.createObjectURL(file);
     img.onload = () => {
-      const s = Math.min(1, 768 / Math.max(img.width, img.height));
+      const s = Math.min(1, MAX / Math.max(img.width, img.height));
       const w = Math.max(256, Math.round(img.width * s / 64) * 64), h = Math.max(256, Math.round(img.height * s / 64) * 64);
       const c = document.createElement("canvas"); c.width = w; c.height = h;
       c.getContext("2d").drawImage(img, 0, 0, w, h); URL.revokeObjectURL(url);
@@ -989,7 +1092,7 @@ $("#gb").onclick = async () => {
   const fd = new FormData(); fd.append("prompt", t);
   if (GFOTO) { fd.append("foto", GFOTO.blob, "foto.jpg"); fd.append("kekuatan", $("#gk").value); fd.append("w", GFOTO.w); fd.append("h", GFOTO.h); }
   try {
-    const r = await api("/api/gambar", {method: "POST", body: fd}); gQuota(r);
+    const r = await api("/api/gambar", {method: "POST", body: fd}); gQuota(r); refreshMe();
     const src = gImg(r.id);
     $("#gr").innerHTML = `<img src="${src}" alt="${esc(r.prompt)}"><div class="bar" style="margin-top:10px"><a class="bt g" href="${src}${DEMO ? "" : "?unduh=1"}" download="mci-gambar-${r.id}" style="text-decoration:none;display:inline-flex;align-items:center">Unduh</a><span class="mu" style="font-size:12px">Prompt ke AI: ${esc(r.prompt_en)}</span></div>`;
     loadGambar();
@@ -1000,12 +1103,12 @@ $("#gWatch").onclick = () => { show("office"); setTimeout(() => OFFICE.follow("c
 
 /* Kas */
 async function loadKas(quiet) {
-  if (ME.role !== "admin") return;
+  if (!can("kas")) return;
   try {
     KAS = await api("/api/kas");
     $("#s1").textContent = rp(KAS.ringkas.masuk); $("#s2").textContent = rp(KAS.ringkas.keluar); $("#s3").textContent = rp(KAS.ringkas.saldo);
     renderCmd();
-    $("#kb").innerHTML = KAS.rows.map(r => `<tr><td>${esc(r.tanggal)}</td><td>${esc(r.keterangan)}</td><td><span class="ch">${esc(r.kategori)}</span></td><td class="rt">${r.masuk?rp(r.masuk):"–"}</td><td class="rt">${r.keluar?rp(r.keluar):"–"}</td><td class="rt"><b>${rp(r.saldo)}</b></td><td><button class="bt o" style="padding:6px 12px;min-height:36px" data-d="${r.id}" aria-label="Hapus catatan ${r.id}">Hapus</button></td></tr>`).join("") || '<tr><td colspan="7" class="mu">Belum ada catatan.</td></tr>';
+    $("#kb").innerHTML = KAS.rows.map(r => `<tr><td>${esc(r.tanggal)}</td><td>${esc(r.keterangan)}</td><td><span class="ch">${esc(r.kategori)}</span></td><td class="rt">${r.masuk?rp(r.masuk):"–"}</td><td class="rt">${r.keluar?rp(r.keluar):"–"}</td><td class="rt"><b>${rp(r.saldo)}</b></td><td>${can("kas_edit") ? `<button class="bt o" style="padding:6px 12px;min-height:36px" data-d="${r.id}" aria-label="Hapus catatan ${r.id}">Hapus</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="7" class="mu">Belum ada catatan.</td></tr>';
     $$("[data-d]").forEach(b => b.onclick = async () => { if (confirm("Hapus catatan ini?")) { await api("/api/kas/" + b.dataset.d, {method: "DELETE"}); loadKas(); } });
   } catch (e) { if (!quiet) $("#kb").innerHTML = '<tr><td colspan="7" class="er">' + esc(e.message) + "</td></tr>"; }
 }
@@ -1030,7 +1133,7 @@ async function loadSkills() {
     SKL = await api("/api/skills");
     const sel = $("#skBot"); if (!sel.options.length) sel.innerHTML = SKL.bots.map(b => `<option value="${esc(b.key)}">${esc(b.nama)}</option>`).join("");
     const nm = k => (SKL.bots.find(b => b.key === k) || {nama: k}).nama;
-    $("#skList").innerHTML = SKL.skills.map(s => `<div class="cd" style="margin:0"><b>${esc(s.nama)}</b> <span class="ch">${esc(nm(s.bot))}</span><div class="mu" style="margin:6px 0">${esc(s.deskripsi)}</div><div style="font-size:12.5px"><b>Pemicu:</b> ${esc(s.pemicu || "-")}</div><div class="bar" style="margin:12px 0 0"><button class="bt o" data-ske="${esc(s.nama)}" style="min-height:38px;padding:7px 14px">Ubah</button><button class="bt o" data-skd="${esc(s.nama)}" style="min-height:38px;padding:7px 14px">Hapus</button></div></div>`).join("") || '<p class="mu">Belum ada skill.</p>';
+    $("#skList").innerHTML = SKL.skills.map(s => `<div class="cd" style="margin:0"><b>${esc(s.nama)}</b> <span class="ch">${esc(nm(s.bot))}</span><div class="mu" style="margin:6px 0">${esc(s.deskripsi)}</div><div style="font-size:12.5px"><b>Pemicu:</b> ${esc(s.pemicu || "-")}</div>${ADM() ? `<div class="bar" style="margin:12px 0 0"><button class="bt o" data-ske="${esc(s.nama)}" style="min-height:38px;padding:7px 14px">Ubah</button><button class="bt o" data-skd="${esc(s.nama)}" style="min-height:38px;padding:7px 14px">Hapus</button></div>` : ""}</div>`).join("") || '<p class="mu">Belum ada skill.</p>';
     $$("[data-ske]").forEach(b => b.onclick = () => { const s = SKL.skills.find(x => x.nama === b.dataset.ske); $("#skTitle").textContent = "Ubah skill " + s.nama; $("#skNama").value = s.nama; $("#skBot").value = s.bot; $("#skDesk").value = s.deskripsi; $("#skPem").value = s.pemicu || ""; $("#skIsi").value = s.isi; scrollTo({top: 0, behavior: "smooth"}); });
     $$("[data-skd]").forEach(b => b.onclick = async () => { if (confirm("Hapus skill " + b.dataset.skd + "?")) { await api("/api/skills/" + encodeURIComponent(b.dataset.skd), {method: "DELETE"}); loadSkills(); } });
   } catch (e) { $("#skList").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
@@ -2055,11 +2158,70 @@ const OFFICE = (() => {
       else { shelf(x, r.n * 6.6, r.n < 0 ? 0 : PI, 1.6); if (title.includes("GUDANG")) boxes(x - .3, r.n * 3.2, 3); } }
     return r;
   }
+  /* STORAGE BARANG (LT 3): rak besi + kardus. Kardus di rak = data Stok Barang asli; foto barang ditempel di sisi depan kardus */
+  const STOKG = {g: null, slots: [], last: ""};
+  let STOKD = null;
+  function storageRoom(f) {
+    const r = westRoom(f, 1, 2, "S", "STORAGE BARANG", "#f59e0b", {rug: "#3a2c16"});
+    const n = r.n, zr = n * 4.6, ry = n < 0 ? PI : 0, steel = {roughness: .45, metalness: .55};
+    // rak besi berdiri di tengah ruangan, sisi kardus menghadap kamera; jalur pintu (x = r.xd) dibiarkan kosong
+    [[-23.35, 3], [-19.15, 2]].forEach(([cx, cols]) => {
+      const W = cols * .95 + .15, g = grp(cx, 0, zr, ry); CAST = true;
+      [[-W / 2, -.3], [W / 2, -.3], [-W / 2, .3], [W / 2, .3]].forEach(p => add(PANEL(.07, 2.35, .07, .015), "#f59e0b", p[0], 1.175, p[1], g, steel));
+      CAST = false;
+      [.06, .82, 1.58].forEach(y => { add(PANEL(W, .05, .66, .02), "#64748b", 0, y, 0, g, steel); add(PANEL(W, .06, .03, .01), "#f59e0b", 0, y + .03, .33, g, steel); });
+      [.06, .82, 1.58].forEach(y => { for (let i = 0; i < cols; i++) {
+        const lx = (i - (cols - 1) / 2) * .95, sn = Math.sin(ry), cs = Math.cos(ry);
+        STOKG.slots.push({x: cx + lx * cs, y: y + .03, z: zr - lx * sn, ry}); } });
+    });
+    // palet + tumpukan kardus hias, troli, meja cek barang
+    const pal = grp(-19.2, 0, n * 2.4, .1); add(PANEL(1.3, .14, 1.0, .02), "#a16207", 0, .07, 0, pal, {roughness: .9});
+    [[-.32, .36, -.22], [.32, .36, -.22], [-.32, .36, .26], [0, .78, 0]].forEach((p, i) => add(PANEL(.6, .44, .46, .03), ["#c49a6c", "#b5835a", "#d4a373", "#c49a6c"][i], p[0], p[1], p[2], pal, {roughness: .85}));
+    const tr = grp(-24.6, 0, n * 6.3, .5); add(PANEL(.55, .04, .45, .01), "#334155", 0, .1, 0, tr, steel); add(PANEL(.05, 1.1, .05, .01), "#ef4444", 0, .6, -.22, tr, steel);
+    [-.2, .2].forEach(x => add(CY(.07, .07, .05, 14), "#111827", x, .07, .2, tr).rotation.z = PI / 2);
+    const dk = grp(-24.3, 0, n * 2.3, 0); add(SLAB(1.4, .6, .06, .05), "#e2e8f0", 0, .8, 0, dk); [[-.6, -.22], [.6, -.22], [-.6, .22], [.6, .22]].forEach(p => add(CY(.03, .03, .8, 8), "#94a3b8", p[0], .4, p[1], dk, steel));
+    add(PANEL(.32, .22, .02, .01), "#0c1426", -.2, .95, -.1, dk).rotation.x = -.4; add(PANEL(.25, .03, .18, .01), "#f8fafc", .3, .84, 0, dk);
+    label("STOK · MCI.NEXUS", r.xc, 3.3, n * 6.7, .4, "#f59e0b");
+    const fr = n < 0 ? 0 : PI;   // berdiri di belakang rak, menghadap rak
+    S(`f${f}_st0`, f, -23.35, n * 5.6, fr, r.inner); S(`f${f}_st1`, f, -19.15, n * 5.6, fr, r.inner); S(`f${f}_st2`, f, -21.6, n * 6.2, fr, r.inner);
+    STOKG.g = grp(0, 0, 0, 0); STOKG.g.userData.dyn = true;   // diisi stokSet(), tidak ikut di-bake
+    return r;
+  }
+  function kardusTex(x, img) {
+    return CT(256, 192, (g, w, h) => {
+      const q = g.createLinearGradient(0, 0, w, h); q.addColorStop(0, "#d9b48a"); q.addColorStop(1, "#b98a5c"); g.fillStyle = q; g.fillRect(0, 0, w, h);
+      g.fillStyle = "rgba(120,80,40,.18)"; for (let i = 0; i < 9; i++) g.fillRect(0, i * 22, w, 2);
+      g.fillStyle = "rgba(226,206,160,.85)"; g.fillRect(w / 2 - 22, 0, 44, 30);   // lakban
+      const low = x[4] && x[2] <= x[4];
+      if (img) { g.save(); g.translate(w / 2, 86); g.rotate(-.05); g.fillStyle = "#fff"; g.fillRect(-70, -48, 140, 100);
+        const ir = img.width / img.height, bw = 128, bh = 88; let sx = 0, sy = 0, sw = img.width, sh = img.height;
+        if (ir > bw / bh) { sw = img.height * bw / bh; sx = (img.width - sw) / 2; } else { sh = img.width * bh / bw; sy = (img.height - sh) / 2; }
+        g.drawImage(img, sx, sy, sw, sh, -64, -42, bw, bh); g.restore(); }
+      else { g.strokeStyle = "rgba(60,35,15,.55)"; g.lineWidth = 4; g.strokeRect(w / 2 - 40, 50, 80, 60); g.beginPath(); g.moveTo(w / 2, 50); g.lineTo(w / 2, 110); g.stroke(); }
+      g.fillStyle = "#2b1a0b"; g.textAlign = "center"; g.font = "800 22px system-ui,sans-serif";
+      let nm = String(x[1]); while (g.measureText(nm).width > w - 16 && nm.length > 3) nm = nm.slice(0, -2) + "…"; g.fillText(nm, w / 2, 160);
+      g.font = "800 20px system-ui,sans-serif"; g.fillStyle = low ? "#b91c1c" : "#0A2A6B"; g.fillText(`${x[2]} ${x[3]}`, w / 2, 184);
+      if (low) { g.save(); g.translate(46, 40); g.rotate(-.35); g.strokeStyle = "#dc2626"; g.lineWidth = 4; g.strokeRect(-40, -14, 80, 28); g.fillStyle = "#dc2626"; g.font = "800 15px system-ui"; g.fillText("RESTOCK", 0, 6); g.restore(); }
+    });
+  }
+  function stokSet(list) {
+    const key = JSON.stringify(list); if (!STOKG.g || key === STOKG.last) return; STOKG.last = key;
+    STOKG.g.children.slice().forEach(o => { STOKG.g.remove(o); o.traverse(m => { if (m.material && m.material.map) { m.material.map.dispose(); m.material.dispose(); m.geometry.dispose(); } }); });   // material warna dipakai bersama (cache), jangan di-dispose
+    list.slice(0, STOKG.slots.length).forEach((x, i) => {
+      const sl = STOKG.slots[i], bx = grp(sl.x, sl.y, sl.z, sl.ry + (i % 3 - 1) * .04, STOKG.g); bx.userData.dyn = true;
+      const hgt = .42 + (x[0] % 3) * .06;
+      add(PANEL(.78, hgt, .5, .025), ["#c49a6c", "#b5835a", "#d4a373"][x[0] % 3], 0, hgt / 2, 0, bx, {roughness: .85});
+      add(PANEL(.79, .02, .12, .005), "#e2cea0", 0, hgt + .005, 0, bx, {roughness: .6});
+      const face = plane(kardusTex(x, null), .7, .52 * Math.min(1, hgt / .5), 0, hgt / 2, .256, 0, bx);
+      if (x[5]) { const im = new Image(); im.onload = () => { const old = face.material.map; face.material.map = kardusTex(x, im); face.material.needsUpdate = true; old.dispose(); };
+        im.src = DEMO ? MOCK_IMG(x[0]) : `/api/stok/${x[0]}/gambar?v=${x[6]}`; }
+    });
+  }
   function westWing(f) {
     westHall(f);
     if (f === 0) { botRoom(f, 0, 1, "N", "herald", "HERALD", "#a3e635"); botRoom(f, 1, 1, "N", "sentinel", "SENTINEL", "#8b5cf6"); ruangTamu(f, 2, "N"); mushola(f, 0, "S"); canvasStudio(f); }
     if (f === 1) { botRoom(f, 0, 1, "N", "devmatrix", "DEVMATRIX", "#3b82f6"); botRoom(f, 1, 1, "N", "pulse", "PULSE", "#10b981"); botRoom(f, 2, 1, "N", "aegis", "AEGIS", "#ef4444"); rakRuang(f, 0, 1, "S", "RUANG SERVER", "#5ee6ff", true); rakRuang(f, 1, 2, "S", "GUDANG KOMPONEN", "#F1D58A", false); }
-    if (f === 2) { botRoom(f, 0, 1, "N", "nexus", "NEXUS", "#f59e0b"); botRoom(f, 1, 1, "N", "ledger", "LEDGER", "#14b8a6"); botRoom(f, 2, 1, "N", "scribe", "SCRIBE", "#ec4899"); botRoom(f, 0, 1, "S", "atlas", "ATLAS", "#0ea5e9"); rakRuang(f, 1, 2, "S", "RUANG ARSIP", "#ec4899", false); }
+    if (f === 2) { botRoom(f, 0, 1, "N", "nexus", "NEXUS", "#f59e0b"); botRoom(f, 1, 1, "N", "ledger", "LEDGER", "#14b8a6"); botRoom(f, 2, 1, "N", "scribe", "SCRIBE", "#ec4899"); botRoom(f, 0, 1, "S", "atlas", "ATLAS", "#0ea5e9"); storageRoom(f); }
     if (f === 3) gym(f);
     label(["KAMAR BOT · LT 1", "KAMAR BOT · LT 2", "KAMAR BOT · LT 3", "PUSAT KEBUGARAN"][f], -18.8, 3.7, 0, .6, "#5ee6ff");
     plant(-12.9, -6.5, .9); plant(-12.9, 6.5, .9);
@@ -2188,6 +2350,7 @@ const OFFICE = (() => {
     lab: {n: "Lab Komputer", spots: ["f1_pa0", "f1_pa1", "f1_pa2", "f1_pa3", "f1_pb0", "f1_pb1", "f1_pb2", "f1_pb3"], anim: "type"},
     perpus: {n: "Perpustakaan", spots: ["f2_rt0", "f2_rt1", "f2_ac0", "f2_ac1"], anim: "read", prop: "paper"},
     observ: {n: "Observatorium", spots: ["f3_tel", "f3_or", "f3_bb0", "f3_bb1", "f3_bb2"], anim: "stare"},
+    gudang: {n: "Storage Barang", spots: ["f2_st0", "f2_st1", "f2_st2"], anim: "read", prop: "paper"},
   };
   function toRoom(a, room) {
     const R = ROOMW[room], mine = a.spot && R.spots.includes(a.spot) ? a.spot : null;
@@ -2384,6 +2547,7 @@ const OFFICE = (() => {
     kamar1: {vis: {floor: 0}, r: 25, phi: .9, th: -.25, t: [-19.4, .6, 0], w: "LT 1 · Kamar Herald, Sentinel & Studio Canvas"},
     kamar2: {vis: {floor: 1}, r: 25, phi: .9, th: -.25, t: [-19.4, 5.0, 0], w: "LT 2 · Kamar DevMatrix, Pulse & Aegis"},
     kamar3: {vis: {floor: 2}, r: 25, phi: .9, th: -.25, t: [-19.4, 9.4, 0], w: "LT 3 · Kamar Nexus, Ledger, Scribe & Atlas"},
+    storage: {vis: {floor: 2}, r: 9, phi: .98, th: .1, t: [-21.6, 9.5, 4.4], w: "LT 3 · Storage Barang (stok asli)"},
     gym: {vis: {floor: 3}, r: 19, phi: .9, th: -.2, t: [-19.4, 13.8, 0], w: "LT 4 · Pusat Kebugaran"},
     galeri: {vis: {floor: 0}, r: 19, phi: .9, th: .32, t: [16.4, .6, -.2], w: "LT 1 · Galeri Karya"},
     labiot: {vis: {floor: 1}, r: 19, phi: .88, th: .12, t: [16.6, 5.2, -1.0], w: "LT 2 · Lab Komputer & IoT"},
@@ -2526,6 +2690,7 @@ const OFFICE = (() => {
     AG.forEach(a => { bakeLocal(a.body, new Set([a.aL, a.aR, a.lL, a.lR, a.props.paper, a.disk, ...a.eyes])); bakeLocal(a.chair, new Set()); a.g.userData.dyn = true; a.chair.userData.dyn = true; });
     FG.forEach(g => bakeLocal(g, new Set())); bakeLocal(ROOF, new Set()); bakeLocal(BASE, new Set());
     ready = true; clock = new THREE.Clock();
+    if (STOKD) stokSet(STOKD);
     cam.position.set(10, 20, 50); ctl.target.set(0, 9, 0);
     pipOn = false; $("#pipBtn").classList.remove("on"); $("#pipBtn").setAttribute("aria-pressed", "false");
     resize(); flyTo("gedung", true);
@@ -2552,6 +2717,7 @@ const OFFICE = (() => {
     iot(list) { iotFeed(list); },
     follow(k) { if (!ready) return; const a = AG.find(x => x.key === k); if (a) setFollow(a); },
     galeri(ids) { if (ready) galeriSet(ids); },
+    stok(list) { STOKD = list; if (ready) stokSet(list); },
   };
 })();
 
@@ -2559,19 +2725,26 @@ const OFFICE = (() => {
 (async () => {
   if (DEMO) { $("#demoBanner").hidden = false; $("#csv").removeAttribute("href"); $("#csv").onclick = e => { e.preventDefault(); alert("Ekspor CSV aktif di versi server."); }; }
   try { ME = await api("/api/me"); if (ME.lantai) LANTAI = ME.lantai; } catch (e) { return; }
-  if (ME.role !== "admin") $$(".nv").forEach(b => { if (!["office", "tentang"].includes(b.dataset.p)) b.style.display = "none"; });
-  $("#whoRole").innerHTML = (ME.role === "admin" ? "<span class=\"wl\">Masuk sebagai</span><span class=\"wh\">Masuk sebagai</span> <b>Admin</b>" : "<span class=\"wl\">Masuk sebagai</span><span class=\"wh\">⚡ Hemat token</span> <b>Viewer</b>");
-  if (ME.role !== "admin") $("#logout").style.display = "none";   // viewer tidak perlu tombol keluar
+  $$(".nv").forEach(b => { const p = PAGE_PERM[b.dataset.p]; if (p && !can(p)) b.style.display = "none"; });
+  const NP = ME.nama_peran || "Viewer";
+  $("#whoRole").innerHTML = ADM() ? `<span class="wl">Masuk sebagai</span><span class="wh">Masuk sebagai</span> <b>Admin</b>`
+    : `<span class="wl">Masuk sebagai</span><span class="wh">⚡ Hemat token</span> <b>${esc(NP)}</b>`;
+  if (ME.role === "viewer") $("#logout").style.display = "none";   // viewer tidak perlu tombol keluar
+  if (!ADM()) { const dw = $('[data-mode="dewan"]'); if (dw) dw.remove(); }   // Sidang Dewan khusus admin/dev
+  if (!can("kas_edit")) { $("#kCatat").hidden = true; }
+  if (!can("gambar_buat")) { $("#gBuat").hidden = true; }
+  if (!ADM()) { $("#skForm").hidden = true; ["#mt", "#mx"].forEach(q => { const e = $(q); if (e) (e.closest("label") || e).style.display = "none"; }); }
+  renderKuota();
   if (DEMO) $("#logout").onclick = e => { e.preventDefault(); alert("Tombol Keluar aktif di versi server."); };
   await poll();
-  if (ME.role === "admin") { loadKas(true); loadUsage(); }
-  show(DEMO || ME.role !== "admin" ? "office" : "cmd");
+  loadKas(true); loadUsage();
+  show(DEMO || !can("boss") ? "office" : "cmd");
   OFFICE.ensure(DATA); OFFICE.sync(DATA);
   // admin 1 detik, viewer 3 detik; berhenti saat tab tidak dilihat (hemat server & kuota bandwidth)
   setInterval(() => { if (!document.hidden) poll(); }, ME.role === "admin" ? 1000 : 3000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
   setInterval(() => { if (!$("#p-office").hidden) renderList(); }, 1000);
-  setInterval(() => { if (ME.role === "admin") loadUsage(); }, 15000);
+  setInterval(() => { if (can("tim")) loadUsage(); }, 15000);
 })();
 </script>
 </body>

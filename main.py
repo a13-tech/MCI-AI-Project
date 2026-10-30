@@ -19,8 +19,8 @@ from flask import Flask, jsonify, abort, request, send_from_directory, make_resp
 from pydantic import BaseModel
 from google import genai
 from google.genai import types
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
 try:
     import psycopg2
@@ -46,6 +46,24 @@ MAX_TASKS = max(1, min(4, int(os.getenv("BOSS_MAX_TASKS", "3"))))
 COUNCIL_MAX = max(2, min(6, int(os.getenv("COUNCIL_MAX", "4"))))
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 VIEW_TOKEN = os.getenv("VIEW_TOKEN", "")
+# Token divisi: tiap divisi satu token, kuota harian dihitung per divisi (web + Telegram digabung)
+ROLE_TOKENS = {"bendahara": os.getenv("BENDAHARA_TOKEN", "").strip(), "designer": os.getenv("DESIGNER_TOKEN", "").strip(),
+               "anggota": os.getenv("ANGGOTA_TOKEN", "").strip()}
+DIVISI = ("bendahara", "designer", "anggota")
+NAMA_PERAN = {"admin": "Admin", "bendahara": "Bendahara", "designer": "Designer", "anggota": "Anggota", "viewer": "Viewer"}
+# Hak akses: admin = semua. "kas" = lihat buku kas, "kas_edit" = catat/hapus, "gambar_buat" = Studio Gambar,
+# "gambar_lihat" = galeri, "tim" = halaman Tim & Token (lihat saja). Sidang Dewan, Lab IoT, Laporan, Tentang Kami (edit) = admin.
+PERM = {
+    "admin": {"*"},
+    "bendahara": {"boss", "kas", "kas_edit", "gambar_lihat", "memori", "skills", "tim"},
+    "designer": {"boss", "kas", "gambar_lihat", "gambar_buat", "memori", "skills", "tim"},
+    "anggota": {"boss", "kas", "gambar_lihat", "memori", "skills", "tim"},
+    "viewer": set(),
+}
+KUOTA = {"boss": max(0, int(os.getenv("KUOTA_BOSS", "3"))), "gambar": max(0, int(os.getenv("KUOTA_GAMBAR", "5")))}
+MAIL_WEBHOOK = os.getenv("MAIL_WEBHOOK", "").strip()       # URL Google Apps Script (Render gratis memblokir port SMTP)
+MAIL_SECRET = os.getenv("MAIL_SECRET", "").strip()
+MAIL_TO = os.getenv("MAIL_TO", "mci.corp.indonesia@gmail.com").strip()
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 PG = bool(DATABASE_URL and psycopg2)
 DB_PATH = os.getenv("DB_PATH", "mci.db")
@@ -170,6 +188,7 @@ def db_init():
         sql(c, f"CREATE TABLE IF NOT EXISTS iot (id {pk}, ts {big} NOT NULL, perangkat TEXT NOT NULL, data TEXT NOT NULL)")
         sql(c, f"CREATE TABLE IF NOT EXISTS gambar (id {pk}, prompt TEXT NOT NULL, prompt_en TEXT, sumber TEXT, mime TEXT NOT NULL, data TEXT NOT NULL, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS aktivitas (id {pk}, waktu TEXT NOT NULL, bot TEXT, tugas TEXT, status TEXT, jalur TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS stok (id {pk}, nama TEXT NOT NULL, jumlah {big} NOT NULL DEFAULT 0, satuan TEXT, kategori TEXT, minimum {big} NOT NULL DEFAULT 0, catatan TEXT, mime TEXT, gambar TEXT, diubah TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS laporan (id {pk}, minggu TEXT, dibuat TEXT, dari TEXT, sampai TEXT, sumber TEXT, isi TEXT, data TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS pemakaian (tanggal TEXT NOT NULL, model TEXT NOT NULL, masuk {big} NOT NULL DEFAULT 0, keluar {big} NOT NULL DEFAULT 0, pikir {big} NOT NULL DEFAULT 0, panggilan {big} NOT NULL DEFAULT 0, PRIMARY KEY (tanggal, model))")
         r = sql(c, "SELECT v FROM pengaturan WHERE k=?", ("s",)).fetchone()
@@ -1089,13 +1108,103 @@ def iot_rules_check(pr, d):
                 asyncio.run_coroutine_threadsafe(iot_alert(pr, r, d[r["metrik"]]), LOOP)
 
 
+# ---------- STOK BARANG (dipegang MCI.Nexus, ruang Storage Barang LT 3) ----------
+# Semua orang boleh melihat; tambah/ubah/hapus khusus admin (dev). Foto barang ditempel di kardus 3D.
+STOK = []   # cache tanpa data gambar
+
+
+def stok_load():
+    with db() as c:
+        rows = sql(c, "SELECT id,nama,jumlah,satuan,kategori,minimum,catatan,diubah, CASE WHEN gambar IS NULL OR gambar='' THEN 0 ELSE 1 END FROM stok ORDER BY LOWER(nama)").fetchall()
+    STOK[:] = [{"id": int(i), "nama": n, "jumlah": int(j or 0), "satuan": sa or "pcs", "kategori": k or "Umum", "minimum": int(mi or 0),
+                "catatan": ca or "", "diubah": d or "", "foto": bool(g), "v": abs(hash(d or "")) % 100000} for i, n, j, sa, k, mi, ca, d, g in rows]
+    return STOK
+
+
+def stok_save(d, foto=None, mime=None, hapus_foto=False):
+    nama = str(d.get("nama", "")).strip()[:80]
+    if not nama:
+        raise ValueError("Nama barang wajib diisi")
+    try:
+        jumlah, minimum = int(float(d.get("jumlah") or 0)), int(float(d.get("minimum") or 0))
+    except (TypeError, ValueError):
+        raise ValueError("Jumlah dan minimum harus angka")
+    if not (0 <= jumlah <= 10**9 and 0 <= minimum <= 10**9):
+        raise ValueError("Jumlah tidak masuk akal")
+    vals = (nama, jumlah, str(d.get("satuan") or "pcs").strip()[:20], str(d.get("kategori") or "Umum").strip()[:40], minimum,
+            str(d.get("catatan") or "").strip()[:300], _now())
+    i = str(d.get("id") or "")
+    with db() as c:
+        if i.isdigit():
+            sql(c, "UPDATE stok SET nama=?,jumlah=?,satuan=?,kategori=?,minimum=?,catatan=?,diubah=? WHERE id=?", (*vals, int(i)))
+            sid = int(i)
+        else:
+            if len(STOK) >= 300:
+                raise ValueError("Maksimal 300 jenis barang")
+            sql(c, "INSERT INTO stok (nama,jumlah,satuan,kategori,minimum,catatan,diubah) VALUES (?,?,?,?,?,?,?)", vals)
+            sid = int(sql(c, "SELECT MAX(id) FROM stok").fetchone()[0])
+        if foto:
+            sql(c, "UPDATE stok SET mime=?, gambar=? WHERE id=?", (mime or "image/jpeg", base64.b64encode(foto).decode(), sid))
+        elif hapus_foto:
+            sql(c, "UPDATE stok SET mime=NULL, gambar=NULL WHERE id=?", (sid,))
+    stok_load()
+    return sid
+
+
+def stok_jumlah(i, jumlah):
+    with db() as c:
+        n = sql(c, "UPDATE stok SET jumlah=?, diubah=? WHERE id=?", (max(0, int(jumlah)), _now(), i)).rowcount
+    stok_load()
+    return n
+
+
+def stok_del(i):
+    with db() as c:
+        n = sql(c, "DELETE FROM stok WHERE id=?", (i,)).rowcount
+    stok_load()
+    return n
+
+
+def stok_img(i):
+    with db() as c:
+        r = sql(c, "SELECT mime, gambar FROM stok WHERE id=?", (i,)).fetchone()
+    return (r[0], base64.b64decode(r[1])) if r and r[1] else None
+
+
+def stok_menipis():
+    return [x for x in STOK if x["minimum"] and x["jumlah"] <= x["minimum"]]
+
+
+def stok_teks(maks=40):
+    if not STOK:
+        return "Belum ada data stok."
+    low = {x["id"] for x in stok_menipis()}
+    out = [f"• {x['nama']}: {x['jumlah']} {x['satuan']}" + (f" ⚠️ menipis (min {x['minimum']})" if x["id"] in low else "")
+           + (f" [{x['kategori']}]" if x["kategori"] != "Umum" else "") for x in STOK[:maks]]
+    if len(STOK) > maks:
+        out.append(f"… dan {len(STOK) - maks} barang lain (lihat web → Stok Barang)")
+    return "\n".join(out)
+
+
+def gudang_ctx(text):
+    stok_load()
+    if not STOK:
+        return "", "📦 Storage Barang (stok masih kosong)"
+    low = stok_menipis()
+    return (f"[DATA STOK BARANG MCI dari Storage Barang, diperbarui {max(x['diubah'] for x in STOK)[:16].replace('T', ' ')}]\n{stok_teks(80)}\n"
+            f"Barang menipis: {', '.join(x['nama'] for x in low) or 'tidak ada'}.\n"
+            "Pakai data asli ini untuk menjawab (cek ketersediaan, hitung kebutuhan, saran belanja). Jangan mengarang barang yang tidak ada.\n\n",
+            f"📦 data Storage Barang ({len(STOK)} jenis)")
+
+
 # ---------- RUANG KERJA SAYAP TIMUR ----------
 # Prompt yang cocok membuat bot bekerja di ruangan khusus DAN mendapat data asli:
 #   lab    = Lab Komputer & IoT : data sensor ESP32 live (nilai terakhir + tren)
 #   perpus = Perpustakaan       : arsip Memori, Skills, dan sejarah MCI (Tentang Kami)
 #   observ = Observatorium      : cuaca, laut, matahari & fase bulan (Open-Meteo, gratis tanpa key)
-ROOMS = ("lab", "perpus", "observ")
-ROOM_NAMA = {"lab": "Lab Komputer", "perpus": "Perpustakaan", "observ": "Observatorium"}
+ROOMS = ("lab", "perpus", "observ", "gudang")
+ROOM_NAMA = {"lab": "Lab Komputer", "perpus": "Perpustakaan", "observ": "Observatorium", "gudang": "Storage Barang"}
+R_GUDANG = re.compile(r"\b(stok|stock|inventaris|inventori|inventory|gudang|storage|persediaan|sisa barang|barang|komponen tersedia|ada berapa|tersisa|restock|belanja komponen|kurang berapa)\b", re.I)
 R_IOT = re.compile(r"\b(sensor|iot|perangkat|device|jarak|suhu|temperatur|kelembap\w*|baterai|battery|tegangan|volt|rssi|sinyal|tangki|level air|ketinggian air|data (live|terakhir|terbaru)|alarm|pembacaan|bacaan|nilai terakhir|online|offline)\b", re.I)
 R_LAB = re.compile(r"\b(kode|coding|ngoding|program\w*|sketch|sketsa|script|skrip|debug|error|bug|compile|kompil\w*|upload|firmware|library|arduino|esp32|esp8266|nano|uno|raspberry|micropython|python|c\+\+|javascript|html|mqtt|wifi|bluetooth|lora|i2c|spi|uart|serial|gpio|pinout|pin|wiring|rangkaian|solder|pcb|servo|motor|relay|lcd|oled|printer 3d|3d print\w*|drone)\b", re.I)
 R_PERPUS = re.compile(r"\b(riset|research|rangkum\w*|ringkas\w*|resume|laporan|proposal|dokumen|referensi|jurnal|artikel|materi|belajar|pelajari|teori|definisi|apa itu|sejarah|histori|arsip|catatan|ingat|kemarin|sebelumnya|tadi|minggu lalu|bulan lalu|pernah|keputusan|putusan|hasil sidang|anggota|profil mci|tentang mci|semboyan)\b", re.I)
@@ -1114,9 +1223,11 @@ def room_for(text, bot=None):
     t = text or ""
     devs = [d for d in IOT_LAST if d in t.lower()]
     sk = {"lab": len(R_LAB.findall(t)) + 2 * (len(R_IOT.findall(t)) if IOT_LAST else 0) + 3 * len(devs),
-          "perpus": len(R_PERPUS.findall(t)), "observ": len(R_OBSERV.findall(t))}
+          "perpus": len(R_PERPUS.findall(t)), "observ": len(R_OBSERV.findall(t)), "gudang": 2 * len(R_GUDANG.findall(t)) + (bot == "nexus")}
     best = max(sk, key=sk.get)
     if not sk[best]:
+        return None
+    if not sum(v for k, v in sk.items() if k != "gudang") and sk["gudang"] == 1:   # Nexus tanpa kata stok tetap di mejanya
         return None
     if bot == "apex" and best != "observ":
         return None
@@ -1271,6 +1382,9 @@ async def room_prep(text, bot):
         elif room == "perpus":
             ctx, note = await asyncio.to_thread(perpus_ctx, text)
             act = "Buka arsip di Perpustakaan"
+        elif room == "gudang":
+            ctx, note = await asyncio.to_thread(gudang_ctx, text)
+            act = "Cek stok di Storage Barang"
         else:
             ctx, note = await observ_ctx(text)
             act = "Analisis di Observatorium"
@@ -1356,6 +1470,9 @@ def laporan_data(hari=7):
         except (ValueError, TypeError, KeyError):
             pass
     out["ide_lama"] = list(dict.fromkeys(lama))[:20]
+    stok_load()
+    out["stok"] = {"jenis": len(STOK), "unit": sum(x["jumlah"] for x in STOK), "menipis": [f"{x['nama']} ({x['jumlah']} {x['satuan']})" for x in stok_menipis()],
+                   "teks": stok_teks(60)}
     return out
 
 
@@ -1380,6 +1497,11 @@ def laporan_teks(d, n):
         T.append("Pengeluaran terbesar: " + "; ".join(f"{r['keterangan']} {rp(r['keluar'])}" for r in k["terbesar_keluar"]))
     if n.get("catatan_kas"):
         T += [f"💡 {n['catatan_kas']}"]
+    st = d.get("stok") or {}
+    if st:
+        T += ["", "📦 SISA STOK BARANG (dicek MCI.Nexus di Storage Barang)", f"{st['jenis']} jenis barang · total {st['unit']:,} unit".replace(",", "."), st["teks"]]
+        if st["menipis"]:
+            T.append("⚠️ Perlu restock: " + ", ".join(st["menipis"]))
     T += ["", "📊 PEMAKAIAN", f"Token AI {l['token']:,} ({l['panggilan_ai']} panggilan) · Gambar {l['gambar']} · Memori disimpan {l['memori']}".replace(",", ".")]
     if l["iot"]:
         T.append("Data IoT: " + ", ".join(f"{p} {c} kiriman" for p, c in l["iot"].items()))
@@ -1398,6 +1520,7 @@ async def laporan_buat(kirim=True, sumber="otomatis"):
                f"\nSidang dewan: {a['sidang']}\nAlarm IoT: {a['alarm']}\n"
                f"Kas minggu ini: masuk {k['masuk']}, keluar {k['keluar']}, selisih {k['saldo']}, saldo total {k['saldo_total']}, per kategori {k['kategori']}.\n"
                f"Transaksi: " + "; ".join(f"{r['tanggal']} {r['keterangan']} +{r['masuk']} -{r['keluar']}" for r in k["rows"]) +
+               f"\nStok barang: {d['stok']['jenis']} jenis, menipis: {d['stok']['menipis'] or 'tidak ada'}"
                f"\nLain: {d['lain']}\nIde minggu-minggu lalu (JANGAN diulang): {d['ide_lama'] or '-'}")
     try:
         tk = await asyncio.to_thread(tentang_get)
@@ -1507,15 +1630,66 @@ def page_bytes():
 
 _OFFICE_CACHE = {}
 FAILS = {}
+_KLOCK = threading.Lock()
+
+
+def can(perm, r):
+    p = PERM.get(r or "", set())
+    return "*" in p or perm in p
+
+
+def kuota_pakai(r, jenis, cek_saja=False):
+    """True kalau masih ada jatah hari ini (lalu dihitung). Admin tanpa batas. Jatah = per divisi per hari WIB."""
+    if r == "admin":
+        return True
+    with _KLOCK:
+        k = SET.setdefault("kuota", {})
+        if k.get("tgl") != today():
+            k.clear()
+            k["tgl"] = today()
+        n = k.get(f"{r}:{jenis}", 0)
+        if n >= KUOTA[jenis]:
+            return False
+        if not cek_saja:
+            k[f"{r}:{jenis}"] = n + 1
+    if not cek_saja:
+        try:
+            set_save()
+        except Exception:
+            log.exception("simpan kuota gagal")
+    return True
+
+
+def kuota_info(r):
+    if r == "admin" or r not in DIVISI:
+        return {}
+    k = SET.get("kuota", {})
+    tgl = k.get("tgl") == today()
+    out = {"boss": {"pakai": k.get(f"{r}:boss", 0) if tgl else 0, "batas": KUOTA["boss"]}}
+    if can("gambar_buat", r):
+        out["gambar"] = {"pakai": k.get(f"{r}:gambar", 0) if tgl else 0, "batas": KUOTA["gambar"]}
+    return out
+
+
+def kuota_teks(r, jenis):
+    return f"Jatah {'Boss bagi tugas' if jenis == 'boss' else 'Studio Gambar'} divisi {NAMA_PERAN[r]} hari ini sudah habis ({KUOTA[jenis]}/{KUOTA[jenis]}). Reset jam 00.00 WIB."
 
 
 def _eq(a, b):
     return bool(b) and secrets.compare_digest(a.encode(), b.encode())
 
 
+def role_of(t):
+    if _eq(t, ADMIN_TOKEN):
+        return "admin"
+    for r, tok in ROLE_TOKENS.items():
+        if _eq(t, tok):
+            return r
+    return "viewer" if _eq(t, VIEW_TOKEN) else None
+
+
 def role():
-    t = request.cookies.get("mci_auth", "")
-    return "admin" if _eq(t, ADMIN_TOKEN) else "viewer" if _eq(t, VIEW_TOKEN) else None
+    return role_of(request.cookies.get("mci_auth", ""))
 
 
 def _setcookie(resp, token):
@@ -1532,7 +1706,7 @@ def _try_login(token):
     FAILS[ip] = [t for t in FAILS.get(ip, []) if now - t < 600]
     if len(FAILS[ip]) >= 8:
         abort(429)
-    if _eq(token, ADMIN_TOKEN) or _eq(token, VIEW_TOKEN):
+    if role_of(token):
         return _setcookie(make_response(redirect("/")), token)
     FAILS[ip].append(now)
     return None
@@ -1560,6 +1734,15 @@ def need(r):
         abort(403)
 
 
+def need_perm(p):
+    cur = role()
+    if not cur:
+        abort(401)
+    if not can(p, cur):
+        abort(403)
+    return cur
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -1576,15 +1759,16 @@ def api_masuk():
     if len(FAILS[ip]) >= 8:
         return jsonify({"error": "Terlalu banyak percobaan. Coba lagi 10 menit lagi."}), 429
     tok = str((request.get_json(silent=True) or {}).get("token", "")).strip()
-    if ADMIN_TOKEN and _eq(tok, ADMIN_TOKEN):
-        return _setcookie(jsonify({"role": "admin"}), tok)
+    r = role_of(tok)
+    if r and r != "viewer":   # admin atau token divisi
+        return _setcookie(jsonify({"role": r}), tok)
     FAILS[ip].append(now)
-    return jsonify({"error": "Token admin salah."}), 401
+    return jsonify({"error": "Token salah."}), 401
 
 
 @app.route("/logout")
 def logout():
-    """Hapus cookie admin lalu kembali sebagai viewer (link biasa = mode lihat saja)."""
+    """Hapus cookie admin/divisi lalu kembali sebagai viewer (link biasa = mode lihat saja)."""
     resp = make_response(redirect("/" if VIEW_TOKEN else "/login"))
     resp.delete_cookie("mci_auth", samesite="Strict", secure=bool(os.getenv("RENDER")), httponly=True)
     return resp
@@ -1617,7 +1801,9 @@ def healthz():
 @app.route("/api/me")
 def api_me():
     need("viewer")
-    return jsonify({"role": role(), **SET, "mcp_siap": bool(MCP_SERVERS and ClientSession), "db_permanen": PG, "lantai": LANTAI,
+    r = role()
+    return jsonify({"role": r, "nama_peran": NAMA_PERAN.get(r, r), "izin": sorted(PERM.get(r, set())), "kuota": kuota_info(r),
+                    **{k: v for k, v in SET.items() if k not in ("kuota", "tg_users", "tg_izin")}, "mcp_siap": bool(MCP_SERVERS and ClientSession), "db_permanen": PG, "lantai": LANTAI,
                     "gambar": img_status()})
 
 
@@ -1636,7 +1822,8 @@ def api_office():
     ags.append({"key": "canvas", "name": CANVAS["nama"], "peran": CANVAS["peran"], "boss": False, "lantai": 1, "divisi": CANVAS["divisi"],
                 "status": o[0], "activity": o[1], "mode": o[2], "model": "cloudflare-flux", "gemini": bool(CF_TOKEN),
                 "telegram": bool(os.getenv("TOKEN_GAMBAR")), **({"calls": img_today(), "tokens": 0} if adm else {})})
-    body = json.dumps({"agents": ags, "log": list(TASKLOG) if adm else [], "lantai": LANTAI, "iot": iot_public(adm), **({"galeri": GAL_IDS[:4]} if adm else {})})
+    body = json.dumps({"agents": ags, "log": list(TASKLOG) if adm else [], "lantai": LANTAI, "iot": iot_public(adm), **({"galeri": GAL_IDS[:4]} if adm else {}),
+                       "stok": [[x["id"], x["nama"], x["jumlah"], x["satuan"], x["minimum"], x["foto"], x["v"]] for x in STOK[:18]]})
     _OFFICE_CACHE[adm] = (time.time(), body)
     return Response(body, mimetype="application/json")
 
@@ -1663,8 +1850,10 @@ def start_job(coro):
 
 @app.route("/api/boss", methods=["POST"])
 def api_boss():
-    need("admin")
+    r = need_perm("boss")
     d = request.get_json(silent=True) or {}
+    if d.get("mode") == "dewan" and r != "admin":
+        return jsonify({"error": "Sidang Dewan khusus admin/dev."}), 403
     teks = str(d.get("perintah", "")).strip()[:3000]
     if not teks:
         return jsonify({"error": "Perintah kosong"}), 400
@@ -1676,6 +1865,8 @@ def api_boss():
         bots, jawab = mem_from_result(h)
         h["memori"] = await asyncio.to_thread(mem_save, "web", bots, h.get("jalur", ""), teks, jawab, simpan)
         return h
+    if not kuota_pakai(r, "boss"):
+        return jsonify({"error": kuota_teks(r, "boss")}), 429
     try:
         if d.get("mode") == "dewan":
             ang = [str(x).lower() for x in (d.get("anggota") or [])][:COUNCIL_MAX]
@@ -1687,20 +1878,20 @@ def api_boss():
 
 @app.route("/api/job/<jid>")
 def api_job(jid):
-    need("admin")
+    need_perm("boss")
     return jsonify(JOBS.get(jid) or {"status": "tidak ada"})
 
 
 @app.route("/api/kas")
 def api_kas():
-    need("admin")
+    need_perm("kas")
     rows = kas_all()
     return jsonify({"rows": rows[-300:][::-1], "ringkas": kas_summary(rows), "kategori": KAT})
 
 
 @app.route("/api/kas/olah", methods=["POST"])
 def api_kas_olah():
-    need("admin")
+    need_perm("kas_edit")
     teks = request.form.get("teks", "")[:3000]
     f, foto, mime = request.files.get("foto"), None, "image/jpeg"
     if f:
@@ -1723,7 +1914,7 @@ def api_kas_olah():
 
 @app.route("/api/kas/simpan", methods=["POST"])
 def api_kas_simpan():
-    need("admin")
+    need_perm("kas_edit")
     rows = []
     for r in ((request.get_json(silent=True) or {}).get("rows") or [])[:50]:
         try:
@@ -1741,13 +1932,13 @@ def api_kas_simpan():
 
 @app.route("/api/kas/<int:i>", methods=["DELETE"])
 def api_kas_del(i):
-    need("admin")
+    need_perm("kas_edit")
     return jsonify({"dihapus": kas_del(i)})
 
 
 @app.route("/api/kas.csv")
 def api_kas_csv():
-    need("admin")
+    need_perm("kas")
     out = io.StringIO()
     w = csv.writer(out)
     w.writerow(["tanggal", "keterangan", "kategori", "masuk", "keluar", "saldo"])
@@ -1759,8 +1950,9 @@ def api_kas_csv():
 
 @app.route("/api/skills", methods=["GET", "POST"])
 def api_skills():
-    need("admin")
+    need_perm("skills")
     if request.method == "POST":
+        need("admin")
         try:
             return jsonify({"disimpan": skill_save(request.get_json(silent=True) or {})})
         except ValueError as e:
@@ -1776,9 +1968,13 @@ def api_skill_del(nama):
 
 @app.route("/api/gambar", methods=["GET", "POST"])
 def api_gambar():
-    need("admin")
+    r = need_perm("gambar_lihat")
     if request.method == "GET":
-        return jsonify({"items": img_list(), **img_status()})
+        return jsonify({"items": img_list(), **img_status(), "kuota": kuota_info(r).get("gambar")})
+    if not can("gambar_buat", r):
+        return jsonify({"error": "Divisi kamu hanya bisa melihat galeri."}), 403
+    if not kuota_pakai(r, "gambar", cek_saja=True):
+        return jsonify({"error": kuota_teks(r, "gambar")}), 429
     f, foto = request.files.get("foto"), None
     if f:
         foto = f.read(4_000_001)
@@ -1795,13 +1991,15 @@ def api_gambar():
     except Exception:
         log.exception("buat gambar gagal")
         return jsonify({"error": "Gagal membuat gambar, coba lagi"}), 502
-    return jsonify({"id": r["id"], "prompt": r["prompt"], "prompt_en": r["prompt_en"], "url": f"/api/gambar/{r['id']}", **img_status()})
+    kuota_pakai(role(), "gambar")   # dihitung hanya kalau gambar berhasil
+    return jsonify({"kuota": kuota_info(role()).get("gambar"), "id": r["id"], "prompt": r["prompt"], "prompt_en": r["prompt_en"], "url": f"/api/gambar/{r['id']}", **img_status()})
 
 
 @app.route("/api/gambar/<int:i>", methods=["GET", "DELETE"])
 def api_gambar_one(i):
-    need("admin")
+    need_perm("gambar_lihat")
     if request.method == "DELETE":
+        need("admin")
         return jsonify({"dihapus": img_del(i)})
     g = img_get(i)
     if not g:
@@ -1815,8 +2013,9 @@ def api_gambar_one(i):
 
 @app.route("/api/memori", methods=["GET", "DELETE"])
 def api_memori():
-    need("admin")
+    need_perm("memori")
     if request.method == "DELETE":
+        need("admin")
         return jsonify({"dihapus": mem_del()})
     return jsonify({"items": mem_list(request.args.get("q", "").strip(), request.args.get("sumber", "")), "mem_tg": SET.get("mem_tg", "tidak")})
 
@@ -1930,8 +2129,61 @@ def api_laporan_del(i):
 
 @app.route("/api/usage")
 def api_usage():
-    need("admin")
+    need_perm("tim")
     return jsonify(usage_report())
+
+
+@app.route("/api/stok", methods=["GET", "POST"])
+def api_stok():
+    """GET semua orang (termasuk viewer). POST khusus admin: multipart nama, jumlah, satuan, kategori, minimum, catatan, foto, id (ubah), hapus_foto."""
+    need("viewer")
+    if request.method == "GET":
+        return jsonify({"items": STOK, "menipis": len(stok_menipis()), "edit": role() == "admin"})
+    need("admin")
+    f, foto, mime = request.files.get("foto"), None, None
+    if f:
+        foto, mime = f.read(1_500_001), f.mimetype or "image/jpeg"
+        if len(foto) > 1_500_000 or not mime.startswith("image/"):
+            return jsonify({"error": "Foto harus gambar, maksimal 1,5 MB"}), 400
+    try:
+        sid = stok_save(request.form, foto, mime, request.form.get("hapus_foto") == "1")
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"id": sid, "items": STOK})
+
+
+@app.route("/api/stok/<int:i>", methods=["POST", "DELETE"])
+def api_stok_one(i):
+    need("admin")
+    if request.method == "DELETE":
+        return jsonify({"dihapus": stok_del(i), "items": STOK})
+    try:
+        j = int((request.get_json(silent=True) or {}).get("jumlah"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "jumlah harus angka"}), 400
+    return jsonify({"diubah": stok_jumlah(i, j), "items": STOK})
+
+
+@app.route("/api/stok/<int:i>/gambar")
+def api_stok_img(i):
+    need("viewer")
+    g = stok_img(i)
+    if not g:
+        abort(404)
+    return Response(g[1], mimetype=g[0], headers={"Cache-Control": "private, max-age=86400"})
+
+
+@app.route("/api/tg", methods=["GET", "POST"])
+def api_tg():
+    """Daftar pengguna Telegram yang diizinkan lewat !izin, plus yang menunggu. POST {id, peran: bendahara|designer|anggota|cabut|tolak}."""
+    need("admin")
+    if request.method == "POST":
+        d = request.get_json(silent=True) or {}
+        uid, peran = str(d.get("id", "")), str(d.get("peran", ""))
+        if not uid.isdigit() or peran not in (*DIVISI, "cabut", "tolak"):
+            return jsonify({"error": "data tidak valid"}), 400
+        izin_putus(uid, peran)
+    return jsonify({"users": SET.get("tg_users", {}), "menunggu": SET.get("tg_izin", {}), "email": bool(MAIL_WEBHOOK), "admin": len(ALLOWED)})
 
 
 @app.route("/api/settings", methods=["POST"])
@@ -1958,10 +2210,149 @@ def run_flask():
 
 # ---------- TELEGRAM ----------
 HIST = {}
+CANVAS_APP = {}
+
+
+def tg_role(u):
+    """admin = ID di ALLOWED_USER_IDS; divisi = disetujui lewat !izin; None = belum punya akses."""
+    if u is None:
+        return None
+    if not ALLOWED or u.id in ALLOWED:
+        return "admin"
+    x = SET.get("tg_users", {}).get(str(u.id))
+    return x["peran"] if x and x.get("peran") in DIVISI else None
 
 
 def _ok(u):
-    return not ALLOWED or (u is not None and u.id in ALLOWED)
+    return tg_role(u) is not None
+
+
+def _adm(u):
+    return bool(ALLOWED) and tg_role(u) == "admin"
+
+
+async def _gate(m, u, perm, kuota=None):
+    """Cek hak + kuota sebelum perintah Telegram dijalankan. Balas alasannya kalau ditolak."""
+    r = tg_role(u)
+    if r is None:
+        await m.reply_text(f"Akses ditolak. Kirim !izin untuk minta akses ke admin.\nID kamu: {u.id}")
+        return None
+    if not can(perm, r):
+        await m.reply_text(f"Fitur ini tidak tersedia untuk divisi {NAMA_PERAN[r]}.")
+        return None
+    if kuota and not await asyncio.to_thread(kuota_pakai, r, kuota):
+        await m.reply_text(kuota_teks(r, kuota))
+        return None
+    return r
+
+
+async def kirim_email(subjek, isi):
+    """Lewat Google Apps Script (HTTP). Render gratis memblokir SMTP 25/465/587, jadi tidak bisa kirim Gmail langsung."""
+    if not MAIL_WEBHOOK:
+        log.info("MAIL_WEBHOOK kosong: email izin tidak dikirim (%s)", subjek)
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as h:
+            r = await h.post(MAIL_WEBHOOK, json={"secret": MAIL_SECRET, "to": MAIL_TO, "subject": subjek, "body": isi})
+        ok = r.status_code < 400 and "ok" in r.text.lower()
+        if not ok:
+            log.warning("Email izin gagal: %s %s", r.status_code, r.text[:200])
+        return ok
+    except Exception:
+        log.exception("Email izin gagal")
+        return False
+
+
+def _tg_app(key):
+    return TG_APPS.get(key) or CANVAS_APP.get("app")
+
+
+def _izin_tombol(uid):
+    return InlineKeyboardMarkup([[InlineKeyboardButton("💰 Bendahara", callback_data=f"izin:{uid}:bendahara"),
+                                  InlineKeyboardButton("🎨 Designer", callback_data=f"izin:{uid}:designer")],
+                                 [InlineKeyboardButton("👤 Anggota", callback_data=f"izin:{uid}:anggota"),
+                                  InlineKeyboardButton("❌ Tolak", callback_data=f"izin:{uid}:tolak")]])
+
+
+async def izin_minta(m, c, key):
+    u = m.from_user
+    r = tg_role(u)
+    if r:
+        await m.reply_text(f"Kamu sudah punya akses sebagai {NAMA_PERAN[r]}. 👍")
+        return
+    if not ALLOWED:
+        await m.reply_text("Admin belum mengisi ALLOWED_USER_IDS, jadi izin belum bisa diproses.")
+        return
+    tunggu = SET.setdefault("tg_izin", {})
+    lama = tunggu.get(str(u.id))
+    if lama and time.time() - lama.get("ts", 0) < 600:
+        await m.reply_text("Permintaan izinmu sudah dikirim. Tunggu admin menyetujui ya.")
+        return
+    nama = " ".join(x for x in (u.first_name, u.last_name) if x) or "-"
+    tunggu[str(u.id)] = {"nama": nama[:60], "user": u.username or "", "bot": key, "ts": int(time.time()),
+                         "waktu": datetime.now(WIB).strftime("%Y-%m-%d %H:%M")}
+    await asyncio.to_thread(set_save)
+    await m.reply_text("📨 Permintaan izin terkirim ke admin MCI. Kamu akan dapat pesan di sini begitu disetujui.")
+    info = (f"Permintaan izin Telegram MCI HQ\n\nNama: {nama}\nUsername: @{u.username or '-'}\nID Telegram: {u.id}\n"
+            f"Lewat bot: {AGENTS[key]['nama'] if key in AGENTS else CANVAS['nama']}\nWaktu: {tunggu[str(u.id)]['waktu']} WIB")
+    app_ = _tg_app("apex") or _tg_app(key)
+    for aid in ALLOWED:
+        try:
+            await app_.bot.send_message(aid, "🔔 " + info + "\n\nPilih divisinya:", reply_markup=_izin_tombol(u.id))
+        except Exception:
+            log.warning("Notif izin ke admin %s gagal (admin belum /start bot Apex?)", aid)
+    asyncio.create_task(kirim_email(f"[MCI HQ] Permintaan izin Telegram: {nama}",
+                                    info + "\n\nSetujui lewat tombol di chat bot MCI.Apex (admin), atau di web → Tim & Token."))
+
+
+def izin_putus(uid, peran):
+    """Simpan keputusan admin. Return teks status. Pesan ke pemohon dikirim terpisah (async)."""
+    tunggu, users = SET.setdefault("tg_izin", {}), SET.setdefault("tg_users", {})
+    data = tunggu.pop(uid, None) or users.get(uid) or {}
+    if peran in DIVISI:
+        users[uid] = {"peran": peran, "nama": data.get("nama", "-"), "user": data.get("user", ""), "bot": data.get("bot", "apex"),
+                      "sejak": datetime.now(WIB).strftime("%Y-%m-%d %H:%M")}
+    elif peran == "cabut":
+        users.pop(uid, None)
+    set_save()
+    if LOOP:
+        asyncio.run_coroutine_threadsafe(_izin_kabari(uid, peran, data.get("bot", "apex")), LOOP)
+    return data
+
+
+async def _izin_kabari(uid, peran, bot):
+    app_ = _tg_app(bot) or _tg_app("apex")
+    if not app_:
+        return
+    if peran in DIVISI:
+        batas = f"Boss bagi tugas maks {KUOTA['boss']}x/hari per divisi" + (f", Studio Gambar maks {KUOTA['gambar']}x/hari" if can("gambar_buat", peran) else "")
+        t = f"✅ Izin diterima! Kamu terdaftar sebagai {NAMA_PERAN[peran]}.\n{batas}. Sidang Dewan khusus admin.\nKetik /start untuk daftar perintah."
+    elif peran == "cabut":
+        t = "Akses Telegram MCI kamu sudah dicabut admin."
+    else:
+        t = "Maaf, permintaan izin kamu ditolak admin."
+    try:
+        await app_.bot.send_message(int(uid), t)
+    except Exception:
+        log.warning("Gagal mengabari %s soal izin", uid)
+
+
+async def izin_klik(u, c):
+    q = u.callback_query
+    if not _adm(q.from_user):
+        await q.answer("Khusus admin.", show_alert=True)
+        return
+    try:
+        _, uid, peran = q.data.split(":")
+    except ValueError:
+        return await q.answer()
+    data = await asyncio.to_thread(izin_putus, uid, peran)
+    hasil = f"✅ Disetujui sebagai {NAMA_PERAN[peran]}" if peran in DIVISI else "❌ Ditolak"
+    await q.answer(hasil)
+    try:
+        await q.edit_message_text(f"{q.message.text.split(chr(10) + chr(10) + 'Pilih')[0]}\n\n{hasil} oleh {q.from_user.first_name}.")
+    except Exception:
+        pass
 
 
 def _addressed(u, c):
@@ -2038,8 +2429,19 @@ def make_handlers(key):
     cfg = AGENTS[key]
 
     async def start(u, c):
-        await u.message.reply_text(f"Halo, saya {cfg['nama']} (Lantai {cfg['lantai']}, {cfg['divisi']}).\n{cfg['peran']}.\n\n"
-                                   "/status  /id  /budget\n/caveman on|off\n/council <pertanyaan>\n/skills  /skill <nama> <teks>\n/gambar <deskripsi>\n/laporan (laporan mingguan, ke Apex)")
+        r = tg_role(u.effective_user)
+        head = f"Halo, saya {cfg['nama']} (Lantai {cfg['lantai']}, {cfg['divisi']}).\n{cfg['peran']}.\n\n"
+        if r is None:
+            await u.message.reply_text(head + "Kamu belum punya akses. Kirim !izin untuk minta izin ke admin MCI.")
+            return
+        if r == "admin":
+            menu = "/status  /id  /budget\n/caveman on|off\n/council <pertanyaan>\n/skills  /skill <nama> <teks>\n/gambar <deskripsi>\n/stok (sisa stok barang)\n/laporan (laporan mingguan, ke Apex)"
+        else:
+            k = kuota_info(r)
+            menu = (f"Kamu: {NAMA_PERAN[r]}\n/status  /id  /budget  /stok  /skills  /skill <nama> <teks>\n"
+                    + ("/gambar <deskripsi>\n" if can("gambar_buat", r) else "") + ("Kirim catatan kas ke Ledger\n" if can("kas_edit", r) else "")
+                    + f"Jatah hari ini: Boss {k['boss']['pakai']}/{k['boss']['batas']}" + (f", gambar {k['gambar']['pakai']}/{k['gambar']['batas']}" if "gambar" in k else ""))
+        await u.message.reply_text(head + menu)
 
     async def myid(u, c):
         await u.message.reply_text(f"ID Telegram kamu: {u.effective_user.id}")
@@ -2061,19 +2463,22 @@ def make_handlers(key):
             await u.message.reply_text("Isi ALLOWED_USER_IDS dulu untuk memakai perintah ini.")
             return
         a = (c.args[0].lower() if c.args else "")
-        if a in ("on", "off"):
+        if a in ("on", "off") and _adm(u.effective_user):
             SET["caveman"] = a == "on"
             await asyncio.to_thread(set_save)
         await u.message.reply_text(f"Mode caveman: {'ON' if SET['caveman'] else 'OFF'} (berlaku untuk semua bot)")
 
     async def hapus(u, c):
-        if not (ALLOWED and _ok(u.effective_user)) or not (c.args and c.args[0].isdigit()):
+        if not (ALLOWED and c.args and c.args[0].isdigit()) or not await _gate(u.message, u.effective_user, "kas_edit"):
             return
         n = await asyncio.to_thread(kas_del, int(c.args[0]))
         await u.message.reply_text("Dihapus." if n else "Nomor tidak ditemukan.")
 
     async def council(u, c):
         if not _ok(u.effective_user):
+            return
+        if not _adm(u.effective_user):
+            await u.message.reply_text("Sidang Dewan khusus admin/dev.")
             return
         q = " ".join(c.args or []).strip()
         if not q:
@@ -2102,6 +2507,8 @@ def make_handlers(key):
         if not c.args or c.args[0].lower() not in SKILLS:
             await u.message.reply_text("Skill tidak ditemukan. Lihat /skills")
             return
+        if not await _gate(u.message, u.effective_user, "boss", "boss"):
+            return
         s = SKILLS[c.args[0].lower()]
         teks = " ".join(c.args[1:]).strip() or s["deskripsi"]
         await c.bot.send_chat_action(chat_id=u.message.chat_id, action="typing")
@@ -2112,14 +2519,22 @@ def make_handlers(key):
         m = u.message
         if not m or not m.text or not _addressed(u, c):
             return
+        text = m.text.replace(f"@{c.bot.username}", "").strip() if c.bot.username else m.text
+        if text.lower().startswith("!izin"):
+            await izin_minta(m, c, key)
+            return
         if not _ok(u.effective_user):
-            await m.reply_text(f"Akses ditolak. ID kamu: {u.effective_user.id}")
+            await m.reply_text(f"Akses ditolak. Kirim !izin untuk minta akses ke admin.\nID kamu: {u.effective_user.id}")
             return
         if key == "ledger" and (m.chat.type != "private" or not ALLOWED):
             await m.reply_text("Ledger hanya di chat pribadi dan butuh ALLOWED_USER_IDS terisi.")
             return
-        text = m.text.replace(f"@{c.bot.username}", "").strip() if c.bot.username else m.text
         if not text:
+            return
+        if key == "ledger" and not can("kas_edit", tg_role(u.effective_user)):
+            await m.reply_text("Catat kas khusus Bendahara dan admin. Buku kas bisa dilihat di web → Keuangan AI.")
+            return
+        if key != "ledger" and not await _gate(m, u.effective_user, "boss", "boss"):   # catat kas tidak memakai jatah Boss
             return
         t0 = time.time()
         room = None if key in ("apex", "ledger") else room_for(text, key)
@@ -2164,7 +2579,8 @@ def make_handlers(key):
         if not q:
             await u.message.reply_text(GAMBAR_HELP)
             return
-        await tg_gambar(u.message, c, q)
+        if await _gate(u.message, u.effective_user, "gambar_buat", "gambar"):
+            await tg_gambar(u.message, c, q)
 
     async def photo(u, c):
         m = u.message
@@ -2178,9 +2594,10 @@ def make_handlers(key):
             if not q:
                 await m.reply_text(GAMBAR_HELP)
                 return
-            await tg_gambar(m, c, q, m)
+            if await _gate(m, u.effective_user, "gambar_buat", "gambar"):
+                await tg_gambar(m, c, q, m)
             return
-        if key != "ledger" or m.chat.type != "private" or not ALLOWED or not _ok(u.effective_user):
+        if key != "ledger" or m.chat.type != "private" or not ALLOWED or not can("kas_edit", tg_role(u.effective_user)):
             return
         try:
             f = await m.photo[-1].get_file()
@@ -2190,9 +2607,17 @@ def make_handlers(key):
             ans = "⚠️ Gagal membaca foto."
         await _send(m, ans)
 
+    async def stok(u, c):
+        if not _ok(u.effective_user):
+            return
+        await asyncio.to_thread(stok_load)
+        low = stok_menipis()
+        await _send(u.message, f"📦 STOK BARANG MCI ({len(STOK)} jenis, dipegang MCI.Nexus)\n{stok_teks(60)}"
+                    + (f"\n\n⚠️ Perlu restock: {', '.join(x['nama'] for x in low)}" if low else "") + "\n\nUbah stok: web → Stok Barang (khusus dev).")
+
     async def laporan(u, c):
-        if not (ALLOWED and _ok(u.effective_user)):
-            await u.message.reply_text("Isi ALLOWED_USER_IDS dulu untuk memakai perintah ini.")
+        if not _adm(u.effective_user):
+            await u.message.reply_text("Laporan mingguan khusus admin/dev." if _ok(u.effective_user) else "Isi ALLOWED_USER_IDS dulu untuk memakai perintah ini.")
             return
         if key != "apex":
             await u.message.reply_text("Laporan mingguan dibuat oleh MCI.Apex. Kirim /laporan ke bot Apex ya.")
@@ -2207,7 +2632,7 @@ def make_handlers(key):
             await u.message.reply_text(str(e) if isinstance(e, RuntimeError) else "⚠️ Laporan gagal dibuat, cek log server.")
 
     return {"start": start, "id": myid, "status": status, "tokens": status, "budget": budget, "caveman": caveman,
-            "hapus": hapus, "council": council, "dewan": council, "skills": skills, "skill": skill, "gambar": gambar, "laporan": laporan}, chat, photo
+            "hapus": hapus, "council": council, "dewan": council, "skills": skills, "skill": skill, "gambar": gambar, "laporan": laporan, "stok": stok}, chat, photo
 
 
 def _group_cmd(key, f):
@@ -2245,22 +2670,26 @@ def pixel_handlers():
         if not q:
             await u.message.reply_text(GAMBAR_HELP)
             return
-        await tg_gambar(u.message, c, q)
+        if await _gate(u.message, u.effective_user, "gambar_buat", "gambar"):
+            await tg_gambar(u.message, c, q)
 
     async def teks(u, c):
         m = u.message
         if not m or not m.text or not _addressed(u, c):
             return
-        if not _ok(u.effective_user):
-            await m.reply_text(f"Akses ditolak. ID kamu: {u.effective_user.id}")
-            return
         q = m.text.replace(f"@{c.bot.username}", "").strip() if c.bot.username else m.text
-        if q:
+        if q.lower().startswith("!izin"):
+            await izin_minta(m, c, "canvas")
+            return
+        if not _ok(u.effective_user):
+            await m.reply_text(f"Akses ditolak. Kirim !izin untuk minta akses ke admin.\nID kamu: {u.effective_user.id}")
+            return
+        if q and await _gate(m, u.effective_user, "gambar_buat", "gambar"):
             await tg_gambar(m, c, q)
 
     async def foto(u, c):
         m = u.message
-        if not _ok(u.effective_user):
+        if not _ok(u.effective_user) or not await _gate(m, u.effective_user, "gambar_buat", "gambar"):
             return
         q = re.sub(r"^/gambar(@\w+)?", "", (m.caption or "").strip(), flags=re.I).strip()
         if not q:
@@ -2294,6 +2723,7 @@ async def run_bots():
                 tg.add_handler(CommandHandler(n, _group_cmd(key, f)))
             tg.add_handler(MessageHandler(filters.PHOTO, photo))
             tg.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
+            tg.add_handler(CallbackQueryHandler(izin_klik, pattern=r"^izin:"))
             tg.add_error_handler(on_error)
             await tg.initialize()
             await tg.start()
@@ -2311,10 +2741,12 @@ async def run_bots():
             for n, f in pixel_handlers().items():
                 tg.add_handler(CommandHandler(n, f) if n not in ("teks", "foto") else
                                MessageHandler(filters.PHOTO if n == "foto" else (filters.TEXT & ~filters.COMMAND), f))
+            tg.add_handler(CallbackQueryHandler(izin_klik, pattern=r"^izin:"))
             tg.add_error_handler(on_error)
             await tg.initialize()
             await tg.start()
             await tg.updater.start_polling(drop_pending_updates=True)
+            CANVAS_APP["app"] = tg
             log.info("[MCI Studio Gambar] bot gambar terpisah online (aktif=%s)", bool(CF_ACCOUNT and CF_TOKEN))
         except Exception:
             log.exception("[MCI Studio Gambar] gagal start")
@@ -2326,11 +2758,13 @@ async def run_bots():
 if __name__ == "__main__":
     if not (ADMIN_TOKEN and VIEW_TOKEN):
         log.warning("ADMIN_TOKEN / VIEW_TOKEN belum diisi: web tidak bisa dibuka.")
+    log.info("Token divisi aktif: %s", ", ".join(r for r, t in ROLE_TOKENS.items() if t) or "belum ada")
     try:
         db_init()
         usage_load()
         iot_load()
         gal_load()
+        stok_load()
     except Exception:
         log.exception("Database gagal diinisialisasi (cek DATABASE_URL)")
     threading.Thread(target=run_flask, daemon=True).start()
