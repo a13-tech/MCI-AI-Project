@@ -241,7 +241,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
   <div id="views">
    <div class="grp"><button class="vb on" data-view="gedung">Gedung</button></div>
    <div class="grp"><span class="lbl">LANTAI</span><button class="vb" data-view="f0">LT 1</button><button class="vb" data-view="f1">LT 2</button><button class="vb" data-view="f2">LT 3</button><button class="vb" data-view="f3">LT 4</button></div>
-   <div class="grp"><span class="lbl">RUANGAN</span><button class="vb" data-view="dewan">Ruang Dewan</button><button class="vb" data-view="studio">Studio Canvas</button><button class="vb" data-view="ceo">Ruang CEO</button><button class="vb" data-view="meeting">Meeting</button><button class="vb" data-view="labiot">Lab IoT</button><button class="vb" data-view="lab">Lab Teknik</button><button class="vb" data-view="perpus">Perpustakaan</button><button class="vb" data-view="observ">Observatorium</button><button class="vb" data-view="galeri">Galeri</button><button class="vb" data-view="lounge">Lounge</button><button class="vb" data-view="pantry">Pantry</button><button class="vb" data-view="game">Game</button></div>
+   <div class="grp"><span class="lbl">RUANGAN</span><button class="vb" data-view="dewan">Ruang Dewan</button><button class="vb" data-view="studio">Studio Canvas</button><button class="vb" data-view="kamar1">Kamar Bot LT1</button><button class="vb" data-view="kamar2">Kamar Bot LT2</button><button class="vb" data-view="kamar3">Kamar Bot LT3</button><button class="vb" data-view="gym">Kebugaran</button><button class="vb" data-view="ceo">Ruang CEO</button><button class="vb" data-view="meeting">Meeting</button><button class="vb" data-view="labiot">Lab IoT</button><button class="vb" data-view="lab">Lab Teknik</button><button class="vb" data-view="perpus">Perpustakaan</button><button class="vb" data-view="observ">Observatorium</button><button class="vb" data-view="galeri">Galeri</button><button class="vb" data-view="lounge">Lounge</button><button class="vb" data-view="pantry">Pantry</button><button class="vb" data-view="game">Game</button></div>
   </div>
   <div id="stage">
    <div id="chips"></div>
@@ -1409,14 +1409,14 @@ const OFFICE = (() => {
   /* ---------- lingkungan & gedung ---------- */
   function world() {
     sc.background = LIN("#0a1638");
-    sc.fog = new THREE.Fog(LIN("#0a1638"), 70, 160);
+    sc.fog = new THREE.Fog(LIN("#0a1638"), 110, 260);
     sc.add(new THREE.HemisphereLight(LIN("#c7d8ff"), LIN("#1a2a55"), .85));
     const d = new THREE.DirectionalLight(LIN("#fff4e2"), .95);
     d.position.set(12, 36, 20); d.castShadow = true; d.shadow.mapSize.set(2048, 2048);
-    d.position.set(16.4, 36, 20); d.target.position.set(4.4, 0, 0); sc.add(d.target);
-    Object.assign(d.shadow.camera, {left: -26, right: 26, top: 24, bottom: -24, near: 2, far: 110});
+    d.position.set(BX + 12, 36, 20); d.target.position.set(BX, 0, 0); sc.add(d.target);
+    Object.assign(d.shadow.camera, {left: -32, right: 32, top: 26, bottom: -26, near: 2, far: 120});
     d.shadow.bias = -.0006; d.shadow.normalBias = .02; sc.add(d);
-    FY.forEach(y => [-1, WC].forEach(x => { const l = new THREE.PointLight(LIN("#ffe2b0"), x < 0 ? .7 : .55, 22, 1.6); l.position.set(x, y + 3.4, 0); sc.add(l); }));
+    FY.forEach(y => [-1, WC, -19].forEach(x => { const l = new THREE.PointLight(LIN("#ffe2b0"), x < 0 ? .7 : .55, 22, 1.6); l.position.set(x, y + 3.4, 0); sc.add(l); }));
     const sky = CT(2048, 512, (g, W, H) => {
       const q = g.createLinearGradient(0, 0, 0, H); q.addColorStop(0, "#050c26"); q.addColorStop(.6, "#13285e"); q.addColorStop(1, "#2a4a95");
       g.fillStyle = q; g.fillRect(0, 0, W, H);
@@ -1429,19 +1429,76 @@ const OFFICE = (() => {
             if (Math.random() < .38) { g.fillStyle = Math.random() < .25 ? "#ffd27a" : "#9fd0ff"; g.globalAlpha = .5 + Math.random() * .5; g.fillRect(xx, yy, 5, 7); g.globalAlpha = 1; }
           x += bw + 4; } });
     });
-    [[BX, 14, -40, 0, 170], [-46, 14, 0, PI / 2, 120]].forEach(a => {
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(a[4], 48), new THREE.MeshBasicMaterial({map: sky, fog: false, toneMapped: false}));
-      m.position.set(a[0], a[1], a[2]); m.rotation.y = a[3]; sc.add(m);
-    });
+    sky.wrapS = THREE.RepeatWrapping; sky.repeat.set(4, 1);   // langit melingkar: tidak kosong dilihat dari mana pun
+    const dome = new THREE.Mesh(new THREE.CylinderGeometry(300, 300, 150, 64, 1, true), new THREE.MeshBasicMaterial({map: sky, fog: false, toneMapped: false, side: THREE.BackSide}));
+    dome.position.set(BX, 55, 0); sc.add(dome);
     BASE = new THREE.Group(); sc.add(BASE); CUR = BASE;
-    add(CY(40, 40, .2, 64), "#0d1c45", BX, -.5, 0, null, {roughness: .9});
-    add(TO(23.5, .06), "#D4AF5A", BX, -.39, 0, null, GOLD).rotation.x = PI / 2;
     [[8.0, 7], [8.7, 8.4]].forEach((s, i) => add(SLAB(s[1], .8, .18, .2), "#EEF2F9", 0, -.24 - i * .1, s[0]));
-    [[-15.5, 6], [24.3, 6], [-15.5, -4], [24.3, -4], [-17, 1], [25.8, 1]].forEach(p => { const g = grp(p[0], -.4, p[1], 0); CAST = true; add(CY(.16, .22, 1.4, 12), "#6b4423", 0, .7, 0, g); add(SP(1.0, 18, 14), "#1f8f52", 0, 1.9, 0, g, {roughness: .8}); add(SP(.7, 16, 12), "#27a35f", .3, 2.6, .1, g, {roughness: .8}); CAST = false; });
+    kota();
   }
+  /* ---------- lingkungan kota di sekeliling gedung (tidak lagi melayang di ruang kosong) ---------- */
+  function winTex(seed, lit) {
+    let r = seed * 7919 + 13; const rnd = () => (r = (r * 9301 + 49297) % 233280) / 233280;
+    const t = CT(128, 128, (g, w, h) => { g.fillStyle = "#000"; g.fillRect(0, 0, w, h);
+      for (let y = 6; y < h; y += 16) for (let x = 6; x < w; x += 16) { if (rnd() < lit) { g.fillStyle = rnd() < .3 ? "#ffd27a" : "#9fd0ff"; g.globalAlpha = .55 + rnd() * .45; g.fillRect(x, y, 8, 10); g.globalAlpha = 1; } } });
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+  }
+  function boxUV(w, h, d) {
+    return G(`bx${w},${h},${d}`, () => { const g = new THREE.BoxGeometry(w, h, d), uv = g.attributes.uv;
+      for (let i = 0; i < uv.count; i++) { const f = Math.floor(i / 4); const sx = f < 2 ? d : w, sy = f === 2 || f === 3 ? d : h; uv.setXY(i, uv.getX(i) * sx / 8, uv.getY(i) * sy / 8); }
+      return g; });
+  }
+  function kota() {
+    const ROAD = "#141a2e", WALK = "#26386b";
+    add(CY(260, 260, .2, 72), "#0b1433", BX, -.62, 2, null, {roughness: .95});
+    /* plaza berpaving di sekeliling gedung */
+    const px0 = WX - 8, px1 = EX + 8, pz0 = -15, pz1 = 19, pw = px1 - px0, pd = pz1 - pz0, pcx = (px0 + px1) / 2, pcz = (pz0 + pz1) / 2;
+    const pav = CT(256, 256, (g, w, h) => { g.fillStyle = "#1f3470"; g.fillRect(0, 0, w, h); g.strokeStyle = "rgba(255,255,255,.07)"; g.lineWidth = 3; for (let i = 0; i <= 8; i++) { g.beginPath(); g.moveTo(i * 32, 0); g.lineTo(i * 32, h); g.stroke(); g.beginPath(); g.moveTo(0, i * 32); g.lineTo(w, i * 32); g.stroke(); } });
+    pav.wrapS = pav.wrapT = THREE.RepeatWrapping; pav.repeat.set(pw / 8, pd / 8);
+    add(SLAB(pw, pd, .12, .6), new THREE.MeshStandardMaterial({color: LIN("#ffffff"), map: pav, roughness: .85}), pcx, -.5, pcz);
+    add(SLAB(pw + .3, pd + .3, .06, .7), "#D4AF5A", pcx, -.55, pcz, null, GOLD);
+    /* jalan keliling + marka putus-putus */
+    const rw = 7, rx0 = px0 - 1.5 - rw / 2, rx1 = px1 + 1.5 + rw / 2, rz0 = pz0 - 1.5 - rw / 2, rz1 = pz1 + 1.5 + rw / 2;
+    [[pcx, rz0, rx1 - rx0 + rw, rw], [pcx, rz1, rx1 - rx0 + rw, rw]].forEach(r => { add(SLAB(r[2], r[3], .06, .1), ROAD, r[0], -.53, r[1], null, {roughness: .9}); for (let x = rx0; x < rx1; x += 4) add(SLAB(1.8, .16, .01, .02), "#e8edf7", x, -.49, r[1], null, {emissive: "#ffffff", emissiveIntensity: .15}); });
+    [[rx0, pcz, rw, rz1 - rz0 - rw], [rx1, pcz, rw, rz1 - rz0 - rw]].forEach(r => { add(SLAB(r[2], r[3], .06, .1), ROAD, r[0], -.53, r[1], null, {roughness: .9}); for (let z = rz0 + 4; z < rz1 - 4; z += 4) add(SLAB(.16, 1.8, .01, .02), "#e8edf7", r[0], -.49, z, null, {emissive: "#ffffff", emissiveIntensity: .15}); });
+    /* jalan masuk dari depan + air mancur logo MCI */
+    add(SLAB(9, rz1 - pz1, .08, .1), WALK, 0, -.5, (pz1 + rz1) / 2);
+    const fx = 0, fz = 13.2;
+    add(CY(3.2, 3.4, .5, 48), "#EEF2F9", fx, -.2, fz, null, {roughness: .4}); add(CY(2.9, 2.9, .06, 48), "#38bdf8", fx, .06, fz, null, {emissive: "#38bdf8", emissiveIntensity: .45, transparent: true, opacity: .85});
+    add(TO(3.25, .07), "#D4AF5A", fx, .07, fz, null, GOLD).rotation.x = PI / 2; add(CY(.35, .5, 1.4, 20), "#D4AF5A", fx, .7, fz, null, GOLD);
+    const jet = add(CN(.5, 1.6, 20), "#bfe0ff", fx, 2.2, fz, null, {emissive: "#7cc4ff", emissiveIntensity: .8, transparent: true, opacity: .45}); jet.rotation.x = PI; jet.userData.dyn = true; ANI.push({o: jet.material, k: "pulse"});
+    label("MCI HQ", fx, 3.4, fz, .7, "#F1D58A");
+    /* parkiran di samping timur */
+    const car = (x, z, col, ry) => { const g = grp(x, -.45, z, ry); CAST = true; add(PANEL(1.9, .55, 4.0, .25), col, 0, .45, 0, g, {roughness: .3, metalness: .4}); add(PANEL(1.6, .5, 2.0, .25), "#1b2433", 0, .9, -.2, g, {roughness: .1, metalness: .6}); CAST = false;
+      [[-.85, 1.3], [.85, 1.3], [-.85, -1.3], [.85, -1.3]].forEach(w => add(CY(.32, .32, .25, 16), "#0b0f1a", w[0], .32, w[1], g).rotation.z = PI / 2);
+      add(SP(.1, 8, 6), "#fff6d8", -.6, .5, 2.0, g, {emissive: "#fff6d8", emissiveIntensity: 1.2}); add(SP(.1, 8, 6), "#fff6d8", .6, .5, 2.0, g, {emissive: "#fff6d8", emissiveIntensity: 1.2}); };
+    for (let i = 0; i < 5; i++) { add(SLAB(.12, 5, .01, .02), "#e8edf7", EX + 3.2 + i * 2.6, -.43, -6); }
+    ["#ef4444", "#1D4ED8", "#e5e7eb", "#D4AF5A"].forEach((c, i) => car(EX + 4.5 + i * 2.6, -6, c, 0));
+    car(rx1, rz1 - 10, "#22c55e", PI); car(rx0, rz0 + 12, "#f59e0b", 0); car(-14, rz1, "#e5e7eb", PI / 2); car(12, rz0, "#38bdf8", -PI / 2);
+    /* lampu jalan */
+    const lampu = (x, z) => { const g = grp(x, -.45, z, 0); add(CY(.07, .1, 4.2, 10), "#334155", 0, 2.1, 0, g, CHROME); add(CAP(.05, .9), "#334155", .4, 4.2, 0, g, CHROME).rotation.z = PI / 2;
+      add(SP(.2, 12, 8), "#fff1cf", .85, 4.1, 0, g, {emissive: "#ffd27a", emissiveIntensity: 2}); };
+    for (let x = px0 + 4; x < px1; x += 12) { lampu(x, pz0 + 1); lampu(x, pz1 - 1); }
+    for (let z = pz0 + 8; z < pz1 - 4; z += 12) { lampu(px0 + 1, z); lampu(px1 - 1, z); }
+    /* pohon di tepi plaza */
+    const pohon = (x, z, s) => { const g = grp(x, -.45, z, 0); g.scale.setScalar(s); CAST = true; add(CY(.16, .22, 1.4, 12), "#6b4423", 0, .7, 0, g); add(SP(1.0, 18, 14), "#1f8f52", 0, 1.9, 0, g, {roughness: .8}); add(SP(.7, 16, 12), "#27a35f", .3, 2.6, .1, g, {roughness: .8}); CAST = false; };
+    for (let x = px0 + 2; x < px1; x += 6) { if (Math.abs(x) > 6) pohon(x, pz1 - 3, .9 + ((x * 7) % 3) * .1); pohon(x + 3, pz0 + 3, .9); }
+    [[px0 + 3, -4], [px0 + 3, 4], [px1 - 3, 6], [px1 - 3, 12]].forEach(p => pohon(p[0], p[1], 1.1));
+    /* gedung-gedung tetangga (kotak berjendela) */
+    const tex = [winTex(1, .35), winTex(2, .5), winTex(3, .25)], cols = ["#22346b", "#28407d", "#1d2d61", "#2c4688"];
+    const mats = tex.map((t, i) => new THREE.MeshStandardMaterial({color: LIN(cols[i]), emissive: LIN("#ffffff"), emissiveMap: t, emissiveIntensity: .85, roughness: .7}));
+    let s = 3; const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280;
+    const tower = (x, z) => { const w = 7 + rnd() * 7, d = 7 + rnd() * 6, h = 8 + rnd() * 30; const m = add(boxUV(+w.toFixed(1), +h.toFixed(1), +d.toFixed(1)), mats[(rnd() * 3) | 0], x, h / 2 - .5, z);
+      if (rnd() < .35) add(CY(.06, .06, 3, 8), "#cbd5e1", x + w * .2, h + 1, z, null, CHROME); if (rnd() < .3) add(PANEL(w * .8, .3, .2, .05), "#D4AF5A", x, h - .2, z + d / 2 + .05, null, {emissive: "#D4AF5A", emissiveIntensity: .6}); return m; };
+    /* hanya di belakang & samping, supaya kamera depan tidak terhalang */
+    for (let x = rx0 - 6; x <= rx1 + 6; x += 13) tower(x, rz0 - 12 - rnd() * 6);
+    for (let z = rz0 - 4; z <= 8; z += 13) { tower(rx0 - 12 - rnd() * 6, z); tower(rx1 + 12 + rnd() * 6, z); }
+    for (let i = 0; i < 22; i++) { const a = PI + i / 21 * PI, R = 95 + rnd() * 30; tower(BX + Math.cos(a) * R, -6 + Math.sin(a) * R * .8); }
+  }
+
   const floorMat = {};
   /* lebar gedung: inti x -12.2..12.2 + sayap timur x 12.2..21 */
-  const EX = 21.0, BW = EX + 12.2, BX = (EX - 12.2) / 2, WC = 16.6;
+  const EX = 21.0, WX = -25.4, BW = EX - WX, BX = (EX + WX) / 2, WC = 16.6;
   function floorBase(f, col) {
     if (!floorMat[col]) {
       const ft = CT(512, 512, (g, w, h) => { g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); g.strokeStyle = "rgba(0,0,0,.16)"; g.lineWidth = 3;
@@ -1453,7 +1510,10 @@ const OFFICE = (() => {
     add(CAP(.05, BW - .2), "#D4AF5A", BX, -.17, 7.22, null, GOLD).rotation.z = PI / 2;
     add(CAP(.025, BW - .4), "#5ee6ff", BX, .02, 7.24, null, {emissive: "#5ee6ff", emissiveIntensity: 1.4}).rotation.z = PI / 2;
     add(CAP(.05, 14.2), "#D4AF5A", EX + .02, -.17, 0, null, GOLD).rotation.x = PI / 2;
-    wall(BX, -7.05, BW, 0); wall(-12.05, 0, 14.4, PI / 2); wall(EX - .08, 0, 14.4, -PI / 2, true);
+    const lo = DOORZ[f] - 1.0, hi = DOORZ[f] + 1.0;   // pintu ke sayap barat
+    wall(BX, -7.05, BW, 0); wall(-12.05, (lo - 7.2) / 2, lo + 7.2, PI / 2); wall(-12.05, (hi + 7.2) / 2, 7.2 - hi, PI / 2);
+    wall(EX - .08, 0, 14.4, -PI / 2, true); wall(WX + .08, 0, 14.4, PI / 2, true);
+    add(CAP(.05, 14.2), "#D4AF5A", WX - .02, -.17, 0, null, GOLD).rotation.x = PI / 2;
     const tube = new THREE.Mesh(G("tube", () => new THREE.CylinderGeometry(.85, .85, FH, 40, 1, true, .55, PI * 2 - 1.1)), new THREE.MeshStandardMaterial({color: LIN("#bfe0ff"), transparent: true, opacity: .2, roughness: .05, metalness: .2, side: THREE.DoubleSide, depthWrite: false}));
     tube.position.set(LIFT[0], FH / 2 - .3, LIFT[1]); CUR.add(tube);
     [.02, WH - .05].forEach(y => add(TO(.87, .04), "#D4AF5A", LIFT[0], y, LIFT[1], null, GOLD).rotation.x = PI / 2);
@@ -1466,18 +1526,22 @@ const OFFICE = (() => {
     ROOF = new THREE.Group(); ROOF.position.y = FY[3] + FH; sc.add(ROOF); CUR = ROOF;
     add(SLAB(BW, 14.4, .35, .5), new THREE.MeshStandardMaterial({color: LIN("#14295e"), roughness: .6}), BX, -.175, 0);
     add(CAP(.05, BW - .2), "#D4AF5A", BX, -.17, 7.22, null, GOLD).rotation.z = PI / 2;
-    [[BX, -7.0, BW - .2, 0], [-12.0, 0, 14.2, PI / 2], [EX - .2, 0, 14.2, PI / 2]].forEach(w => { const g = grp(w[0], 0, w[1], w[3]); add(PANEL(w[2], .55, .22, .1), "#EEF2F9", 0, .27, 0, g); add(CAP(.03, w[2]), "#F1D58A", 0, .57, 0, g, {emissive: "#D4AF5A", emissiveIntensity: 1}).rotation.z = PI / 2; });
+    [[BX, -7.0, BW - .2, 0], [WX + .2, 0, 14.2, PI / 2], [EX - .2, 0, 14.2, PI / 2]].forEach(w => { const g = grp(w[0], 0, w[1], w[3]); add(PANEL(w[2], .55, .22, .1), "#EEF2F9", 0, .27, 0, g); add(CAP(.03, w[2]), "#F1D58A", 0, .57, 0, g, {emissive: "#D4AF5A", emissiveIntensity: 1}).rotation.z = PI / 2; });
     add(CY(3, 3, .05, 56), "#0A2A6B", -4, .03, 0);
     add(TO(2.9, .06), "#D4AF5A", -4, .07, 0, null, GOLD).rotation.x = PI / 2;
     const hp = CT(512, 512, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = "#F1D58A"; g.font = "800 300px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("H", w / 2, h / 2 + 20); });
     plane(hp, 3.6, 3.6, -4, .08, 0).rotation.x = -PI / 2;
     const sg = CT(1024, 256, (g, w, h) => { g.fillStyle = "#0A2A6B"; roundRect(g, 0, 0, w, h, 60); g.fill(); g.strokeStyle = "#D4AF5A"; g.lineWidth = 12; roundRect(g, 10, 10, w - 20, h - 20, 52); g.stroke();
       g.fillStyle = "#F1D58A"; g.font = "800 140px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("MCI  HQ", w / 2, h / 2 + 8); });
-    const sgn = grp(4.5, 0, 4.0, 0); [-3.2, 3.2].forEach(x => add(CY(.07, .07, 1.4, 12), "#D4AF5A", x, .7, 0, sgn, GOLD)); plane(sg, 8, 2, 0, 2.3, 0, 0, sgn);
+    const sgn = grp(4.5, 0, 4.0, 0); [-3.2, 3.2].forEach(x => add(CY(.07, .07, 1.4, 12), "#D4AF5A", x, .7, 0, sgn, GOLD)); plane(sg, 8, 2, 0, 2.3, .02, 0, sgn); plane(sg, 8, 2, 0, 2.3, -.02, PI, sgn);   // dua sisi: tetap terbaca dari belakang
+    add(PANEL(8.2, 2.2, .03, .1), "#0A2A6B", 0, 2.3, 0, sgn);
     const ant = grp(8.5, 0, -4.5, 0); add(CY(.08, .14, 4, 12), "#cbd5e1", 0, 2, 0, ant, CHROME); [1, 2, 3].forEach(y => add(TO(.25 - y * .05, .02), "#cbd5e1", 0, y, 0, ant, CHROME).rotation.x = PI / 2);
     const bl = add(SP(.14), "#ef4444", 0, 4.1, 0, ant, {emissive: "#ef4444", emissiveIntensity: 2}); ANI.push({o: bl.material, k: "pulse"});
     [[2, -4.5], [5, -4.5]].forEach(p => { add(SLAB(2.4, 1.4, .08, .12), "#1e3a8a", p[0], .9, p[1], null, {roughness: .2, metalness: .5}).rotation.x = -.5; add(CY(.04, .04, .8, 8), "#cbd5e1", p[0], .45, p[1] + .2, null, CHROME); });
-    plant(-10.8, 6, 1.2); plant(10.8, 6, 1.2); plant(-10.8, -6, 1); plant(10.8, 2, 1); plant(20.2, 6, 1.1);
+    plant(-10.8, 6, 1.2); plant(10.8, 6, 1.2); plant(-10.8, -6, 1); plant(10.8, 2, 1); plant(20.2, 6, 1.1); plant(-24.6, 6, 1.1); plant(-24.6, -6, 1);
+    /* panel surya + tandon air di atas sayap barat */
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) { add(SLAB(2.4, 1.4, .08, .12), "#1e3a8a", -15.5 - i * 2.7, .9, -4.5 + j * 2.2, null, {roughness: .2, metalness: .5}).rotation.x = -.5; add(CY(.04, .04, .8, 8), "#cbd5e1", -15.5 - i * 2.7, .45, -4.3 + j * 2.2, null, CHROME); }
+    const tk = grp(-21.5, 0, 3.6, 0); [-1, 1].forEach(a => [-1, 1].forEach(b => add(CY(.06, .06, 1.4, 8), "#94a3b8", a * .7, .7, b * .7, tk, CHROME))); CAST = true; add(CY(1.0, 1.0, 1.6, 28), "#EEF2F9", 0, 2.2, 0, tk, {roughness: .4}); CAST = false; add(TO(1.0, .04), "#D4AF5A", 0, 3.0, 0, tk, GOLD).rotation.x = PI / 2;
     /* kubah observatorium di atas sayap timur */
     const dm = grp(WC + .6, 0, -2.2, 0); CAST = true;
     add(CY(3.0, 3.2, .7, 48), "#EEF2F9", 0, .35, 0, dm, {roughness: .4});
@@ -1493,7 +1557,7 @@ const OFFICE = (() => {
   function lt1() {
     const f = 0; floorBase(f, "#1b3a80");
     [-6.6, -3.0, 0.4, 1.6, 4.8, 8.0].forEach((x, k, a) => { N(`f0_sp${x}`, f, x, -1.3); if (k) L(`f0_sp${a[k - 1]}`, `f0_sp${x}`); });
-    [1.6, 4.8, 8.0].forEach(x => { N(`f0_a${x}`, f, x, 1.4); L(`f0_a${x}`, `f0_sp${x}`); SLOTS[0].push({f, x, z: 3.0, ry: PI, link: `f0_a${x}`}); });
+    [1.6, 4.8, 8.0].forEach(x => { N(`f0_a${x}`, f, x, 1.4); L(`f0_a${x}`, `f0_sp${x}`); });
     lift(f, "f0_sp8");
     label("RESEPSIONIS", 4.8, 2.9, 3.3, .6);
     const lg = CT(512, 512, (g, w, h) => { g.clearRect(0, 0, w, h); g.strokeStyle = "#D4AF5A"; g.lineWidth = 16; g.beginPath(); g.arc(w / 2, h / 2, 230, 0, 7); g.stroke(); g.lineWidth = 4; g.beginPath(); g.arc(w / 2, h / 2, 200, 0, 7); g.stroke();
@@ -1573,7 +1637,6 @@ const OFFICE = (() => {
   function lt2() {
     const f = 1; floorBase(f, "#173273");
     grid(f, -1.4, [{z: 2.9, xs: [-5.6, -1.6, 2.4, 6.4]}], [-7.6, -3.6, .4, 4.4, 8.0], [-9.4]);
-    [-5.6, -1.6, 2.4, 6.4].forEach(x => SLOTS[1].push({f, x, z: 1.4, ry: 0, link: `f1_r0a${x}`}));
     lift(f, "f1_sp8");
     label("LAB ELEKTRONIK", -6.0, 3.55, -5.4, .7);
     CAST = true; add(SLAB(9.2, 1.0, .9, .14), "#EEF2F9", -6.0, .45, -6.35, null, {roughness: .45}); add(SLAB(9.3, 1.08, .06, .16), "#20335f", -6.0, .93, -6.33, null, {roughness: .3, metalness: .3}); CAST = false;
@@ -1599,7 +1662,6 @@ const OFFICE = (() => {
   function lt3() {
     const f = 2; floorBase(f, "#173273");
     grid(f, -.3, [{z: 2.1, xs: [-2.0, 2.2, 6.4]}, {z: 5.5, xs: [-2.0, 2.2, 6.4]}], [-4.4, .1, 4.3, 8.3], [-8.25]);
-    [[-2.0, .6, 0], [2.2, .6, 0], [-2.0, 4.0, 1], [2.2, 4.0, 1], [6.4, .6, 0], [6.4, 4.0, 1]].forEach(s => SLOTS[2].push({f, x: s[0], z: s[1], ry: 0, link: `f2_r${s[2]}a${s[0]}`}));
     lift(f, "f2_sp8.3");
     glassSeg(-5.2, -6.9, -5.2, -.9); glassSeg(-11.9, -.9, -8.9, -.9); glassSeg(-7.6, -.9, -5.2, -.9);
     label("MEETING", -8.55, 3.55, -3.9, .7);
@@ -1875,6 +1937,115 @@ const OFFICE = (() => {
     [[14.8, 4.5], [16.6, 5.1], [18.4, 4.5]].forEach((b, i) => S(`f3_bb${i}`, f, b[0], b[1], PI, `f3_e${xs[i]}`, .3));
   }
 
+  /* ---------- SAYAP BARAT (x -12.2..-25.4): kamar pribadi tiap bot + ruang bersama ---------- */
+  const DOORZ = [-.4, -.6, .6, 3.0], DOORLINK = ["f0_sp-6.6", "f1_sp-9.4", "f2_sp-8.25", "f3_sp-9"];
+  const WCOL = [[-14.6, -18.2], [-18.2, -21.8], [-21.8, -25.4]];
+  function westHall(f) {
+    const zd = DOORZ[f];
+    [-1, 1].forEach(s => add(CY(.1, .1, WH, 14), "#D4AF5A", -12.05, WH / 2, zd + s * 1.0, null, GOLD));
+    add(CAP(.06, 2.1), "#D4AF5A", -12.05, 2.7, zd, null, GOLD).rotation.x = PI / 2;
+    N(`f${f}_wd`, f, -12.2, zd); L(`f${f}_wd`, DOORLINK[f]);
+    N(`f${f}_wh`, f, -13.4, zd); L(`f${f}_wd`, `f${f}_wh`);
+    N(`f${f}_wh0`, f, -13.4, 0); L(`f${f}_wh`, `f${f}_wh0`);
+    add(SLAB(13.2, 2.2, .02, .1), "#24396f", -18.8, .012, 0, null, {roughness: .9});
+    const xs = [-15.25, -18.85, -20.65, -22.45];
+    xs.forEach((x, k) => { N(`f${f}_wk${x}`, f, x, 0); L(`f${f}_wk${x}`, k ? `f${f}_wk${xs[k - 1]}` : `f${f}_wh0`); });
+  }
+  /* kamar: kolom c (0..2), span 1/2, baris "N"/"S"; mengembalikan {xc, zc, inner node} */
+  function westRoom(f, c, span, row, title, col, opts = {}) {
+    const x0 = WCOL[c][0], x1 = WCOL[c + span - 1][1], xc = (x0 + x1) / 2, xd = +(xc + 1.15).toFixed(2), n = row === "N" ? -1 : 1;
+    const zf = 1.2 * n, zb = 7.05 * n, zc = 4.1 * n;
+    glassSeg(x0, zf, xd + .55, zf); glassSeg(xd - .55, zf, x1, zf);
+    glassSeg(x0, zf, x0, zb - n * .05);
+    label(title, xc, 2.75, zf, .42, col);
+    add(SLAB(x0 - x1 - .6, 4.6, .02, .3), opts.rug || "#1a2d66", xc, .014, zc + n * .3, null, {roughness: .95});
+    const inner = N(`f${f}_wi${c}${row}`, f, xd, 5.2 * n); L(inner, `f${f}_wk${xd}`);
+    return {xc, zc, n, inner, x0, x1, xd};
+  }
+  function botRoom(f, c, span, row, key, title, col) {
+    const r = westRoom(f, c, span, row, title, col);
+    if (r.n < 0) SLOTS[f].push({f, x: r.xc, z: -3.6, ry: PI, link: r.inner, key});
+    else { const k = N(`f${f}_wq${c}${row}`, f, r.xc, 5.2); L(k, r.inner); SLOTS[f].push({f, x: r.xc, z: 3.6, ry: 0, link: k, key}); }
+    add(SLAB(2.4, 1.8, .02, .4), col, r.xc, .02, r.n * 3.9, null, {roughness: .9, transparent: true, opacity: .55});
+    plant(r.x0 - .45, r.n * 6.5, .8);
+    return r;
+  }
+  function poster(x, z, ry, w, h, title, sub, col) {
+    const t = CT(512, 320, (g, W, H) => { g.fillStyle = "#0A2A6B"; g.fillRect(0, 0, W, H); g.strokeStyle = col; g.lineWidth = 14; g.strokeRect(7, 7, W - 14, H - 14);
+      g.fillStyle = col; g.font = "800 64px system-ui,sans-serif"; g.textAlign = "center"; g.fillText(title, W / 2, 140); g.fillStyle = "#e6edf7"; g.font = "600 34px system-ui,sans-serif"; g.fillText(sub, W / 2, 220); });
+    const g = grp(x, 1.9, z, ry); add(PANEL(w + .1, h + .1, .05, .03), "#D4AF5A", 0, 0, 0, g, GOLD); plane(t, w, h, 0, 0, .03, 0, g);
+  }
+  function screenWall(x, z, ry, kind, ac, w = 1.6, h = 1.0) { const g = grp(x, 1.8, z, ry); add(PANEL(w + .1, h + .1, .06, .04), "#0c1426", 0, 0, 0, g); const m = plane(screenTex(kind, ac), w, h, 0, 0, .035, 0, g); ANI.push({o: m.material.map, k: "scroll"}); }
+  function boxes(x, z, n) { for (let i = 0; i < n; i++) add(PANEL(.5, .4, .5, .03), ["#c49a6c", "#b5835a", "#d4a373"][i % 3], x + (i % 2) * .55, .2 + Math.floor(i / 2) * .41, z, null, {roughness: .8}); }
+  /* hiasan khas tiap bot di kamarnya */
+  const ROOMDECO = {
+    herald: r => { poster(r.x0 - .06, r.zc, -PI / 2, 1.5, .95, "PENGUMUMAN", "Herald · Humas MCI", "#a3e635"); add(CN(.18, .42, 16), "#ef4444", r.x1 + .6, 1.1, r.n * 6.3).rotation.z = PI / 2; shelf(r.x1 + .3, r.zc, PI / 2, 1.6); },
+    sentinel: r => { screenWall(r.x0 - .06, r.zc, -PI / 2, "list", "#8b5cf6"); shelf(r.x1 + .3, r.zc, PI / 2, 1.6); lamp(r.x1 + .5, r.n * 6.3); },
+    devmatrix: r => { const g = grp(r.x1 + .55, 0, r.n * 6.2, PI / 2); CAST = true; add(PANEL(.9, 2.0, .7, .12), "#1b2433", 0, 1.0, 0, g, {roughness: .3, metalness: .4}); CAST = false; const s = plane(screenTex("rack", "#3b82f6"), .7, 1.7, 0, 1.0, .36, 0, g); ANI.push({o: s.material.map, k: "scroll"}); screenWall(r.x0 - .06, r.zc, -PI / 2, "code", "#3b82f6"); },
+    pulse: r => { poster(r.x0 - .06, r.zc, -PI / 2, 1.4, .9, "V = I × R", "Pulse · Listrik", "#10b981"); const g = grp(r.x1 + .5, 0, r.zc, PI / 2); add(PANEL(1.2, .9, .5, .06), "#20335f", 0, .45, 0, g); for (let i = 0; i < 6; i++) add(CY(.07, .07, .3, 12), "#10b981", -.45 + i * .18, 1.05, 0, g, {emissive: "#10b981", emissiveIntensity: .5}); },
+    aegis: r => { const g = grp(r.x0 - .08, 1.9, r.zc, -PI / 2); add(CY(.6, .6, .06, 32), "#ef4444", 0, 0, 0, g).rotation.x = PI / 2; add(TO(.6, .05), "#D4AF5A", 0, 0, .03, g, GOLD); label("SAFETY FIRST", r.x0 - .3, 2.85, r.zc, .32, "#ef4444"); add(PANEL(.3, .5, .2, .05), "#ef4444", r.x1 + .4, .25, r.n * 6.4); add(CY(.08, .08, .5, 12), "#ef4444", r.x1 + .9, .25, r.n * 6.4); },
+    nexus: r => { screenWall(r.x0 - .06, r.zc, -PI / 2, "list", "#f59e0b", 1.8, 1.1); boxes(r.x1 + .4, r.n * 6.3, 5); },
+    ledger: r => { const g = grp(r.x1 + .6, 0, r.n * 6.2, PI / 2); CAST = true; add(PANEL(.9, 1.1, .7, .15), "#C9A24A", 0, .55, 0, g, GOLD); CAST = false; add(TO(.14, .03), "#0A2A6B", 0, .65, .36, g); screenWall(r.x0 - .06, r.zc, -PI / 2, "chart", "#14b8a6"); },
+    scribe: r => { shelf(r.x0 - .3, r.zc - r.n * .2, -PI / 2, 2.2); shelf(r.x1 + .3, r.zc - r.n * .2, PI / 2, 2.2); },
+    atlas: r => { screenWall(r.x0 - .06, r.zc, -PI / 2, "map", "#0ea5e9", 1.8, 1.1); const gl = grp(r.x1 + .6, 0, r.n * 6.2, 0); add(CY(.15, .2, .05, 20), "#D4AF5A", 0, .03, 0, gl, GOLD); add(CY(.025, .025, .7, 8), "#D4AF5A", 0, .38, 0, gl, GOLD); const gb = grp(0, .95, 0, 0, gl); gb.userData.dyn = true; add(SP(.28, 22, 14), "#2563eb", 0, 0, 0, gb); add(SP(.12, 10, 8), "#22c55e", .18, .08, .14, gb).scale.set(1, .5, .4); ANI.push({o: gb, k: "spin", s: .5}); },
+  };
+  function canvasStudio(f) {
+    const r = botRoom(f, 1, 2, "S", "canvas", "STUDIO CANVAS", "#a855f7");
+    [[-19.0, 6.2, .3], [-24.4, 5.9, -.4]].forEach((e, i) => { const g = grp(e[0], 0, e[1], PI + e[2]); [-1, 1].forEach(s => add(CY(.025, .025, 1.7, 8), "#92400e", s * .32, .85, 0, g).rotation.z = s * .12); add(CY(.025, .025, 1.6, 8), "#92400e", 0, .8, -.3, g).rotation.x = -.3;
+      const pic = plane(artTex(i + 7), .9, .7, 0, 1.15, .06, 0, g); pic.rotation.x = -.12; add(PANEL(.96, .76, .03, .01), "#f4f1ea", 0, 1.15, .03, g).rotation.x = -.12; });
+    frameArt(-25.3, 2.0, 3.0, 1.6, 1.2, 9, PI / 2); frameArt(-25.3, 2.0, 5.6, 1.2, .9, 10, PI / 2); frameArt(-18.3, 2.0, 4.2, 1.4, 1.0, 11, -PI / 2);
+    const tb = grp(-23.2, 0, 2.2, 0); add(SLAB(1.4, .7, .06, .06), "#92400e", 0, .8, 0, tb); [[-.5, -.2], [.5, -.2], [-.5, .2], [.5, .2]].forEach(p => add(CY(.03, .03, .8, 8), "#92400e", p[0], .4, p[1], tb));
+    ["#ef4444", "#facc15", "#38bdf8", "#22c55e", "#a855f7"].forEach((c, i) => add(CY(.09, .08, .16, 14), c, -.5 + i * .25, .91, 0, tb, {roughness: .5}));
+    ["#ef4444", "#38bdf8", "#facc15", "#22c55e", "#f472b6", "#a855f7"].forEach((c, i) => add(CY(.15 + (i % 3) * .08, .15 + (i % 3) * .08, .005, 16), c, -19.5 - i * .9, .025, 1.8 + (i % 2) * 4.6, null, {roughness: .4}));
+    label("KARYA CANVAS", -21.8, 3.3, 6.6, .4, "#a855f7");
+    return r;
+  }
+  function ruangTamu(f, c, row) {
+    const r = westRoom(f, c, 1, row, "RUANG TAMU", "#F1D58A", {rug: "#3b2f6b"});
+    const sofa = grp(r.xc, 0, r.n * 6.3, r.n < 0 ? 0 : PI); CAST = true; add(SLAB(2.6, .8, .42, .3), "#2b56c4", 0, .21, 0, sofa); add(PANEL(2.6, .7, .3, .14), "#2449a8", 0, .55, -.4, sofa); CAST = false;
+    roundTable(r.xc, r.n * 4.6, .5, .42); plant(r.x1 + .5, r.n * 2.0, .9); lamp(r.x0 - .5, r.n * 6.3);
+    S(`f${f}_tm0`, f, r.xc - .6, r.n * 5.9, r.n < 0 ? 0 : PI, r.inner, .44); S(`f${f}_tm1`, f, r.xc + .6, r.n * 5.9, r.n < 0 ? 0 : PI, r.inner, .44);
+  }
+  function mushola(f, c, row) {
+    const r = westRoom(f, c, 1, row, "MUSHOLA", "#22c55e", {rug: "#14532d"});
+    for (let i = 0; i < 3; i++) { const m = add(SLAB(.75, 1.25, .02, .06), ["#166534", "#7f1d1d", "#1e3a8a"][i], r.xc - .9 + i * .9, .03, r.zc + r.n * .4, null, {roughness: .9}); m.rotation.y = -.25; add(SLAB(.6, .14, .021, .02), "#D4AF5A", r.xc - .9 + i * .9 - .15, .031, r.zc + r.n * .4 - .5, null, GOLD).rotation.y = -.25; }
+    shelf(r.x1 + .3, r.zc, PI / 2, 1.4); plant(r.x0 - .45, r.n * 2.0, .8);
+  }
+  function rakRuang(f, c, span, row, title, col, rack) {
+    const r = westRoom(f, c, span, row, title, col, {rug: "#18264f"});
+    const n = span * 2;
+    for (let i = 0; i < n; i++) { const x = r.x0 - .9 - i * ((r.x0 - r.x1 - 1.2) / Math.max(1, n - 1)); if (rack) { const g = grp(x, 0, r.n * 6.4, r.n < 0 ? 0 : PI); CAST = true; add(PANEL(.9, 2.1, .7, .12), "#1b2433", 0, 1.05, 0, g, {roughness: .3, metalness: .4}); CAST = false; const s = plane(screenTex("rack", ["#5ee6ff", "#a78bfa", "#22c55e"][i % 3]), .7, 1.8, 0, 1.05, .36, 0, g); ANI.push({o: s.material.map, k: "scroll"}); }
+      else { shelf(x, r.n * 6.6, r.n < 0 ? 0 : PI, 1.6); if (title.includes("GUDANG")) boxes(x - .3, r.n * 3.2, 3); } }
+    return r;
+  }
+  function westWing(f) {
+    westHall(f);
+    if (f === 0) { botRoom(f, 0, 1, "N", "herald", "HERALD", "#a3e635"); botRoom(f, 1, 1, "N", "sentinel", "SENTINEL", "#8b5cf6"); ruangTamu(f, 2, "N"); mushola(f, 0, "S"); canvasStudio(f); }
+    if (f === 1) { botRoom(f, 0, 1, "N", "devmatrix", "DEVMATRIX", "#3b82f6"); botRoom(f, 1, 1, "N", "pulse", "PULSE", "#10b981"); botRoom(f, 2, 1, "N", "aegis", "AEGIS", "#ef4444"); rakRuang(f, 0, 1, "S", "RUANG SERVER", "#5ee6ff", true); rakRuang(f, 1, 2, "S", "GUDANG KOMPONEN", "#F1D58A", false); }
+    if (f === 2) { botRoom(f, 0, 1, "N", "nexus", "NEXUS", "#f59e0b"); botRoom(f, 1, 1, "N", "ledger", "LEDGER", "#14b8a6"); botRoom(f, 2, 1, "N", "scribe", "SCRIBE", "#ec4899"); botRoom(f, 0, 1, "S", "atlas", "ATLAS", "#0ea5e9"); rakRuang(f, 1, 2, "S", "RUANG ARSIP", "#ec4899", false); }
+    if (f === 3) gym(f);
+    label(["KAMAR BOT · LT 1", "KAMAR BOT · LT 2", "KAMAR BOT · LT 3", "PUSAT KEBUGARAN"][f], -18.8, 3.7, 0, .6, "#5ee6ff");
+    plant(-12.9, -6.5, .9); plant(-12.9, 6.5, .9);
+  }
+  function gym(f) {
+    add(SLAB(12.4, 13.4, .02, .3), "#1e2b55", -19.0, .013, 0, null, {roughness: .95});
+    [-16.4, -18.6].forEach((x, i) => { const g = grp(x, 0, -5.9, 0); CAST = true; add(SLAB(.8, 1.9, .14, .06), "#1b2433", 0, .07, 0, g); CAST = false; add(SLAB(.6, 1.6, .02, .03), "#334155", 0, .15, 0, g);
+      [-1, 1].forEach(s => add(CY(.03, .03, 1.1, 8), "#cbd5e1", s * .35, .65, -.8, g, CHROME)); add(PANEL(.8, .35, .06, .04), "#0c1426", 0, 1.2, -.85, g).rotation.x = -.6; add(SP(.04), "#22c55e", .2, 1.24, -.82, g, {emissive: "#22c55e", emissiveIntensity: 1.5});
+      S(`f3_tr${i}`, f, x, -5.6, PI, `f3_wk${i ? -18.85 : -15.25}`); });
+    [-21.4, -23.6].forEach((x, i) => { add(SLAB(.7, 1.8, .02, .05), ["#a855f7", "#14b8a6"][i], x, .025, -4.6); S(`f3_ym${i}`, f, x, -4.6, PI, "f3_wk-22.45"); });
+    const rack = grp(-24.9, 0, -1.8, PI / 2); add(PANEL(1.4, .6, .4, .05), "#1b2433", 0, .7, 0, rack); [-.45, -.15, .15, .45].forEach(x => { add(CY(.09, .09, .14, 14), "#334155", x, 1.08, 0, rack, CHROME); });
+    [-16.6, -20.4].forEach((x, i) => { const g = grp(x, 0, 5.4, 0); CAST = true; add(SP(1, 22, 16), "#EEF2F9", 0, .8, 0, g, {roughness: .3}).scale.set(1.3, .75, .75); CAST = false;
+      add(CY(.62, .62, .02, 28), "#1e3a8a", -.0, .8, .75, g, {emissive: "#5ee6ff", emissiveIntensity: .25}).rotation.x = PI / 2; S(`f3_pod${i}`, f, x, 4.2, 0, `f3_wk${i ? -20.65 : -15.25}`, .5); });
+    add(PANEL(.45, 1.0, .45, .12), "#EEF2F9", -24.6, .5, 4.0); add(CY(.17, .17, .42, 24), "#7cc4ff", -24.6, 1.22, 4.0, null, {transparent: true, opacity: .55});
+    poster(-25.3, 0, PI / 2, 1.8, 1.0, "SEHAT = PRODUKTIF", "Pusat Kebugaran MCI", "#22c55e");
+  }
+  /* area lama bekas meja bot: jadi meja resepsionis & area kolaborasi */
+  function bekasMeja(f) {
+    if (f === 0) { CAST = true; add(SLAB(6.6, .9, 1.0, .3), "#0A2A6B", 4.8, .5, 3.0); CAST = false; add(SLAB(6.8, 1.0, .06, .32), "#D4AF5A", 4.8, 1.02, 3.0, null, GOLD); monitor(CUR, 3.6, 3.1, .5, .32, "cal", "#a3e635", null, PI, 1.05); monitor(CUR, 6.0, 3.1, .5, .32, "list", "#8b5cf6", null, PI, 1.05); add(SP(.08), "#facc15", 4.8, 1.1, 3.2, null, {emissive: "#facc15", emissiveIntensity: 1}); }
+    if (f === 1) [-5.6, -1.6, 2.4, 6.4].forEach(x => { roundTable(x, 1.6, .55, .74, "#5ee6ff"); chair(x - .8, 1.6, PI / 2); chair(x + .8, 1.6, -PI / 2); });
+    if (f === 2) [[-2.0, .6], [2.2, .6], [-2.0, 4.0], [2.2, 4.0], [6.4, .6], [6.4, 4.0]].forEach(p => { roundTable(p[0], p[1], .5, .74, "#D4AF5A"); chair(p[0] - .75, p[1], PI / 2); chair(p[0] + .75, p[1], -PI / 2); });
+    if (f) label("AREA KOLABORASI", 0.4, 2.9, f === 1 ? 1.6 : 2.3, .55);
+  }
   /* ---------- kegiatan istirahat ---------- */
   const ACT = {
     kopi: {t: "Ngopi dulu", spots: ["f0_pk1", "f0_pk2", "f3_bar"], anim: "sip", prop: "cup", w: 5},
@@ -1904,6 +2075,10 @@ const OFFICE = (() => {
     rakbuku: {t: "Cari buku di rak", spots: ["f2_rk0", "f2_rk1"], anim: "reach", w: 1},
     teropong: {t: "Neropong bintang", spots: ["f3_tel"], anim: "stare", w: 1.2},
     planet: {t: "Lihat planetarium mini", spots: ["f3_or"], anim: "stare", w: 1},
+    tamu: {t: "Ngobrol di ruang tamu", spots: ["f0_tm0", "f0_tm1"], anim: "talk", w: 1.5},
+    olahraga: {t: "Lari di treadmill", spots: ["f3_tr0", "f3_tr1"], anim: "walk", w: 1.4},
+    peregangan: {t: "Peregangan di matras", spots: ["f3_ym0", "f3_ym1"], anim: "stare", w: 1},
+    pod: {t: "Tidur siang di pod", spots: ["f3_pod0", "f3_pod1"], anim: "doze", w: 1},
     bintang: {t: "Rebahan di observatorium", spots: ["f3_bb0", "f3_bb1", "f3_bb2"], anim: "lounge", w: 1.5},
   };
   const PREF = {apex: {golf: 1, visi: 1, kopi: 1, rapat: 1.5, tidur: .3, sibuk: .5, teropong: 1.5}, devmatrix: {kopi: 3, ngoprek: 2, komputer: 2, esp: 2}, nexus: {makan: 2, rapat: 2, cetak3d: 1.5}, aegis: {koran: 3, pantau: 3}, sentinel: {jendela: 3, arcade: 2, teropong: 2},
@@ -1916,8 +2091,9 @@ const OFFICE = (() => {
     const boss = !!d.boss || d.key === "apex";
     let f = Math.max(0, Math.min(3, (d.lantai || 1) - 1));
     let slot = boss ? SLOTS[3].find(s => s.boss && !s.used) : null;
-    if (!slot) slot = SLOTS[f].find(s => !s.boss && !s.used);
-    for (let k = 0; k < 4 && !slot; k++) slot = SLOTS[k].find(s => !s.boss && !s.used);
+    if (!slot) slot = SLOTS.flat().find(s => s.key === d.key && !s.used);   // tiap bot punya kamar sendiri
+    if (!slot) slot = SLOTS[f].find(s => !s.boss && !s.used && !s.key);
+    for (let k = 0; k < 4 && !slot; k++) slot = SLOTS[k].find(s => !s.boss && !s.used && !s.key);
     if (!slot) return null;
     slot.used = true; f = slot.f; CUR = FG[f];
     const face = slot.ry ? 0 : PI, seat = [slot.x, slot.z + (slot.ry ? -.62 : .62)];
@@ -2155,11 +2331,11 @@ const OFFICE = (() => {
 
   /* ---------- tampilan & kamera ---------- */
   const PRESET = {
-    gedung: {vis: {all: true}, r: 66, phi: 1.32, th: .12, t: [5.6, 9.4, 0], tall: {r: 92, phi: 1.36, th: .12, t: [4.4, 9.6, 0]}, w: "Gedung MCI · tampak samping"},
-    f0: {vis: {floor: 0}, r: 42, phi: .92, th: .55, t: [4.4, 0, .3], tall: {r: 50, phi: .85, th: 1.35, t: [4.6, 0, .5]}},
-    f1: {vis: {floor: 1}, r: 42, phi: .92, th: .55, t: [4.4, 4.4, .3], tall: {r: 50, phi: .85, th: 1.35, t: [4.6, 4.4, .5]}},
-    f2: {vis: {floor: 2}, r: 42, phi: .92, th: .55, t: [4.4, 8.8, .3], tall: {r: 50, phi: .85, th: 1.35, t: [4.6, 8.8, .5]}},
-    f3: {vis: {floor: 3}, r: 42, phi: .92, th: .55, t: [4.4, 13.2, .3], tall: {r: 50, phi: .85, th: 1.35, t: [4.6, 13.2, .5]}},
+    gedung: {vis: {all: true}, r: 84, phi: 1.3, th: .1, t: [-1.2, 9.6, 0], tall: {r: 118, phi: 1.34, th: .1, t: [-2.2, 9.8, 0]}, w: "Gedung MCI · tampak samping"},
+    f0: {vis: {floor: 0}, r: 56, phi: .92, th: .5, t: [-2.2, 0, .3], tall: {r: 66, phi: .85, th: 1.35, t: [-2.2, 0, .5]}},
+    f1: {vis: {floor: 1}, r: 56, phi: .92, th: .5, t: [-2.2, 4.4, .3], tall: {r: 66, phi: .85, th: 1.35, t: [-2.2, 4.4, .5]}},
+    f2: {vis: {floor: 2}, r: 56, phi: .92, th: .5, t: [-2.2, 8.8, .3], tall: {r: 66, phi: .85, th: 1.35, t: [-2.2, 8.8, .5]}},
+    f3: {vis: {floor: 3}, r: 56, phi: .92, th: .5, t: [-2.2, 13.2, .3], tall: {r: 66, phi: .85, th: 1.35, t: [-2.2, 13.2, .5]}},
     lounge: {vis: {floor: 0}, r: 13, phi: .9, th: .75, t: [-8.2, .3, 3.2], w: "LT 1 · Lounge"},
     pantry: {vis: {floor: 0}, r: 12.5, phi: .95, th: .2, t: [4.2, .5, -4.8], w: "LT 1 · Pantry"},
     game: {vis: {floor: 0}, r: 11, phi: .95, th: .55, t: [-1.8, .3, 3.0], w: "LT 1 · Game Corner"},
@@ -2167,7 +2343,11 @@ const OFFICE = (() => {
     meeting: {vis: {floor: 2}, r: 12, phi: .9, th: .55, t: [-8.4, 9.1, -3.6], w: "LT 3 · Ruang Meeting"},
     dewan: {vis: {floor: 3}, r: 14, phi: .88, th: .45, t: [-6.4, 13.5, -2.6], w: "LT 4 · Ruang Dewan"},
     ceo: {vis: {floor: 3}, r: 12, phi: .9, th: -.25, t: [4.8, 13.5, -3.4], w: "LT 4 · Ruang CEO"},
-    studio: {vis: {floor: 0}, r: 6.5, phi: .9, th: .45, t: [8.0, .9, 2.7], w: "LT 1 · Studio Canvas"},
+    studio: {vis: {floor: 0}, r: 13, phi: .9, th: .2, t: [-21.8, .9, 3.4], w: "LT 1 · Studio Canvas"},
+    kamar1: {vis: {floor: 0}, r: 25, phi: .9, th: -.25, t: [-19.4, .6, 0], w: "LT 1 · Kamar Herald, Sentinel & Studio Canvas"},
+    kamar2: {vis: {floor: 1}, r: 25, phi: .9, th: -.25, t: [-19.4, 5.0, 0], w: "LT 2 · Kamar DevMatrix, Pulse & Aegis"},
+    kamar3: {vis: {floor: 2}, r: 25, phi: .9, th: -.25, t: [-19.4, 9.4, 0], w: "LT 3 · Kamar Nexus, Ledger, Scribe & Atlas"},
+    gym: {vis: {floor: 3}, r: 19, phi: .9, th: -.2, t: [-19.4, 13.8, 0], w: "LT 4 · Pusat Kebugaran"},
     galeri: {vis: {floor: 0}, r: 19, phi: .9, th: .32, t: [16.4, .6, -.2], w: "LT 1 · Galeri Karya"},
     labiot: {vis: {floor: 1}, r: 19, phi: .88, th: .12, t: [16.6, 5.2, -1.0], w: "LT 2 · Lab Komputer & IoT"},
     perpus: {vis: {floor: 2}, r: 19, phi: .9, th: .32, t: [16.4, 9.2, -.2], w: "LT 3 · Perpustakaan"},
@@ -2294,14 +2474,15 @@ const OFFICE = (() => {
     R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap; R.shadowMap.autoUpdate = false;
     stage.prepend(R.domElement);
     sc = new THREE.Scene(); CUR = sc;
-    cam = new THREE.PerspectiveCamera(34, 1, .1, 320);
+    cam = new THREE.PerspectiveCamera(34, 1, .1, 520);
     topCam = new THREE.OrthographicCamera(-BW / 2 - .5, BW / 2 + .5, (BW + 1) / 3.32, -(BW + 1) / 3.32, 1, 100); topCam.up.set(0, 0, -1);
     ctl = new THREE.OrbitControls(cam, R.domElement);
-    Object.assign(ctl, {enableDamping: true, dampingFactor: .08, minDistance: 4, maxDistance: 120, maxPolarAngle: 1.5, screenSpacePanning: true, rotateSpeed: .7, zoomSpeed: .9});
+    Object.assign(ctl, {enableDamping: true, dampingFactor: .08, minDistance: 4, maxDistance: 170, maxPolarAngle: 1.5, screenSpacePanning: true, rotateSpeed: .7, zoomSpeed: .9});
     world();
     for (let i = 0; i < 4; i++) { const g = new THREE.Group(); g.position.y = FY[i]; sc.add(g); FG.push(g); }
     [lt1, lt2, lt3, lt4].forEach((fn, i) => { CUR = FG[i]; fn(); });
     [wing1, wing2, wing3, wing4].forEach((fn, i) => { CUR = FG[i]; fn(); });
+    [0, 1, 2, 3].forEach(i => { CUR = FG[i]; westWing(i); bekasMeja(i); });
     roof(); CUR = sc;
     const order = [...list].sort((a, b) => (b.boss ? 1 : 0) - (a.boss ? 1 : 0));
     AG = order.map(build).filter(Boolean);
