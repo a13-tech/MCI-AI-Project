@@ -24,7 +24,8 @@ button,input,select,textarea{font:inherit}
 .nv.on{background:rgba(212,175,90,.18);color:var(--gold2);font-weight:700}
 .nv:focus-visible{outline:2px solid var(--gold2)}
 .cv{margin-top:auto;padding:14px;border-radius:14px;background:rgba(255,255,255,.07);color:#DCE6FB;font-size:12px;line-height:1.5}
-.cv b{color:var(--gold2)}.cv,.brand b{cursor:default;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.cv b{color:var(--gold2)}.cv,.brand b,#whoRole{cursor:default;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation;-webkit-touch-callout:none}
+.wh{display:none}
 .adm{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(4,12,34,.72);backdrop-filter:blur(4px)}.adm[hidden]{display:none}
 .adm form{width:min(380px,90vw);display:grid;gap:12px;padding:26px;border-radius:20px;background:#0B1F4D;border:1px solid var(--gold);color:#F3F7FF;box-shadow:0 20px 60px rgba(0,0,0,.4)}
 .adm b{font-size:22px;color:var(--gold2);letter-spacing:.08em}.adm p{margin:0;font-size:13px;color:#AFC2EA}.adm input{font:inherit;padding:12px;border-radius:12px;border:1px solid #3B5BA8;background:#14306E;color:#fff;min-height:44px}
@@ -186,6 +187,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
  #app{flex-direction:column}
  #sd{width:auto;height:auto;position:sticky;top:0;z-index:5;flex-direction:row;overflow-x:auto;padding:10px 12px;align-items:center}
  .brand{padding:0 8px 0 0}.brand small,.brand i,.cv{display:none}.brand b{font-size:22px}
+ .wl{display:none}.wh{display:inline;color:#DCE6FB}
  main{padding:16px 12px}
  #stage{height:70vh;min-height:400px;border-radius:16px}
  .chip span,.chip.busy span{display:none}.chip.on span{display:inline}
@@ -785,19 +787,22 @@ $("#lpBuat").onclick = async () => {
   b.disabled = false; setTimeout(() => $("#lpMsg").textContent = "", 6000);
 };
 
-/* Pintu rahasia admin: ketuk kotak "Hemat token" (atau logo MCI di HP) 7 kali */
+/* Pintu rahasia admin: ketuk kotak "Hemat token" 7 kali (di HP: kotak "⚡ Hemat token · Viewer" kanan atas, atau logo MCI) */
 (() => {
-  let n = 0, last = 0, tt;
+  let n = 0, last = 0, tt, opened = 0;
   const toast = m => { const e = $("#tst"); e.textContent = m; e.hidden = false; clearTimeout(tt); tt = setTimeout(() => e.hidden = true, 1200); };
   const tap = () => {
     if (ME.role === "admin") return;
     const now = Date.now(); n = now - last < 1500 ? n + 1 : 1; last = now;
     if (n >= 4 && n < 7) toast(`${7 - n} ketukan lagi`);
-    if (n >= 7) { n = 0; $("#adm").hidden = false; $("#admE").textContent = ""; $("#admT").value = ""; setTimeout(() => $("#admT").focus(), 50); }
+    if (n >= 7) { n = 0; opened = Date.now(); clearTimeout(tt); $("#tst").hidden = true; $("#adm").hidden = false; $("#admE").textContent = ""; $("#admT").value = ""; setTimeout(() => $("#admT").focus(), 50); }
   };
-  $$(".cv, .brand b").forEach(e => e.addEventListener("click", tap));
+  /* pointerup, bukan click: di iPhone ketukan cepat dimakan fitur "ketuk dua kali untuk zoom" */
+  let lastUp = 0;
+  const onUp = e => { if (e.pointerType === "mouse" && e.button !== 0) return; const t = Date.now(); if (t - lastUp < 60) return; lastUp = t; tap(); };
+  $$(".cv, .brand b, #whoRole").forEach(e => e.addEventListener("pointerup", onUp));
   $("#admX").onclick = () => $("#adm").hidden = true;
-  $("#adm").onclick = e => { if (e.target.id === "adm") $("#adm").hidden = true; };
+  $("#adm").onclick = e => { if (e.target.id === "adm" && Date.now() - opened > 600) $("#adm").hidden = true; }; /* abaikan "klik hantu" sisa ketukan ke-7 di HP */
   $("#admF").onsubmit = async e => {
     e.preventDefault(); const t = $("#admT").value.trim(); if (!t) return;
     if (DEMO) { $("#admE").textContent = "(DEMO) Di server asli, token yang benar langsung membuka mode admin."; return; }
@@ -2555,7 +2560,7 @@ const OFFICE = (() => {
   if (DEMO) { $("#demoBanner").hidden = false; $("#csv").removeAttribute("href"); $("#csv").onclick = e => { e.preventDefault(); alert("Ekspor CSV aktif di versi server."); }; }
   try { ME = await api("/api/me"); if (ME.lantai) LANTAI = ME.lantai; } catch (e) { return; }
   if (ME.role !== "admin") $$(".nv").forEach(b => { if (!["office", "tentang"].includes(b.dataset.p)) b.style.display = "none"; });
-  $("#whoRole").innerHTML = "Masuk sebagai <b>" + (ME.role === "admin" ? "Admin" : "Viewer") + "</b>";
+  $("#whoRole").innerHTML = (ME.role === "admin" ? "<span class=\"wl\">Masuk sebagai</span><span class=\"wh\">Masuk sebagai</span> <b>Admin</b>" : "<span class=\"wl\">Masuk sebagai</span><span class=\"wh\">⚡ Hemat token</span> <b>Viewer</b>");
   if (ME.role !== "admin") $("#logout").style.display = "none";   // viewer tidak perlu tombol keluar
   if (DEMO) $("#logout").onclick = e => { e.preventDefault(); alert("Tombol Keluar aktif di versi server."); };
   await poll();
