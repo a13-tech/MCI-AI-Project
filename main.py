@@ -55,9 +55,9 @@ NAMA_PERAN = {"admin": "Admin", "bendahara": "Bendahara", "designer": "Designer"
 # "gambar_lihat" = galeri, "tim" = halaman Tim & Token (lihat saja). Sidang Dewan, Lab IoT, Laporan, Tentang Kami (edit) = admin.
 PERM = {
     "admin": {"*"},
-    "bendahara": {"boss", "kas", "kas_edit", "gambar_lihat", "memori", "skills", "tim"},
-    "designer": {"boss", "kas", "gambar_lihat", "gambar_buat", "memori", "skills", "tim"},
-    "anggota": {"boss", "kas", "gambar_lihat", "memori", "skills", "tim"},
+    "bendahara": {"boss", "kas", "kas_edit", "gambar_lihat", "memori", "skills", "tim", "stok"},
+    "designer": {"boss", "kas", "gambar_lihat", "gambar_buat", "memori", "skills", "tim", "stok"},
+    "anggota": {"boss", "kas", "gambar_lihat", "memori", "skills", "tim", "stok"},
     "viewer": set(),
 }
 KUOTA = {"boss": max(0, int(os.getenv("KUOTA_BOSS", "3"))), "gambar": max(0, int(os.getenv("KUOTA_GAMBAR", "5")))}
@@ -1810,8 +1810,10 @@ def api_me():
 @app.route("/api/office")
 def api_office():
     need("viewer")
-    adm = role() == "admin"
-    c = _OFFICE_CACHE.get(adm)
+    r_ = role()
+    adm, lihat_stok = r_ == "admin", can("stok", r_)
+    ck = (adm, lihat_stok)
+    c = _OFFICE_CACHE.get(ck)
     if c and time.time() - c[0] < 0.8:   # banyak viewer = satu hitungan per 0,8 detik
         return Response(c[1], mimetype="application/json")
     ags = [{"key": k, "name": a["nama"], "peran": a["peran"], "boss": a["boss"], "lantai": a["lantai"], "divisi": a["divisi"],
@@ -1823,8 +1825,8 @@ def api_office():
                 "status": o[0], "activity": o[1], "mode": o[2], "model": "cloudflare-flux", "gemini": bool(CF_TOKEN),
                 "telegram": bool(os.getenv("TOKEN_GAMBAR")), **({"calls": img_today(), "tokens": 0} if adm else {})})
     body = json.dumps({"agents": ags, "log": list(TASKLOG) if adm else [], "lantai": LANTAI, "iot": iot_public(adm), **({"galeri": GAL_IDS[:4]} if adm else {}),
-                       "stok": [[x["id"], x["nama"], x["jumlah"], x["satuan"], x["minimum"], x["foto"], x["v"]] for x in STOK[:18]]})
-    _OFFICE_CACHE[adm] = (time.time(), body)
+                       "stok": [[x["id"], x["nama"], x["jumlah"], x["satuan"], x["minimum"], x["foto"], x["v"]] for x in STOK[:18]] if lihat_stok else []})
+    _OFFICE_CACHE[ck] = (time.time(), body)
     return Response(body, mimetype="application/json")
 
 
@@ -2135,8 +2137,8 @@ def api_usage():
 
 @app.route("/api/stok", methods=["GET", "POST"])
 def api_stok():
-    """GET semua orang (termasuk viewer). POST khusus admin: multipart nama, jumlah, satuan, kategori, minimum, catatan, foto, id (ubah), hapus_foto."""
-    need("viewer")
+    """GET admin + divisi (viewer TIDAK boleh). POST khusus admin: multipart nama, jumlah, satuan, kategori, minimum, catatan, foto, id (ubah), hapus_foto."""
+    need_perm("stok")
     if request.method == "GET":
         return jsonify({"items": STOK, "menipis": len(stok_menipis()), "edit": role() == "admin"})
     need("admin")
@@ -2166,7 +2168,7 @@ def api_stok_one(i):
 
 @app.route("/api/stok/<int:i>/gambar")
 def api_stok_img(i):
-    need("viewer")
+    need_perm("stok")
     g = stok_img(i)
     if not g:
         abort(404)

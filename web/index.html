@@ -402,7 +402,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 
  <section id="p-stok" class="pg" hidden>
   <h1>Stok Barang</h1>
-  <p class="mu">Persediaan barang MCI, dijaga <b>MCI.Nexus</b> di ruang <b>Storage Barang</b> (LT 3, sayap barat). Foto barang ikut ditempel di kardusnya di kantor 3D. Semua orang bisa melihat; yang bisa mengubah hanya dev.</p>
+  <p class="mu">Persediaan barang MCI, dijaga <b>MCI.Nexus</b> di ruang <b>Storage Barang</b> (LT 3, sayap barat). Foto barang ikut ditempel di kardusnya di kantor 3D. Bisa dilihat admin dan semua divisi (Bendahara, Designer, Anggota); yang bisa mengubah hanya dev.</p>
   <div class="gr">
    <div class="cd"><div class="k">Jenis barang</div><div class="v" id="st1">-</div></div>
    <div class="cd"><div class="k">Total unit</div><div class="v" id="st2">-</div></div>
@@ -680,7 +680,7 @@ async function api(u, o = {}) {
 let IOTD = [];
 const ADM = () => ME.role === "admin";
 const can = p => { if (ME.role === "admin") return true; const z = ME.izin || []; return z.includes("*") || z.includes(p); };
-const PAGE_PERM = {cmd: "boss", kas: "kas", gambar: "gambar_lihat", memori: "memori", iot: "iot", laporan: "laporan", skills: "skills", tim: "tim"};
+const PAGE_PERM = {stok: "stok", cmd: "boss", kas: "kas", gambar: "gambar_lihat", memori: "memori", iot: "iot", laporan: "laporan", skills: "skills", tim: "tim"};
 function kuotaTxt(j) { return j ? `${j.pakai} dari ${j.batas} hari ini` : ""; }
 async function refreshMe() { try { const m = await api("/api/me"); ME = Object.assign(ME, m); renderKuota(); } catch (e) {} }
 function renderKuota() {
