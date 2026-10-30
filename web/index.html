@@ -24,7 +24,12 @@ button,input,select,textarea{font:inherit}
 .nv.on{background:rgba(212,175,90,.18);color:var(--gold2);font-weight:700}
 .nv:focus-visible{outline:2px solid var(--gold2)}
 .cv{margin-top:auto;padding:14px;border-radius:14px;background:rgba(255,255,255,.07);color:#DCE6FB;font-size:12px;line-height:1.5}
-.cv b{color:var(--gold2)}
+.cv b{color:var(--gold2)}.cv,.brand b{cursor:default;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.adm{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(4,12,34,.72);backdrop-filter:blur(4px)}.adm[hidden]{display:none}
+.adm form{width:min(380px,90vw);display:grid;gap:12px;padding:26px;border-radius:20px;background:#0B1F4D;border:1px solid var(--gold);color:#F3F7FF;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.adm b{font-size:22px;color:var(--gold2);letter-spacing:.08em}.adm p{margin:0;font-size:13px;color:#AFC2EA}.adm input{font:inherit;padding:12px;border-radius:12px;border:1px solid #3B5BA8;background:#14306E;color:#fff;min-height:44px}
+.adm .er{color:#FFB4B4;min-height:18px}.adm .bar{margin:0;justify-content:flex-end}
+.tst{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:61;background:#0B1F4D;color:#F1D58A;border:1px solid var(--gold);padding:10px 18px;border-radius:99px;font-weight:700;font-size:13px;pointer-events:none;transition:opacity .3s}.tst[hidden]{display:block;opacity:0}
 .who{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;padding:10px 12px;border-radius:12px;border:1px solid rgba(212,175,90,.35);color:#DCE6FB;font-size:12px}
 .who b{color:var(--gold2)}
 .lo{color:var(--navy);background:var(--gold);border-radius:10px;padding:8px 12px;font-weight:800;text-decoration:none;min-height:36px;display:inline-flex;align-items:center}
@@ -209,6 +214,10 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
  <div class="cv"><b>Hemat token</b><br>Router lokal, skill, model Lite, cache, dan mode Caveman.</div>
  <div class="who"><span id="whoRole">Memuat…</span><a class="lo" id="logout" href="/logout">Keluar</a></div>
 </aside>
+<div class="adm" id="adm" hidden><form id="admF"><b>MODE ADMIN</b><p>Masukkan token admin untuk membuka semua fitur.</p>
+ <input type="password" id="admT" autocomplete="current-password" aria-label="Token admin" placeholder="Token admin">
+ <div class="er" id="admE" role="alert"></div><div class="bar"><button type="button" class="bt o" id="admX">Batal</button><button class="bt g">Masuk</button></div></form></div>
+<div class="tst" id="tst" hidden></div>
 <main>
  <div class="demo" id="demoBanner" hidden>DEMO: semua data contoh. Tanpa server dan tanpa AI sungguhan.</div>
 
@@ -623,7 +632,7 @@ async function api(u, o = {}) {
   o.headers = Object.assign({"X-MCI": "1"}, o.headers || {});
   if (o.json) { o.method = "POST"; o.headers["Content-Type"] = "application/json"; o.body = JSON.stringify(o.json); delete o.json; }
   const r = await fetch(u, o);
-  if (r.status === 401) { location = "/login"; throw new Error("login"); }
+  if (r.status === 401) { location = "/"; throw new Error("login"); }
   let d = {}; try { d = await r.json(); } catch (e) {}
   if (!r.ok) throw new Error(d.error || "Error " + r.status);
   return d;
@@ -775,6 +784,29 @@ $("#lpBuat").onclick = async () => {
   } catch (e) { $("#lpMsg").textContent = e.message; }
   b.disabled = false; setTimeout(() => $("#lpMsg").textContent = "", 6000);
 };
+
+/* Pintu rahasia admin: ketuk kotak "Hemat token" (atau logo MCI di HP) 7 kali */
+(() => {
+  let n = 0, last = 0, tt;
+  const toast = m => { const e = $("#tst"); e.textContent = m; e.hidden = false; clearTimeout(tt); tt = setTimeout(() => e.hidden = true, 1200); };
+  const tap = () => {
+    if (ME.role === "admin") return;
+    const now = Date.now(); n = now - last < 1500 ? n + 1 : 1; last = now;
+    if (n >= 4 && n < 7) toast(`${7 - n} ketukan lagi`);
+    if (n >= 7) { n = 0; $("#adm").hidden = false; $("#admE").textContent = ""; $("#admT").value = ""; setTimeout(() => $("#admT").focus(), 50); }
+  };
+  $$(".cv, .brand b").forEach(e => e.addEventListener("click", tap));
+  $("#admX").onclick = () => $("#adm").hidden = true;
+  $("#adm").onclick = e => { if (e.target.id === "adm") $("#adm").hidden = true; };
+  $("#admF").onsubmit = async e => {
+    e.preventDefault(); const t = $("#admT").value.trim(); if (!t) return;
+    if (DEMO) { $("#admE").textContent = "(DEMO) Di server asli, token yang benar langsung membuka mode admin."; return; }
+    try { const r = await fetch("/api/masuk", {method: "POST", headers: {"X-MCI": "1", "Content-Type": "application/json"}, body: JSON.stringify({token: t})});
+      const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || "Gagal masuk");
+      $("#admE").textContent = ""; toast("Mode admin aktif"); setTimeout(() => location.replace("/"), 400);
+    } catch (er) { $("#admE").textContent = er.message; }
+  };
+})();
 
 /* Boss / Dewan */
 $$("[data-mode]").forEach(b => b.onclick = () => { MODE = b.dataset.mode; $$("[data-mode]").forEach(x => x.classList.toggle("on", x === b)); $("#pickWrap").hidden = MODE !== "dewan"; $("#bs").textContent = MODE === "dewan" ? "Mulai sidang" : "Kirim"; renderPicks(); });
@@ -2524,6 +2556,7 @@ const OFFICE = (() => {
   try { ME = await api("/api/me"); if (ME.lantai) LANTAI = ME.lantai; } catch (e) { return; }
   if (ME.role !== "admin") $$(".nv").forEach(b => { if (!["office", "tentang"].includes(b.dataset.p)) b.style.display = "none"; });
   $("#whoRole").innerHTML = "Masuk sebagai <b>" + (ME.role === "admin" ? "Admin" : "Viewer") + "</b>";
+  if (ME.role !== "admin") $("#logout").style.display = "none";   // viewer tidak perlu tombol keluar
   if (DEMO) $("#logout").onclick = e => { e.preventDefault(); alert("Tombol Keluar aktif di versi server."); };
   await poll();
   if (ME.role === "admin") { loadKas(true); loadUsage(); }

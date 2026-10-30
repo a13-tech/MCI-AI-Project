@@ -1568,10 +1568,24 @@ def login():
     return LOGIN % ""
 
 
+@app.route("/api/masuk", methods=["POST"])
+def api_masuk():
+    """Pintu rahasia admin (logo / kotak Hemat token diketuk 7x). Dibatasi 8 percobaan salah per 10 menit per IP."""
+    now, ip = time.time(), _ip()
+    FAILS[ip] = [t for t in FAILS.get(ip, []) if now - t < 600]
+    if len(FAILS[ip]) >= 8:
+        return jsonify({"error": "Terlalu banyak percobaan. Coba lagi 10 menit lagi."}), 429
+    tok = str((request.get_json(silent=True) or {}).get("token", "")).strip()
+    if ADMIN_TOKEN and _eq(tok, ADMIN_TOKEN):
+        return _setcookie(jsonify({"role": "admin"}), tok)
+    FAILS[ip].append(now)
+    return jsonify({"error": "Token admin salah."}), 401
+
+
 @app.route("/logout")
 def logout():
-    """Hapus cookie login lalu kembali ke halaman login (misalnya untuk mencoba mode viewer)."""
-    resp = make_response(redirect("/login"))
+    """Hapus cookie admin lalu kembali sebagai viewer (link biasa = mode lihat saja)."""
+    resp = make_response(redirect("/" if VIEW_TOKEN else "/login"))
     resp.delete_cookie("mci_auth", samesite="Strict", secure=bool(os.getenv("RENDER")), httponly=True)
     return resp
 
@@ -1581,17 +1595,18 @@ def index():
     k = request.args.get("k")
     if k:
         return _try_login(k) or abort(404)
-    if not role():
+    auto = not role()
+    if auto and not VIEW_TOKEN:
         return redirect("/login")
     pg = page_bytes()
-    if request.headers.get("If-None-Match") == pg["etag"]:
+    if not auto and request.headers.get("If-None-Match") == pg["etag"]:
         return Response(status=304, headers={"ETag": pg["etag"]})
     gz = "gzip" in request.headers.get("Accept-Encoding", "")
     r = Response(pg["gz"] if gz else pg["raw"], mimetype="text/html")
     r.headers.update({"ETag": pg["etag"], "Cache-Control": "no-cache", "Vary": "Accept-Encoding"})
     if gz:
         r.headers["Content-Encoding"] = "gzip"
-    return r
+    return _setcookie(r, VIEW_TOKEN) if auto else r   # siapa pun yang membuka link otomatis jadi viewer
 
 
 @app.route("/healthz")
