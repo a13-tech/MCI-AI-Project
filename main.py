@@ -55,11 +55,13 @@ NAMA_PERAN = {"admin": "Admin", "bendahara": "Bendahara", "designer": "Designer"
 # "gambar_lihat" = galeri, "tim" = halaman Tim & Token (lihat saja). Sidang Dewan, Lab IoT, Laporan, Tentang Kami (edit) = admin.
 PERM = {
     "admin": {"*"},
-    "bendahara": {"boss", "kas", "kas_edit", "gambar_lihat", "memori", "skills", "tim", "stok"},
+    "bendahara": {"boss", "kas", "kas_edit", "gambar_lihat", "memori", "skills", "tim", "stok", "hutang"},
     "designer": {"boss", "kas", "gambar_lihat", "gambar_buat", "memori", "skills", "tim", "stok"},
     "anggota": {"boss", "kas", "gambar_lihat", "memori", "skills", "tim", "stok"},
     "viewer": set(),
 }
+HUTANG_MAX = max(0, int(os.getenv("HUTANG_MAX", "15000")))      # batas pinjaman per anggota per bulan
+HUTANG_HARI = max(1, int(os.getenv("HUTANG_HARI", "3")))         # jatuh tempo H+3
 KUOTA = {"boss": max(0, int(os.getenv("KUOTA_BOSS", "3"))), "gambar": max(0, int(os.getenv("KUOTA_GAMBAR", "5")))}
 MAIL_WEBHOOK = os.getenv("MAIL_WEBHOOK", "").strip()       # URL Google Apps Script (Render gratis memblokir port SMTP)
 MAIL_SECRET = os.getenv("MAIL_SECRET", "").strip()
@@ -188,6 +190,8 @@ def db_init():
         sql(c, f"CREATE TABLE IF NOT EXISTS iot (id {pk}, ts {big} NOT NULL, perangkat TEXT NOT NULL, data TEXT NOT NULL)")
         sql(c, f"CREATE TABLE IF NOT EXISTS gambar (id {pk}, prompt TEXT NOT NULL, prompt_en TEXT, sumber TEXT, mime TEXT NOT NULL, data TEXT NOT NULL, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS aktivitas (id {pk}, waktu TEXT NOT NULL, bot TEXT, tugas TEXT, status TEXT, jalur TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS hutang (id {pk}, nama TEXT NOT NULL, jumlah {big} NOT NULL, tanggal TEXT NOT NULL, jatuh_tempo TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'belum', lunas TEXT, konfirmasi INTEGER NOT NULL DEFAULT 0, catatan TEXT, dibuat TEXT)")
+        sql(c, "CREATE TABLE IF NOT EXISTS dikeluarkan (nama TEXT PRIMARY KEY, tanggal TEXT NOT NULL, alasan TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS stok (id {pk}, nama TEXT NOT NULL, jumlah {big} NOT NULL DEFAULT 0, satuan TEXT, kategori TEXT, minimum {big} NOT NULL DEFAULT 0, catatan TEXT, mime TEXT, gambar TEXT, diubah TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS laporan (id {pk}, minggu TEXT, dibuat TEXT, dari TEXT, sampai TEXT, sumber TEXT, isi TEXT, data TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS pemakaian (tanggal TEXT NOT NULL, model TEXT NOT NULL, masuk {big} NOT NULL DEFAULT 0, keluar {big} NOT NULL DEFAULT 0, pikir {big} NOT NULL DEFAULT 0, panggilan {big} NOT NULL DEFAULT 0, PRIMARY KEY (tanggal, model))")
@@ -1108,6 +1112,111 @@ def iot_rules_check(pr, d):
                 asyncio.run_coroutine_threadsafe(iot_alert(pr, r, d[r["metrik"]]), LOOP)
 
 
+# ---------- HUTANG ANGGOTA (khusus Bendahara + admin) ----------
+# Aturan: maks HUTANG_MAX per anggota per bulan kalender, jatuh tempo H+HUTANG_HARI.
+# Lewat jatuh tempo tanpa konfirmasi tambahan dari Bendahara -> anggota otomatis tercatat DIKELUARKAN.
+def _nama_key(n):
+    return re.sub(r"\s+", " ", str(n or "")).strip().lower()
+
+
+def hutang_cek_telat():
+    """Tandai anggota yang menunggak lewat jatuh tempo (tanpa konfirmasi) sebagai dikeluarkan. Return nama baru."""
+    hari = today()
+    baru = []
+    with db() as c:
+        rows = sql(c, "SELECT nama, jatuh_tempo FROM hutang WHERE status='belum' AND jatuh_tempo < ?", (hari,)).fetchall()
+        sudah = {_nama_key(r[0]) for r in sql(c, "SELECT nama FROM dikeluarkan").fetchall()}
+        for nama, jt in rows:
+            k = _nama_key(nama)
+            if k in sudah:
+                continue
+            sql(c, "INSERT INTO dikeluarkan (nama,tanggal,alasan) VALUES (?,?,?)", (nama, hari, f"Hutang lewat jatuh tempo {jt} tanpa konfirmasi tambahan"))
+            sudah.add(k); baru.append(nama)
+    return baru
+
+
+def hutang_data():
+    hutang_cek_telat()
+    bulan, hari = today()[:7], today()
+    with db() as c:
+        rows = sql(c, "SELECT id,nama,jumlah,tanggal,jatuh_tempo,status,lunas,konfirmasi,catatan FROM hutang ORDER BY id DESC LIMIT 500").fetchall()
+        keluar = sql(c, "SELECT nama,tanggal,alasan FROM dikeluarkan ORDER BY tanggal DESC").fetchall()
+    items = [{"id": int(i), "nama": n, "jumlah": int(j or 0), "tanggal": t, "jatuh_tempo": jt, "status": st, "lunas": lu, "konfirmasi": bool(ko),
+              "catatan": ca or "", "telat": st == "belum" and jt < hari} for i, n, j, t, jt, st, lu, ko, ca in rows]
+    per = {}
+    for x in items:
+        if x["tanggal"][:7] == bulan:
+            per[_nama_key(x["nama"])] = per.get(_nama_key(x["nama"]), 0) + x["jumlah"]
+    belum = [x for x in items if x["status"] == "belum"]
+    return {"items": items, "bulan": bulan, "pakai_bulan_ini": per, "batas": HUTANG_MAX, "hari": HUTANG_HARI,
+            "total_belum": sum(x["jumlah"] for x in belum), "telat": sum(1 for x in belum if x["telat"]),
+            "dikeluarkan": [{"nama": n, "tanggal": t, "alasan": a} for n, t, a in keluar]}
+
+
+def hutang_tambah(nama, jumlah, catatan="", catat_kas=True):
+    nama = re.sub(r"\s+", " ", str(nama or "")).strip()[:60]
+    if not nama:
+        raise ValueError("Nama anggota wajib diisi")
+    try:
+        jumlah = int(float(jumlah))
+    except (TypeError, ValueError):
+        raise ValueError("Jumlah harus angka")
+    if jumlah <= 0:
+        raise ValueError("Jumlah harus lebih dari 0")
+    hutang_cek_telat()
+    k, bulan = _nama_key(nama), today()[:7]
+    with db() as c:
+        if any(_nama_key(r[0]) == k for r in sql(c, "SELECT nama FROM dikeluarkan").fetchall()):
+            raise ValueError(f"{nama} sudah dikeluarkan karena menunggak, tidak bisa pinjam lagi")
+        rows = sql(c, "SELECT nama, jumlah, tanggal FROM hutang").fetchall()
+        dipakai = sum(int(j or 0) for n, j, t in rows if _nama_key(n) == k and str(t)[:7] == bulan)
+        if dipakai + jumlah > HUTANG_MAX:
+            raise ValueError(f"Melebihi batas {rp(HUTANG_MAX)} per bulan. {nama} sudah pinjam {rp(dipakai)} bulan ini, sisa {rp(max(0, HUTANG_MAX - dipakai))}.")
+        tgl = today()
+        jt = (datetime.now(WIB) + timedelta(days=HUTANG_HARI)).strftime("%Y-%m-%d")
+        sql(c, "INSERT INTO hutang (nama,jumlah,tanggal,jatuh_tempo,status,catatan,dibuat) VALUES (?,?,?,?,?,?,?)",
+            (nama, jumlah, tgl, jt, "belum", str(catatan or "")[:200], _now()))
+    if catat_kas:
+        kas_add([{"tanggal": tgl, "keterangan": f"Pinjaman ke {nama} (jatuh tempo {jt})", "kategori": "Lainnya", "masuk": 0, "keluar": jumlah}], "hutang")
+    return jt
+
+
+def hutang_aksi(i, aksi, catat_kas=True):
+    with db() as c:
+        r = sql(c, "SELECT nama, jumlah, status, konfirmasi, jatuh_tempo FROM hutang WHERE id=?", (i,)).fetchone()
+        if not r:
+            raise ValueError("Data hutang tidak ditemukan")
+        nama, jumlah, status, konf, jt = r
+        if aksi == "lunas":
+            if status == "lunas":
+                raise ValueError("Sudah lunas")
+            sql(c, "UPDATE hutang SET status='lunas', lunas=? WHERE id=?", (today(), i))
+        elif aksi == "konfirmasi":
+            if status == "lunas":
+                raise ValueError("Sudah lunas")
+            if konf:
+                raise ValueError("Konfirmasi tambahan hanya bisa sekali")
+            baru = (datetime.strptime(max(jt, today()), "%Y-%m-%d") + timedelta(days=HUTANG_HARI)).strftime("%Y-%m-%d")
+            sql(c, "UPDATE hutang SET konfirmasi=1, jatuh_tempo=? WHERE id=?", (baru, i))
+        elif aksi == "hapus":
+            sql(c, "DELETE FROM hutang WHERE id=?", (i,))
+        else:
+            raise ValueError("Aksi tidak dikenal")
+    if aksi == "lunas" and catat_kas:
+        kas_add([{"tanggal": today(), "keterangan": f"Pelunasan pinjaman {nama}", "kategori": "Lainnya", "masuk": int(jumlah), "keluar": 0}], "hutang")
+    return True
+
+
+def hutang_pulihkan(nama):
+    """Admin memulihkan anggota. Syarat: tidak ada pinjaman yang masih telat (lunasi / beri konfirmasi dulu)."""
+    k = _nama_key(nama)
+    with db() as c:
+        telat = [r for r in sql(c, "SELECT nama FROM hutang WHERE status='belum' AND jatuh_tempo < ?", (today(),)).fetchall() if _nama_key(r[0]) == k]
+        if telat:
+            raise ValueError("Masih ada pinjaman yang telat. Tandai lunas atau beri konfirmasi tambahan dulu, baru pulihkan.")
+        return sum(sql(c, "DELETE FROM dikeluarkan WHERE nama=?", (r[0],)).rowcount for r in sql(c, "SELECT nama FROM dikeluarkan").fetchall() if _nama_key(r[0]) == k)
+
+
 # ---------- STOK BARANG (dipegang MCI.Nexus, ruang Storage Barang LT 3) ----------
 # Semua orang boleh melihat; tambah/ubah/hapus khusus admin (dev). Foto barang ditempel di kardus 3D.
 STOK = []   # cache tanpa data gambar
@@ -1470,6 +1579,11 @@ def laporan_data(hari=7):
         except (ValueError, TypeError, KeyError):
             pass
     out["ide_lama"] = list(dict.fromkeys(lama))[:20]
+    try:
+        h = hutang_data()
+        out["hutang"] = {"total_belum": h["total_belum"], "telat": h["telat"], "dikeluarkan": [x["nama"] for x in h["dikeluarkan"]][:10]}
+    except Exception:
+        log.exception("ringkasan hutang gagal")
     stok_load()
     out["stok"] = {"jenis": len(STOK), "unit": sum(x["jumlah"] for x in STOK), "menipis": [f"{x['nama']} ({x['jumlah']} {x['satuan']})" for x in stok_menipis()],
                    "teks": stok_teks(60)}
@@ -1497,6 +1611,9 @@ def laporan_teks(d, n):
         T.append("Pengeluaran terbesar: " + "; ".join(f"{r['keterangan']} {rp(r['keluar'])}" for r in k["terbesar_keluar"]))
     if n.get("catatan_kas"):
         T += [f"💡 {n['catatan_kas']}"]
+    hu = d.get("hutang") or {}
+    if hu:
+        T += ["", "🧾 HUTANG ANGGOTA", f"Belum lunas {rp(hu['total_belum'])} · telat bayar {hu['telat']}" + (f" · dikeluarkan: {', '.join(hu['dikeluarkan'])}" if hu["dikeluarkan"] else "")]
     st = d.get("stok") or {}
     if st:
         T += ["", "📦 SISA STOK BARANG (dicek MCI.Nexus di Storage Barang)", f"{st['jenis']} jenis barang · total {st['unit']:,} unit".replace(",", "."), st["teks"]]
@@ -1597,6 +1714,18 @@ async def laporan_jadwal():
                 await laporan_buat(kirim=True, sumber="otomatis")
         except Exception:
             log.exception("Jadwal laporan mingguan gagal")
+        try:   # cek hutang telat tiap 5 menit; anggota yang lewat H+3 tanpa konfirmasi otomatis dikeluarkan
+            baru = await asyncio.to_thread(hutang_cek_telat)
+            app_ = TG_APPS.get("apex")
+            for nama in baru:
+                log.info("Anggota dikeluarkan (hutang telat): %s", nama)
+                for aid in ALLOWED if app_ else []:
+                    try:
+                        await app_.bot.send_message(aid, f"🧾 {nama} otomatis DIKELUARKAN: hutang lewat jatuh tempo tanpa konfirmasi tambahan. Admin bisa memulihkan di web → Hutang.")
+                    except Exception:
+                        pass
+        except Exception:
+            log.exception("Cek hutang telat gagal")
         await asyncio.sleep(300)
 
 
@@ -1811,8 +1940,8 @@ def api_me():
 def api_office():
     need("viewer")
     r_ = role()
-    adm, lihat_stok = r_ == "admin", can("stok", r_)
-    ck = (adm, lihat_stok)
+    adm = r_ == "admin"
+    ck = adm
     c = _OFFICE_CACHE.get(ck)
     if c and time.time() - c[0] < 0.8:   # banyak viewer = satu hitungan per 0,8 detik
         return Response(c[1], mimetype="application/json")
@@ -1825,7 +1954,7 @@ def api_office():
                 "status": o[0], "activity": o[1], "mode": o[2], "model": "cloudflare-flux", "gemini": bool(CF_TOKEN),
                 "telegram": bool(os.getenv("TOKEN_GAMBAR")), **({"calls": img_today(), "tokens": 0} if adm else {})})
     body = json.dumps({"agents": ags, "log": list(TASKLOG) if adm else [], "lantai": LANTAI, "iot": iot_public(adm), **({"galeri": GAL_IDS[:4]} if adm else {}),
-                       "stok": [[x["id"], x["nama"], x["jumlah"], x["satuan"], x["minimum"], x["foto"], x["v"]] for x in STOK[:18]] if lihat_stok else []})
+                       "stok": [[x["id"], x["nama"], x["jumlah"], x["satuan"], x["minimum"], x["foto"], x["v"]] for x in STOK[:18]]})   # kardus 3D terlihat semua peran
     _OFFICE_CACHE[ck] = (time.time(), body)
     return Response(body, mimetype="application/json")
 
@@ -2135,6 +2264,45 @@ def api_usage():
     return jsonify(usage_report())
 
 
+@app.route("/api/hutang", methods=["GET", "POST"])
+def api_hutang():
+    """Khusus Bendahara + admin. POST {nama, jumlah, catatan?, kas?} = catat pinjaman baru."""
+    need_perm("hutang")
+    if request.method == "POST":
+        d = request.get_json(silent=True) or {}
+        try:
+            jt = hutang_tambah(d.get("nama"), d.get("jumlah"), d.get("catatan", ""), d.get("kas", True) is not False)
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+        return jsonify({"jatuh_tempo": jt, **hutang_data()})
+    return jsonify(hutang_data())
+
+
+@app.route("/api/hutang/<int:i>", methods=["POST"])
+def api_hutang_aksi(i):
+    """{aksi: lunas | konfirmasi | hapus}. Konfirmasi tambahan = perpanjang H+3 sekali. Hapus khusus admin."""
+    r = need_perm("hutang")
+    d = request.get_json(silent=True) or {}
+    aksi = str(d.get("aksi", ""))
+    if aksi == "hapus" and r != "admin":
+        return jsonify({"error": "Hapus data hutang khusus admin/dev"}), 403
+    try:
+        hutang_aksi(i, aksi, d.get("kas", True) is not False)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify(hutang_data())
+
+
+@app.route("/api/hutang/pulihkan", methods=["POST"])
+def api_hutang_pulihkan():
+    need("admin")
+    try:
+        n = hutang_pulihkan((request.get_json(silent=True) or {}).get("nama", ""))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"dipulihkan": n, **hutang_data()})
+
+
 @app.route("/api/stok", methods=["GET", "POST"])
 def api_stok():
     """GET admin + divisi (viewer TIDAK boleh). POST khusus admin: multipart nama, jumlah, satuan, kategori, minimum, catatan, foto, id (ubah), hapus_foto."""
@@ -2168,7 +2336,7 @@ def api_stok_one(i):
 
 @app.route("/api/stok/<int:i>/gambar")
 def api_stok_img(i):
-    need_perm("stok")
+    need("viewer")   # foto ditempel di kardus 3D, viewer juga melihatnya (halaman Stok tetap tertutup)
     g = stok_img(i)
     if not g:
         abort(404)
