@@ -54,7 +54,7 @@ JABATAN = {"admin": "Admin/Dev", "manager": "Manager", "pj": "PJ Divisi", "sekre
 _BASE = {"boss", "kas", "gambar_lihat", "memori", "skills", "tim", "stok", "catatan", "polling", "dok_lihat"}
 JABATAN_PERM = {
     "admin": {"*"},
-    "manager": _BASE | {"laporan_lihat", "polling_buat"},
+    "manager": _BASE | {"laporan_lihat", "polling_buat", "polling_semua"},
     "pj": _BASE | {"polling_buat"},
     "sekretaris": _BASE | {"catatan_kelola", "laporan_lihat"},
     "bendahara": _BASE | {"kas_edit", "hutang"},
@@ -62,6 +62,18 @@ JABATAN_PERM = {
     "anggota": set(_BASE),
 }
 DIVISI_PERM = {"ss": {"blacklist"}, "dokumentasi": {"dok_kelola", "gambar_buat"}}
+# Divisi & jabatan bisa ditambah/diubah Dev dari web (disimpan di tabel pengaturan, kunci "struktur").
+# Yang bawaan tidak bisa dihapus; Admin/Dev selalu punya semua izin dan tidak bisa diubah.
+_DEF = {"divisi": (dict(DIVISI), {k: set(v) for k, v in DIVISI_PERM.items()}),
+        "jabatan": (dict(JABATAN), {k: set(v) for k, v in JABATAN_PERM.items()})}
+IZIN_PILIHAN = {  # izin yang boleh dipasang ke divisi/jabatan (Sidang Dewan, Lab IoT, Anggota tetap khusus Dev)
+    "boss": "Boss bagi tugas (maks 3x/hari)", "kas": "Lihat Keuangan AI", "kas_edit": "Catat & hapus kas", "hutang": "Kelola hutang",
+    "gambar_lihat": "Lihat galeri Studio Gambar", "gambar_buat": "Buat gambar (maks 5x/hari)", "memori": "Lihat Memori", "skills": "Lihat Skills",
+    "tim": "Lihat Tim & Token", "stok": "Lihat Stok Barang", "catatan": "Catatan", "catatan_kelola": "Kelola catatan bersama",
+    "polling": "Ikut voting", "polling_buat": "Buat polling (divisi sendiri)", "polling_semua": "Buat polling untuk semua anggota",
+    "dok_lihat": "Lihat Dokumentasi", "dok_kelola": "Kelola Dokumentasi", "laporan_lihat": "Lihat Laporan Mingguan", "blacklist": "Blacklist",
+}
+STRUKTUR_MAKS = {"divisi": 20, "jabatan": 30}
 MEMBERS = {}   # id -> {id, nama, token, divisi[], jabatan[], aktif}
 HUTANG_MAX = max(0, int(os.getenv("HUTANG_MAX", "15000")))      # batas pinjaman per anggota per bulan
 HUTANG_HARI = max(1, int(os.getenv("HUTANG_HARI", "3")))         # jatuh tempo H+3
@@ -1820,6 +1832,94 @@ def jabatan_teks(m):
     return ", ".join(JABATAN.get(j, j) for j in m["jabatan"]) or "-"
 
 
+def struktur_baca():
+    with db() as c:
+        r = sql(c, "SELECT v FROM pengaturan WHERE k=?", ("struktur",)).fetchone()
+    try:
+        d = json.loads(r[0]) if r else {}
+    except ValueError:
+        d = {}
+    return {"divisi": dict(d.get("divisi") or {}), "jabatan": dict(d.get("jabatan") or {})}
+
+
+def struktur_load():
+    """Bangun ulang DIVISI/JABATAN beserta izinnya: bawaan + tambahan/ubahan dari Dev (diubah di tempat)."""
+    st = struktur_baca()
+    for jenis, nama, izin in (("divisi", DIVISI, DIVISI_PERM), ("jabatan", JABATAN, JABATAN_PERM)):
+        dn, di = _DEF[jenis]
+        nama.clear(); nama.update(dn)
+        izin.clear(); izin.update({k: set(v) for k, v in di.items()})
+        for k, v in st[jenis].items():
+            if k == "admin" or not isinstance(v, dict):
+                continue
+            nama[k] = str(v.get("nama") or nama.get(k) or k)[:40]
+            izin[k] = {x for x in (v.get("izin") or []) if x in IZIN_PILIHAN}
+    return st
+
+
+def struktur_out():
+    def daftar(jenis, nama, izin):
+        bawaan = _DEF[jenis][0]
+        return [{"key": k, "nama": v, "izin": sorted(izin.get(k, set())), "bawaan": k in bawaan, "kunci": k == "admin",
+                 "dipakai": sum(1 for m in MEMBERS.values() if k in m[jenis])} for k, v in nama.items()]
+    return {"divisi": daftar("divisi", DIVISI, DIVISI_PERM), "jabatan": daftar("jabatan", JABATAN, JABATAN_PERM),
+            "izin": IZIN_PILIHAN, "maks": STRUKTUR_MAKS}
+
+
+def _slug(nama):
+    return re.sub(r"[^a-z0-9]+", "_", nama.lower()).strip("_")[:24] or "baru"
+
+
+def struktur_simpan(d):
+    jenis = d.get("jenis")
+    if jenis not in ("divisi", "jabatan"):
+        raise ValueError("Jenis harus divisi atau jabatan")
+    daftar = DIVISI if jenis == "divisi" else JABATAN
+    nama = re.sub(r"\s+", " ", str(d.get("nama", ""))).strip()[:40]
+    if not nama:
+        raise ValueError("Nama wajib diisi")
+    key = str(d.get("key") or "")
+    if key == "admin":
+        raise ValueError("Admin/Dev tidak bisa diubah")
+    if any(v.lower() == nama.lower() and k != key for k, v in daftar.items()):
+        raise ValueError(f"{nama} sudah ada")
+    if key and key not in daftar:
+        raise ValueError("Tidak ditemukan")
+    if not key:
+        if len(daftar) >= STRUKTUR_MAKS[jenis]:
+            raise ValueError(f"Maksimal {STRUKTUR_MAKS[jenis]} {jenis}")
+        key, n = _slug(nama), 2
+        base = key
+        while key in daftar or key == "admin":
+            key, n = f"{base}_{n}", n + 1
+    izin = sorted({x for x in (d.get("izin") or []) if x in IZIN_PILIHAN})
+    st = struktur_baca()
+    st[jenis][key] = {"nama": nama, "izin": izin}
+    with db() as c:
+        sql(c, "INSERT INTO pengaturan (k,v) VALUES (?,?) ON CONFLICT (k) DO UPDATE SET v=excluded.v", ("struktur", json.dumps(st)))
+    struktur_load()
+    members_load()
+
+
+def struktur_hapus(jenis, key):
+    if jenis not in ("divisi", "jabatan"):
+        raise ValueError("Jenis harus divisi atau jabatan")
+    if key in _DEF[jenis][0]:
+        raise ValueError("Divisi/jabatan bawaan tidak bisa dihapus (izinnya tetap bisa diubah)")
+    st = struktur_baca()
+    if key not in st[jenis]:
+        raise ValueError("Tidak ditemukan")
+    st[jenis].pop(key)
+    with db() as c:
+        sql(c, "INSERT INTO pengaturan (k,v) VALUES (?,?) ON CONFLICT (k) DO UPDATE SET v=excluded.v", ("struktur", json.dumps(st)))
+        for m in MEMBERS.values():   # lepas dari anggota yang memakainya
+            if key in m[jenis]:
+                baru = [x for x in m[jenis] if x != key] or (["anggota"] if jenis == "jabatan" else [])
+                sql(c, f"UPDATE anggota SET {jenis}=? WHERE id=?", (json.dumps(baru), m["id"]))
+    struktur_load()
+    members_load()
+
+
 def members_load():
     with db() as c:
         rows = sql(c, "SELECT id,nama,token,divisi,jabatan,aktif FROM anggota ORDER BY id").fetchall()
@@ -2391,6 +2491,28 @@ def api_anggota():
     return jsonify({"items": [_member_out(m, True) for m in MEMBERS.values()], "divisi": DIVISI, "jabatan": JABATAN})
 
 
+@app.route("/api/struktur", methods=["GET", "POST"])
+def api_struktur():
+    """Khusus Dev: daftar divisi & jabatan beserta izinnya. POST {jenis, key?, nama, izin[]} untuk tambah/ubah."""
+    need("admin")
+    if request.method == "POST":
+        try:
+            struktur_simpan(request.get_json(silent=True) or {})
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+    return jsonify(struktur_out())
+
+
+@app.route("/api/struktur/<jenis>/<key>", methods=["DELETE"])
+def api_struktur_del(jenis, key):
+    need("admin")
+    try:
+        struktur_hapus(jenis, key)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify(struktur_out())
+
+
 @app.route("/api/anggota/<int:i>/token", methods=["POST"])
 def api_anggota_token(i):
     need("admin")
@@ -2506,7 +2628,7 @@ def polling_list(r):
         vs = [v for v in votes if int(v[0]) == int(i)]
         mine = next((int(v[2]) for v in vs if int(v[1]) == me), None)
         hasil = [sum(1 for v in vs if int(v[2]) == k) for k in range(len(opsi))] if tutup else None
-        out.append({"id": int(i), "judul": j, "deskripsi": ds or "", "opsi": opsi, "pembuat": pn or "", "divisi": dv, "divisi_nama": DIVISI.get(dv, "Semua anggota"),
+        out.append({"id": int(i), "judul": j, "deskripsi": ds or "", "opsi": opsi, "pembuat": pn or "", "divisi": dv, "divisi_nama": DIVISI.get(dv, "Divisi dihapus") if dv else "Semua anggota",
                     "tutup": tutup, "batas": bt, "dibuat": db_, "pemilih": len(vs), "pilihan_saya": mine, "hasil": hasil,
                     "bisa_tutup": not tutup and (is_admin(r) or int(pb or -1) == me)})
     return out
@@ -2527,7 +2649,7 @@ def api_polling():
         if div and div not in DIVISI:
             return jsonify({"error": "Divisi tidak dikenal"}), 400
         m = member_of(r)
-        if not is_admin(r) and "manager" not in (m or {}).get("jabatan", []) and (not div or div not in m["divisi"]):
+        if not can("polling_semua", r) and (not div or div not in m["divisi"]):
             return jsonify({"error": "PJ Divisi hanya bisa membuat polling untuk divisinya sendiri"}), 403
         batas = str(d.get("batas") or "")[:16] or None
         with db() as c:
@@ -3299,6 +3421,7 @@ if __name__ == "__main__":
         iot_load()
         gal_load()
         stok_load()
+        struktur_load()
         members_load()
     except Exception:
         log.exception("Database gagal diinisialisasi (cek DATABASE_URL)")

@@ -412,7 +412,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 
  <section id="p-anggota" class="pg" hidden>
   <h1>Anggota</h1>
-  <p class="mu">Khusus Dev. Tiap anggota punya token pribadi (diawali nama depan). Hak akses mengikuti jabatan dan divisinya: maksimal 2 divisi dan 3 jabatan per orang. Ganti jabatan tidak perlu ganti token.</p>
+  <p class="mu">Khusus Dev. Tiap anggota punya token pribadi (diawali nama depan). Hak akses mengikuti jabatan dan divisinya: maksimal 2 divisi dan 3 jabatan per orang. Ganti jabatan tidak perlu ganti token. Divisi dan jabatan baru bisa ditambah di bagian bawah halaman ini.</p>
   <div class="cd" id="agForm"><b id="agTitle">Tambah anggota</b>
    <div class="fl" style="margin-top:12px"><label class="full">Nama<input type="text" id="agNama" maxlength="60" placeholder="contoh: Budi Santoso"></label></div>
    <div style="margin-top:10px"><b style="font-size:13px">Divisi</b> <span class="mu" style="font-size:12px">(maks 2)</span><div class="picks" id="agDiv" style="margin-top:6px"></div></div>
@@ -420,6 +420,14 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="agSave">Simpan</button><button class="bt o" id="agReset">Kosongkan</button><label class="mu" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="agAktif" checked>Aktif</label><span id="agMsg" class="mu"></span></div>
   </div>
   <div class="cd" style="padding:0"><div class="tb"><table><thead><tr><th>Nama</th><th>Divisi</th><th>Jabatan</th><th>Token pribadi</th><th></th></tr></thead><tbody id="agList"></tbody></table></div></div>
+  <h2>Divisi &amp; Jabatan</h2>
+  <p class="mu">Tambah divisi atau jabatan baru, lalu centang izinnya. Izin seseorang = gabungan semua jabatan + divisinya. Yang bawaan tidak bisa dihapus tapi izinnya bisa diubah; Admin/Dev selalu bisa semua. Sidang Dewan, Lab IoT, dan menu Anggota tetap khusus Dev.</p>
+  <div class="cd" id="sxForm"><b id="sxTitle">Tambah divisi / jabatan</b>
+   <div class="fl" style="margin-top:12px"><label>Jenis<select id="sxJenis"><option value="divisi">Divisi</option><option value="jabatan">Jabatan</option></select></label><label>Nama<input type="text" id="sxNama" maxlength="40" placeholder="contoh: Humas, Wakil Manager"></label></div>
+   <div style="margin-top:10px"><b style="font-size:13px">Izin</b> <button class="bt o" id="sxDasar" type="button" style="padding:3px 9px;min-height:28px;font-size:12px">Pakai izin dasar anggota</button><div class="picks" id="sxIzin" style="margin-top:6px"></div></div>
+   <div class="bar" style="margin:12px 0 0"><button class="bt g" id="sxSave">Simpan</button><button class="bt o" id="sxReset">Kosongkan</button><span id="sxMsg" class="mu"></span></div>
+  </div>
+  <div class="cd" style="padding:0"><div class="tb"><table><thead><tr><th>Nama</th><th>Jenis</th><th>Izin</th><th>Dipakai</th><th></th></tr></thead><tbody id="sxList"></tbody></table></div></div>
  </section>
 
  <section id="p-catatan" class="pg" hidden>
@@ -1137,7 +1145,45 @@ function renderAnggota() {
 async function loadAnggota() {
   if (!ADM()) return;
   try { AGD = await api("/api/anggota"); agForm(); renderAnggota(); } catch (e) { $("#agList").innerHTML = '<tr><td colspan="5" class="er">' + esc(e.message) + "</td></tr>"; }
+  try { SXD = await api("/api/struktur"); sxForm(); renderSx(); } catch (e) { $("#sxList").innerHTML = '<tr><td colspan="5" class="er">' + esc(e.message) + "</td></tr>"; }
 }
+
+/* Divisi & jabatan (khusus Dev) */
+let SXD = null;
+const SX_DASAR = ["boss", "kas", "gambar_lihat", "memori", "skills", "tim", "stok", "catatan", "polling", "dok_lihat"];
+function sxForm(x, jenis) {
+  x = x || {izin: []};
+  const f = $("#sxForm"); f.dataset.key = x.key || ""; f.dataset.jenis = jenis || "";
+  $("#sxTitle").textContent = x.key ? "Ubah " + x.nama : "Tambah divisi / jabatan";
+  $("#sxJenis").value = jenis || $("#sxJenis").value; $("#sxJenis").disabled = !!x.key; $("#sxNama").value = x.nama || ""; $("#sxMsg").textContent = "";
+  $("#sxIzin").innerHTML = Object.entries(SXD.izin).map(([k, v]) => `<label><input type="checkbox" value="${k}" ${x.izin.includes(k) ? "checked" : ""}>${esc(v)}</label>`).join("");
+}
+async function sxRefresh() {
+  SXD = await api("/api/struktur");
+  AGD = Object.assign(AGD || {}, await api("/api/anggota"));
+  renderSx(); renderAnggota(); agForm();
+}
+function renderSx() {
+  const rows = [...SXD.divisi.map(x => [x, "divisi"]), ...SXD.jabatan.map(x => [x, "jabatan"])];
+  $("#sxList").innerHTML = rows.map(([x, j]) => `<tr><td><b>${esc(x.nama)}</b>${x.bawaan ? ' <span class="ch n">Bawaan</span>' : ' <span class="ch g">Baru</span>'}</td><td>${j === "divisi" ? "Divisi" : "Jabatan"}</td>
+    <td style="max-width:420px">${x.kunci ? '<span class="ch y">Semua izin</span>' : (x.izin.map(k => `<span class="ch">${esc(SXD.izin[k] || k)}</span>`).join(" ") || '<span class="mu">Tidak ada izin tambahan</span>')}</td><td>${x.dipakai} orang</td>
+    <td class="rt" style="white-space:nowrap">${x.kunci ? "" : `<button class="bt o" data-sxe="${j}:${x.key}" style="padding:5px 10px;min-height:34px">Ubah</button>`}${x.bawaan ? "" : ` <button class="bt o" data-sxd="${j}:${x.key}" style="padding:5px 10px;min-height:34px">Hapus</button>`}</td></tr>`).join("");
+  const one = v => { const [j, k] = v.split(":"); return [SXD[j].find(x => x.key === k), j]; };
+  $$("[data-sxe]").forEach(b => b.onclick = () => { const [x, j] = one(b.dataset.ste); sxForm(x, j); $("#sxForm").scrollIntoView({behavior: "smooth", block: "start"}); });
+  $$("[data-sxd]").forEach(b => b.onclick = async () => {
+    const [x, j] = one(b.dataset.std);
+    if (!confirm(`Hapus ${j} ${x.nama}?` + (x.dipakai ? ` ${x.dipakai} orang yang memakainya akan dilepas dari ${j} ini.` : ""))) return;
+    try { await api(`/api/struktur/${j}/${encodeURIComponent(x.key)}`, {method: "DELETE"}); await sxRefresh(); sxForm(); } catch (e) { alert(e.message); }
+  });
+}
+$("#sxReset").onclick = () => sxForm();
+$("#sxDasar").onclick = () => $$("#sxIzin input").forEach(x => { if (SX_DASAR.includes(x.value)) x.checked = true; });
+$("#sxSave").onclick = async () => {
+  const f = $("#sxForm"), body = {jenis: f.dataset.jenis || $("#sxJenis").value, key: f.dataset.key || null, nama: $("#sxNama").value, izin: $$("#sxIzin input:checked").map(x => x.value)};
+  $("#sxSave").disabled = true;
+  try { await api("/api/struktur", {json: body}); await sxRefresh(); sxForm(); $("#sxMsg").textContent = "Tersimpan."; } catch (e) { $("#sxMsg").textContent = e.message; }
+  $("#sxSave").disabled = false;
+};
 $("#agReset").onclick = () => agForm();
 $("#agSave").onclick = async () => {
   const body = {id: $("#agForm").dataset.id || null, nama: $("#agNama").value, aktif: $("#agAktif").checked, divisi: $$("#agDiv input:checked").map(x => x.value), jabatan: $$("#agJab input:checked").map(x => x.value)};
@@ -1166,7 +1212,7 @@ let PLD = null;
 function renderPolling() {
   $("#plForm").hidden = !PLD.bisa_buat;
   if (PLD.bisa_buat && !$("#plDiv").options.length) {
-    const own = ME.anggota ? ME.anggota.divisi_key : [], all = ADM() || (ME.anggota && ME.anggota.jabatan.includes("Manager"));
+    const own = ME.anggota ? ME.anggota.divisi_key : [], all = ADM() || can("polling_semua");
     $("#plDiv").innerHTML = (all ? '<option value="">Semua anggota</option>' : "") + Object.entries(ME.daftar_divisi || {}).filter(([k]) => all || own.includes(k)).map(([k, v]) => `<option value="${k}">Divisi ${esc(v)}</option>`).join("");
   }
   $("#plList").innerHTML = PLD.items.map(p => {
