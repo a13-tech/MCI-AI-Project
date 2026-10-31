@@ -719,7 +719,7 @@ function renderList() {
   const by = {}; DATA.forEach(d => (by[d.lantai] = by[d.lantai] || []).push(d));
   $("#sl").innerHTML = Object.keys(LANTAI).map(f => `<div class="cd flc" style="margin:0"><h3>Lantai ${f} · ${esc(LANTAI[f])}</h3>${(by[f] || []).map(d => {
     const s = st[d.key] || {c: d.status === "WORKING" ? "#ef4444" : "#22c55e", t: d.status === "WORKING" ? d.activity : "Siaga"};
-    return `<div class="st"><i style="background:${s.c}"></i><b>${esc(d.name.replace("MCI.",""))}</b><span>${esc(s.t)}</span></div>`; }).join("") || '<div class="mu">Kosong</div>'}</div>`).join("");
+    return `<div class="st"><i style="background:${s.c}"></i><b>${esc(d.name.replace("MCI.",""))}</b><span>${esc(s.t)}</span></div>`; }).join("") || '<div class="mu">Kosong</div>'}</div>`).join("") + (st.kilap ? `<div class="cd flc" style="margin:0;border-style:dashed"><h3>Petugas kebersihan (NPC)</h3><div class="st"><i style="background:${st.kilap.c}"></i><b>Kilap</b><span>${esc(st.kilap.t)}</span></div></div>` : "");
 }
 function renderTim() {
   if ($("#p-tim").hidden) return;
@@ -1466,7 +1466,7 @@ const OFFICE = (() => {
   };
 
   /* ---------- robot ---------- */
-  const BADGE = {apex: "#D4AF5A", devmatrix: "#3b82f6", nexus: "#f59e0b", aegis: "#ef4444", sentinel: "#8b5cf6", pulse: "#10b981", ledger: "#14b8a6", scribe: "#ec4899", atlas: "#0ea5e9", herald: "#a3e635", canvas: "#a855f7"};
+  const BADGE = {apex: "#D4AF5A", devmatrix: "#3b82f6", nexus: "#f59e0b", aegis: "#ef4444", sentinel: "#8b5cf6", pulse: "#10b981", ledger: "#14b8a6", scribe: "#ec4899", atlas: "#0ea5e9", herald: "#a3e635", canvas: "#a855f7", kilap: "#22d3ee"};
   function mkBot(key, boss) {
     const O = "#EA8A3C", CR = "#FFE4C7", N = "#0b1d4a";
     const g = new THREE.Group(), body = grp(0, 0, 0, 0, g); CAST = true;
@@ -1495,6 +1495,7 @@ const OFFICE = (() => {
     else if (key === "ledger") { H(CY(.32, .32, .02, 32), "#16a34a", 0, 1.24, .1, {transparent: true, opacity: .85}).rotation.x = .3; H(TO(.31, .02), "#16a34a", 0, 1.26, 0).rotation.x = PI / 2; }
     else if (key === "scribe") { const b = H(SP(.3, 22, 14), "#ec4899", -.05, 1.3, 0, {roughness: .8}); b.scale.set(1.05, .38, 1.05); b.rotation.z = .15; H(SP(.03, 8, 6), "#ec4899", -.05, 1.42, 0); }
     else if (key === "canvas") { const b = H(SP(.31, 22, 14), "#7c3aed", .06, 1.31, -.02, {roughness: .85}); b.scale.set(1.08, .34, 1.08); b.rotation.z = -.22; H(SP(.035, 8, 6), "#7c3aed", .1, 1.42, -.02); [["#ef4444", -.16], ["#facc15", .02], ["#22c55e", .2]].forEach(c => H(SP(.03, 8, 6), c[0], c[1], 1.36, .22, {emissive: c[0], emissiveIntensity: .4})); }
+    else if (key === "kilap") { H(G("hat", () => new THREE.SphereGeometry(.33, 24, 12, 0, PI * 2, 0, PI / 2)), "#0e7490", 0, 1.16, 0, {roughness: .5}); H(CY(.2, .2, .02, 24), "#0e7490", 0, 1.17, .26, {roughness: .5}).scale.set(1, 1, .7); H(PANEL(.5, .16, .02, .01), "#22d3ee", 0, .52, .3, {roughness: .6}); }
     else if (key === "herald") { [-1, 1].forEach(s => { H(CAP(.01, .2), "#1b2433", s * .14, 1.42, 0).rotation.z = -s * .4; H(SP(.045, 10, 8), "#a3e635", s * .2, 1.53, 0, {emissive: "#a3e635", emissiveIntensity: 1.2}); }); H(SP(.05, 10, 8), "#ef4444", 0, .9, .3).scale.set(1.6, .6, .5); }
     const cup = grp(0, -.36, .05, 0, aR); add(CY(.05, .045, .1, 18), "#ffffff", 0, 0, 0, cup); add(TO(.032, .01), "#ffffff", .055, 0, 0, cup); add(TO(.05, .006), "#D4AF5A", 0, .05, 0, cup, GOLD).rotation.x = PI / 2;
     const donut = add(TO(.055, .028), "#f472b6", 0, -.36, .06, aR); donut.rotation.x = PI / 2;
@@ -1503,14 +1504,16 @@ const OFFICE = (() => {
     const pm = new THREE.Mesh(new THREE.PlaneGeometry(.58, .4), new THREE.MeshBasicMaterial({map: pt})); pm.position.z = -.008; pm.rotation.y = PI; paper.add(pm); paper.rotation.x = -.25;
     const paddle = grp(0, -.38, .06, 0, aR); add(CY(.09, .09, .015, 24), "#ef4444", 0, .02, .09, paddle).rotation.x = PI / 2; add(CAP(.015, .08), "#92400e", 0, 0, 0, paddle);
     const club = grp(0, -.36, .04, 0, aR); add(CY(.01, .01, .7, 8), "#cbd5e1", 0, -.33, 0, club, CHROME); add(CAP(.03, .08), "#1b2433", 0, -.68, .04, club).rotation.x = PI / 2;
-    [cup, donut, paper, paddle, club].forEach(o => o.visible = false);
+    const mop = grp(0, -.36, .05, 0, aR); add(CY(.014, .014, 1.25, 8), "#94a3b8", 0, -.35, .1, mop, CHROME).rotation.x = .35; add(PANEL(.32, .05, .12, .02), "#22d3ee", 0, -.95, .32, mop, {roughness: .9});
+    const rag = add(PANEL(.14, .03, .1, .01), "#facc15", 0, -.38, .06, aR, {roughness: .9});
+    [cup, donut, paper, paddle, club, mop, rag].forEach(o => o.visible = false);
     const disk = grp(0, 0, 0, 0, g); add(CY(.55, .55, .05, 32), "#D4AF5A", 0, .02, 0, disk, GOLD); add(TO(.56, .03), "#5ee6ff", 0, .04, 0, disk, {emissive: "#5ee6ff", emissiveIntensity: 1.6}).rotation.x = PI / 2; disk.visible = false;
     if (boss) g.scale.setScalar(1.15);
     /* jejak kilat saat bergegas kerja (gaya Flash) */
     const trail = grp(0, .72, -.42, 0, g);
     [0, 1, 2].forEach(i => add(SP(.17 - i * .04, 12, 8), "#F1D58A", 0, -i * .06, -i * .3, trail, {transparent: true, opacity: .5 - i * .14, emissive: "#F1D58A", emissiveIntensity: .9, depthWrite: false}).scale.set(1, .8, 2.4));
     trail.visible = false;
-    return {g, body, aL, aR, lL, lR, eyes, disk, trail, props: {cup, donut, paper, paddle, club}};
+    return {g, body, aL, aR, lL, lR, eyes, disk, trail, props: key === "kilap" ? {cup, mop, rag} : {cup, donut, paper, paddle, club}};
   }
 
   /* ---------- graf jalur 3D ---------- */
@@ -2311,8 +2314,57 @@ const OFFICE = (() => {
     return a;
   }
 
+  /* ---------- MCI.Kilap: petugas kebersihan NPC (tanpa token, tanpa AI, tidak dihitung sebagai bot) ---------- */
+  const KILAP_JOB = [
+    {t: "Ngepel lantai", anim: "mop", prop: "mop", sign: 1, w: 4},
+    {t: "Nyapu koridor", anim: "mop", prop: "mop", w: 3},
+    {t: "Lap meja dan kaca", anim: "wipe", prop: "rag", w: 3},
+    {t: "Buang sampah", anim: "trash", prop: null, w: 2},
+    {t: "Istirahat ngopi sebentar", anim: "sip", prop: "cup", w: 1},
+  ];
+  const LT = ["LT 1", "LT 2", "LT 3", "LT 4"];
+  let KSIGN = null, KCART = null;
+  function buildKilap() {
+    const start = "f0_door"; if (!NODES[start]) return null;
+    const [x, y, z] = NODES[start];
+    const a = {key: "kilap", name: "MCI.Kilap", npc: true, boss: false, home: 0, floor: 0, seat: [x, z], face: 0, scr: [], path: [], ph: "npc", t: 3, job: null, act: null, spot: null, where: "npc",
+      lift: 0, liftT: 0, seated: false, baseY: y, anim: "stare", p: {aL: 0, aR: 0, lL: 0, lR: 0, lean: 0}, phase: Math.random() * 6, blink: 2, atDesk: false, rot: 0, rotT: 0, node: start, task: "Siap bersih-bersih"};
+    Object.assign(a, mkBot("kilap", false)); a.g.scale.setScalar(.9); a.g.position.set(x, y, z); sc.add(a.g);
+    a.chair = new THREE.Group();
+    CUR = sc; const zz = label("Zzz", 0, 0, 0, .3, "#bfe0ff"); zz.visible = false; a.zzz = zz;
+    // papan "LANTAI BASAH" dan troli kebersihan ikut ke mana Kilap kerja
+    KSIGN = grp(0, 0, 0, 0, sc); KSIGN.userData.dyn = true; KSIGN.visible = false;
+    const st = CT(256, 256, (g, w, h) => { g.fillStyle = "#facc15"; g.fillRect(0, 0, w, h); g.fillStyle = "#111827"; g.font = "900 46px system-ui,sans-serif"; g.textAlign = "center"; g.fillText("AWAS", w / 2, 96); g.fillText("LANTAI", w / 2, 156); g.fillText("BASAH", w / 2, 214); g.beginPath(); g.moveTo(w / 2, 10); g.lineTo(w / 2 + 26, 50); g.lineTo(w / 2 - 26, 50); g.fill(); });
+    [-1, 1].forEach(sd => { const m = plane(st, .34, .5, 0, .3, sd * .09, sd < 0 ? PI : 0, KSIGN); m.rotation.x = sd * .18; });
+    KCART = grp(0, 0, 0, 0, sc); KCART.userData.dyn = true;
+    add(PANEL(.5, .06, .34, .02), "#0e7490", 0, .14, 0, KCART); add(CY(.13, .11, .26, 16), "#22d3ee", -.1, .3, 0, KCART, {roughness: .4}); add(CY(.1, .1, .3, 14), "#334155", .14, .32, 0, KCART);
+    add(PANEL(.04, .7, .04, .01), "#94a3b8", .26, .45, 0, KCART, CHROME); [-.18, .18].forEach(xx => add(CY(.05, .05, .04, 12), "#111827", xx, .05, .14, KCART).rotation.x = PI / 2);
+    KCART.position.set(x + .6, y, z + .4);
+    const el = document.createElement("button"); el.className = "chip"; el.type = "button"; el.style.borderStyle = "dashed";
+    el.innerHTML = `<i></i><b>Kilap</b><span></span>`; el.title = "Petugas kebersihan (NPC, tanpa AI)"; el.onclick = () => setFollow(a);
+    chipsEl.appendChild(el); a.el = el; a.dot = el.querySelector("i"); a.txt = el.querySelector("span");
+    return a;
+  }
+  function kilapTargets() { return Object.keys(NODES).filter(k => /^f\d_(sp|r\d+l|wk|e-?\d)/.test(k)); }
+  function npcNext(a) {
+    KSIGN.visible = false;
+    if (a.ph === "clean") { a.ph = "npc"; a.anim = "stare"; showProp(a, null); a.task = "Pindah tempat"; a.t = 1 + Math.random() * 2; return; }
+    const tg = kilapTargets(); if (!tg.length) { a.t = 10; return; }
+    const target = tg[(Math.random() * tg.length) | 0], f = floorOf(NODES[target][1]);
+    let r = Math.random() * KILAP_JOB.reduce((s2, j) => s2 + j.w, 0), job = KILAP_JOB[0];
+    for (const j of KILAP_JOB) { r -= j.w; if (r < 0) { job = j; break; } }
+    const pts = route(a.node, target);
+    a.ph = "go"; a.task = `Menuju ${LT[f]} buat ${job.t.toLowerCase()}`; showProp(a, job.prop === "rag" ? "rag" : "mop");
+    walkTo(a, pts, () => {
+      a.node = target; a.ph = "clean"; a.anim = job.anim; showProp(a, job.prop); a.task = `${job.t} ${LT[f]}`; a.t = 9 + Math.random() * 10;
+      const P = a.g.position; KCART.position.set(P.x + .7, a.baseY, P.z + .5);
+      if (job.sign) { KSIGN.position.set(P.x - .6, a.baseY, P.z + .6); KSIGN.visible = true; }
+    });
+  }
+
   /* ---------- mesin status ---------- */
   function status(a) {
+    if (a.npc) return {c: "#22d3ee", t: a.task || "Keliling bersih-bersih"};
     if (a.where === "dewan" && a.job) return {c: "#a78bfa", t: a.ph === "urgent" ? "Menuju ruang dewan" : "Sidang dewan"};
     if (a.ph === "work") return {c: "#ef4444", t: a.job || "Bekerja"};
     if (ROOMW[a.where] && a.ph === "urgent" && a.job) return {c: "#f59e0b", t: "Bergegas ke " + ROOMW[a.where].n};
@@ -2455,6 +2507,7 @@ const OFFICE = (() => {
     walkTo(a, pts, () => { sitDesk(a); if (a.job) think(a); else { a.ph = "idle"; a.t = 4 + Math.random() * 7; } });
   }
   function next(a) {
+    if (a.npc) return npcNext(a);
     switch (a.ph) {
       case "think":
         // tugas sudah selesai di server saat bot masih jalan ke meja: jangan kerja selamanya
@@ -2512,6 +2565,9 @@ const OFFICE = (() => {
     else if (k === "golf") { const s = Math.sin(t * 1.6); aL = aR = -.4 + s * .7; aLz = .4; aRz = -.4; lean = .2; }
     else if (k === "arcade") { aL = -1.3 + Math.sin(t * 14) * .12; aR = -1.3 + Math.cos(t * 11) * .15; bob = Math.abs(Math.sin(t * 5)) * .02; }
     else if (k === "paint") { const s = Math.sin(t * 6 + ph); aR = -2.1 + s * .35; aRz = .25 + Math.cos(t * 6) * .2; aL = -.5; lean = .06; bob = Math.abs(s) * .012; }
+    else if (k === "mop") { const s = Math.sin(t * 3.2 + ph); aL = -.9 + s * .12; aR = -.75 - s * .12; aLz = -.25 + s * .35; aRz = .25 + s * .35; lean = .16; bob = Math.abs(s) * .015; }
+    else if (k === "wipe") { aR = -1.75 + Math.sin(t * 5) * .25; aRz = .35 + Math.cos(t * 5) * .3; aL = -.3; }
+    else if (k === "trash") { aL = aR = -.55 + Math.sin(t * 2) * .1; aLz = -.35; aRz = .35; lean = .3; }
     else if (k === "tinker") { aL = -1.2 + Math.sin(t * 3) * .1; aR = -1.4 + Math.sin(t * 7) * .2; lean = .15; }
     const f = Math.min(1, dt * 10), p = a.p;
     p.aL += (aL - p.aL) * f; p.aR += (aR - p.aR) * f; p.lL += (lL - p.lL) * f; p.lR += (lR - p.lR) * f; p.lean += (lean - p.lean) * f;
@@ -2687,6 +2743,7 @@ const OFFICE = (() => {
     roof(); CUR = sc;
     const order = [...list].sort((a, b) => (b.boss ? 1 : 0) - (a.boss ? 1 : 0));
     AG = order.map(build).filter(Boolean);
+    const npc = buildKilap(); if (npc) AG.push(npc);   // petugas kebersihan, bukan bot AI
     AG.forEach(a => { bakeLocal(a.body, new Set([a.aL, a.aR, a.lL, a.lR, a.props.paper, a.disk, ...a.eyes])); bakeLocal(a.chair, new Set()); a.g.userData.dyn = true; a.chair.userData.dyn = true; });
     FG.forEach(g => bakeLocal(g, new Set())); bakeLocal(ROOF, new Set()); bakeLocal(BASE, new Set());
     ready = true; clock = new THREE.Clock();
