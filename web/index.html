@@ -1463,7 +1463,8 @@ function blPreview(isi) {
   if (BLP.length < 2) { el.hidden = true; el.innerHTML = ""; return 0; }
   const n = () => BLP.filter(o => o.pilih).length;
   el.hidden = false;
-  el.innerHTML = `<b>AI membaca ${BLP.length} orang. Satu baris = satu entri.</b> <span class="mu" style="font-size:12.5px">Cek dan ubah dulu; yang dicentang disimpan terpisah. Yang sudah ada di daftar tidak dicentang.</span>
+  el.innerHTML = `<b>AI membaca ${BLP.length} orang. Satu baris = satu entri.</b> <span class="mu" style="font-size:12.5px">Cek dan ubah dulu; yang dicentang disimpan terpisah. Nama yang sudah ada di daftar tidak dicentang (centang sendiri kalau memang orang yang berbeda).</span>
+   <div class="bar" style="margin:8px 0 0"><label style="flex:1;min-width:220px;font-size:12.5px">Alasan untuk semua yang masih kosong<input type="text" id="blAlasanSemua" maxlength="200" placeholder="contoh: menunggak iuran / melanggar aturan"></label></div>
    <div class="tb" style="margin-top:8px"><table><thead><tr><th></th><th>Nama</th><th>Alasan</th><th>Keterangan</th></tr></thead><tbody>${BLP.map((o, i) => `<tr><td><input type="checkbox" data-blc="${i}" ${o.pilih ? "checked" : ""} style="width:auto" aria-label="Simpan ${esc(o.nama)}"></td>
     <td style="min-width:140px"><input type="text" data-blf="nama" data-i="${i}" value="${esc(o.nama)}" maxlength="80">${o.sudah_ada ? '<span class="ch y" style="margin-top:4px">Sudah ada</span>' : ""}</td>
     <td style="min-width:160px"><input type="text" data-blf="alasan" data-i="${i}" value="${esc(o.alasan)}" maxlength="200"></td><td style="min-width:200px"><input type="text" data-blf="keterangan" data-i="${i}" value="${esc(o.keterangan)}" maxlength="500"></td></tr>`).join("")}</tbody></table></div>
@@ -1471,6 +1472,8 @@ function blPreview(isi) {
   const lbl = () => { $("#blSemua").textContent = `Simpan ${n()} orang`; $("#blSemua").disabled = !n(); }; lbl();
   $$("#blPrev [data-blc]").forEach(c => c.onchange = () => { BLP[c.dataset.blc].pilih = c.checked; lbl(); });
   $$("#blPrev [data-blf]").forEach(c => c.oninput = () => { BLP[c.dataset.i][c.dataset.blf] = c.value; });
+  $("#blAlasanSemua").oninput = e => { BLP.forEach((o, i) => { if (!o.asli_alasan) { o.alasan = e.target.value; const f = $(`[data-blf=alasan][data-i="${i}"]`); if (f) f.value = o.alasan; } }); };
+  BLP.forEach(o => o.asli_alasan = !!o.alasan);
   $("#blBatal").onclick = () => { BLP = []; el.hidden = true; el.innerHTML = ""; };
   $("#blSemua").onclick = async () => {
     $("#blSemua").disabled = true;
