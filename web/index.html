@@ -158,6 +158,13 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 .pp .bd{padding:10px 12px 12px;display:grid;gap:5px}.pp .bd b{font-size:14px}.pp .bd .bar{margin:6px 0 0;gap:6px}.pp .bd .bar .bt{padding:5px 10px;min-height:34px;font-size:12px;text-decoration:none;display:inline-flex;align-items:center}
 .baca{position:fixed;inset:0;z-index:60;background:rgba(4,12,34,.72);display:grid;place-items:center;padding:16px}.baca[hidden]{display:none}
 .baca article{width:min(760px,100%);max-height:88vh;overflow:auto;background:#fffdf7;color:#1f2937;border-radius:18px;padding:26px 28px;box-shadow:0 20px 60px rgba(0,0,0,.4);font-size:15.5px;line-height:1.75}
+.nb{display:inline-block;min-width:18px;padding:1px 6px;margin-left:6px;border-radius:99px;background:#ef4444;color:#fff;font-size:11px;font-weight:800;text-align:center;line-height:16px}.nb[hidden]{display:none}
+.ib{padding:14px 16px;margin-bottom:10px;cursor:default}.ib.baru{border-left:4px solid var(--gold,#D4AF5A);background:#FFFCF2}.ibh{display:flex;gap:10px;align-items:flex-start}.ibi{font-size:20px;line-height:1.2}.ibx{padding:2px 10px;min-height:0}.ibf{width:96px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.brl{display:grid;gap:10px}.bri{display:flex;gap:12px;align-items:flex-start;text-decoration:none;color:inherit;margin:0;padding:14px 16px}.bri:hover{border-color:#9DB6EA;background:#F7FAFF}.brn{min-width:28px;height:28px;border-radius:9px;background:#0A2A6B;color:#F1D58A;font-weight:800;display:grid;place-items:center;font-size:13px}.br-r{background:linear-gradient(135deg,#F3F8FF,#FFFBEF)}
+.bkg{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-top:12px}.bkm{display:flex;flex-direction:column;gap:5px;align-items:flex-start;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:#fff}
+.bkm.lunas{background:#E3F8EC;border-color:#7BD3A0}.bkm.lunas b{color:#0E6B3A}.bkm.menunggu{background:#FFF7DC;border-color:#EBCB6B}.bkm.belum{background:#FFF3F2;border-color:#F3B4AE}.bkm.bebas{background:#F3F5F9;border-color:#D7DDE8;opacity:.85}
+.bkw{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.bkc{display:inline-flex;gap:6px;align-items:center;padding:7px 11px;border:1px solid #BFD0F2;border-radius:10px;font-size:13px;background:#fff;cursor:pointer}.bkc:has(input:checked){background:#E3F8EC;border-color:#7BD3A0}
+.bkpv{display:block;max-width:220px;max-height:160px;border-radius:12px;margin-top:10px;border:1px solid var(--line)}.bkpv[hidden]{display:none}.bkk{display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--line)}.bkk img{width:110px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
 .baca h2{margin:0 0 4px;font-size:22px}.baca .tx{white-space:pre-wrap;margin-top:14px}
 .gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:12px}
 .gal figure{margin:0;background:#F3F7FF;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
@@ -223,8 +230,11 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 <aside id="sd">
  <div class="brand"><b>MCI</b><small>AI COMMAND CENTER</small><i></i></div>
  <button class="nv on" data-p="cmd">Command Center</button>
+ <button class="nv" data-p="inbox">Inbox <span class="nb" id="nbInbox" hidden>0</span></button>
+ <button class="nv" data-p="berita">Berita Hari Ini</button>
  <button class="nv" data-p="office">Virtual Office</button>
  <button class="nv" data-p="kas">Keuangan AI</button>
+ <button class="nv" data-p="bayarkas">Bayar Kas</button>
  <button class="nv" data-p="gambar">Studio Gambar</button>
  <button class="nv" data-p="memori">Memori</button>
  <button class="nv" data-p="iot">Lab IoT</button>
@@ -492,6 +502,49 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
   <div class="cd" style="padding:0"><div class="tb"><table><thead><tr><th>Nama</th><th>Alasan</th><th>Keterangan</th><th>Dicatat</th><th></th></tr></thead><tbody id="blList"></tbody></table></div></div>
  </section>
 
+ <section id="p-inbox" class="pg" hidden>
+  <h1>Inbox</h1>
+  <p class="mu">Notifikasi untukmu: permintaan konfirmasi bayar kas, hasil konfirmasi, dan info dari Bendahara. Kalau akun Telegram kamu sudah terhubung, notifikasi juga dikirim lewat bot Ledger.</p>
+  <div class="bar"><button class="bt o" id="ibAll">Tandai semua dibaca</button><span class="mu" id="ibInfo"></span></div>
+  <div id="ibList"></div>
+ </section>
+
+ <section id="p-berita" class="pg" hidden>
+  <h1>Berita Hari Ini</h1>
+  <p class="mu">Berita terbaru dari Google News Indonesia, diperbarui tiap 20 menit. Klik judul untuk membaca di situs aslinya.</p>
+  <div class="cd br-r"><div class="bar" style="justify-content:space-between;margin:0"><b>Ringkasan MCI.Herald</b><button class="bt g" id="brRB">Rangkum berita hari ini</button></div>
+   <div class="tx" id="brRT" style="margin-top:10px;white-space:pre-wrap"></div><div class="mu" id="brRI" style="font-size:12.5px;margin-top:6px"></div></div>
+  <div class="bar" id="brKat" style="margin-top:4px"></div>
+  <div class="bar"><input type="search" id="brQ" placeholder="Cari judul atau sumber…" style="max-width:340px"><span class="mu" id="brInfo"></span></div>
+  <div class="brl" id="brList"></div>
+ </section>
+
+ <section id="p-bayarkas" class="pg" hidden>
+  <h1>Bayar Kas</h1>
+  <p class="mu">Iuran kas <b>mingguan</b>. Setiap pembayaran <b>wajib foto bukti</b> (foto uangnya atau bukti transfer). Setelah kamu menekan <b>Saya sudah bayar</b>, Bendahara dapat notifikasi di Inbox untuk konfirmasi. Begitu diterima, namamu jadi <b style="color:#0E6B3A">hijau</b> dan uangnya tercatat otomatis di buku kas. Anggota berstatus <b>Tidak bayar</b> adalah <b>peminjam</b>: tidak punya hak atas barang dan komponen MCI, hanya boleh meminjam.</p>
+  <div class="bar" style="flex-wrap:nowrap"><button class="bt o" id="bkPrev" aria-label="Minggu sebelumnya">‹</button><b id="bkLabel" style="flex:0 1 auto;min-width:0;text-align:center">Memuat…</b><button class="bt o" id="bkNext" aria-label="Minggu berikutnya">›</button><button class="bt o" id="bkNow">Minggu ini</button></div>
+  <div class="gr">
+   <div class="cd"><div class="k">Sudah lunas</div><div class="v" id="bk1">-</div></div>
+   <div class="cd"><div class="k">Menunggu konfirmasi</div><div class="v" id="bk2">-</div></div>
+   <div class="cd"><div class="k">Masuk minggu ini</div><div class="v" id="bk3">-</div></div>
+  </div>
+  <div class="cd" id="bkBayar" hidden></div>
+  <div class="cd"><b>Status anggota</b><div class="mu" style="font-size:12.5px;margin-top:4px">Hijau = lunas · Kuning = menunggu konfirmasi Bendahara · Merah = belum bayar · Abu-abu = tidak bayar (peminjam)</div><div class="bkg" id="bkList"></div></div>
+  <div class="cd" id="bkKonf" hidden><b>Menunggu konfirmasi</b><div id="bkMenunggu" style="margin-top:10px"></div></div>
+  <div class="cd" id="bkAtur" hidden><b>Atur iuran (Bendahara)</b>
+   <div class="fl" style="margin-top:12px"><label>Tarif Biasa per minggu (Rp)<input type="number" id="bkTB" min="1" step="500"></label><label>Tarif Keringanan per minggu (Rp)<input type="number" id="bkTR" min="1" step="500"></label></div>
+   <div class="tb" style="margin-top:12px"><table><thead><tr><th>Anggota</th><th>Tingkat</th><th class="rt">Per minggu</th></tr></thead><tbody id="bkTk"></tbody></table></div>
+   <div class="bar" style="margin:12px 0 0"><button class="bt g" id="bkSaveT">Simpan pengaturan</button><span class="mu" id="bkMsgT"></span></div>
+   <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+   <b>Catat pembayaran anggota</b><div class="mu" style="font-size:12.5px">Untuk yang bayar langsung ke Bendahara. Tetap wajib foto bukti; langsung tercatat lunas.</div>
+   <div class="fl" style="margin-top:10px"><label>Anggota<select id="bkCA"></select></label><label>Foto bukti<input type="file" id="bkCF" accept="image/*" capture="environment"></label></div>
+   <div class="bkw" id="bkCW"></div>
+   <div class="bar" style="margin:10px 0 0"><button class="bt g" id="bkCS">Catat lunas</button><span class="mu" id="bkMsgC"></span></div>
+  </div>
+  <div class="cd" style="padding:0"><div class="bar" style="padding:16px 20px 0;margin:0"><b id="bkRT">Riwayat pembayaran</b></div>
+   <div class="tb"><table><thead><tr><th>Tanggal</th><th>Nama</th><th>Minggu</th><th class="rt">Jumlah</th><th>Status</th><th></th></tr></thead><tbody id="bkRiw"></tbody></table></div></div>
+ </section>
+
  <section id="p-hutang" class="pg" hidden>
   <h1>Hutang Anggota</h1>
   <p class="mu">Khusus Bendahara. Aturan: pinjaman maksimal <b id="hbMax">Rp 15.000</b> per anggota per bulan, wajib lunas paling lambat <b>H+<span id="hbHari">3</span></b>. Lewat dari itu tanpa konfirmasi tambahan, anggota otomatis <b>dikeluarkan</b>.</p>
@@ -520,6 +573,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
  <section id="p-stok" class="pg" hidden>
   <h1>Stok Barang</h1>
   <p class="mu">Persediaan barang MCI, dijaga <b>MCI.Nexus</b> di ruang <b>Storage Barang</b> (LT 3, sayap barat). Foto barang ikut ditempel di kardusnya di kantor 3D. Halaman ini untuk semua anggota; yang bisa mengubah hanya Dev (bisa langsung dari foto, dihitung AI). Viewer cuma bisa melihat kardusnya di ruang Storage 3D.</p>
+  <div class="cd" id="stPinjam" hidden style="background:#F3F5F9"><b>Status kamu: Peminjam.</b> Kamu tidak ikut iuran kas, jadi barang dan komponen MCI bukan hak milikmu; kamu hanya boleh meminjam (minta izin dulu).</div>
   <div class="gr">
    <div class="cd"><div class="k">Jenis barang</div><div class="v" id="st1">-</div></div>
    <div class="cd"><div class="k">Total unit</div><div class="v" id="st2">-</div></div>
@@ -859,6 +913,9 @@ function show(p) {
   if (p === "laporan") loadLaporan();
   if (p === "stok") loadStok();
   if (p === "perpus") loadPerpus();
+  if (p === "inbox") loadInbox();
+  if (p === "berita") loadBerita();
+  if (p === "bayarkas") loadBayarKas();
   if (p === "hutang") loadHutang();
   if (p === "anggota") loadAnggota();
   if (p === "catatan") loadCatatan();
@@ -1378,6 +1435,7 @@ function renderStok() {
   $$("[data-se]").forEach(b => b.onclick = () => { const x = one(b.dataset.se); $("#stForm").dataset.id = x.id; $("#stTitle").textContent = "Ubah " + x.nama; $("#stNama").value = x.nama; $("#stKat").value = x.kategori; $("#stJml").value = x.jumlah; $("#stSat").value = x.satuan; $("#stMin").value = x.minimum; $("#stCat").value = x.catatan; $("#stFoto").value = ""; $("#stHfW").hidden = !x.foto; $("#stHf").checked = false; scrollTo({top: 0, behavior: "smooth"}); });
 }
 async function loadStok() {
+  $("#stPinjam").hidden = !(ME.anggota && ME.anggota.iuran === "bebas");
   $("#stForm").hidden = !ADM(); $("#saiBox").hidden = !ADM() || DEMO;
   try { STK = await api("/api/stok"); renderStok(); } catch (e) { $("#stList").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
 }
@@ -1396,6 +1454,149 @@ $("#stSave").onclick = async () => {
     STK = Object.assign(STK, await api("/api/stok", {method: "POST", body: fd})); renderStok(); stReset(); $("#stMsg").textContent = "Tersimpan.";
   } catch (e) { $("#stMsg").textContent = e.message; }
   $("#stSave").disabled = false;
+};
+
+/* ===== Inbox, Berita Hari Ini, Bayar Kas ===== */
+const pesan = m => { const e = $("#tst"); e.textContent = m; e.hidden = false; clearTimeout(pesan.t); pesan.t = setTimeout(() => e.hidden = true, 2600); };
+const relW = t => { if (!t) return ""; const d = (Date.now() - new Date(t)) / 60000; if (isNaN(d)) return ""; if (d < 1) return "baru saja"; if (d < 60) return Math.round(d) + " menit lalu"; if (d < 1440) return Math.round(d / 60) + " jam lalu"; return new Date(t).toLocaleDateString("id-ID", {day: "numeric", month: "short"}); };
+const PUNYA_INBOX = () => !!ME.anggota || ADM();
+async function inboxBadge(n) {
+  if (!PUNYA_INBOX() || DEMO) return;
+  if (n == null) { try { n = (await api("/api/inbox/jumlah")).belum; } catch (e) { return; } }
+  const b = $("#nbInbox"); b.textContent = n > 99 ? "99+" : n; b.hidden = !n;
+}
+let IBD = {items: []};
+const IB_IKON = {bayar_kas: "💸", bayar_ok: "✅", bayar_tolak: "⛔", info: "📢"};
+async function bayarAksi(id, aksi) {
+  let alasan = "";
+  if (aksi === "tolak") { alasan = prompt("Alasan ditolak (opsional, dikirim ke anggota):", "Foto bukti tidak jelas"); if (alasan === null) return false; }
+  try { BKD = await api("/api/iuran/" + id, {json: {aksi, alasan, minggu: BKD && BKD.minggu}}); pesan(aksi === "terima" ? "Pembayaran diterima, nama anggota jadi hijau" : aksi === "hapus" ? "Data pembayaran dihapus" : "Pembayaran ditolak, anggota diberi tahu"); return true; }
+  catch (e) { alert(e.message); return false; }
+}
+function renderInbox() {
+  const it = IBD.items || [], kf = can("kas_edit");
+  $("#ibInfo").textContent = it.length ? `${IBD.belum} belum dibaca dari ${it.length}` : "";
+  $("#ibList").innerHTML = it.map(x => {
+    const tunggu = x.jenis === "bayar_kas" && x.bayar_status === "menunggu";
+    const st = x.jenis === "bayar_kas" ? (x.bayar_status === "lunas" ? `<span class="ch g">Diterima${x.bayar_oleh ? " · " + esc(x.bayar_oleh) : ""}</span>` : x.bayar_status === "ditolak" ? `<span class="ch r">Ditolak${x.bayar_oleh ? " · " + esc(x.bayar_oleh) : ""}</span>` : x.bayar_status === "dihapus" ? '<span class="ch n">Dihapus</span>' : '<span class="ch y">Menunggu kamu</span>') : "";
+    return `<div class="cd ib${x.dibaca ? "" : " baru"}" data-ibr="${x.id}"><div class="ibh"><span class="ibi" aria-hidden="true">${IB_IKON[x.jenis] || "🔔"}</span><div style="flex:1;min-width:0"><b>${esc(x.judul)}</b><div class="mu" style="font-size:12.5px">${relW(x.dibuat)} ${st}</div></div><button class="bt o ibx" data-ibd="${x.id}" aria-label="Hapus notifikasi">×</button></div>
+      ${x.isi ? `<div style="margin-top:8px">${esc(x.isi)}</div>` : ""}
+      ${x.jenis === "bayar_kas" && x.ref && x.bayar_status !== "dihapus" && kf ? `<div class="bar" style="margin:10px 0 0"><a href="/api/iuran/${x.ref}/foto" target="_blank" rel="noopener"><img class="ibf" src="/api/iuran/${x.ref}/foto" alt="Foto bukti bayar" loading="lazy"></a>${tunggu ? `<button class="bt g" data-ibt="${x.ref}">Terima</button><button class="bt o" data-ibn="${x.ref}">Tolak</button>` : ""}</div>` : ""}
+      ${x.jenis.startsWith("bayar") ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="1">Buka Bayar Kas</button></div>' : ""}</div>`;
+  }).join("") || '<p class="mu">Inbox kosong. Notifikasi baru akan muncul di sini.</p>';
+  $$("[data-ibr]").forEach(e => e.onclick = async ev => { if (ev.target.closest("button,a")) return; const x = it.find(y => y.id == e.dataset.ibr); if (x && !x.dibaca) { IBD = await api("/api/inbox/baca", {json: {id: x.id}}); renderInbox(); inboxBadge(IBD.belum); } });
+  $$("[data-ibd]").forEach(b => b.onclick = async () => { IBD = await api("/api/inbox/" + b.dataset.ibd, {method: "DELETE"}); renderInbox(); inboxBadge(IBD.belum); });
+  $$("[data-ibt],[data-ibn]").forEach(b => b.onclick = async () => { b.disabled = true; if (await bayarAksi(b.dataset.ibt || b.dataset.ibn, b.dataset.ibt ? "terima" : "tolak")) await loadInbox(); b.disabled = false; });
+  $$("[data-ibgo]").forEach(b => b.onclick = () => show("bayarkas"));
+}
+async function loadInbox() { if (DEMO) { IBD = {items: [], belum: 0}; renderInbox(); return; } try { IBD = await api("/api/inbox"); renderInbox(); inboxBadge(IBD.belum); } catch (e) { $("#ibList").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; } }
+$("#ibAll").onclick = async () => { IBD = await api("/api/inbox/baca", {json: {semua: true}}); renderInbox(); inboxBadge(0); };
+
+let BRD = null, BRK = "utama";
+function renderBerita() {
+  if (!BRD) return;
+  $("#brKat").innerHTML = (BRD.urut || Object.keys(BRD.kategori || {})).map(k => [k, (BRD.kategori || {})[k]]).map(([k, v]) => `<button class="bt ${k === BRK ? "g" : "o"}" data-brk="${k}">${esc(v)}</button>`).join("");
+  $$("[data-brk]").forEach(b => b.onclick = () => { BRK = b.dataset.brk; loadBerita(); });
+  const q = $("#brQ").value.trim().toLowerCase(), it = (BRD.items || []).filter(x => !q || (x.judul + " " + x.sumber).toLowerCase().includes(q));
+  $("#brList").innerHTML = it.map((x, i) => `<a class="cd bri" href="${esc(x.link)}" target="_blank" rel="noopener noreferrer"><span class="brn">${i + 1}</span><span><b>${esc(x.judul)}</b><span class="mu" style="display:block;font-size:12.5px;margin-top:4px">${esc(x.sumber || "Google News")}${x.waktu ? " · " + relW(x.waktu) : ""}</span></span></a>`).join("") || `<p class="mu">${BRD.error ? esc(BRD.error) : "Tidak ada berita yang cocok."}</p>`;
+  $("#brInfo").textContent = BRD.diambil ? "Diperbarui " + new Date(BRD.diambil).toLocaleTimeString("id-ID", {hour: "2-digit", minute: "2-digit"}) + " WIB · sumber: Google News" : "";
+  const r = BRD.ringkas;
+  $("#brRT").textContent = r ? r.teks : "Belum ada ringkasan hari ini. Tekan tombol untuk meminta MCI.Herald merangkum berita utama dan teknologi.";
+  $("#brRI").textContent = r ? `Dirangkum ${relW(r.t)}${r.oleh ? " atas permintaan " + r.oleh : ""}. Ringkasan dibuat dari judul berita, cek situs aslinya untuk detail.` : "";
+  $("#brRB").hidden = !BRD.bisa_ringkas;
+}
+async function loadBerita() {
+  $("#brList").innerHTML = '<p class="mu">Memuat berita…</p>';
+  if (DEMO) { BRD = {kategori: {utama: "Utama", teknologi: "Teknologi"}, items: [], error: "Berita aktif di versi server."}; renderBerita(); return; }
+  try { BRD = await api("/api/berita?kat=" + BRK); } catch (e) { BRD = Object.assign(BRD || {}, {items: [], error: e.message}); }
+  renderBerita();
+}
+$("#brQ").oninput = renderBerita;
+$("#brRB").onclick = async () => {
+  $("#brRB").disabled = true; $("#brRT").textContent = "MCI.Herald sedang membaca berita…";
+  try { const d = await api("/api/berita/ringkas", {method: "POST"}); if (BRD) BRD.ringkas = d.ringkas; if (d.cache) pesan("Ringkasan masih baru (di bawah 3 jam), dipakai ulang"); } catch (e) { alert(e.message); }
+  $("#brRB").disabled = false; renderBerita();
+};
+
+let BKD = null, BKW = null, BKF = null;
+const BK_ST = {lunas: ["g", "Lunas ✓"], menunggu: ["y", "Menunggu konfirmasi"], belum: ["r", "Belum bayar"], bebas: ["n", "Peminjam"], ditolak: ["r", "Ditolak"]};
+function bkMinggu(list, name, cek) { return list.length ? list.map(w => `<label class="bkc"><input type="checkbox" name="${name}" value="${w.k}" ${cek === w.k ? "checked" : ""}> ${esc(w.label)}</label>`).join("") : '<span class="mu">Semua minggu sudah lunas atau sedang menunggu konfirmasi.</span>'; }
+function renderBayarKas() {
+  const d = BKD; if (!d) return;
+  $("#bkLabel").textContent = d.label + (d.minggu === d.sekarang ? " (minggu ini)" : "");
+  $("#bkPrev").disabled = !d.prev; $("#bkNext").disabled = !d.next; $("#bkNow").hidden = d.minggu === d.sekarang;
+  $("#bk1").textContent = `${d.lunas} / ${d.wajib}`; $("#bk2").textContent = num(d.anggota.filter(a => a.status === "menunggu").length); $("#bk3").textContent = rp(d.masuk);
+  $("#bkList").innerHTML = d.anggota.map(a => `<div class="bkm ${a.status}"><b>${esc(a.nama)}</b><span class="ch ${BK_ST[a.status][0]}">${BK_ST[a.status][1]}</span>
+    <span class="mu" style="font-size:12px">${esc(a.tingkat_label)}${a.nominal ? " · " + rp(a.nominal) + "/minggu" : ""}</span>${a.tunggak ? `<span style="font-size:12px;color:#B42318;font-weight:600">Nunggak ${a.tunggak} minggu</span>` : ""}</div>`).join("") || '<p class="mu">Belum ada anggota.</p>';
+  // formulir bayar milik sendiri
+  const s = d.saya, B = $("#bkBayar");
+  B.hidden = !s;
+  if (s && s.tingkat === "bebas") B.innerHTML = `<b>Status kamu: Tidak bayar (peminjam)</b><p class="mu" style="margin:6px 0 0">Kamu tidak wajib bayar kas, tapi barang dan komponen MCI <b>bukan hak milikmu</b>; kamu hanya boleh meminjam. Kalau mau ikut iuran, minta Bendahara mengubah tingkatmu.</p>`;
+  else if (s) {
+    B.innerHTML = `<b>Bayar iuran kamu</b><div class="mu" style="font-size:12.5px;margin-top:2px">Tingkat: ${esc(s.tingkat_label)} · ${rp(s.nominal)} per minggu${s.bendahara ? " · sebagai Bendahara, pembayaranmu langsung tercatat lunas" : ""}</div>
+      <div class="k" style="margin-top:12px">Minggu yang dibayar (boleh lebih dari satu)</div><div class="bkw" id="bkW">${bkMinggu(s.pilihan, "bkw", (s.pilihan.find(w => w.k === d.sekarang) || s.pilihan[0] || {}).k)}</div>
+      <div class="fl" style="margin-top:10px"><label>Foto bukti (wajib)<input type="file" id="bkF" accept="image/*" capture="environment"></label><label>Catatan (opsional)<input type="text" id="bkC" maxlength="300" placeholder="contoh: cash ke Shera, transfer BCA"></label></div>
+      <img id="bkPv" class="bkpv" alt="Pratinjau foto bukti" hidden>
+      <div class="bar" style="margin:12px 0 0"><button class="bt g" id="bkGo" ${s.pilihan.length ? "" : "disabled"}>Saya sudah bayar</button><b id="bkTot"></b><span class="mu" id="bkMsg"></span></div>`;
+    const tot = () => { const n = $$('input[name=bkw]:checked').length; $("#bkTot").textContent = n ? "Total " + rp(n * s.nominal) : ""; };
+    $$('input[name=bkw]').forEach(c => c.onchange = tot); tot();
+    $("#bkF").onchange = async () => { const f = $("#bkF").files[0]; BKF = null; $("#bkPv").hidden = true; if (!f) return; try { BKF = await resizeFoto(f, 1280); $("#bkPv").src = BKF.url; $("#bkPv").hidden = false; } catch (e) { $("#bkMsg").textContent = e.message; } };
+    $("#bkGo").onclick = async () => {
+      const mg = $$('input[name=bkw]:checked').map(c => c.value);
+      if (!mg.length) { $("#bkMsg").textContent = "Pilih minimal satu minggu."; return; }
+      if (!BKF) { $("#bkMsg").textContent = "Wajib lampirkan foto bukti (foto uangnya atau bukti transfer)."; return; }
+      const fd = new FormData(); fd.append("minggu", mg.join(",")); fd.append("catatan", $("#bkC").value); fd.append("foto", BKF.blob, "bukti.jpg");
+      $("#bkGo").disabled = true; $("#bkMsg").textContent = "Mengirim…";
+      try { BKD = await api("/api/iuran/bayar", {method: "POST", body: fd}); BKF = null; pesan(BKD.status === "lunas" ? "Tercatat lunas ✓" : "Terkirim. Tunggu konfirmasi Bendahara di Inbox"); renderBayarKas(); }
+      catch (e) { $("#bkMsg").textContent = e.message; $("#bkGo").disabled = false; }
+    };
+  }
+  // konfirmasi (Bendahara & Dev)
+  $("#bkKonf").hidden = !d.bisa_konfirmasi;
+  $("#bkMenunggu").innerHTML = (d.menunggu || []).map(x => `<div class="bkk"><a href="/api/iuran/${x.id}/foto" target="_blank" rel="noopener"><img src="/api/iuran/${x.id}/foto" alt="Foto bukti ${esc(x.nama)}" loading="lazy"></a>
+    <div style="flex:1;min-width:0"><b>${esc(x.nama)}</b> · ${rp(x.jumlah)}<div class="mu" style="font-size:12.5px">${esc(x.minggu_label.join("; "))} · ${relW(x.dibuat)}</div>${x.catatan ? `<div style="font-size:13px">${esc(x.catatan)}</div>` : ""}
+    <div class="bar" style="margin:8px 0 0"><button class="bt g" data-bkt="${x.id}">Terima</button><button class="bt o" data-bkn="${x.id}">Tolak</button></div></div></div>`).join("") || '<p class="mu">Tidak ada yang menunggu. Mantap.</p>';
+  $$("[data-bkt],[data-bkn]").forEach(b => b.onclick = async () => { b.disabled = true; if (await bayarAksi(b.dataset.bkt || b.dataset.bkn, b.dataset.bkt ? "terima" : "tolak")) { renderBayarKas(); inboxBadge(); } b.disabled = false; });
+  // pengaturan
+  $("#bkAtur").hidden = !d.bisa_konfirmasi;
+  if (d.bisa_konfirmasi) {
+    if (document.activeElement !== $("#bkTB")) $("#bkTB").value = d.tarif.biasa; if (document.activeElement !== $("#bkTR")) $("#bkTR").value = d.tarif.ringan;
+    $("#bkTk").innerHTML = d.anggota.map(a => `<tr><td>${esc(a.nama)}</td><td><select data-tk="${a.id}" style="max-width:240px">${Object.entries(d.tingkat_nama).map(([k, v]) => `<option value="${k}" ${k === a.tingkat ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></td><td class="rt">${a.nominal ? rp(a.nominal) : "-"}</td></tr>`).join("");
+    const cur = $("#bkCA").value, wajib = d.anggota.filter(a => a.tingkat !== "bebas");
+    $("#bkCA").innerHTML = wajib.map(a => `<option value="${a.id}" ${String(a.id) === cur ? "selected" : ""}>${esc(a.nama)} (${rp(a.nominal)}/minggu)</option>`).join("");
+    const cw = () => { $("#bkCW").innerHTML = bkMinggu((d.pilihan_anggota || {})[$("#bkCA").value] || [], "bkcw"); }; $("#bkCA").onchange = cw; cw();
+  }
+  // riwayat
+  $("#bkRT").textContent = d.bisa_konfirmasi ? "Riwayat pembayaran (semua anggota)" : "Riwayat pembayaran kamu";
+  $("#bkRiw").innerHTML = (d.riwayat || []).map(x => `<tr><td>${esc((x.dibuat || "").slice(0, 10))}</td><td>${esc(x.nama)}</td><td>${esc(x.minggu.map(k => "M" + +k.slice(-2)).join(", "))}</td><td class="rt">${rp(x.jumlah)}</td>
+    <td><span class="ch ${BK_ST[x.status][0]}">${BK_ST[x.status][1]}</span>${x.alasan ? `<div class="mu" style="font-size:12px">${esc(x.alasan)}</div>` : ""}${x.oleh ? `<div class="mu" style="font-size:12px">oleh ${esc(x.oleh)}</div>` : ""}</td>
+    <td><a class="bt o" href="/api/iuran/${x.id}/foto" target="_blank" rel="noopener">Bukti</a>${ADM() ? ` <button class="bt o" data-bkh="${x.id}">Hapus</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="mu">Belum ada pembayaran.</td></tr>';
+  $$("[data-bkh]").forEach(b => b.onclick = async () => { if (!confirm("Hapus data pembayaran ini? Catatan kasnya ikut dihapus.")) return; if (await bayarAksi(b.dataset.bkh, "hapus")) renderBayarKas(); });
+}
+async function loadBayarKas(m) {
+  if (DEMO) { $("#bkLabel").textContent = "Bayar Kas aktif di versi server."; return; }
+  try { BKD = await api("/api/iuran" + (m ? "?minggu=" + m : "")); renderBayarKas(); } catch (e) { $("#bkLabel").textContent = e.message; }
+}
+$("#bkPrev").onclick = () => BKD && BKD.prev && loadBayarKas(BKD.prev);
+$("#bkNext").onclick = () => BKD && BKD.next && loadBayarKas(BKD.next);
+$("#bkNow").onclick = () => loadBayarKas();
+$("#bkSaveT").onclick = async () => {
+  const tingkat = {}; $$("[data-tk]").forEach(s => tingkat[s.dataset.tk] = s.value);
+  $("#bkSaveT").disabled = true; $("#bkMsgT").textContent = "Menyimpan…";
+  try { BKD = await api("/api/iuran/atur", {json: {biasa: +$("#bkTB").value, ringan: +$("#bkTR").value, tingkat, minggu: BKD.minggu}}); renderBayarKas(); $("#bkMsgT").textContent = "Tersimpan. Anggota yang tingkatnya berubah dapat notifikasi."; }
+  catch (e) { $("#bkMsgT").textContent = e.message; }
+  $("#bkSaveT").disabled = false;
+};
+$("#bkCS").onclick = async () => {
+  const mg = $$('input[name=bkcw]:checked').map(c => c.value), f = $("#bkCF").files[0];
+  if (!$("#bkCA").value) { $("#bkMsgC").textContent = "Pilih anggota."; return; }
+  if (!mg.length) { $("#bkMsgC").textContent = "Pilih minimal satu minggu."; return; }
+  if (!f) { $("#bkMsgC").textContent = "Wajib foto bukti."; return; }
+  $("#bkCS").disabled = true; $("#bkMsgC").textContent = "Menyimpan…";
+  try { const fd = new FormData(); fd.append("untuk", $("#bkCA").value); fd.append("minggu", mg.join(",")); fd.append("foto", (await resizeFoto(f, 1280)).blob, "bukti.jpg");
+    BKD = await api("/api/iuran/bayar", {method: "POST", body: fd}); $("#bkCF").value = ""; renderBayarKas(); $("#bkMsgC").textContent = "Tercatat lunas ✓"; }
+  catch (e) { $("#bkMsgC").textContent = e.message; }
+  $("#bkCS").disabled = false;
 };
 
 /* Perpustakaan: semua boleh baca dan mengunggah (ada jatah harian); ubah/hapus milik orang lain khusus Dev */
@@ -3584,6 +3785,8 @@ const OFFICE = (() => {
   if (DEMO) { $("#demoBanner").hidden = false; $("#csv").removeAttribute("href"); $("#csv").onclick = e => { e.preventDefault(); alert("Ekspor CSV aktif di versi server."); }; }
   try { ME = await api("/api/me"); if (ME.lantai) LANTAI = ME.lantai; } catch (e) { return; }
   $$(".nv").forEach(b => { const p = PAGE_PERM[b.dataset.p]; if (p && !can(p)) b.style.display = "none"; });
+  if (!PUNYA_INBOX()) ["inbox", "bayarkas"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // viewer tidak punya inbox & iuran
+  inboxBadge(); setInterval(() => { if (!document.hidden) inboxBadge(); }, 20000);
   const NP = ME.anggota ? ME.anggota.nama + " · " + ME.anggota.jabatan.join(", ") : (ME.nama_peran || "Viewer");
   $("#whoRole").innerHTML = ADM() ? `<span class="wl">Masuk sebagai</span><span class="wh">Masuk sebagai</span> <b>Admin</b>`
     : `<span class="wl">Masuk sebagai</span><span class="wh">⚡ Hemat token</span> <b>${esc(NP)}</b>`;

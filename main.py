@@ -14,6 +14,8 @@ import os, io, csv, json, re, time, gzip, base64, asyncio, secrets, logging, sql
 from collections import deque, OrderedDict
 from datetime import datetime, timedelta, timezone
 from html import unescape as _unesc
+from email.utils import parsedate_to_datetime
+import xml.etree.ElementTree as ET
 
 import httpx, pytz, psutil
 from flask import Flask, jsonify, abort, request, send_from_directory, make_response, redirect, Response
@@ -216,6 +218,9 @@ def db_init():
         sql(c, "CREATE TABLE IF NOT EXISTS dikeluarkan (nama TEXT PRIMARY KEY, tanggal TEXT NOT NULL, alasan TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS perpus (id {pk}, judul TEXT NOT NULL, penulis TEXT, kategori TEXT, ringkasan TEXT, isi TEXT, link TEXT, "
                "file_nama TEXT, file_mime TEXT, file_data TEXT, sampul_mime TEXT, sampul TEXT, dibuat TEXT, diubah TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS inbox (id {pk}, untuk INTEGER NOT NULL, jenis TEXT, judul TEXT NOT NULL, isi TEXT, ref INTEGER, dibaca INTEGER NOT NULL DEFAULT 0, dibuat TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS bayar_kas (id {pk}, anggota INTEGER NOT NULL, nama TEXT, periode TEXT NOT NULL, jumlah {big} NOT NULL DEFAULT 0, mime TEXT, foto TEXT, "
+               "status TEXT NOT NULL DEFAULT 'menunggu', catatan TEXT, alasan TEXT, dibuat TEXT, dikonfirmasi TEXT, oleh TEXT, kas_id INTEGER)")
         sql(c, f"CREATE TABLE IF NOT EXISTS stok (id {pk}, nama TEXT NOT NULL, jumlah {big} NOT NULL DEFAULT 0, satuan TEXT, kategori TEXT, minimum {big} NOT NULL DEFAULT 0, catatan TEXT, mime TEXT, gambar TEXT, diubah TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS laporan (id {pk}, minggu TEXT, dibuat TEXT, dari TEXT, sampai TEXT, sumber TEXT, isi TEXT, data TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS pemakaian (tanggal TEXT NOT NULL, model TEXT NOT NULL, masuk {big} NOT NULL DEFAULT 0, keluar {big} NOT NULL DEFAULT 0, pikir {big} NOT NULL DEFAULT 0, panggilan {big} NOT NULL DEFAULT 0, PRIMARY KEY (tanggal, model))")
@@ -2261,8 +2266,8 @@ def api_me():
     m = member_of(r)
     return jsonify({"role": "admin" if is_admin(r) else ("anggota" if m else r), "nama_peran": nama_peran(r), "izin": sorted(perms_of(r)), "kuota": kuota_info(r),
                     "anggota": {"id": m["id"], "nama": m["nama"], "divisi": [DIVISI[x] for x in m["divisi"]], "jabatan": [JABATAN[x] for x in m["jabatan"]],
-                                "divisi_key": m["divisi"]} if m else None, "daftar_divisi": DIVISI,
-                    **{k: v for k, v in SET.items() if k not in ("kuota", "tg_users", "tg_izin")}, "mcp_siap": bool(MCP_SERVERS and ClientSession), "db_permanen": PG, "lantai": LANTAI,
+                                "divisi_key": m["divisi"], "iuran": tingkat_of(m["id"])} if m else None, "daftar_divisi": DIVISI,
+                    **{k: v for k, v in SET.items() if k not in ("kuota", "tg_users", "tg_izin", "iuran", "berita_ringkas")}, "mcp_siap": bool(MCP_SERVERS and ClientSession), "db_permanen": PG, "lantai": LANTAI,
                     "gambar": img_status()})
 
 
@@ -2980,6 +2985,500 @@ def api_stok_one(i):
     except (TypeError, ValueError):
         return jsonify({"error": "jumlah harus angka"}), 400
     return jsonify({"diubah": stok_jumlah(i, j), "items": STOK})
+
+
+# ---------- INBOX: notifikasi pribadi per anggota (0 = token admin master). Ikut dikirim ke Telegram kalau akunnya sudah terhubung ----------
+def _tg_ke_anggota(ids, teks):
+    if not LOOP or not TG_APPS:
+        return
+    tgt = [int(k) for k, v in SET.get("tg_users", {}).items() if v.get("anggota") in ids]
+    app_ = TG_APPS.get("ledger") or next(iter(TG_APPS.values()), None)
+    if not tgt or not app_:
+        return
+
+    async def kirim():
+        for uid in tgt:
+            try:
+                await app_.bot.send_message(chat_id=uid, text=teks[:4000])
+            except Exception:
+                log.warning("Notifikasi Inbox tidak terkirim ke Telegram %s (sudah /start bot Ledger?)", uid)
+    try:
+        asyncio.run_coroutine_threadsafe(kirim(), LOOP)
+    except Exception:
+        log.exception("kirim notif Telegram gagal")
+
+
+def inbox_kirim(untuk, jenis, judul, isi="", ref=None, tg=True):
+    ids = sorted({int(u) for u in untuk if u is not None})
+    if not ids:
+        return
+    now = _now()
+    with db() as c:
+        for u in ids:
+            sql(c, "INSERT INTO inbox (untuk,jenis,judul,isi,ref,dibaca,dibuat) VALUES (?,?,?,?,?,0,?)", (u, jenis, judul[:200], isi[:2000], ref, now))
+    if tg:
+        _tg_ke_anggota(ids, f"📬 {judul}" + (f"\n{isi}" if isi else "") + "\n\nBuka web MCI → Inbox.")
+
+
+def inbox_data(mid):
+    with db() as c:
+        rows = sql(c, "SELECT id,jenis,judul,isi,ref,dibaca,dibuat FROM inbox WHERE untuk=? ORDER BY id DESC LIMIT 150", (mid,)).fetchall()
+        refs = sorted({int(r[4]) for r in rows if r[1] == "bayar_kas" and r[4] is not None})
+        st = {}
+        if refs:
+            q = ",".join("?" * len(refs))
+            st = {int(i): (s, o) for i, s, o in sql(c, f"SELECT id,status,oleh FROM bayar_kas WHERE id IN ({q})", tuple(refs)).fetchall()}
+    items = [{"id": int(i), "jenis": j, "judul": t, "isi": s or "", "ref": rf, "dibaca": bool(d), "dibuat": w,
+              **({"bayar_status": st.get(int(rf), ("dihapus", ""))[0], "bayar_oleh": st.get(int(rf), ("", ""))[1] or ""} if j == "bayar_kas" and rf is not None else {})}
+             for i, j, t, s, rf, d, w in rows]
+    return {"items": items, "belum": sum(1 for x in items if not x["dibaca"])}
+
+
+def _mid_req():
+    r = role()
+    if not r:
+        abort(401)
+    mid = mid_of(r)
+    if mid is None:
+        abort(403)   # viewer tidak punya inbox
+    return r, mid
+
+
+@app.route("/api/inbox")
+def api_inbox():
+    r, mid = _mid_req()
+    return jsonify(inbox_data(mid))
+
+
+@app.route("/api/inbox/jumlah")
+def api_inbox_jumlah():
+    r = role()
+    if not r:
+        abort(401)
+    mid = mid_of(r)
+    if mid is None:
+        return jsonify({"belum": 0})
+    with db() as c:
+        n = sql(c, "SELECT COUNT(*) FROM inbox WHERE untuk=? AND dibaca=0", (mid,)).fetchone()[0]
+    return jsonify({"belum": int(n)})
+
+
+@app.route("/api/inbox/baca", methods=["POST"])
+def api_inbox_baca():
+    """{id} = tandai satu dibaca, {semua: true} = tandai semua."""
+    r, mid = _mid_req()
+    d = request.get_json(silent=True) or {}
+    with db() as c:
+        if d.get("semua"):
+            sql(c, "UPDATE inbox SET dibaca=1 WHERE untuk=?", (mid,))
+        else:
+            sql(c, "UPDATE inbox SET dibaca=1 WHERE untuk=? AND id=?", (mid, int(d.get("id") or 0)))
+    return jsonify(inbox_data(mid))
+
+
+@app.route("/api/inbox/<int:i>", methods=["DELETE"])
+def api_inbox_hapus(i):
+    r, mid = _mid_req()
+    with db() as c:
+        sql(c, "DELETE FROM inbox WHERE untuk=? AND id=?", (mid, i))
+    return jsonify(inbox_data(mid))
+
+
+# ---------- BAYAR KAS: iuran MINGGUAN. Bendahara menentukan tingkat tiap anggota: Biasa / Keringanan / Tidak bayar (= peminjam,
+# tidak punya hak atas barang & komponen MCI). Tiap pembayaran WAJIB foto bukti; anggota → menunggu konfirmasi Bendahara (Inbox). ----------
+TINGKAT = {"biasa": "Biasa", "ringan": "Keringanan", "bebas": "Tidak bayar (peminjam)"}
+_BLN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
+
+
+def minggu_key(d=None):
+    d = d or datetime.now(WIB).date()
+    y, w, _ = d.isocalendar()
+    return f"{y}-W{w:02d}"
+
+
+def _senin(k):
+    y, w = k.split("-W")
+    return datetime.fromisocalendar(int(y), int(w), 1).date()
+
+
+def minggu_geser(k, n):
+    return minggu_key(_senin(k) + timedelta(days=7 * n))
+
+
+def minggu_label(k):
+    a = _senin(k)
+    b = a + timedelta(days=6)
+    return f"Minggu {int(k[-2:])} · {a.day} {_BLN[a.month - 1]} – {b.day} {_BLN[b.month - 1]} {b.year}"
+
+
+def minggu_valid(k):
+    try:
+        return bool(re.fullmatch(r"\d{4}-W\d{2}", k or "")) and minggu_key(_senin(k)) == k
+    except ValueError:
+        return False
+
+
+def minggu_antara(a, b):
+    out, k = [], a
+    while k <= b and len(out) < 520:
+        out.append(k)
+        k = minggu_geser(k, 1)
+    return out
+
+
+def iuran_set():
+    d = SET.setdefault("iuran", {})
+    baru = not d.get("mulai")
+    d.setdefault("biasa", 25000)
+    d.setdefault("ringan", 10000)
+    d.setdefault("tingkat", {})
+    if baru:
+        d["mulai"] = minggu_key()   # tunggakan dihitung sejak fitur ini dipakai, bukan mundur ke belakang
+        try:
+            set_save()
+        except Exception:
+            log.exception("simpan iuran gagal")
+    return d
+
+
+def tingkat_of(mid):
+    t = iuran_set()["tingkat"].get(str(mid), "biasa")
+    return t if t in TINGKAT else "biasa"
+
+
+def nominal_of(mid):
+    t = tingkat_of(mid)
+    return 0 if t == "bebas" else int(iuran_set()[t])
+
+
+def bayar_rows():
+    with db() as c:
+        rows = sql(c, "SELECT id,anggota,nama,periode,jumlah,status,catatan,alasan,dibuat,dikonfirmasi,oleh FROM bayar_kas ORDER BY id DESC LIMIT 5000").fetchall()
+    out = []
+    for i, a, n, p, j, s, ca, al, d, k, o in rows:
+        try:
+            mg = json.loads(p or "[]")
+        except ValueError:
+            mg = []
+        out.append({"id": int(i), "anggota": int(a), "nama": n, "minggu": mg, "minggu_label": [minggu_label(x) for x in mg if minggu_valid(x)], "jumlah": int(j or 0),
+                    "status": s, "catatan": ca or "", "alasan": al or "", "dibuat": d or "", "dikonfirmasi": k or "", "oleh": o or ""})
+    return out
+
+
+def _st_minggu(rows, mid, k):
+    st = "belum"
+    for x in rows:
+        if x["anggota"] == mid and k in x["minggu"]:
+            if x["status"] == "lunas":
+                return "lunas"
+            if x["status"] == "menunggu":
+                st = "menunggu"
+    return st
+
+
+def minggu_bisa_bayar(rows, mid):
+    """Minggu yang boleh dibayar: sejak mulai s/d 4 minggu ke depan, yang belum lunas & tidak sedang menunggu."""
+    cur, d = minggu_key(), iuran_set()
+    return [k for k in minggu_antara(d["mulai"], minggu_geser(cur, 4)) if _st_minggu(rows, mid, k) == "belum"][-16:]
+
+
+def penerima_konfirmasi(kecuali=None):
+    b = [m["id"] for m in MEMBERS.values() if m["aktif"] and "bendahara" in m["jabatan"] and m["id"] != kecuali]
+    if b:
+        return b
+    return [0] + [m["id"] for m in MEMBERS.values() if m["aktif"] and "admin" in m["jabatan"] and m["id"] != kecuali]
+
+
+def iuran_data(r, minggu=None):
+    d, cur, mine, konf = iuran_set(), minggu_key(), mid_of(r), can("kas_edit", r)
+    minggu = minggu if minggu_valid(minggu) else cur
+    rows = bayar_rows()
+    lalu = minggu_antara(d["mulai"], minggu_geser(cur, -1))   # minggu berjalan belum dihitung nunggak
+    anggota = []
+    for m in sorted((m for m in MEMBERS.values() if m["aktif"]), key=lambda m: m["nama"].lower()):
+        t = tingkat_of(m["id"])
+        tg = [] if t == "bebas" else [k for k in lalu if _st_minggu(rows, m["id"], k) == "belum"]
+        anggota.append({"id": m["id"], "nama": m["nama"], "tingkat": t, "tingkat_label": TINGKAT[t], "nominal": nominal_of(m["id"]),
+                        "status": "bebas" if t == "bebas" else _st_minggu(rows, m["id"], minggu), "tunggak": len(tg), "tunggak_minggu": tg[-8:]})
+    masuk = sum(x["jumlah"] // max(1, len(x["minggu"])) for x in rows if x["status"] == "lunas" and minggu in x["minggu"])
+    wajib = [a for a in anggota if a["tingkat"] != "bebas"]
+    out = {"minggu": minggu, "label": minggu_label(minggu), "sekarang": cur, "mulai": d["mulai"], "prev": minggu_geser(minggu, -1) if minggu > d["mulai"] else None,
+           "next": minggu_geser(minggu, 1) if minggu < minggu_geser(cur, 4) else None, "tarif": {"biasa": d["biasa"], "ringan": d["ringan"]}, "tingkat_nama": TINGKAT,
+           "anggota": anggota, "lunas": sum(1 for a in wajib if a["status"] == "lunas"), "wajib": len(wajib), "masuk": masuk,
+           "bisa_konfirmasi": konf, "saya": None, "menunggu": [], "riwayat": []}
+    if mine is not None and mine in MEMBERS:
+        out["saya"] = {"id": mine, "tingkat": tingkat_of(mine), "tingkat_label": TINGKAT[tingkat_of(mine)], "nominal": nominal_of(mine),
+                       "pilihan": [{"k": k, "label": minggu_label(k)} for k in minggu_bisa_bayar(rows, mine)], "bendahara": "bendahara" in MEMBERS[mine]["jabatan"]}
+    if konf:
+        out["menunggu"] = [x for x in rows if x["status"] == "menunggu"][:100]
+        out["riwayat"] = rows[:60]
+        out["pilihan_anggota"] = {str(a["id"]): [{"k": k, "label": minggu_label(k)} for k in minggu_bisa_bayar(rows, a["id"])] for a in wajib}
+    elif mine is not None:
+        out["riwayat"] = [x for x in rows if x["anggota"] == mine][:30]
+    return out
+
+
+def _kas_iuran(nama, mg, jumlah):
+    return kas_add([{"tanggal": today(), "keterangan": f"Iuran kas {nama} · " + ", ".join(f"M{int(k[-2:])}" for k in mg) + f" ({mg[0][:4]})",
+                     "kategori": "Iuran", "masuk": int(jumlah), "keluar": 0}], "iuran")[0]
+
+
+@app.route("/api/iuran")
+def api_iuran():
+    r = role()
+    if not r:
+        abort(401)
+    if mid_of(r) is None:
+        abort(403)   # viewer tidak melihat siapa yang sudah bayar
+    return jsonify(iuran_data(r, request.args.get("minggu")))
+
+
+@app.route("/api/iuran/bayar", methods=["POST"])
+def api_iuran_bayar():
+    """multipart: minggu (dipisah koma), catatan, foto (WAJIB), untuk (opsional, khusus Bendahara/Dev: catat pembayaran anggota lain)."""
+    r = role()
+    if not r:
+        abort(401)
+    konf = can("kas_edit", r)
+    untuk = str(request.form.get("untuk") or "")
+    if untuk:
+        if not konf:
+            abort(403)
+        m = MEMBERS.get(int(untuk)) if untuk.isdigit() else None
+        if not m or not m["aktif"]:
+            return jsonify({"error": "Anggota tidak ditemukan"}), 400
+    else:
+        m = member_of(r)
+        if not m:
+            return jsonify({"error": "Bayar kas hanya untuk anggota yang masuk dengan token pribadi"}), 403
+    if tingkat_of(m["id"]) == "bebas":
+        return jsonify({"error": f"{m['nama']} berstatus Tidak bayar (peminjam). Minta Bendahara mengubah tingkatnya dulu."}), 400
+    rows = bayar_rows()
+    boleh = set(minggu_bisa_bayar(rows, m["id"]))
+    mg = sorted({x.strip() for x in str(request.form.get("minggu") or "").split(",") if x.strip()})
+    if not mg:
+        return jsonify({"error": "Pilih minimal satu minggu yang dibayar"}), 400
+    if any(k not in boleh for k in mg):
+        return jsonify({"error": "Ada minggu yang sudah lunas, sedang menunggu konfirmasi, atau di luar jangkauan. Muat ulang halaman."}), 400
+    f = request.files.get("foto")
+    data = f.read(4_000_001) if f and f.filename else b""
+    mime = _gambar_mime(data) if data else None
+    if not mime:
+        return jsonify({"error": "Wajib lampirkan foto bukti (foto uangnya atau bukti transfer), format JPG/PNG/WEBP"}), 400
+    if len(data) > 4_000_000:
+        return jsonify({"error": "Foto maksimal 4 MB"}), 400
+    jumlah = nominal_of(m["id"]) * len(mg)
+    sendiri = untuk == "" or int(untuk) == mid_of(r)
+    auto = (konf and not sendiri) or "bendahara" in m["jabatan"]   # dicatat Bendahara langsung, atau Bendahara bayar sendiri
+    oleh = nama_peran(r)
+    catatan = str(request.form.get("catatan") or "").strip()[:300]
+    with db() as c:
+        q = "INSERT INTO bayar_kas (anggota,nama,periode,jumlah,mime,foto,status,catatan,dibuat,dikonfirmasi,oleh) VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+        p = (m["id"], m["nama"], json.dumps(mg), jumlah, mime, base64.b64encode(data).decode(), "lunas" if auto else "menunggu", catatan, _now(),
+             _now() if auto else None, oleh if auto else None)
+        pid = int(sql(c, q + " RETURNING id", p).fetchone()[0] if PG else sql(c, q, p).lastrowid)
+    lbl = ", ".join(f"M{int(k[-2:])}" for k in mg)
+    if auto:
+        kid = _kas_iuran(m["nama"], mg, jumlah)
+        with db() as c:
+            sql(c, "UPDATE bayar_kas SET kas_id=? WHERE id=?", (kid, pid))
+        if sendiri:
+            inbox_kirim([x for x in penerima_konfirmasi(m["id"]) if x == 0] + [x["id"] for x in MEMBERS.values() if x["aktif"] and "admin" in x["jabatan"] and x["id"] != m["id"]],
+                        "info", f"{m['nama']} (Bendahara) bayar kas {lbl}", f"{rp(jumlah)}, otomatis lunas. Bukti foto ada di halaman Bayar Kas.", pid, tg=False)
+        else:
+            inbox_kirim([m["id"]], "bayar_ok", f"Bendahara mencatat iuran kas kamu {lbl} ✓", f"{rp(jumlah)} dicatat oleh {oleh}. Nama kamu sudah hijau.", pid)
+    else:
+        inbox_kirim(penerima_konfirmasi(m["id"]), "bayar_kas", f"{m['nama']} bayar kas {lbl}", f"{rp(jumlah)} ({TINGKAT[tingkat_of(m['id'])]})"
+                    + (f" · catatan: {catatan}" if catatan else "") + ". Cek foto bukti lalu Terima atau Tolak.", pid)
+    return jsonify({"ok": True, "status": "lunas" if auto else "menunggu", **iuran_data(r, mg[0])})
+
+
+@app.route("/api/iuran/<int:i>", methods=["POST"])
+def api_iuran_aksi(i):
+    """{aksi: terima | tolak | hapus, alasan?}. Terima/tolak: Bendahara & Dev. Hapus: khusus Dev (catatan kas ikut dihapus)."""
+    r = need_perm("kas_edit")
+    d = request.get_json(silent=True) or {}
+    aksi = str(d.get("aksi", ""))
+    with db() as c:
+        row = sql(c, "SELECT anggota,nama,periode,jumlah,status,kas_id,oleh FROM bayar_kas WHERE id=?", (i,)).fetchone()
+    if not row:
+        return jsonify({"error": "Data pembayaran tidak ditemukan"}), 404
+    mid, nama, per, jumlah, status, kid, oleh0 = row
+    mg = json.loads(per or "[]")
+    lbl = ", ".join(f"M{int(k[-2:])}" for k in mg)
+    oleh = nama_peran(r)
+    if aksi in ("terima", "tolak"):
+        if mid == mid_of(r) and not is_admin(r):
+            return jsonify({"error": "Tidak bisa mengonfirmasi pembayaran sendiri"}), 403
+        alasan = str(d.get("alasan") or "").strip()[:300]
+        with db() as c:
+            n = sql(c, "UPDATE bayar_kas SET status=?, alasan=?, dikonfirmasi=?, oleh=? WHERE id=? AND status='menunggu'",
+                    ("lunas" if aksi == "terima" else "ditolak", alasan, _now(), oleh, i)).rowcount
+            sql(c, "UPDATE inbox SET dibaca=1 WHERE jenis='bayar_kas' AND ref=?", (i,))
+        if not n:
+            return jsonify({"error": f"Pembayaran ini sudah diproses{' oleh ' + oleh0 if oleh0 else ''}"}), 409
+        if aksi == "terima":
+            kid = _kas_iuran(nama, mg, jumlah)
+            with db() as c:
+                sql(c, "UPDATE bayar_kas SET kas_id=? WHERE id=?", (kid, i))
+            inbox_kirim([mid], "bayar_ok", f"Iuran kas {lbl} DITERIMA ✓", f"{rp(int(jumlah))} dikonfirmasi oleh {oleh}. Nama kamu sudah hijau.", i)
+        else:
+            inbox_kirim([mid], "bayar_tolak", f"Iuran kas {lbl} DITOLAK", (f"Alasan: {alasan}. " if alasan else "") + f"Ditolak oleh {oleh}. Kirim ulang dengan bukti yang benar di halaman Bayar Kas.", i)
+    elif aksi == "hapus":
+        if not is_admin(r):
+            return jsonify({"error": "Hapus data pembayaran khusus Dev"}), 403
+        with db() as c:
+            sql(c, "DELETE FROM bayar_kas WHERE id=?", (i,))
+            sql(c, "UPDATE inbox SET dibaca=1 WHERE jenis='bayar_kas' AND ref=?", (i,))
+        if kid:
+            kas_del(int(kid))
+    else:
+        return jsonify({"error": "Aksi tidak dikenal"}), 400
+    return jsonify(iuran_data(r, d.get("minggu")))
+
+
+@app.route("/api/iuran/<int:i>/foto")
+def api_iuran_foto(i):
+    """Foto bukti: hanya pembayar sendiri, Bendahara, dan Dev."""
+    r = role()
+    if not r:
+        abort(401)
+    with db() as c:
+        row = sql(c, "SELECT anggota, mime, foto FROM bayar_kas WHERE id=?", (i,)).fetchone()
+    if not row or not row[2]:
+        abort(404)
+    if not can("kas_edit", r) and row[0] != mid_of(r):
+        abort(403)
+    mime = row[1] if row[1] in ("image/jpeg", "image/png", "image/gif", "image/webp") else "image/jpeg"
+    return Response(base64.b64decode(row[2]), mimetype=mime, headers={"Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox"})
+
+
+@app.route("/api/iuran/atur", methods=["POST"])
+def api_iuran_atur():
+    """Bendahara/Dev: {biasa, ringan, tingkat: {id_anggota: biasa|ringan|bebas}}."""
+    r = need_perm("kas_edit")
+    b = request.get_json(silent=True) or {}
+    d = iuran_set()
+    for k in ("biasa", "ringan"):
+        if k in b:
+            try:
+                v = int(float(b[k]))
+            except (TypeError, ValueError):
+                return jsonify({"error": "Tarif harus angka"}), 400
+            if not 0 < v <= 10_000_000:
+                return jsonify({"error": "Tarif harus lebih dari 0"}), 400
+            d[k] = v
+    ubah = []
+    for k, v in (b.get("tingkat") or {}).items():
+        if str(k).isdigit() and int(k) in MEMBERS and v in TINGKAT:
+            if tingkat_of(int(k)) != v:
+                ubah.append((int(k), v))
+            d["tingkat"][str(int(k))] = v
+    set_save()
+    for mid, v in ubah:
+        inbox_kirim([mid], "info", f"Tingkat iuran kas kamu sekarang: {TINGKAT[v]}",
+                    "Kamu tidak wajib bayar kas, tapi statusmu PEMINJAM: barang dan komponen MCI bukan hak milikmu, hanya boleh dipinjam." if v == "bebas"
+                    else f"Iuran {rp(d[v])} per minggu. Bayar lewat halaman Bayar Kas (wajib foto bukti).", tg=False)
+    return jsonify(iuran_data(r, b.get("minggu")))
+
+
+# ---------- BERITA HARI INI: Google News (RSS, bahasa Indonesia) per kategori, cache 20 menit. Ringkasan oleh MCI.Herald (maks tiap 3 jam) ----------
+_GN = "https://news.google.com/rss{p}?hl=id&gl=ID&ceid=ID:id"
+BERITA_KAT = {"utama": ("Utama", _GN.format(p="")), "teknologi": ("Teknologi", _GN.format(p="/headlines/section/topic/TECHNOLOGY")),
+              "nasional": ("Nasional", _GN.format(p="/headlines/section/topic/NATION")), "bisnis": ("Bisnis", _GN.format(p="/headlines/section/topic/BUSINESS")),
+              "sains": ("Sains", _GN.format(p="/headlines/section/topic/SCIENCE")), "dunia": ("Dunia", _GN.format(p="/headlines/section/topic/WORLD")),
+              "olahraga": ("Olahraga", _GN.format(p="/headlines/section/topic/SPORTS")), "hiburan": ("Hiburan", _GN.format(p="/headlines/section/topic/ENTERTAINMENT")),
+              "kesehatan": ("Kesehatan", _GN.format(p="/headlines/section/topic/HEALTH"))}
+_BERITA, _BLOCK = {}, threading.Lock()
+
+
+def berita_ambil(kat):
+    c = _BERITA.get(kat)
+    if c and time.time() - c[0] < 1200:
+        return c[1], c[0]
+    with _BLOCK:
+        c = _BERITA.get(kat)
+        if c and time.time() - c[0] < 1200:
+            return c[1], c[0]
+        try:
+            r = httpx.get(BERITA_KAT[kat][1], timeout=12, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0 (MCI HQ news reader)"})
+            r.raise_for_status()
+            root = ET.fromstring(r.content[:3_000_000])
+            items = []
+            for it in root.iter("item"):
+                judul, link = (it.findtext("title") or "").strip(), (it.findtext("link") or "").strip()
+                se = it.find("source")
+                sumber = (se.text or "").strip() if se is not None else ""
+                if sumber and judul.endswith(" - " + sumber):
+                    judul = judul[: -len(sumber) - 3].strip()
+                if not judul or not re.match(r"^https?://", link):
+                    continue
+                try:
+                    waktu = parsedate_to_datetime(it.findtext("pubDate") or "").astimezone(WIB).isoformat(timespec="minutes")
+                except (TypeError, ValueError):
+                    waktu = ""
+                items.append({"judul": judul[:300], "link": link[:1000], "sumber": sumber[:80], "waktu": waktu})
+                if len(items) >= 40:
+                    break
+            if not items:
+                raise ValueError("feed kosong")
+            _BERITA[kat] = (time.time(), items)
+            return items, _BERITA[kat][0]
+        except Exception as e:
+            log.warning("Ambil berita %s gagal: %s", kat, e)
+            if c:
+                return c[1], c[0]   # pakai cache lama daripada kosong
+            raise RuntimeError("Berita belum bisa diambil sekarang, coba lagi sebentar.")
+
+
+@app.route("/api/berita")
+def api_berita():
+    need("viewer")
+    kat = request.args.get("kat", "utama")
+    if kat not in BERITA_KAT:
+        kat = "utama"
+    try:
+        items, ts = berita_ambil(kat)
+    except RuntimeError as e:
+        return jsonify({"error": str(e), "kategori": {k: v[0] for k, v in BERITA_KAT.items()}}), 502
+    return jsonify({"kat": kat, "items": items, "diambil": datetime.fromtimestamp(ts, WIB).isoformat(timespec="minutes"),
+                    "kategori": {k: v[0] for k, v in BERITA_KAT.items()}, "urut": list(BERITA_KAT), "ringkas": SET.get("berita_ringkas"),
+                    "bisa_ringkas": mid_of(role()) is not None})
+
+
+@app.route("/api/berita/ringkas", methods=["POST"])
+def api_berita_ringkas():
+    """Anggota & Dev: MCI.Herald merangkum berita utama + teknologi. Hasil dibagikan ke semua, dibuat ulang paling cepat 3 jam sekali."""
+    r = role()
+    if not r:
+        abort(401)
+    if mid_of(r) is None:
+        abort(403)
+    lama = SET.get("berita_ringkas") or {}
+    try:
+        if lama.get("t") and datetime.now(WIB) - datetime.fromisoformat(lama["t"]) < timedelta(hours=3):
+            return jsonify({"ringkas": lama, "cache": True})
+    except ValueError:
+        pass
+    try:
+        utama, _ = berita_ambil("utama")
+        tek, _ = berita_ambil("teknologi")
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 502
+    daftar = "\n".join(f"- {x['judul']} ({x['sumber']})" for x in utama[:14] + tek[:8])
+    prompt = ("Ini judul berita hari ini dari Google News Indonesia:\n" + daftar +
+              "\n\nRangkum untuk tim MCI (komunitas teknologi, elektronika, dan AI) dalam bahasa Indonesia santai. Format: 5 poin berita terpenting "
+              "(masing-masing 1 kalimat), lalu 1-2 poin 'Relevan buat MCI' dari berita teknologi. Hanya pakai informasi dari judul di atas, jangan menambah fakta. Tanpa markdown tebal.")
+    try:
+        teks = asyncio.run_coroutine_threadsafe(ask("herald", prompt, use_mcp=False, cache=False, act="Merangkum berita hari ini"), LOOP).result(90) if LOOP else ""
+    except Exception as e:
+        log.exception("ringkas berita gagal")
+        return jsonify({"error": f"Herald gagal merangkum: {e}"}), 502
+    if not teks:
+        return jsonify({"error": "Mesin AI belum siap, coba lagi sebentar."}), 503
+    SET["berita_ringkas"] = {"t": _now(), "teks": teks[:4000], "oleh": nama_peran(r)}
+    set_save()
+    return jsonify({"ringkas": SET["berita_ringkas"]})
 
 
 # ---------- PERPUSTAKAAN: semua yang bisa membuka web boleh membaca DAN mengunggah; ubah/hapus milik orang lain khusus Dev ----------
