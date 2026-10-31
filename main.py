@@ -3481,7 +3481,7 @@ def api_berita_ringkas():
     return jsonify({"ringkas": SET["berita_ringkas"]})
 
 
-# ---------- PERPUSTAKAAN: semua yang bisa membuka web boleh membaca DAN mengunggah; ubah/hapus milik orang lain khusus Dev ----------
+# ---------- PERPUSTAKAAN: semua yang bisa membuka web (termasuk viewer) boleh MEMBACA; mengunggah khusus anggota; ubah/hapus milik orang lain khusus Dev ----------
 PERPUS_MAKS, PERPUS_FILE_MAKS = 300, 8_000_000
 PERPUS_JATAH = {"viewer_ip": 3, "viewer_semua": 30, "anggota": 10}   # unggahan per hari (WIB); Dev tanpa batas
 PERPUS_BYTE_MAKS = 150_000_000                                         # total file kiriman non-Dev (karakter base64)
@@ -3663,6 +3663,8 @@ def api_perpus():
     if not r:
         abort(401)
     if request.method == "POST":
+        if r == "viewer" or mid_of(r) is None:
+            return jsonify({"error": "Viewer hanya bisa membaca dan mengunduh. Unggah buku khusus anggota."}), 403
         admin = is_admin(r)
         if str(request.form.get("id") or "").isdigit() and not admin:
             abort(403)

@@ -613,7 +613,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 
  <section id="p-perpus" class="pg" hidden>
   <h1>Perpustakaan</h1>
-  <p class="mu">Koleksi bacaan MCI: buku, modul, datasheet, catatan materi, dan arsip. Semua orang yang bisa membuka web ini, termasuk viewer, boleh membaca, mengunduh, dan mengunggah buku sendiri (PDF, Word, atau e-book). Yang bisa mengubah koleksi orang lain dan menghapus sembarang koleksi hanya Dev. Ruangannya ada di LT 3 kantor 3D.</p>
+  <p class="mu">Koleksi bacaan MCI: buku, modul, datasheet, catatan materi, dan arsip. Semua orang yang bisa membuka web ini, termasuk viewer, boleh membaca dan mengunduh. Yang bisa mengunggah buku (PDF, Word, atau e-book) hanya anggota; viewer cuma bisa baca. Mengubah dan menghapus koleksi orang lain hanya Dev. Ruangannya ada di LT 3 kantor 3D.</p>
   <div class="cd" id="ppForm" hidden><b id="ppTitle">Unggah koleksi</b><div class="mu" id="ppNote" style="margin-top:4px">Unggahanmu langsung tampil untuk semua orang. Isi salah satu: file, link, atau teks bacaan. Jatah unggah dibatasi per hari.</div>
    <div class="fl" style="margin-top:12px">
     <label>Judul<input type="text" id="ppJudul" maxlength="150" placeholder="contoh: Dasar Pemrograman ESP32"></label>
@@ -1613,7 +1613,7 @@ function renderPerpus() {
     <div class="bd"><b>${esc(x.judul)}</b>${x.penulis ? `<span class="mu" style="font-size:12.5px">${esc(x.penulis)}</span>` : ""}<span><span class="ch">${esc(x.kategori)}</span> <span class="mu" style="font-size:12px">oleh ${esc(x.oleh)}</span></span>${x.ringkasan ? `<span style="font-size:13px">${esc(x.ringkasan)}</span>` : ""}
     <div class="bar">${x.ada_isi ? `<button class="bt g" data-ppb="${x.id}">Baca</button>` : ""}${x.file_nama ? `<a class="bt o" href="/api/perpus/${x.id}/file" target="_blank" rel="noopener">Buka file</a><a class="bt o" href="/api/perpus/${x.id}/file?unduh=1">Unduh${x.file_kb ? ` (${x.file_kb > 1024 ? (x.file_kb / 1024).toFixed(1) + " MB" : x.file_kb + " KB"})` : ""}</a>` : ""}${x.link ? `<a class="bt o" href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">Buka link</a>` : ""}
     ${PPD.edit ? `<button class="bt o" data-ppe="${x.id}">Ubah</button>` : ""}${PPD.edit || x.milikku ? `<button class="bt o" data-ppd="${x.id}">Hapus</button>` : ""}</div></div></div>`).join("")
-    || `<p class="mu">${it.length ? "Tidak ada yang cocok." : "Rak masih kosong. Jadi yang pertama: unggah lewat formulir di atas."}</p>`;
+    || `<p class="mu">${it.length ? "Tidak ada yang cocok." : "Rak masih kosong." + (PUNYA_INBOX() ? " Jadi yang pertama: unggah lewat formulir di atas." : "")}</p>`;
   const one = id => it.find(x => x.id == id);
   $$("[data-ppb]").forEach(b => b.onclick = async () => {
     const x = one(b.dataset.ppb); $("#ppBK").textContent = x.kategori; $("#ppBJ").textContent = x.judul; $("#ppBP").textContent = x.penulis; $("#ppBT").textContent = "Memuat…"; $("#ppBaca").hidden = false;
@@ -1629,7 +1629,7 @@ function renderPerpus() {
   });
 }
 async function loadPerpus() {
-  try { PPD = DEMO ? {items: [], edit: false} : await api("/api/perpus"); $("#ppForm").hidden = DEMO; renderPerpus(); } catch (e) { $("#ppList").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
+  try { PPD = DEMO ? {items: [], edit: false} : await api("/api/perpus"); $("#ppForm").hidden = DEMO || !PUNYA_INBOX(); renderPerpus(); } catch (e) { $("#ppList").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
 }
 $("#ppQ").oninput = renderPerpus; $("#ppF").onchange = renderPerpus; $("#ppReset").onclick = ppReset;
 $("#ppBX").onclick = () => $("#ppBaca").hidden = true;
