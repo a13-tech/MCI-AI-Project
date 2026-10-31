@@ -165,6 +165,9 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 .bkm.lunas{background:#E3F8EC;border-color:#7BD3A0}.bkm.lunas b{color:#0E6B3A}.bkm.menunggu{background:#FFF7DC;border-color:#EBCB6B}.bkm.belum{background:#FFF3F2;border-color:#F3B4AE}.bkm.bebas{background:#F3F5F9;border-color:#D7DDE8;opacity:.85}
 .bkw{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.bkc{display:inline-flex;gap:6px;align-items:center;padding:7px 11px;border:1px solid #BFD0F2;border-radius:10px;font-size:13px;background:#fff;cursor:pointer}.bkc:has(input:checked){background:#E3F8EC;border-color:#7BD3A0}
 .bkpv{display:block;max-width:220px;max-height:160px;border-radius:12px;margin-top:10px;border:1px solid var(--line)}.bkpv[hidden]{display:none}.bkk{display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--line)}.bkk img{width:110px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.aibox{margin:12px 0 4px;padding:12px 14px;border-radius:14px;background:linear-gradient(135deg,#F2F6FF,#FFF9EA);border:1px dashed #C9B26A}.aih{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.aih .mu{font-size:12.5px}
+.air{display:flex;gap:8px;align-items:stretch;margin-top:8px;flex-wrap:wrap}.air textarea{flex:1 1 260px;min-height:44px}.aif{display:inline-flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap}.aim{font-size:12.5px;margin-top:6px;min-height:1em}
+.aiok{box-shadow:0 0 0 3px rgba(212,175,90,.55)!important;transition:box-shadow .3s}
 .baca h2{margin:0 0 4px;font-size:22px}.baca .tx{white-space:pre-wrap;margin-top:14px}
 .gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:12px}
 .gal figure{margin:0;background:#F3F7FF;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
@@ -1493,6 +1496,50 @@ $("#stSave").onclick = async () => {
   $("#stSave").disabled = false;
 };
 
+/* ===== Isi pakai AI: satu komponen untuk semua form pencatatan. AI hanya mengisi kolom; manusia yang menekan Simpan ===== */
+const AI_FORM = {
+  hutang: {at: "#hbNama", ph: "contoh: Budi pinjem ceban buat beli timah solder", isi: {nama: "#hbNama", jumlah: "#hbJml", catatan: "#hbCat"}},
+  blacklist: {at: "#blNama", ph: "contoh: akun IG @tokoabal nipu DP 200rb, setelah transfer kita diblokir (atau lampirkan screenshot chat)", isi: {nama: "#blNama", alasan: "#blAlasan", keterangan: "#blKet"}},
+  catatan: {at: "#ctJudul", ph: "tempel catatan mentah, atau foto papan tulis / kertas rapat", isi: {judul: "#ctJudul", isi: "#ctIsi"}},
+  dokumentasi: {at: "#dkJudul", ph: "contoh: kemarin uji kapal di danau, GPS aman, baterai drop di menit 20 (atau lampirkan foto kegiatan)", isi: {judul: "#dkJudul", tanggal: "#dkTgl", keterangan: "#dkKet"}},
+  polling: {at: "#plJudul", ph: "contoh: voting ketua divisi creative, kandidat Nico, Sunan, Alkhalifi", isi: {judul: "#plJudul", deskripsi: "#plDesk", opsi: ["#plOpsi", v => (v || []).join("\n")]}},
+  produk: {at: "#prNama", ph: "contoh: kaos MCI hitam 85rb dari Konveksi Jaya, preorder, cotton combed 30s (atau foto barang/label harga)", isi: {nama: "#prNama", harga: "#prHarga", kategori: "#prKat", mitra: "#prMitra", satuan: "#prSat", sedia: "#prSedia", deskripsi: "#prDesk", spesifikasi: "#prSpek"}},
+  perpus: {at: "#ppJudul", ph: "contoh: modul dasar ESP32 karya tim MCI untuk pemula (atau foto sampul buku)", isi: {judul: "#ppJudul", penulis: "#ppPenulis", kategori: "#ppKat", ringkasan: "#ppRing"}},
+};
+function pasangAI() {
+  if (DEMO) return;
+  for (const [jenis, c] of Object.entries(AI_FORM)) {
+    const el = $(c.at), card = el && el.closest(".cd");
+    if (!card || card.querySelector(".aibox")) continue;
+    const box = document.createElement("div"); box.className = "aibox";
+    box.innerHTML = `<div class="aih"><span aria-hidden="true">✨</span><b>Isi pakai AI</b><span class="mu">Ketik bebas atau lampirkan foto, AI mengisi kolom di bawah. Cek dulu, lalu tekan Simpan.</span></div>
+      <div class="air"><textarea rows="2" maxlength="3000" aria-label="Keterangan untuk AI" placeholder="${esc(c.ph)}"></textarea>
+      <label class="bt o aif" title="Lampirkan foto">📷 <span>Foto</span><input type="file" accept="image/*" hidden></label><button class="bt g" type="button">Isi otomatis</button></div><div class="mu aim" role="status"></div>`;
+    const t = card.firstElementChild && card.firstElementChild.tagName === "B" ? card.firstElementChild : null;
+    if (t) t.after(box); else card.prepend(box);
+    const ta = box.querySelector("textarea"), fi = box.querySelector("input[type=file]"), bt = box.querySelector("button"), msg = box.querySelector(".aim"), fl = box.querySelector(".aif span");
+    fi.onchange = () => { fl.textContent = fi.files[0] ? fi.files[0].name.slice(0, 18) : "Foto"; };
+    bt.onclick = async () => {
+      const f = fi.files[0];
+      if (!ta.value.trim() && !f) { msg.textContent = "Ketik keterangan atau lampirkan foto dulu."; return; }
+      bt.disabled = true; msg.textContent = "AI sedang membaca…";
+      try {
+        const fd = new FormData(); fd.append("jenis", jenis); fd.append("teks", ta.value);
+        if (f) fd.append("foto", (await resizeFoto(f, 1280)).blob, "foto.jpg");
+        const d = await api("/api/ai/isi", {method: "POST", body: fd}); let n = 0;
+        for (const [k, sel] of Object.entries(c.isi)) {
+          const [q, fn] = Array.isArray(sel) ? sel : [sel, null], v = fn ? fn(d.isi[k]) : d.isi[k];
+          if (v === "" || v == null || v === 0) continue;
+          const e = $(q); if (!e) continue; e.value = v; e.dispatchEvent(new Event("input", {bubbles: true})); e.classList.add("aiok"); setTimeout(() => e.classList.remove("aiok"), 2500); n++;
+        }
+        msg.textContent = n ? `Terisi ${n} kolom. Cek dulu, ubah kalau perlu, lalu tekan Simpan.` : "AI tidak menemukan data yang bisa diisi. Coba tulis lebih jelas.";
+        if (n) { ta.value = ""; fi.value = ""; fl.textContent = "Foto"; }
+      } catch (e) { msg.textContent = e.message; }
+      bt.disabled = false;
+    };
+  }
+}
+
 /* ===== Inbox, Berita Hari Ini, Bayar Kas ===== */
 const pesan = m => { const e = $("#tst"); e.textContent = m; e.hidden = false; clearTimeout(pesan.t); pesan.t = setTimeout(() => e.hidden = true, 2600); };
 const relW = t => { if (!t) return ""; const d = (Date.now() - new Date(t)) / 60000; if (isNaN(d)) return ""; if (d < 1) return "baru saja"; if (d < 60) return Math.round(d) + " menit lalu"; if (d < 1440) return Math.round(d / 60) + " jam lalu"; return new Date(t).toLocaleDateString("id-ID", {day: "numeric", month: "short"}); };
@@ -1592,7 +1639,11 @@ function renderBayarKas() {
   $("#bkKonf").hidden = !d.bisa_konfirmasi;
   $("#bkMenunggu").innerHTML = (d.menunggu || []).map(x => `<div class="bkk"><a href="/api/iuran/${x.id}/foto" target="_blank" rel="noopener"><img src="/api/iuran/${x.id}/foto" alt="Foto bukti ${esc(x.nama)}" loading="lazy"></a>
     <div style="flex:1;min-width:0"><b>${esc(x.nama)}</b> · ${rp(x.jumlah)}<div class="mu" style="font-size:12.5px">${esc(x.minggu_label.join("; "))} · ${relW(x.dibuat)}</div>${x.catatan ? `<div style="font-size:13px">${esc(x.catatan)}</div>` : ""}
-    <div class="bar" style="margin:8px 0 0"><button class="bt g" data-bkt="${x.id}">Terima</button><button class="bt o" data-bkn="${x.id}">Tolak</button></div></div></div>`).join("") || '<p class="mu">Tidak ada yang menunggu. Mantap.</p>';
+    <div class="bar" style="margin:8px 0 0"><button class="bt g" data-bkt="${x.id}">Terima</button><button class="bt o" data-bkn="${x.id}">Tolak</button><button class="bt o" data-bkai="${x.id}">✨ Cek foto pakai AI</button></div><div id="bkai${x.id}" style="font-size:13px"></div></div></div>`).join("") || '<p class="mu">Tidak ada yang menunggu. Mantap.</p>';
+  $$("[data-bkai]").forEach(b => b.onclick = async () => { const o = $("#bkai" + b.dataset.bkai); b.disabled = true; o.textContent = "AI sedang memeriksa foto…";
+    try { const d = await api(`/api/iuran/${b.dataset.bkai}/cek`, {method: "POST"}), c = d.cek;
+      o.innerHTML = `<span class="ch ${c.cocok ? "g" : "r"}">${c.cocok ? "Nominal cocok" : "Perlu dicek"}</span> Terbaca <b>${rp(c.jumlah_terbaca)}</b> (${esc(c.jenis)}) dari ${rp(d.harus)}. ${esc(c.catatan)} <span class="mu">· AI cuma membantu, keputusan tetap di Bendahara.</span>`; }
+    catch (e) { o.textContent = e.message; } b.disabled = false; });
   $$("[data-bkt],[data-bkn]").forEach(b => b.onclick = async () => { b.disabled = true; if (await bayarAksi(b.dataset.bkt || b.dataset.bkn, b.dataset.bkt ? "terima" : "tolak")) { renderBayarKas(); inboxBadge(); } b.disabled = false; });
   // pengaturan
   $("#bkAtur").hidden = !d.bisa_konfirmasi;
@@ -3885,6 +3936,7 @@ const OFFICE = (() => {
   $$(".nv").forEach(b => { const p = PAGE_PERM[b.dataset.p]; if (p && !can(p)) b.style.display = "none"; });
   if (!PUNYA_INBOX()) ["inbox", "bayarkas"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // viewer tidak punya inbox & iuran
   inboxBadge(); setInterval(() => { if (!document.hidden) inboxBadge(); }, 20000);
+  pasangAI();
   const NP = ME.anggota ? ME.anggota.nama + " · " + ME.anggota.jabatan.join(", ") : (ME.nama_peran || "Viewer");
   $("#whoRole").innerHTML = ADM() ? `<span class="wl">Masuk sebagai</span><span class="wh">Masuk sebagai</span> <b>Admin</b>`
     : `<span class="wl">Masuk sebagai</span><span class="wh">⚡ Hemat token</span> <b>${esc(NP)}</b>`;
