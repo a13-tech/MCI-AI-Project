@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="no-referrer">
+<title>Invoice · MCI</title>
+<style>
+:root{--navy:#0A2A6B;--navy2:#0b1d4a;--gold:#D4AF5A;--gold2:#F1D58A;--ink:#10203f;--mute:#5b6b8c;--line:#E1E8F5;--bg:#F4F7FD;--g:#0E6B3A;--gbg:#DDF5E7;--r:#B42318;--rbg:#FDE3E1;--y:#6B4E0A;--ybg:#F6E9C3}
+*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg);font-size:15px;line-height:1.5}
+.wrap{max-width:820px;margin:0 auto;padding:18px 14px 48px}
+.inv{background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 6px 24px rgba(10,42,107,.07)}
+.hd{background:linear-gradient(135deg,var(--navy2),var(--navy));color:#fff;padding:22px 24px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-start}
+.brand{font-weight:900;letter-spacing:.14em;color:var(--gold2);font-size:13px}
+.hd h1{margin:4px 0 0;font-size:26px;letter-spacing:.04em}
+.hd .no{font-size:14px;color:#C9D7F5}
+.st{display:inline-block;padding:6px 14px;border-radius:99px;font-weight:800;font-size:13px;letter-spacing:.03em}
+.st.draft,.st.terkirim{background:var(--ybg);color:var(--y)}.st.lunas{background:var(--gbg);color:var(--g)}.st.batal{background:var(--rbg);color:var(--r)}
+.bd{padding:22px 24px}
+.meta{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.meta h3{margin:0 0 4px;font-size:11.5px;letter-spacing:.1em;color:var(--mute);text-transform:uppercase}
+.meta p{margin:0;white-space:pre-wrap;word-break:break-word}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+table{width:100%;border-collapse:collapse;font-size:14.5px}th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line)}
+th{background:#EEF3FC;font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.05em}tr:last-child td{border-bottom:0}
+td.rt,th.rt{text-align:right;white-space:nowrap}
+.tot{margin:16px 0 0 auto;max-width:340px;display:grid;gap:6px}
+.tot div{display:flex;justify-content:space-between;gap:12px}
+.tot .gt{border-top:2px solid var(--navy);padding-top:8px;margin-top:4px;font-size:20px;font-weight:900;color:var(--navy)}
+.box{margin-top:20px;border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:#FAFBFF}
+.box h2{margin:0 0 6px;font-size:15px}
+.box pre{margin:0;white-space:pre-wrap;word-break:break-word;font:inherit}
+.mu{color:var(--mute);font-size:13.5px}
+.ok{background:var(--gbg);border-color:#BFE8D0}.warn{background:var(--ybg);border-color:#EAD9A1}.bad{background:var(--rbg);border-color:#F3B9B4}
+input[type=file],textarea{font:inherit;width:100%;padding:10px 12px;border:1px solid #BFD0F2;border-radius:12px;background:#fff;color:var(--ink)}
+.btn{all:unset;cursor:pointer;text-align:center;padding:11px 18px;border-radius:12px;font-weight:800;background:var(--gold);color:var(--navy)}
+.btn.o{background:#fff;border:1px solid #BFD0F2}.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.act{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;justify-content:flex-end}
+.er{color:var(--r);font-weight:600}
+#kosong{text-align:center;padding:60px 16px}
+@media (max-width:560px){.meta{grid-template-columns:1fr}.hd,.bd{padding:16px}}
+@media print{body{background:#fff}.wrap{padding:0;max-width:none}.inv{border:0;box-shadow:none;border-radius:0}.act,#unggah,.noprint{display:none!important}.hd{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <div class="act noprint" id="act" hidden><button class="btn o" id="cetak" type="button">Cetak / simpan PDF</button></div>
+ <div id="kosong" class="inv" hidden><h1>Invoice tidak ditemukan</h1><p class="mu">Link ini salah atau invoice belum dikirim. Minta link yang benar ke penjual.</p></div>
+ <article class="inv" id="inv" hidden>
+  <div class="hd"><div><div class="brand" id="usaha"></div><h1>INVOICE</h1><div class="no" id="nomor"></div></div><div style="text-align:right"><span class="st" id="status"></span><div class="no" style="margin-top:8px" id="tgl"></div></div></div>
+  <div class="bd">
+   <div class="meta"><div><h3>Ditagihkan kepada</h3><p id="pembeli"></p></div><div><h3>Jatuh tempo</h3><p id="jt"></p></div></div>
+   <div class="tw"><table><thead><tr><th>Item</th><th class="rt">Jumlah</th><th class="rt">Harga</th><th class="rt">Subtotal</th></tr></thead><tbody id="rows"></tbody></table></div>
+   <div class="tot"><div><span>Subtotal</span><b id="sub"></b></div><div id="dsR"><span>Diskon</span><b id="dis"></b></div><div id="ogR"><span>Ongkir</span><b id="ong"></b></div><div class="gt"><span>Total</span><span id="tot"></span></div></div>
+   <div class="box" id="catB" hidden><h2>Catatan</h2><pre id="cat"></pre></div>
+   <div class="box" id="caraB" hidden><h2>Cara pembayaran</h2><pre id="cara"></pre></div>
+   <div class="box ok" id="lunasB" hidden><h2>Pembayaran diterima. Terima kasih! ✓</h2><div class="mu" id="lunasT"></div></div>
+   <div class="box bad" id="batalB" hidden><h2>Invoice ini dibatalkan</h2><div class="mu">Hubungi admin MCI kalau ini keliru.</div></div>
+   <div class="box warn" id="buktiAda" hidden><h2>Bukti bayar sudah kami terima</h2><div class="mu" id="buktiT">Admin sedang mengecek. Status akan berubah jadi Lunas setelah dikonfirmasi.</div></div>
+   <div class="box noprint" id="unggah" hidden>
+    <h2>Sudah bayar? Kirim bukti</h2>
+    <div class="mu">Unggah foto bukti transfer atau foto uangnya (JPG/PNG/WEBP). Admin MCI akan mengecek dan mengonfirmasi lunas. Jam kerja admin: <span id="jam"></span>.</div>
+    <div class="row"><input type="file" id="foto" accept="image/*" aria-label="Foto bukti bayar"></div>
+    <div class="row"><textarea id="cat2" rows="2" maxlength="300" placeholder="Catatan (opsional): nama pengirim, bank, jam transfer…" aria-label="Catatan"></textarea></div>
+    <div class="row"><button class="btn" id="kirim" type="button">Kirim bukti bayar</button><span class="mu" id="msg" role="status"></span></div>
+   </div>
+   <p class="mu" style="margin-top:22px;text-align:center">Dibuat lewat sistem MCI · <span id="nomor2"></span></p>
+  </div>
+ </article>
+</div>
+<script>
+const $ = q => document.querySelector(q);
+const rp = n => "Rp " + Number(n || 0).toLocaleString("id-ID");
+const tgl = s => { if (!s) return ""; const d = new Date(s + "T00:00:00"); return isNaN(d) ? s : d.toLocaleDateString("id-ID", {day: "numeric", month: "long", year: "numeric"}); };
+const TOKEN = decodeURIComponent(location.pathname.split("/").filter(Boolean).pop() || "");
+let D = null;
+function isi() {
+  $("#usaha").textContent = D.nama_usaha; $("#nomor").textContent = D.nomor; $("#nomor2").textContent = D.nomor;
+  $("#status").textContent = D.status_label; $("#status").className = "st " + D.status; document.title = "Invoice " + D.nomor;
+  $("#tgl").textContent = tgl(D.tanggal);
+  $("#pembeli").textContent = D.pembeli + (D.alamat ? "\n" + D.alamat : "");
+  $("#jt").textContent = D.jatuh_tempo ? tgl(D.jatuh_tempo) : "-";
+  const tb = $("#rows"); tb.textContent = "";
+  D.items.forEach(x => {
+    const tr = document.createElement("tr");
+    [[x.nama, ""], [x.jumlah + " " + x.satuan, "rt"], [rp(x.harga), "rt"], [rp(x.jumlah * x.harga), "rt"]].forEach(([t, c]) => { const td = document.createElement("td"); td.textContent = t; if (c) td.className = c; tr.appendChild(td); });
+    tb.appendChild(tr);
+  });
+  $("#sub").textContent = rp(D.subtotal); $("#dis").textContent = "- " + rp(D.diskon); $("#ong").textContent = rp(D.ongkir); $("#tot").textContent = rp(D.total);
+  $("#dsR").hidden = !D.diskon; $("#ogR").hidden = !D.ongkir;
+  $("#catB").hidden = !D.catatan; $("#cat").textContent = D.catatan;
+  const bayar = D.status === "terkirim";
+  $("#caraB").hidden = !(bayar && D.cara_bayar); $("#cara").textContent = D.cara_bayar;
+  $("#lunasB").hidden = D.status !== "lunas"; $("#lunasT").textContent = D.lunas_at ? "Dikonfirmasi " + new Date(D.lunas_at).toLocaleString("id-ID", {dateStyle: "long", timeStyle: "short"}) : "";
+  $("#batalB").hidden = D.status !== "batal";
+  $("#buktiAda").hidden = !(bayar && D.bukti_ada);
+  $("#unggah").hidden = !(bayar && D.bisa_unggah);
+  $("#jam").textContent = D.jam && D.jam.teks || "";
+  $("#inv").hidden = false; $("#act").hidden = false;
+}
+async function muat() {
+  try {
+    const r = await fetch("/api/publik/invoice/" + encodeURIComponent(TOKEN), {cache: "no-store"});
+    if (!r.ok) throw new Error("x");
+    D = await r.json(); isi();
+  } catch (e) { $("#kosong").hidden = false; }
+}
+function kecil(file, MAX = 1600) {   // perkecil foto di browser supaya unggahan cepat dan di bawah 4 MB
+  return new Promise((ok, no) => {
+    const im = new Image(), u = URL.createObjectURL(file);
+    im.onload = () => {
+      const k = Math.min(1, MAX / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u);
+      c.toBlob(b => b ? ok(b) : no(new Error("Foto tidak bisa dibaca")), "image/jpeg", 0.85);
+    };
+    im.onerror = () => { URL.revokeObjectURL(u); no(new Error("Foto tidak bisa dibaca. Pakai JPG/PNG/WEBP.")); };
+    im.src = u;
+  });
+}
+$("#kirim").onclick = async () => {
+  const f = $("#foto").files[0], m = $("#msg"); m.className = "mu";
+  if (!f) { m.textContent = "Pilih foto bukti dulu."; m.className = "er"; return; }
+  $("#kirim").disabled = true; m.textContent = "Mengirim…";
+  try {
+    const fd = new FormData(); fd.append("foto", await kecil(f), "bukti.jpg"); fd.append("catatan", $("#cat2").value);
+    const r = await fetch("/api/publik/invoice/" + encodeURIComponent(TOKEN) + "/bayar", {method: "POST", body: fd, headers: {"X-MCI": "1"}});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || "Gagal mengirim (" + r.status + ")");
+    m.textContent = "Terkirim ✓ Admin akan mengecek."; $("#foto").value = ""; $("#cat2").value = ""; await muat();
+  } catch (e) { m.textContent = e.message; m.className = "er"; }
+  $("#kirim").disabled = false;
+};
+$("#cetak").onclick = () => window.print();
+muat();
+</script>
+</body>
+</html>

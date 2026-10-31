@@ -222,7 +222,16 @@ def db_init():
         sql(c, f"CREATE TABLE IF NOT EXISTS bayar_kas (id {pk}, anggota INTEGER NOT NULL, nama TEXT, periode TEXT NOT NULL, jumlah {big} NOT NULL DEFAULT 0, mime TEXT, foto TEXT, "
                "status TEXT NOT NULL DEFAULT 'menunggu', catatan TEXT, alasan TEXT, dibuat TEXT, dikonfirmasi TEXT, oleh TEXT, kas_id INTEGER)")
         sql(c, f"CREATE TABLE IF NOT EXISTS produk (id {pk}, nama TEXT NOT NULL, kategori TEXT, mitra TEXT, harga {big} NOT NULL DEFAULT 0, satuan TEXT, sedia TEXT, "
-               "deskripsi TEXT, spesifikasi TEXT, aktif INTEGER NOT NULL DEFAULT 1, mime TEXT, foto TEXT, dibuat TEXT, diubah TEXT)")
+               "deskripsi TEXT, spesifikasi TEXT, aktif INTEGER NOT NULL DEFAULT 1, mime TEXT, foto TEXT, dibuat TEXT, diubah TEXT, stok_id INTEGER)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS invoice (id {pk}, nomor TEXT NOT NULL, token TEXT NOT NULL, pembeli TEXT, kontak TEXT, alamat TEXT, tanggal TEXT, jatuh_tempo TEXT, "
+               f"subtotal {big} NOT NULL DEFAULT 0, diskon {big} NOT NULL DEFAULT 0, ongkir {big} NOT NULL DEFAULT 0, total {big} NOT NULL DEFAULT 0, catatan TEXT, cara_bayar TEXT, "
+               "status TEXT NOT NULL DEFAULT 'draft', bayar_mime TEXT, bayar_foto TEXT, bayar_at TEXT, bayar_catatan TEXT, bayar_n INTEGER NOT NULL DEFAULT 0, kas_id INTEGER, "
+               "oleh TEXT, dibuat TEXT, diubah TEXT, lunas_at TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS invoice_item (id {pk}, invoice_id INTEGER NOT NULL, urut INTEGER, sumber TEXT, produk_id INTEGER, stok_id INTEGER, nama TEXT NOT NULL, "
+               f"satuan TEXT, jumlah {big} NOT NULL DEFAULT 1, harga {big} NOT NULL DEFAULT 0, stok_kurang {big} NOT NULL DEFAULT 0)")
+        sql(c, "CREATE UNIQUE INDEX IF NOT EXISTS iv_nomor ON invoice (nomor)")
+        sql(c, "CREATE UNIQUE INDEX IF NOT EXISTS iv_token ON invoice (token)")
+        sql(c, "CREATE INDEX IF NOT EXISTS iv_item ON invoice_item (invoice_id)")
         sql(c, f"CREATE TABLE IF NOT EXISTS tanya (id {pk}, tiket TEXT NOT NULL, ip TEXT NOT NULL, nama TEXT, kontak TEXT, produk_id INTEGER, produk_nama TEXT, pesan TEXT NOT NULL, "
                "jawaban_ai TEXT, balasan TEXT, dibalas_oleh TEXT, status TEXT, dibuat TEXT, dibalas TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS stok (id {pk}, nama TEXT NOT NULL, jumlah {big} NOT NULL DEFAULT 0, satuan TEXT, kategori TEXT, minimum {big} NOT NULL DEFAULT 0, catatan TEXT, mime TEXT, gambar TEXT, diubah TEXT)")
@@ -241,6 +250,11 @@ def db_init():
                 sql(c, f"ALTER TABLE perpus ADD COLUMN {kol}")
         except Exception:
             pass   # sudah ada
+    try:
+        with db() as c:
+            sql(c, "ALTER TABLE produk ADD COLUMN stok_id INTEGER")   # tautan produk -> barang gudang (database lama)
+    except Exception:
+        pass   # sudah ada
     skills_reload()
     if not PG:
         log.warning("DATABASE_URL kosong: memakai SQLite sementara, data kas, skill, dan pemakaian HILANG saat restart Render.")
@@ -3532,11 +3546,12 @@ def _ip_hash(ip):
 
 def produk_list(semua=False):
     with db() as c:
-        rows = sql(c, "SELECT id,nama,kategori,mitra,harga,satuan,sedia,deskripsi,spesifikasi,aktif,diubah, CASE WHEN foto IS NULL OR foto='' THEN 0 ELSE 1 END "
+        rows = sql(c, "SELECT id,nama,kategori,mitra,harga,satuan,sedia,deskripsi,spesifikasi,aktif,diubah, CASE WHEN foto IS NULL OR foto='' THEN 0 ELSE 1 END, stok_id "
                       "FROM produk ORDER BY LOWER(mitra), LOWER(kategori), LOWER(nama)").fetchall()
     out = [{"id": int(i), "nama": n, "kategori": k or "Lainnya", "mitra": mt or "MCI", "harga": int(h or 0), "satuan": s or "pcs", "sedia": sd if sd in SEDIA else "tersedia",
-            "sedia_label": SEDIA.get(sd, "Tersedia"), "deskripsi": d or "", "spesifikasi": sp or "", "aktif": bool(a), "foto": bool(f), "v": abs(hash(u or "")) % 100000}
-           for i, n, k, mt, h, s, sd, d, sp, a, u, f in rows]
+            "sedia_label": SEDIA.get(sd, "Tersedia"), "deskripsi": d or "", "spesifikasi": sp or "", "aktif": bool(a), "foto": bool(f), "v": abs(hash(u or "")) % 100000,
+            "stok_id": int(sk) if sk else None}
+           for i, n, k, mt, h, s, sd, d, sp, a, u, f, sk in rows]
     return out if semua else [x for x in out if x["aktif"]]
 
 
@@ -3570,6 +3585,14 @@ def produk_simpan(d, foto=None):
             sql(c, "UPDATE produk SET mime=?, foto=? WHERE id=?", (foto[0], base64.b64encode(foto[1]).decode(), pid))
         elif d.get("hapus_foto") == "1":
             sql(c, "UPDATE produk SET mime=NULL, foto=NULL WHERE id=?", (pid,))
+        if "stok_id" in d:   # tautan ke barang gudang ('' = lepas tautan)
+            sk = str(d.get("stok_id") or "")
+            if sk.isdigit() and sql(c, "SELECT 1 FROM stok WHERE id=?", (int(sk),)).fetchone():
+                sql(c, "UPDATE produk SET stok_id=? WHERE id=?", (int(sk), pid))
+            elif not sk:
+                sql(c, "UPDATE produk SET stok_id=NULL WHERE id=?", (pid,))
+            else:
+                raise ValueError("Barang gudang yang ditautkan tidak ditemukan")
     return pid
 
 
@@ -3620,7 +3643,8 @@ def api_publik_produk():
     ih = _ip_hash(client_ip())
     with db() as c:
         n = sql(c, "SELECT COUNT(*) FROM tanya WHERE ip=? AND dibuat>=?", (ih, (datetime.now(WIB) - timedelta(hours=24)).isoformat(timespec="seconds"))).fetchone()[0]
-    return jsonify({"items": produk_list(), "sedia": SEDIA, "jam": jam_kerja(), "sisa_tanya": max(0, TANYA_PER_IP - int(n)), "batas_tanya": TANYA_PER_IP})
+    return jsonify({"items": [{k: v for k, v in x.items() if k != "stok_id"} for x in produk_list()], "sedia": SEDIA, "jam": jam_kerja(),
+                    "sisa_tanya": max(0, TANYA_PER_IP - int(n)), "batas_tanya": TANYA_PER_IP})
 
 
 @app.route("/api/produk/<int:i>/foto")
@@ -3718,6 +3742,7 @@ def api_produk():
             return jsonify({"error": str(e)}), 400
     out = {"items": produk_list(semua=ed), "sedia": SEDIA, "edit": ed, "jam": jam_kerja()}
     if ed:
+        out["gudang"] = [{"id": x["id"], "nama": x["nama"], "satuan": x["satuan"], "jumlah": x["jumlah"]} for x in stok_load()]
         with db() as c:
             out["menunggu"] = int(sql(c, "SELECT COUNT(*) FROM tanya WHERE status='menunggu_admin'").fetchone()[0])
     return jsonify(out)
@@ -3759,6 +3784,395 @@ def api_produk_balas(i):
         sql(c, "UPDATE inbox SET dibaca=1 WHERE jenis='tanya_produk' AND ref=?", (i,))
         rows = sql(c, f"SELECT {_TANYA_KOL} FROM tanya ORDER BY CASE WHEN status='menunggu_admin' THEN 0 ELSE 1 END, id DESC LIMIT 200").fetchall()
     return jsonify({"items": _tanya_out(rows), "jam": jam_kerja()})
+
+
+# ---------- INVOICE DIGITAL: dibuat Dev/Manager/Bendahara. Item dari katalog Produk, stok Gudang, atau ketik manual. Harga & nama dibekukan di invoice (snapshot).
+# Stok gudang: dibooking saat 'terkirim', dikurangi saat 'lunas', dikembalikan saat batal. Lunas (khusus Bendahara/Dev) otomatis masuk Kas kategori Penjualan.
+# Pembeli membuka /invoice/<token> (link acak, tanpa login), melihat tagihan, dan mengunggah bukti bayar. ----------
+INV_MAKS, INV_MAKS_ITEM, INV_BUKTI_MAKS, INV_BUKTI_IP = 2000, 40, 5, 20
+INV_STATUS = {"draft": "Draft", "terkirim": "Menunggu bayar", "lunas": "Lunas", "batal": "Dibatalkan"}
+_INV_IP = {}   # hash IP -> waktu unggah bukti (batas harian)
+
+
+class InvError(ValueError):
+    def __init__(self, msg, kurang=None):
+        super().__init__(msg)
+        self.kurang = kurang or []
+
+
+def _angka(v, nama, lo=0, hi=10**10):
+    try:
+        x = int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else int(float(re.sub(r"[^\d\-]", "", str(v or "0")) or 0))
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError(f"{nama} harus angka")
+    if not lo <= x <= hi:
+        raise ValueError(f"{nama} tidak masuk akal")
+    return x
+
+
+def _tgl_ok(v, nama, wajib=False):
+    v = str(v or "").strip()
+    if not v and not wajib:
+        return ""
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
+        raise ValueError(f"{nama} harus berformat tanggal yang benar")
+    try:
+        datetime.strptime(v, "%Y-%m-%d")
+    except ValueError:
+        raise ValueError(f"{nama} bukan tanggal yang benar")
+    return v
+
+
+def inv_setelan():
+    s = SET.get("invoice") or {}
+    return {"nama_usaha": str(s.get("nama_usaha") or "MCI · Mahardika Cakrawala Indonesia")[:80], "cara_bayar": str(s.get("cara_bayar") or "")[:600]}
+
+
+def stok_booking(kecuali=None):
+    """{stok_id: jumlah yang sedang dibooking invoice berstatus 'terkirim'}."""
+    q = ("SELECT it.stok_id, SUM(it.jumlah) FROM invoice_item it JOIN invoice i ON i.id=it.invoice_id "
+         "WHERE i.status='terkirim' AND it.stok_id IS NOT NULL" + (" AND i.id<>?" if kecuali else "") + " GROUP BY it.stok_id")
+    with db() as c:
+        return {int(a): int(b or 0) for a, b in sql(c, q, (kecuali,) if kecuali else ()).fetchall()}
+
+
+def inv_gudang():
+    book = stok_booking()
+    return [{"id": x["id"], "nama": x["nama"], "satuan": x["satuan"], "kategori": x["kategori"], "jumlah": x["jumlah"], "dibooking": book.get(x["id"], 0),
+             "tersedia": x["jumlah"] - book.get(x["id"], 0)} for x in stok_load()]
+
+
+def inv_cek_stok(items, kecuali=None):
+    """items: [(stok_id, jumlah)]. Balik: daftar barang gudang yang tersedia-nya kurang dari yang dibutuhkan."""
+    need = {}
+    for sid, j in items:
+        if sid:
+            need[int(sid)] = need.get(int(sid), 0) + int(j)
+    if not need:
+        return []
+    ada, book, out = {x["id"]: x for x in stok_load()}, stok_booking(kecuali), []
+    for sid, n in need.items():
+        x = ada.get(sid)
+        if x and n > x["jumlah"] - book.get(sid, 0):
+            out.append({"nama": x["nama"], "perlu": n, "tersedia": max(0, x["jumlah"] - book.get(sid, 0)), "satuan": x["satuan"]})
+    return out
+
+
+_INV_KOL = ("id,nomor,token,pembeli,kontak,alamat,tanggal,jatuh_tempo,subtotal,diskon,ongkir,total,catatan,cara_bayar,status,bayar_at,bayar_catatan,bayar_n,kas_id,oleh,dibuat,diubah,lunas_at,"
+            " CASE WHEN bayar_foto IS NULL OR bayar_foto='' THEN 0 ELSE 1 END")
+
+
+def inv_list(where="", params=(), limit=300):
+    with db() as c:
+        rows = sql(c, f"SELECT {_INV_KOL} FROM invoice {where} ORDER BY id DESC LIMIT {int(limit)}", params).fetchall()
+        ids = [int(r[0]) for r in rows]
+        its = {}
+        if ids:
+            q = ",".join("?" * len(ids))
+            for iid, su, pid, sid, n, sa, j, h in sql(c, f"SELECT invoice_id,sumber,produk_id,stok_id,nama,satuan,jumlah,harga FROM invoice_item WHERE invoice_id IN ({q}) ORDER BY invoice_id, urut, id", tuple(ids)).fetchall():
+                its.setdefault(int(iid), []).append({"sumber": su or "manual", "produk_id": pid, "stok_id": sid, "nama": n, "satuan": sa or "pcs", "jumlah": int(j or 0), "harga": int(h or 0)})
+    return [{"id": int(i), "nomor": no, "token": tk, "pembeli": pb or "", "kontak": kt or "", "alamat": al or "", "tanggal": tg or "", "jatuh_tempo": jt or "",
+             "subtotal": int(st or 0), "diskon": int(di or 0), "ongkir": int(og or 0), "total": int(tot or 0), "catatan": ca or "", "cara_bayar": cb or "", "status": s,
+             "status_label": INV_STATUS.get(s, s), "bayar_at": ba or "", "bayar_catatan": bc or "", "bayar_n": int(bn or 0), "kas_id": ki, "oleh": ol or "", "dibuat": db_ or "",
+             "diubah": du or "", "lunas_at": la or "", "ada_bukti": bool(fo), "items": its.get(int(i), [])}
+            for i, no, tk, pb, kt, al, tg, jt, st, di, og, tot, ca, cb, s, ba, bc, bn, ki, ol, db_, du, la, fo in rows]
+
+
+def inv_payload(extra=None):
+    ivs = inv_list()
+    bulan = today()[:7]
+    out = {"items": ivs, "gudang": inv_gudang(), "setelan": inv_setelan(),
+           "katalog": [{"id": x["id"], "nama": x["nama"], "kategori": x["kategori"], "mitra": x["mitra"], "harga": x["harga"], "satuan": x["satuan"], "stok_id": x["stok_id"],
+                        "sedia": x["sedia_label"]} for x in produk_list()],
+           "ringkas": {"draft": sum(1 for x in ivs if x["status"] == "draft"), "tunggu": sum(1 for x in ivs if x["status"] == "terkirim"),
+                       "tunggu_rp": sum(x["total"] for x in ivs if x["status"] == "terkirim"), "bukti": sum(1 for x in ivs if x["status"] == "terkirim" and x["ada_bukti"]),
+                       "lunas_bulan_rp": sum(x["total"] for x in ivs if x["status"] == "lunas" and (x["lunas_at"] or "")[:7] == bulan)}}
+    out.update(extra or {})
+    return out
+
+
+def inv_nomor(c):
+    pre = "INV-" + datetime.now(WIB).strftime("%Y%m") + "-"
+    row = sql(c, "SELECT nomor FROM invoice WHERE nomor LIKE ? ORDER BY nomor DESC LIMIT 1", (pre + "%",)).fetchone()
+    n = int(row[0][len(pre):]) + 1 if row and row[0][len(pre):].isdigit() else 1
+    return f"{pre}{n:04d}"
+
+
+def inv_simpan(d, oleh):
+    """Buat invoice baru atau ubah DRAFT. Total dihitung ulang di server; harga & nama item dibekukan sesuai kiriman (boleh diubah per baris untuk nego)."""
+    pembeli = re.sub(r"\s+", " ", str(d.get("pembeli") or "")).strip()[:100]
+    if not pembeli:
+        raise ValueError("Nama pembeli wajib diisi")
+    tanggal, jt = _tgl_ok(d.get("tanggal") or today(), "Tanggal", True), _tgl_ok(d.get("jatuh_tempo"), "Jatuh tempo")
+    raw = d.get("item")
+    if not isinstance(raw, list) or not raw:
+        raise ValueError("Tambahkan minimal satu item")
+    if len(raw) > INV_MAKS_ITEM:
+        raise ValueError(f"Maksimal {INV_MAKS_ITEM} item per invoice")
+    items = []
+    with db() as c:
+        for k, it in enumerate(raw, 1):
+            if not isinstance(it, dict):
+                raise ValueError("Format item salah")
+            nama = re.sub(r"\s+", " ", str(it.get("nama") or "")).strip()[:120]
+            if not nama:
+                raise ValueError(f"Nama item baris {k} kosong")
+            jumlah, harga = _angka(it.get("jumlah"), f"Jumlah baris {k}", 1, 1_000_000), _angka(it.get("harga"), f"Harga baris {k}", 0, 1_000_000_000)
+            sumber, pid, sid = str(it.get("sumber") or "manual"), None, None
+            if sumber == "produk" and str(it.get("produk_id") or "").isdigit():
+                p = sql(c, "SELECT stok_id FROM produk WHERE id=?", (int(it["produk_id"]),)).fetchone()
+                if p:
+                    pid, sid = int(it["produk_id"]), (int(p[0]) if p[0] else None)
+            elif sumber == "stok" and str(it.get("stok_id") or "").isdigit():
+                if sql(c, "SELECT 1 FROM stok WHERE id=?", (int(it["stok_id"]),)).fetchone():
+                    sid = int(it["stok_id"])
+            if sid and not sql(c, "SELECT 1 FROM stok WHERE id=?", (sid,)).fetchone():
+                sid = None
+            items.append((("produk" if pid else "stok" if (sid and sumber == "stok") else "manual"), pid, sid, nama, str(it.get("satuan") or "pcs").strip()[:20] or "pcs", jumlah, harga))
+    sub = sum(j * h for *_, j, h in items)
+    diskon, ongkir = _angka(d.get("diskon"), "Diskon"), _angka(d.get("ongkir"), "Ongkir")
+    if diskon > sub:
+        raise ValueError("Diskon tidak boleh lebih besar dari subtotal")
+    total = sub - diskon + ongkir
+    kontak, alamat = str(d.get("kontak") or "").strip()[:80], str(d.get("alamat") or "").strip()[:300]
+    catatan, cara = str(d.get("catatan") or "").strip()[:600], (str(d.get("cara_bayar") or "").strip()[:600] or inv_setelan()["cara_bayar"])
+    i = str(d.get("id") or "")
+    with _KLOCK:
+        with db() as c:
+            if i.isdigit():
+                row = sql(c, "SELECT status FROM invoice WHERE id=?", (int(i),)).fetchone()
+                if not row:
+                    raise ValueError("Invoice tidak ditemukan")
+                if row[0] != "draft":
+                    raise ValueError("Hanya invoice berstatus Draft yang bisa diubah. Tarik kembali ke Draft dulu kalau sudah terkirim.")
+                sql(c, "UPDATE invoice SET pembeli=?,kontak=?,alamat=?,tanggal=?,jatuh_tempo=?,subtotal=?,diskon=?,ongkir=?,total=?,catatan=?,cara_bayar=?,diubah=? WHERE id=?",
+                    (pembeli, kontak, alamat, tanggal, jt, sub, diskon, ongkir, total, catatan, cara, _now(), int(i)))
+                sql(c, "DELETE FROM invoice_item WHERE invoice_id=?", (int(i),))
+                iid = int(i)
+            else:
+                if int(sql(c, "SELECT COUNT(*) FROM invoice").fetchone()[0]) >= INV_MAKS:
+                    raise ValueError(f"Maksimal {INV_MAKS} invoice")
+                q = ("INSERT INTO invoice (nomor,token,pembeli,kontak,alamat,tanggal,jatuh_tempo,subtotal,diskon,ongkir,total,catatan,cara_bayar,status,oleh,dibuat,diubah) "
+                     "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                p = (inv_nomor(c), secrets.token_urlsafe(18), pembeli, kontak, alamat, tanggal, jt, sub, diskon, ongkir, total, catatan, cara, "draft", oleh, _now(), _now())
+                iid = int(sql(c, q + " RETURNING id", p).fetchone()[0] if PG else sql(c, q, p).lastrowid)
+            for urut, (su, pid, sid, nama, sat, j, h) in enumerate(items):
+                sql(c, "INSERT INTO invoice_item (invoice_id,urut,sumber,produk_id,stok_id,nama,satuan,jumlah,harga) VALUES (?,?,?,?,?,?,?,?,?)", (iid, urut, su, pid, sid, nama, sat, j, h))
+    return iid
+
+
+def inv_aksi(i, aksi, r, paksa=False):
+    """kirim (draft->terkirim, booking stok) | tarik (terkirim->draft) | lunas (Bendahara/Dev: kurangi stok + catat Kas) | batal | hapus (draft/batal)."""
+    with _KLOCK:
+        with db() as c:
+            row = sql(c, "SELECT status,nomor,pembeli,total,kas_id FROM invoice WHERE id=?", (i,)).fetchone()
+            its = sql(c, "SELECT id,stok_id,jumlah FROM invoice_item WHERE invoice_id=? ORDER BY urut", (i,)).fetchall() if row else []
+        if not row:
+            raise LookupError("Invoice tidak ditemukan")
+        st, nomor, pembeli, total, kid = row
+        pasangan = [(s, j) for _, s, j in its]
+        if aksi == "kirim":
+            if st != "draft":
+                raise InvError("Hanya invoice Draft yang bisa dikirim")
+            k = inv_cek_stok(pasangan, i)
+            if k and not paksa:
+                raise InvError("Stok gudang tidak cukup untuk sebagian item", k)
+            with db() as c:
+                sql(c, "UPDATE invoice SET status='terkirim', diubah=? WHERE id=?", (_now(), i))
+        elif aksi == "tarik":
+            if st != "terkirim":
+                raise InvError("Hanya invoice 'Menunggu bayar' yang bisa ditarik kembali ke Draft")
+            with db() as c:
+                sql(c, "UPDATE invoice SET status='draft', diubah=? WHERE id=?", (_now(), i))
+        elif aksi == "lunas":
+            if st not in ("draft", "terkirim"):
+                raise InvError("Invoice ini tidak bisa ditandai lunas")
+            k = inv_cek_stok(pasangan, i)
+            if k and not paksa:
+                raise InvError("Stok gudang tidak cukup untuk sebagian item", k)
+            for iid_, sid, j in its:
+                if not sid:
+                    continue
+                with db() as c:
+                    cur = sql(c, "SELECT jumlah FROM stok WHERE id=?", (int(sid),)).fetchone()
+                    kurang = min(int(cur[0] or 0), int(j)) if cur else 0
+                    if kurang:
+                        sql(c, "UPDATE stok SET jumlah=jumlah-?, diubah=? WHERE id=?", (kurang, _now(), int(sid)))
+                    sql(c, "UPDATE invoice_item SET stok_kurang=? WHERE id=?", (kurang, int(iid_)))
+            stok_load()
+            kas = _kas_inv(nomor, pembeli, int(total)) if int(total) > 0 else None
+            with db() as c:
+                sql(c, "UPDATE invoice SET status='lunas', lunas_at=?, kas_id=?, diubah=? WHERE id=?", (_now(), kas, _now(), i))
+        elif aksi == "batal":
+            if st == "batal":
+                raise InvError("Invoice sudah dibatalkan")
+            if st == "lunas":
+                with db() as c:
+                    for iid_, sid, j in its:
+                        sk = sql(c, "SELECT stok_kurang FROM invoice_item WHERE id=?", (int(iid_),)).fetchone()
+                        if sid and sk and int(sk[0] or 0):
+                            sql(c, "UPDATE stok SET jumlah=jumlah+?, diubah=? WHERE id=?", (int(sk[0]), _now(), int(sid)))
+                        sql(c, "UPDATE invoice_item SET stok_kurang=0 WHERE id=?", (int(iid_),))
+                stok_load()
+                if kid:
+                    kas_del(int(kid))
+            with db() as c:
+                sql(c, "UPDATE invoice SET status='batal', kas_id=NULL, diubah=? WHERE id=?", (_now(), i))
+        elif aksi == "hapus":
+            if st not in ("draft", "batal"):
+                raise InvError("Hanya invoice Draft atau Dibatalkan yang bisa dihapus. Batalkan dulu.")
+            with db() as c:
+                sql(c, "DELETE FROM invoice_item WHERE invoice_id=?", (i,))
+                sql(c, "DELETE FROM invoice WHERE id=?", (i,))
+                sql(c, "UPDATE inbox SET dibaca=1 WHERE jenis='invoice_bayar' AND ref=?", (i,))
+        else:
+            raise InvError("Aksi tidak dikenal")
+    return st
+
+
+def _kas_inv(nomor, pembeli, total):
+    return kas_add([{"tanggal": today(), "keterangan": f"Penjualan {nomor} · {pembeli}"[:200], "kategori": "Penjualan", "masuk": int(total), "keluar": 0}], "invoice")[0]
+
+
+def penerima_invoice():
+    return [0] + [m["id"] for m in MEMBERS.values() if m["aktif"] and can("kas_edit", f"m:{m['id']}")]
+
+
+@app.route("/api/invoice", methods=["GET", "POST"])
+def api_invoice():
+    """GET: daftar invoice + katalog + stok gudang. POST (JSON): buat / ubah draft. Khusus Dev/Manager/Bendahara."""
+    r = role()
+    if not r:
+        abort(401)
+    if not bisa_produk(r):
+        abort(403)
+    extra = {}
+    if request.method == "POST":
+        try:
+            extra["id"] = inv_simpan(request.get_json(silent=True) or {}, nama_peran(r))
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+    return jsonify(inv_payload(extra))
+
+
+@app.route("/api/invoice/<int:i>/aksi", methods=["POST"])
+def api_invoice_aksi(i):
+    r = role()
+    if not r:
+        abort(401)
+    if not bisa_produk(r):
+        abort(403)
+    d = request.get_json(silent=True) or {}
+    aksi = str(d.get("aksi") or "")
+    if aksi == "lunas" and not can("kas_edit", r):
+        return jsonify({"error": "Menandai lunas (masuk Kas) khusus Bendahara dan Dev. Minta Bendahara mengonfirmasi."}), 403
+    if aksi == "batal":
+        with db() as c:
+            row = sql(c, "SELECT status FROM invoice WHERE id=?", (i,)).fetchone()
+        if row and row[0] == "lunas" and not can("kas_edit", r):
+            return jsonify({"error": "Membatalkan invoice yang sudah lunas khusus Bendahara dan Dev (catatan Kas ikut dihapus)."}), 403
+    try:
+        inv_aksi(i, aksi, r, bool(d.get("paksa")))
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except InvError as e:
+        return jsonify({"error": str(e), "kurang": e.kurang}), 409
+    return jsonify(inv_payload())
+
+
+@app.route("/api/invoice/<int:i>/bukti")
+def api_invoice_bukti(i):
+    r = role()
+    if not r:
+        abort(401)
+    if not bisa_produk(r):
+        abort(403)
+    with db() as c:
+        row = sql(c, "SELECT bayar_mime, bayar_foto FROM invoice WHERE id=?", (i,)).fetchone()
+    if not row or not row[1]:
+        abort(404)
+    mime = row[0] if row[0] in ("image/jpeg", "image/png", "image/gif", "image/webp") else "image/jpeg"
+    return Response(base64.b64decode(row[1]), mimetype=mime, headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox"})
+
+
+@app.route("/api/invoice/atur", methods=["POST"])
+def api_invoice_atur():
+    """{nama_usaha, cara_bayar}: teks bawaan di setiap invoice baru (rekening / QRIS / instruksi bayar)."""
+    r = role()
+    if not r:
+        abort(401)
+    if not bisa_produk(r):
+        abort(403)
+    d = request.get_json(silent=True) or {}
+    SET["invoice"] = {"nama_usaha": str(d.get("nama_usaha") or "").strip()[:80], "cara_bayar": str(d.get("cara_bayar") or "").strip()[:600]}
+    set_save()
+    return jsonify(inv_payload())
+
+
+_TOKEN_RE = re.compile(r"[A-Za-z0-9_\-]{16,40}")
+
+
+def _inv_token(token):
+    if not _TOKEN_RE.fullmatch(token or ""):
+        abort(404)
+    rows = inv_list("WHERE token=?", (token,), 1)
+    if not rows or rows[0]["status"] == "draft":
+        abort(404)
+    return rows[0]
+
+
+@app.route("/invoice/<token>")
+def halaman_invoice(token):
+    raw = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "invoice.html"), "rb").read()
+    return Response(raw, mimetype="text/html", headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer",
+                                                        "X-Robots-Tag": "noindex, nofollow, noarchive"})
+
+
+@app.route("/api/publik/invoice/<token>")
+def api_publik_invoice(token):
+    v = _inv_token(token)
+    s = inv_setelan()
+    out = {k: v[k] for k in ("nomor", "pembeli", "alamat", "tanggal", "jatuh_tempo", "subtotal", "diskon", "ongkir", "total", "catatan", "cara_bayar", "status", "status_label", "bayar_at", "lunas_at")}
+    out.update(items=[{k: x[k] for k in ("nama", "satuan", "jumlah", "harga")} for x in v["items"]], bukti_ada=v["ada_bukti"], nama_usaha=s["nama_usaha"],
+               bisa_unggah=v["status"] == "terkirim" and v["bayar_n"] < INV_BUKTI_MAKS, jam=jam_kerja())
+    resp = jsonify(out)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.route("/api/publik/invoice/<token>/bayar", methods=["POST"])
+def api_publik_invoice_bayar(token):
+    """multipart: foto (bukti transfer / foto uang, WAJIB), catatan?. Maks 5 unggahan per invoice dan 20 per IP per hari."""
+    v = _inv_token(token)
+    if v["status"] != "terkirim":
+        return jsonify({"error": "Invoice ini tidak sedang menunggu pembayaran"}), 409
+    ih, now = _ip_hash(client_ip()), time.time()
+    if len(_INV_IP) > 5000:
+        _INV_IP.clear()
+    jejak = [t for t in _INV_IP.get(ih, []) if now - t < 86400]
+    if len(jejak) >= INV_BUKTI_IP:
+        return jsonify({"error": "Terlalu banyak unggahan dari jaringan ini hari ini. Coba lagi besok."}), 429
+    f = request.files.get("foto")
+    data = f.read(4_000_001) if f and f.filename else b""
+    mime = _gambar_mime(data) if data else None
+    if not mime:
+        return jsonify({"error": "Lampirkan foto bukti bayar (JPG/PNG/WEBP)."}), 400
+    if len(data) > 4_000_000:
+        return jsonify({"error": "Foto maksimal 4 MB"}), 400
+    catatan = re.sub(r"\s+", " ", str(request.form.get("catatan") or "")).strip()[:300]
+    with _KLOCK:
+        with db() as c:
+            n = sql(c, "UPDATE invoice SET bayar_mime=?, bayar_foto=?, bayar_at=?, bayar_catatan=?, bayar_n=bayar_n+1 WHERE id=? AND status='terkirim' AND bayar_n<?",
+                    (mime, base64.b64encode(data).decode(), _now(), catatan, v["id"], INV_BUKTI_MAKS)).rowcount
+    if not n:
+        return jsonify({"error": "Batas unggah bukti untuk invoice ini sudah tercapai. Hubungi admin."}), 429
+    _INV_IP[ih] = jejak + [now]
+    with db() as c:
+        sudah = sql(c, "SELECT 1 FROM inbox WHERE jenis='invoice_bayar' AND ref=? AND dibaca=0 LIMIT 1", (v["id"],)).fetchone()
+    if not sudah:   # unggah ulang saat notifikasi lama belum dibaca tidak membanjiri Inbox / Telegram Bendahara
+        inbox_kirim(penerima_invoice(), "invoice_bayar", f"Bukti bayar masuk · {v['nomor']}", f"{v['pembeli']} mengunggah bukti untuk {rp(v['total'])}" + (f": {catatan}" if catatan else "")
+                    + ". Cek foto di halaman Invoice, lalu tandai Lunas.", v["id"])
+    return jsonify({"ok": True})
 
 
 # ---------- AI ISI OTOMATIS: semua form pencatatan bisa diisi dari teks bebas / foto. AI hanya MENGISI kolom; manusia yang menekan Simpan. ----------
@@ -3809,6 +4223,53 @@ class IsiPerpus(BaseModel):
     ringkasan: str
 
 
+class ItemInvoiceAI(BaseModel):
+    nama: str
+    jumlah: int
+    harga: int
+    ref: str
+
+
+class IsiInvoice(BaseModel):
+    pembeli: str
+    kontak: str
+    catatan: str
+    diskon: int
+    ongkir: int
+    item: list[ItemInvoiceAI]
+
+
+def inv_ai_rapikan(isi):
+    """Cocokkan ref AI ('P12' = produk, 'S5' = barang gudang) ke data sebenarnya: nama, satuan, harga, dan tautan stok diambil dari sumber, bukan dari tebakan AI."""
+    prod = {x["id"]: x for x in produk_list()}
+    gud = {x["id"]: x for x in stok_load()}
+    out = []
+    for it in (isi.get("item") or [])[:INV_MAKS_ITEM]:
+        nama = str(it.get("nama") or "").strip()[:120]
+        if not nama:
+            continue
+        try:
+            j, h = max(1, int(it.get("jumlah") or 1)), max(0, int(it.get("harga") or 0))
+        except (TypeError, ValueError):
+            j, h = 1, 0
+        m = re.fullmatch(r"([PS])(\d+)", str(it.get("ref") or "").strip().upper())
+        row = {"sumber": "manual", "produk_id": None, "stok_id": None, "nama": nama, "satuan": "pcs", "jumlah": j, "harga": h}
+        if m and m.group(1) == "P" and int(m.group(2)) in prod:
+            p = prod[int(m.group(2))]
+            row.update(sumber="produk", produk_id=p["id"], stok_id=p["stok_id"], nama=p["nama"], satuan=p["satuan"], harga=h or p["harga"])
+        elif m and m.group(1) == "S" and int(m.group(2)) in gud:
+            g = gud[int(m.group(2))]
+            row.update(sumber="stok", stok_id=g["id"], nama=g["nama"], satuan=g["satuan"])
+        out.append(row)
+    isi["item"] = out
+    for k in ("diskon", "ongkir"):
+        try:
+            isi[k] = max(0, int(isi.get(k) or 0))
+        except (TypeError, ValueError):
+            isi[k] = 0
+    return isi
+
+
 class CekBukti(BaseModel):
     jenis: str
     jumlah_terbaca: int
@@ -3844,6 +4305,14 @@ def _ai_isi_cfg(jenis, r):
         return bisa_produk(r), "herald", IsiProduk, (f"Isi data produk untuk katalog jual. {_UANG} Jenis barang yang sudah ada: {', '.join(sorted({x['kategori'] for x in it})) or '-'}. "
                                                      f"Mitra yang sudah ada: {', '.join(sorted({x['mitra'] for x in it})) or 'MCI'} (default MCI). sedia salah satu: {', '.join(SEDIA)}. "
                                                      "satuan default pcs. deskripsi 1-2 kalimat menarik tapi jujur; spesifikasi poin '- ' hanya dari yang terlihat/tertulis. Harga 0 kalau tidak disebut.")
+    if jenis == "invoice":
+        kat = "\n".join(f"P{x['id']}: {x['nama']} ({x['mitra']}) {rp(x['harga'])}/{x['satuan']}" for x in produk_list()[:120]) or "(katalog kosong)"
+        gud = "\n".join(f"S{x['id']}: {x['nama']} (stok {x['jumlah']} {x['satuan']})" for x in stok_load()[:150]) or "(gudang kosong)"
+        return bisa_produk(r), "ledger", IsiInvoice, (f"Isi invoice penjualan MCI dari chat pembeli / catatan / foto nota. {_UANG} pembeli = nama pembeli; kontak = nomor HP/IG kalau ada; "
+                                                      "catatan = permintaan khusus pembeli, singkat. item = SATU entri per jenis barang dengan jumlah dan harga satuan. "
+                                                      "ref: isi 'P<id>' kalau barang sama dengan produk katalog di bawah, 'S<id>' kalau hanya ada di gudang, kosong kalau tidak ada yang cocok "
+                                                      "(utamakan P bila ada keduanya). harga: harga satuan yang DISEBUT; kalau tidak disebut isi 0 (sistem mengisi dari katalog). "
+                                                      f"diskon/ongkir dalam rupiah, 0 kalau tidak disebut.\nKatalog produk:\n{kat}\nBarang gudang:\n{gud}")
     if jenis == "perpus":
         return mid_of(r) is not None, "scribe", IsiPerpus, (f"Isi data koleksi perpustakaan dari teks atau foto sampul. Kategori yang sudah ada: "
                                                             f"{', '.join(sorted({x['kategori'] for x in perpus_list()})) or 'Buku, Modul, Datasheet'}. ringkasan 1-3 kalimat.")
@@ -3863,7 +4332,7 @@ def _ai_foto():
 
 @app.route("/api/ai/isi", methods=["POST"])
 def api_ai_isi():
-    """multipart: jenis (hutang|blacklist|catatan|dokumentasi|polling|produk|perpus), teks, foto?. Balik: {isi: {...}} untuk mengisi form."""
+    """multipart: jenis (hutang|blacklist|catatan|dokumentasi|polling|produk|perpus|invoice), teks, foto?. Balik: {isi: {...}} untuk mengisi form."""
     r = role()
     if not r:
         abort(401)
@@ -3897,6 +4366,8 @@ def api_ai_isi():
         isi["tanggal"] = today()
     if jenis == "polling":
         isi["opsi"] = [str(x).strip()[:80] for x in (isi.get("opsi") or []) if str(x).strip()][:10]
+    if jenis == "invoice":
+        isi = inv_ai_rapikan(isi)
     return jsonify({"isi": isi, "kuota": kuota_info(r)})
 
 

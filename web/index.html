@@ -252,6 +252,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
  <button class="nv" data-p="anggota">Anggota</button>
  <button class="nv" data-p="stok">Stok Barang</button>
  <button class="nv" data-p="produk">Produk</button>
+ <button class="nv" data-p="invoice">Invoice</button>
  <button class="nv" data-p="perpus">Perpustakaan</button>
  <button class="nv" data-p="tentang">Tentang Kami</button>
  <div class="cv"><b>Hemat token</b><br>Router lokal, skill, model Lite, cache, dan mode Caveman.</div>
@@ -569,6 +570,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
     <label>Satuan<input type="text" id="prSat" maxlength="20" placeholder="pcs, set, meter"></label>
     <label>Ketersediaan<select id="prSedia"></select></label>
     <label>Foto (opsional)<input type="file" id="prFoto" accept="image/*"></label>
+    <label>Tertaut ke barang gudang (untuk stok di Invoice)<select id="prStok"></select></label>
     <div style="display:flex;align-items:flex-end;padding-bottom:10px"><label class="mu" style="display:inline-flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="prAktif" checked style="width:auto"> Tampil di katalog publik</label></div>
     <label class="full">Deskripsi<textarea id="prDesk" rows="2" maxlength="1500" placeholder="Singkat: fungsi, kelebihan, isi paket"></textarea></label>
     <label class="full">Spesifikasi (dipakai AI untuk menjawab pembeli)<textarea id="prSpek" rows="3" maxlength="3000" placeholder="Tegangan, ukuran, bahan, garansi, kompatibilitas…"></textarea></label>
@@ -582,6 +584,49 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
    <div class="tb" style="margin-top:10px"><table><thead><tr><th>Barang</th><th>Mitra</th><th>Ketersediaan</th><th class="rt">Harga</th><th></th></tr></thead><tbody id="prList"></tbody></table></div>
   </div>
   <div class="cd" id="prTanyaC" hidden><div class="bar" style="justify-content:space-between;margin:0"><b>Pertanyaan pembeli</b><span class="mu" id="prTanyaI" style="font-size:12.5px"></span></div><div id="prTanya" style="margin-top:8px"></div></div>
+ </section>
+
+ <section id="p-invoice" class="pg" hidden>
+  <h1>Invoice</h1>
+  <p class="mu">Tagihan digital untuk pembeli. Item bisa diambil dari <b>produk jualan</b>, <b>stok gudang</b>, atau diketik manual; harga dibekukan di invoice. Stok gudang <b>dibooking saat dikirim</b>, <b>dikurangi saat lunas</b>, dan <b>kembali kalau dibatalkan</b>. Pembeli membuka link acak (tanpa login) dan bisa mengunggah bukti bayar. Membuat invoice: Dev, Manager, Bendahara. Menandai <b>lunas</b> (otomatis masuk Kas · Penjualan): <b>Bendahara dan Dev</b>.</p>
+  <div class="gr">
+   <div class="cd"><div class="k">Draft</div><div class="v" id="iv1">-</div></div>
+   <div class="cd"><div class="k">Menunggu bayar</div><div class="v" id="iv2">-</div><div class="mu" id="iv2b" style="font-size:12.5px"></div></div>
+   <div class="cd"><div class="k">Bukti bayar masuk</div><div class="v" id="iv3">-</div><div class="mu" style="font-size:12.5px">menunggu dicek</div></div>
+   <div class="cd"><div class="k">Lunas bulan ini</div><div class="v" id="iv4">-</div></div>
+  </div>
+  <div class="cd" id="ivForm"><b id="ivTitle">Buat invoice</b>
+   <div class="fl" style="margin-top:12px">
+    <label>Nama pembeli<input type="text" id="ivPembeli" maxlength="100" placeholder="contoh: Budi Santoso"></label>
+    <label>Kontak (HP / IG)<input type="text" id="ivKontak" maxlength="80" placeholder="08xxxxxxxxxx"></label>
+    <label>Tanggal<input type="date" id="ivTgl"></label>
+    <label>Jatuh tempo (opsional)<input type="date" id="ivJt"></label>
+    <label class="full">Alamat / keterangan pembeli (opsional)<input type="text" id="ivAlamat" maxlength="300" placeholder="alamat kirim, kelas, atau instansi"></label>
+   </div>
+   <div style="margin-top:14px;padding:12px;border:1px dashed #BFD0F2;border-radius:12px;background:#F7F9FE"><b>Tambah item</b>
+    <div class="bar" style="margin:8px 0 0">
+     <select id="ivSumber" style="width:auto" aria-label="Sumber item"><option value="produk">Dari produk jualan</option><option value="stok">Dari stok gudang</option><option value="manual">Ketik manual</option></select>
+     <select id="ivPilih" style="flex:1;min-width:230px" aria-label="Pilih barang"></select>
+     <span id="ivMan" hidden style="display:none;gap:8px;flex-wrap:wrap;flex:1"><input type="text" id="ivMNama" maxlength="120" placeholder="Nama item / jasa" style="flex:2;min-width:160px"><input type="number" id="ivMHarga" min="0" step="500" placeholder="Harga" style="flex:1;min-width:100px"><input type="text" id="ivMSat" maxlength="20" placeholder="satuan" style="width:90px"></span>
+     <input type="number" id="ivQty" value="1" min="1" style="width:84px" aria-label="Jumlah">
+     <button class="bt g" type="button" id="ivTambah">+ Tambah</button>
+    </div>
+    <div class="mu" id="ivInfo" style="font-size:12.5px;margin-top:6px"></div>
+   </div>
+   <div class="tb" style="margin-top:12px"><table><thead><tr><th>Item</th><th class="rt">Jumlah</th><th>Satuan</th><th class="rt">Harga</th><th class="rt">Subtotal</th><th>Stok</th><th></th></tr></thead><tbody id="ivItems"></tbody></table></div>
+   <div class="fl" style="margin-top:12px">
+    <label>Diskon (Rp)<input type="number" id="ivDis" min="0" step="500" value="0"></label>
+    <label>Ongkir (Rp)<input type="number" id="ivOng" min="0" step="500" value="0"></label>
+    <label class="full">Catatan untuk pembeli (opsional)<textarea id="ivCat" rows="2" maxlength="600" placeholder="contoh: Barang diambil di sekretariat hari Jumat"></textarea></label>
+    <label class="full">Cara pembayaran (rekening / QRIS / instruksi, tampil di invoice pembeli)<textarea id="ivCara" rows="2" maxlength="600" placeholder="contoh: BCA 1234567890 a.n. MCI"></textarea></label>
+   </div>
+   <div style="margin-top:12px;text-align:right;font-size:15px">Subtotal <b id="ivSub">Rp 0</b> · Total <b id="ivTot" style="font-size:20px;color:#0A2A6B">Rp 0</b></div>
+   <div class="bar" style="margin:12px 0 0"><button class="bt g" type="button" id="ivSimpan">Simpan draft</button><button class="bt g" type="button" id="ivKirim">Simpan &amp; kirim</button><button class="bt o" type="button" id="ivReset">Kosongkan</button><button class="bt o" type="button" id="ivBawaan" title="Jadikan teks cara pembayaran ini bawaan untuk invoice baru">Jadikan cara bayar bawaan</button><span class="mu" id="ivMsg" role="status"></span></div>
+  </div>
+  <div class="cd" style="padding:0">
+   <div class="bar" style="padding:16px 20px 0;margin:0;justify-content:space-between"><b>Daftar invoice</b><div class="bar" style="margin:0"><select id="ivF" style="width:auto"><option value="">Semua status</option><option value="draft">Draft</option><option value="terkirim">Menunggu bayar</option><option value="lunas">Lunas</option><option value="batal">Dibatalkan</option></select><input type="search" id="ivQ" placeholder="Cari nomor / pembeli…" style="width:auto;min-width:180px"></div></div>
+   <div class="tb"><table><thead><tr><th>Nomor</th><th>Pembeli</th><th class="rt">Total</th><th>Status</th><th></th></tr></thead><tbody id="ivList"></tbody></table></div>
+  </div>
  </section>
 
  <section id="p-hutang" class="pg" hidden>
@@ -921,7 +966,7 @@ async function api(u, o = {}) {
   const r = await fetch(u, o);
   if (r.status === 401) { location = "/"; throw new Error("login"); }
   let d = {}; try { d = await r.json(); } catch (e) {}
-  if (!r.ok) throw new Error(d.error || "Error " + r.status);
+  if (!r.ok) { const er = new Error(d.error || "Error " + r.status); if (d.kurang) er.kurang = d.kurang; throw er; }
   return d;
 }
 
@@ -929,7 +974,7 @@ async function api(u, o = {}) {
 let IOTD = [];
 const ADM = () => ME.role === "admin";
 const can = p => { if (ME.role === "admin") return true; const z = ME.izin || []; return z.includes("*") || z.includes(p); };
-const PAGE_PERM = {anggota: "anggota_kelola", catatan: "catatan", polling: "polling", dokumentasi: "dok_lihat", blacklist: "blacklist", hutang: "hutang", stok: "stok", cmd: "boss", kas: "kas", gambar: "gambar_lihat", memori: "memori", iot: "iot", laporan: "laporan_lihat", skills: "skills", tim: "tim"};
+const PAGE_PERM = {invoice: "produk_kelola", anggota: "anggota_kelola", catatan: "catatan", polling: "polling", dokumentasi: "dok_lihat", blacklist: "blacklist", hutang: "hutang", stok: "stok", cmd: "boss", kas: "kas", gambar: "gambar_lihat", memori: "memori", iot: "iot", laporan: "laporan_lihat", skills: "skills", tim: "tim"};
 function kuotaTxt(j) { return j ? `${j.pakai} dari ${j.batas} hari ini` : ""; }
 async function refreshMe() { try { const m = await api("/api/me"); ME = Object.assign(ME, m); renderKuota(); } catch (e) {} }
 function renderKuota() {
@@ -956,6 +1001,7 @@ function show(p) {
   if (p === "berita") loadBerita();
   if (p === "bayarkas") loadBayarKas();
   if (p === "produk") loadProduk();
+  if (p === "invoice") loadInvoice();
   if (p === "hutang") loadHutang();
   if (p === "anggota") loadAnggota();
   if (p === "catatan") loadCatatan();
@@ -1504,6 +1550,8 @@ const AI_FORM = {
   dokumentasi: {at: "#dkJudul", ph: "contoh: kemarin uji kapal di danau, GPS aman, baterai drop di menit 20 (atau lampirkan foto kegiatan)", isi: {judul: "#dkJudul", tanggal: "#dkTgl", keterangan: "#dkKet"}},
   polling: {at: "#plJudul", ph: "contoh: voting ketua divisi creative, kandidat Nico, Sunan, Alkhalifi", isi: {judul: "#plJudul", deskripsi: "#plDesk", opsi: ["#plOpsi", v => (v || []).join("\n")]}},
   produk: {at: "#prNama", ph: "contoh: kaos MCI hitam 85rb dari Konveksi Jaya, preorder, cotton combed 30s (atau foto barang/label harga)", isi: {nama: "#prNama", harga: "#prHarga", kategori: "#prKat", mitra: "#prMitra", satuan: "#prSat", sedia: "#prSedia", deskripsi: "#prDesk", spesifikasi: "#prSpek"}},
+  invoice: {at: "#ivPembeli", ph: "contoh: Dina beli 3 sensor jarak sama kabel jumper 1 pak, ongkir 10rb, diambil Jumat (atau tempel chat / foto nota)", isi: {pembeli: "#ivPembeli", kontak: "#ivKontak", catatan: "#ivCat", diskon: "#ivDis", ongkir: "#ivOng"},
+    after: isi => { const it = isi.item || []; it.forEach(ivTambah); ivRenderItems(); return it.length; }},
   perpus: {at: "#ppJudul", ph: "contoh: modul dasar ESP32 karya tim MCI untuk pemula (atau foto sampul buku)", isi: {judul: "#ppJudul", penulis: "#ppPenulis", kategori: "#ppKat", ringkasan: "#ppRing"}},
 };
 function pasangAI() {
@@ -1532,6 +1580,7 @@ function pasangAI() {
           if (v === "" || v == null || v === 0) continue;
           const e = $(q); if (!e) continue; e.value = v; e.dispatchEvent(new Event("input", {bubbles: true})); e.classList.add("aiok"); setTimeout(() => e.classList.remove("aiok"), 2500); n++;
         }
+        if (c.after) n += c.after(d.isi) || 0;
         msg.textContent = n ? `Terisi ${n} kolom. Cek dulu, ubah kalau perlu, lalu tekan Simpan.` : "AI tidak menemukan data yang bisa diisi. Coba tulis lebih jelas.";
         if (n) { ta.value = ""; fi.value = ""; fl.textContent = "Foto"; }
       } catch (e) { msg.textContent = e.message; }
@@ -1550,7 +1599,7 @@ async function inboxBadge(n) {
   const b = $("#nbInbox"); b.textContent = n > 99 ? "99+" : n; b.hidden = !n;
 }
 let IBD = {items: []};
-const IB_IKON = {bayar_kas: "💸", bayar_ok: "✅", bayar_tolak: "⛔", info: "📢", tanya_produk: "🛒"};
+const IB_IKON = {bayar_kas: "💸", bayar_ok: "✅", bayar_tolak: "⛔", info: "📢", tanya_produk: "🛒", invoice_bayar: "🧾"};
 async function bayarAksi(id, aksi) {
   let alasan = "";
   if (aksi === "tolak") { alasan = prompt("Alasan ditolak (opsional, dikirim ke anggota):", "Foto bukti tidak jelas"); if (alasan === null) return false; }
@@ -1566,7 +1615,7 @@ function renderInbox() {
     return `<div class="cd ib${x.dibaca ? "" : " baru"}" data-ibr="${x.id}"><div class="ibh"><span class="ibi" aria-hidden="true">${IB_IKON[x.jenis] || "🔔"}</span><div style="flex:1;min-width:0"><b>${esc(x.judul)}</b><div class="mu" style="font-size:12.5px">${relW(x.dibuat)} ${st}</div></div><button class="bt o ibx" data-ibd="${x.id}" aria-label="Hapus notifikasi">×</button></div>
       ${x.isi ? `<div style="margin-top:8px">${esc(x.isi)}</div>` : ""}
       ${x.jenis === "bayar_kas" && x.ref && x.bayar_status !== "dihapus" && kf ? `<div class="bar" style="margin:10px 0 0"><a href="/api/iuran/${x.ref}/foto" target="_blank" rel="noopener"><img class="ibf" src="/api/iuran/${x.ref}/foto" alt="Foto bukti bayar" loading="lazy"></a>${tunggu ? `<button class="bt g" data-ibt="${x.ref}">Terima</button><button class="bt o" data-ibn="${x.ref}">Tolak</button>` : ""}</div>` : ""}
-      ${x.jenis.startsWith("bayar") ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="bayarkas">Buka Bayar Kas</button></div>' : x.jenis === "tanya_produk" ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="produk">Balas di halaman Produk</button></div>' : ""}</div>`;
+      ${x.jenis.startsWith("bayar") ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="bayarkas">Buka Bayar Kas</button></div>' : x.jenis === "tanya_produk" ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="produk">Balas di halaman Produk</button></div>' : x.jenis === "invoice_bayar" ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="invoice">Buka halaman Invoice</button></div>' : ""}</div>`;
   }).join("") || '<p class="mu">Inbox kosong. Notifikasi baru akan muncul di sini.</p>';
   $$("[data-ibr]").forEach(e => e.onclick = async ev => { if (ev.target.closest("button,a")) return; const x = it.find(y => y.id == e.dataset.ibr); if (x && !x.dibaca) { IBD = await api("/api/inbox/baca", {json: {id: x.id}}); renderInbox(); inboxBadge(IBD.belum); } });
   $$("[data-ibd]").forEach(b => b.onclick = async () => { IBD = await api("/api/inbox/" + b.dataset.ibd, {method: "DELETE"}); renderInbox(); inboxBadge(IBD.belum); });
@@ -1689,7 +1738,7 @@ $("#bkCS").onclick = async () => {
 
 /* ===== Produk: katalog jual, kelola Dev/Manager/Bendahara, balas pertanyaan pembeli ===== */
 let PRD = null, PRT = [];
-function prReset() { $("#prTitle").textContent = "Tambah produk"; $("#prForm").dataset.id = ""; ["#prNama", "#prHarga", "#prKat", "#prMitra", "#prSat", "#prDesk", "#prSpek"].forEach(q => $(q).value = ""); $("#prSedia").value = "tersedia"; $("#prAktif").checked = true; $("#prFoto").value = ""; $("#prHf").checked = false; $("#prHfW").hidden = true; $("#prMsg").textContent = ""; }
+function prReset() { $("#prTitle").textContent = "Tambah produk"; $("#prForm").dataset.id = ""; ["#prNama", "#prHarga", "#prKat", "#prMitra", "#prSat", "#prDesk", "#prSpek"].forEach(q => $(q).value = ""); $("#prSedia").value = "tersedia"; $("#prStok").value = ""; $("#prAktif").checked = true; $("#prFoto").value = ""; $("#prHf").checked = false; $("#prHfW").hidden = true; $("#prMsg").textContent = ""; }
 function renderProduk() {
   const d = PRD; if (!d) return;
   const it = d.items, ak = it.filter(x => x.aktif), mitras = [...new Set(it.map(x => x.mitra))].sort(), kats = [...new Set(it.map(x => x.kategori))].sort();
@@ -1698,6 +1747,7 @@ function renderProduk() {
   $("#prJam").className = "ch " + (d.jam.buka ? "g" : "n"); $("#prJam").textContent = d.jam.buka ? "Jam kerja admin: sekarang buka" : "Di luar jam kerja admin";
   $("#prForm").hidden = !d.edit; $("#prTanyaC").hidden = !d.edit;
   if (!$("#prSedia").options.length) { $("#prSedia").innerHTML = Object.entries(d.sedia).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join(""); $("#prSedia").value = "tersedia"; }
+  { const sv = $("#prStok").value; $("#prStok").innerHTML = '<option value="">- tidak tertaut -</option>' + (d.gudang || []).map(g => `<option value="${g.id}">${esc(g.nama)} (stok ${num(g.jumlah)} ${esc(g.satuan)})</option>`).join(""); $("#prStok").value = sv; }
   $("#prKats").innerHTML = kats.map(k => `<option value="${esc(k)}">`).join(""); $("#prMitras").innerHTML = mitras.map(k => `<option value="${esc(k)}">`).join("");
   const fm = $("#prFM").value, fk = $("#prFK").value;
   $("#prFM").innerHTML = '<option value="">Semua mitra</option>' + mitras.map(m => `<option ${m === fm ? "selected" : ""}>${esc(m)}</option>`).join("");
@@ -1706,13 +1756,13 @@ function renderProduk() {
   const grup = {}; vis.forEach(x => (grup[x.kategori] = grup[x.kategori] || []).push(x));
   const SC = {tersedia: "g", terbatas: "y", preorder: "y", habis: "r"};
   $("#prList").innerHTML = Object.keys(grup).sort().map(k => `<tr><td colspan="5" style="background:#F3F7FF;font-weight:800;color:#0A2A6B">${esc(k)} <span class="mu" style="font-weight:600;font-size:12px">${grup[k].length} barang</span></td></tr>` + grup[k].map(x => `<tr${x.aktif ? "" : ' style="opacity:.55"'}>
-    <td><div style="display:flex;gap:10px;align-items:center">${x.foto ? `<img src="/api/produk/${x.id}/foto?v=${x.v}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:8px">` : ""}<div><b>${esc(x.nama)}</b>${x.aktif ? "" : ' <span class="ch n">Disembunyikan</span>'}${x.deskripsi ? `<div class="mu" style="font-size:12.5px">${esc(x.deskripsi.slice(0, 90))}${x.deskripsi.length > 90 ? "…" : ""}</div>` : ""}</div></div></td>
+    <td><div style="display:flex;gap:10px;align-items:center">${x.foto ? `<img src="/api/produk/${x.id}/foto?v=${x.v}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:8px">` : ""}<div><b>${esc(x.nama)}</b>${x.aktif ? "" : ' <span class="ch n">Disembunyikan</span>'}${d.edit && x.stok_id ? ' <span class="ch g" title="Tertaut ke stok gudang">📦 gudang</span>' : ""}${x.deskripsi ? `<div class="mu" style="font-size:12.5px">${esc(x.deskripsi.slice(0, 90))}${x.deskripsi.length > 90 ? "…" : ""}</div>` : ""}</div></div></td>
     <td>${esc(x.mitra)}</td><td><span class="ch ${SC[x.sedia]}">${esc(x.sedia_label)}</span></td><td class="rt"><b>${rp(x.harga)}</b> <span class="mu">/${esc(x.satuan)}</span></td>
     <td>${d.edit ? `<button class="bt o" data-pre="${x.id}">Ubah</button> <button class="bt o" data-prd="${x.id}">Hapus</button>` : ""}</td></tr>`).join("")).join("")
     || `<tr><td colspan="5" class="mu">${it.length ? "Tidak ada yang cocok." : "Belum ada produk." + (d.edit ? " Tambah lewat formulir di atas." : "")}</td></tr>`;
   const one = id => it.find(x => x.id == id);
   $$("[data-pre]").forEach(b => b.onclick = () => { const x = one(b.dataset.pre); $("#prForm").dataset.id = x.id; $("#prTitle").textContent = "Ubah " + x.nama;
-    $("#prNama").value = x.nama; $("#prHarga").value = x.harga; $("#prKat").value = x.kategori; $("#prMitra").value = x.mitra; $("#prSat").value = x.satuan; $("#prSedia").value = x.sedia; $("#prAktif").checked = x.aktif;
+    $("#prNama").value = x.nama; $("#prHarga").value = x.harga; $("#prKat").value = x.kategori; $("#prMitra").value = x.mitra; $("#prSat").value = x.satuan; $("#prSedia").value = x.sedia; $("#prStok").value = x.stok_id || ""; $("#prAktif").checked = x.aktif;
     $("#prDesk").value = x.deskripsi; $("#prSpek").value = x.spesifikasi; $("#prFoto").value = ""; $("#prHfW").hidden = !x.foto; $("#prHf").checked = false; $("#prMsg").textContent = ""; $("#prForm").scrollIntoView({behavior: "smooth", block: "start"}); });
   $$("[data-prd]").forEach(b => b.onclick = async () => { const x = one(b.dataset.prd); if (!confirm(`Hapus produk "${x.nama}"?`)) return; try { PRD = Object.assign(PRD, await api("/api/produk/" + x.id, {method: "DELETE"})); renderProduk(); } catch (e) { alert(e.message); } });
 }
@@ -1741,12 +1791,150 @@ $("#prSave").onclick = async () => {
   const fd = new FormData(), id = $("#prForm").dataset.id, f = $("#prFoto").files[0];
   if (id) fd.append("id", id);
   [["nama", "#prNama"], ["harga", "#prHarga"], ["kategori", "#prKat"], ["mitra", "#prMitra"], ["satuan", "#prSat"], ["sedia", "#prSedia"], ["deskripsi", "#prDesk"], ["spesifikasi", "#prSpek"]].forEach(([k, q]) => fd.append(k, $(q).value));
-  fd.append("aktif", $("#prAktif").checked ? "1" : "0"); if ($("#prHf").checked) fd.append("hapus_foto", "1");
+  fd.append("stok_id", $("#prStok").value); fd.append("aktif", $("#prAktif").checked ? "1" : "0"); if ($("#prHf").checked) fd.append("hapus_foto", "1");
   $("#prSave").disabled = true; $("#prMsg").textContent = "Menyimpan…";
   try { if (f) fd.append("foto", (await resizeFoto(f, 900)).blob, "produk.jpg"); PRD = Object.assign(PRD || {}, await api("/api/produk", {method: "POST", body: fd})); renderProduk(); prReset(); $("#prMsg").textContent = "Tersimpan."; }
   catch (e) { $("#prMsg").textContent = e.message; }
   $("#prSave").disabled = false;
 };
+
+/* ===== Invoice digital: item dari produk / stok gudang / manual; stok dibooking saat dikirim, dikurangi saat lunas ===== */
+let IVD = null, IVI = [], IVEDIT = "";
+const IVS = {draft: ["n", "Draft"], terkirim: ["y", "Menunggu bayar"], lunas: ["g", "Lunas"], batal: ["r", "Dibatalkan"]};
+const ivHari = (n = 0) => new Date(Date.now() + 7 * 3600e3 + n * 864e5).toISOString().slice(0, 10);   // tanggal WIB
+const ivLink = x => location.origin + "/invoice/" + x.token;
+const ivGud = id => (IVD && IVD.gudang || []).find(g => g.id == id);
+function ivReset() {
+  IVEDIT = ""; IVI = []; $("#ivTitle").textContent = "Buat invoice";
+  ["#ivPembeli", "#ivKontak", "#ivAlamat", "#ivCat"].forEach(q => $(q).value = "");
+  $("#ivTgl").value = ivHari(); $("#ivJt").value = ivHari(7); $("#ivDis").value = 0; $("#ivOng").value = 0; $("#ivQty").value = 1;
+  $("#ivCara").value = IVD ? IVD.setelan.cara_bayar : ""; $("#ivMsg").textContent = ""; ivRenderItems();
+}
+function ivIsiPilih() {
+  const s = $("#ivSumber").value, el = $("#ivPilih"), man = s === "manual";
+  el.style.display = man ? "none" : ""; $("#ivMan").style.display = man ? "flex" : "none"; $("#ivMan").hidden = !man;
+  if (man || !IVD) { $("#ivInfo").textContent = man ? "Untuk jasa, ongkos, atau barang yang tidak ada di katalog maupun gudang." : ""; return; }
+  const grup = {};
+  if (s === "produk") IVD.katalog.forEach(x => { const g = ivGud(x.stok_id); (grup[x.mitra + " · " + x.kategori] = grup[x.mitra + " · " + x.kategori] || []).push(`<option value="${x.id}">${esc(x.nama)} · ${rp(x.harga)}/${esc(x.satuan)}${g ? ` · stok ${num(g.tersedia)}` : ""}${x.sedia && x.sedia !== "Tersedia" ? " · " + esc(x.sedia) : ""}</option>`); });
+  else IVD.gudang.forEach(g => (grup[g.kategori] = grup[g.kategori] || []).push(`<option value="${g.id}">${esc(g.nama)} · tersedia ${num(g.tersedia)} ${esc(g.satuan)}</option>`));
+  el.innerHTML = Object.keys(grup).sort().map(k => `<optgroup label="${esc(k)}">${grup[k].join("")}</optgroup>`).join("") || '<option value="">(kosong)</option>';
+  $("#ivInfo").textContent = s === "produk" ? "Harga & nama diambil dari katalog Produk (boleh diubah per baris untuk nego). Produk yang tertaut ke gudang ikut cek stok." : "Dari gudang; harga diisi dari produk yang tertaut, kalau tidak ada isi sendiri di tabel.";
+}
+function ivHitung() {
+  let sub = 0; const per = {};
+  IVI.forEach(x => { sub += x.jumlah * x.harga; if (x.stok_id) per[x.stok_id] = (per[x.stok_id] || 0) + x.jumlah; });
+  const dis = Math.max(0, +$("#ivDis").value || 0), ong = Math.max(0, +$("#ivOng").value || 0);
+  $("#ivSub").textContent = rp(sub); $("#ivTot").textContent = rp(sub - dis + ong);
+  $$("#ivItems [data-sub]").forEach(td => { const x = IVI[td.dataset.sub]; td.textContent = rp(x.jumlah * x.harga); });
+  $$("#ivItems [data-stk]").forEach(td => {
+    const x = IVI[td.dataset.stk], g = x.stok_id ? ivGud(x.stok_id) : null;
+    if (!g) { td.innerHTML = '<span class="mu">-</span>'; return; }
+    const kurang = per[x.stok_id] > g.tersedia;
+    td.innerHTML = `<span class="ch ${kurang ? "r" : "g"}" title="Stok ${g.jumlah}, dibooking ${g.dibooking}">${kurang ? "Kurang" : "OK"} · sisa ${num(g.tersedia)}</span>`;
+  });
+}
+function ivRenderItems() {
+  $("#ivItems").innerHTML = IVI.map((x, i) => `<tr>
+    <td style="min-width:170px"><input type="text" data-ivf="nama" data-i="${i}" value="${esc(x.nama)}" maxlength="120" aria-label="Nama item"><div class="mu" style="font-size:11.5px">${x.sumber === "produk" ? "Produk" : x.sumber === "stok" ? "Gudang" : "Manual"}</div></td>
+    <td class="rt"><input type="number" data-ivf="jumlah" data-i="${i}" value="${x.jumlah}" min="1" style="width:78px" aria-label="Jumlah"></td>
+    <td><input type="text" data-ivf="satuan" data-i="${i}" value="${esc(x.satuan)}" maxlength="20" style="width:74px" aria-label="Satuan"></td>
+    <td class="rt"><input type="number" data-ivf="harga" data-i="${i}" value="${x.harga}" min="0" step="500" style="width:110px" aria-label="Harga satuan"></td>
+    <td class="rt" style="white-space:nowrap"><b data-sub="${i}"></b></td><td data-stk="${i}" style="white-space:nowrap"></td>
+    <td><button class="bt o" type="button" data-ivx="${i}" aria-label="Hapus baris">×</button></td></tr>`).join("") || '<tr><td colspan="7" class="mu">Belum ada item. Pilih dari produk / gudang di atas, atau pakai "Isi pakai AI".</td></tr>';
+  $$("#ivItems [data-ivf]").forEach(inp => inp.oninput = () => { const x = IVI[inp.dataset.i], k = inp.dataset.ivf; x[k] = (k === "nama" || k === "satuan") ? inp.value : Math.max(k === "jumlah" ? 1 : 0, Math.round(+inp.value || 0)); ivHitung(); });
+  $$("#ivItems [data-ivx]").forEach(b => b.onclick = () => { IVI.splice(+b.dataset.ivx, 1); ivRenderItems(); });
+  ivHitung();
+}
+function ivTambah(x) {
+  const m = IVI.find(y => y.sumber === x.sumber && y.harga === x.harga && ((x.produk_id && y.produk_id == x.produk_id) || (!x.produk_id && x.stok_id && y.stok_id == x.stok_id && !y.produk_id)));
+  if (m) m.jumlah += x.jumlah; else IVI.push(x);
+}
+$("#ivSumber").onchange = ivIsiPilih;
+$("#ivTambah").onclick = () => {
+  if (!IVD) return;
+  const s = $("#ivSumber").value, q = Math.max(1, Math.round(+$("#ivQty").value || 1));
+  if (s === "manual") {
+    const nama = $("#ivMNama").value.trim(); if (!nama) { $("#ivInfo").textContent = "Isi nama item dulu."; return; }
+    IVI.push({sumber: "manual", produk_id: null, stok_id: null, nama, satuan: $("#ivMSat").value.trim() || "pcs", jumlah: q, harga: Math.max(0, Math.round(+$("#ivMHarga").value || 0))});
+    ["#ivMNama", "#ivMHarga", "#ivMSat"].forEach(k => $(k).value = "");
+  } else {
+    const id = $("#ivPilih").value; if (!id) return;
+    if (s === "produk") { const p = IVD.katalog.find(x => x.id == id); ivTambah({sumber: "produk", produk_id: p.id, stok_id: p.stok_id, nama: p.nama, satuan: p.satuan, jumlah: q, harga: p.harga}); }
+    else { const g = ivGud(id), p = IVD.katalog.find(x => x.stok_id == g.id); ivTambah({sumber: "stok", produk_id: null, stok_id: g.id, nama: g.nama, satuan: g.satuan, jumlah: q, harga: p ? p.harga : 0}); }
+  }
+  $("#ivQty").value = 1; ivRenderItems();
+};
+["#ivDis", "#ivOng"].forEach(q => $(q).oninput = ivHitung);
+$("#ivReset").onclick = ivReset;
+async function ivKirimPaksa(id, aksi) {   // balasan 409 {kurang:[…]}: tanya dulu sebelum memaksa
+  try { IVD = Object.assign(IVD, await api(`/api/invoice/${id}/aksi`, {json: {aksi}})); return true; }
+  catch (e) {
+    if (!e.kurang) throw e;
+    if (!confirm(e.message + ":\n" + e.kurang.map(k => `• ${k.nama}: butuh ${k.perlu}, tersedia ${k.tersedia} ${k.satuan}`).join("\n") + "\n\nTetap lanjut (pre-order / stok menyusul)?")) return false;
+    IVD = Object.assign(IVD, await api(`/api/invoice/${id}/aksi`, {json: {aksi, paksa: true}})); return true;
+  }
+}
+async function ivSimpan(kirim) {
+  const body = {id: IVEDIT || undefined, pembeli: $("#ivPembeli").value, kontak: $("#ivKontak").value, alamat: $("#ivAlamat").value, tanggal: $("#ivTgl").value, jatuh_tempo: $("#ivJt").value,
+    diskon: +$("#ivDis").value || 0, ongkir: +$("#ivOng").value || 0, catatan: $("#ivCat").value, cara_bayar: $("#ivCara").value, item: IVI};
+  $("#ivSimpan").disabled = $("#ivKirim").disabled = true; $("#ivMsg").textContent = "Menyimpan…";
+  try {
+    const d = await api("/api/invoice", {json: body}); IVD = Object.assign(IVD, d);
+    if (kirim) { if (!await ivKirimPaksa(d.id, "kirim")) { $("#ivMsg").textContent = "Tersimpan sebagai Draft (belum dikirim)."; ivRender(); IVEDIT = String(d.id); return; } }
+    const baru = IVD.items.find(x => x.id == d.id); ivReset(); ivRender(); ivIsiPilih(); pesan(kirim ? `${baru.nomor} dikirim. Salin link di daftar bawah.` : `${baru.nomor} tersimpan sebagai Draft`);
+  } catch (e) { $("#ivMsg").textContent = e.message; }
+  finally { $("#ivSimpan").disabled = $("#ivKirim").disabled = false; }
+}
+$("#ivSimpan").onclick = () => ivSimpan(false); $("#ivKirim").onclick = () => ivSimpan(true);
+$("#ivBawaan").onclick = async () => { try { IVD = Object.assign(IVD, await api("/api/invoice/atur", {json: {nama_usaha: IVD.setelan.nama_usaha, cara_bayar: $("#ivCara").value}})); pesan("Cara pembayaran bawaan disimpan"); } catch (e) { $("#ivMsg").textContent = e.message; } };
+function ivRender() {
+  if (!IVD) return;
+  const r = IVD.ringkas;
+  $("#iv1").textContent = num(r.draft); $("#iv2").textContent = num(r.tunggu); $("#iv2b").textContent = rp(r.tunggu_rp); $("#iv3").textContent = num(r.bukti); $("#iv4").textContent = rp(r.lunas_bulan_rp);
+  const f = $("#ivF").value, q = $("#ivQ").value.trim().toLowerCase(), konf = can("kas_edit");
+  const vis = IVD.items.filter(x => (!f || x.status === f) && (!q || (x.nomor + " " + x.pembeli + " " + x.kontak).toLowerCase().includes(q)));
+  $("#ivList").innerHTML = vis.map(x => {
+    const s = IVS[x.status] || ["n", x.status], hp = (x.kontak || "").replace(/[^\d+]/g, ""), wa = /^(\+?62|0)8\d{6,12}$/.test(hp) ? hp.replace(/^\+?62/, "").replace(/^0/, "") : "";
+    const pesanWa = encodeURIComponent(`Halo ${x.pembeli}, ini invoice ${x.nomor} dari ${IVD.setelan.nama_usaha} (total ${rp(x.total)}): ${ivLink(x)}`);
+    const aksi = [];
+    if (x.status !== "draft") aksi.push(`<a class="bt o" href="${esc(ivLink(x))}" target="_blank" rel="noopener">Buka</a>`, `<button class="bt o" data-ivc="${x.id}">Salin link</button>`, `<a class="bt o" href="https://wa.me/${wa ? "62" + wa : ""}?text=${pesanWa}" target="_blank" rel="noopener noreferrer">WA</a>`);
+    if (x.ada_bukti) aksi.push(`<a class="bt o" href="/api/invoice/${x.id}/bukti" target="_blank" rel="noopener">Lihat bukti</a>`);
+    if (x.status === "draft") aksi.push(`<button class="bt o" data-ive="${x.id}">Ubah</button>`, `<button class="bt g" data-iva="kirim" data-id="${x.id}">Kirim</button>`, `<button class="bt o" data-iva="hapus" data-id="${x.id}">Hapus</button>`);
+    if (x.status === "terkirim") aksi.push(konf ? `<button class="bt g" data-iva="lunas" data-id="${x.id}">Tandai lunas</button>` : "", `<button class="bt o" data-iva="tarik" data-id="${x.id}">Tarik ke draft</button>`, `<button class="bt o" data-iva="batal" data-id="${x.id}">Batalkan</button>`);
+    if (x.status === "lunas" && konf) aksi.push(`<button class="bt o" data-iva="batal" data-id="${x.id}">Batalkan</button>`);
+    if (x.status === "batal") aksi.push(`<button class="bt o" data-iva="hapus" data-id="${x.id}">Hapus</button>`);
+    const ringkas = x.items.slice(0, 3).map(i => `${i.jumlah}× ${esc(i.nama)}`).join(", ") + (x.items.length > 3 ? ` +${x.items.length - 3}` : "");
+    return `<tr><td><b>${esc(x.nomor)}</b><div class="mu" style="font-size:12px">${esc(x.tanggal)}${x.jatuh_tempo ? " · tempo " + esc(x.jatuh_tempo) : ""}</div></td>
+      <td><b>${esc(x.pembeli)}</b>${x.kontak ? `<div class="mu" style="font-size:12px">${esc(x.kontak)}</div>` : ""}<div class="mu" style="font-size:12px">${ringkas}</div></td>
+      <td class="rt"><b>${rp(x.total)}</b></td>
+      <td><span class="ch ${s[0]}" style="white-space:nowrap">${s[1]}</span>${x.status === "terkirim" && x.ada_bukti ? ' <span class="ch g">Bukti masuk</span>' : ""}${x.bayar_catatan && x.status === "terkirim" ? `<div class="mu" style="font-size:12px">“${esc(x.bayar_catatan)}”</div>` : ""}<div class="mu" style="font-size:11.5px">${esc(x.oleh)}</div></td>
+      <td><div class="bar" style="margin:0;gap:6px">${aksi.join("")}</div></td></tr>`;
+  }).join("") || `<tr><td colspan="5" class="mu">${IVD.items.length ? "Tidak ada yang cocok." : "Belum ada invoice. Buat yang pertama lewat formulir di atas."}</td></tr>`;
+  const one = id => IVD.items.find(x => x.id == id);
+  $$("[data-ivc]").forEach(b => b.onclick = async () => { const l = ivLink(one(b.dataset.ivc)); try { await navigator.clipboard.writeText(l); pesan("Link invoice disalin"); } catch (e) { prompt("Salin link ini:", l); } });
+  $$("[data-ive]").forEach(b => b.onclick = () => {
+    const x = one(b.dataset.ive); IVEDIT = String(x.id); $("#ivTitle").textContent = "Ubah " + x.nomor; IVI = x.items.map(i => ({...i}));
+    $("#ivPembeli").value = x.pembeli; $("#ivKontak").value = x.kontak; $("#ivAlamat").value = x.alamat; $("#ivTgl").value = x.tanggal; $("#ivJt").value = x.jatuh_tempo; $("#ivDis").value = x.diskon; $("#ivOng").value = x.ongkir;
+    $("#ivCat").value = x.catatan; $("#ivCara").value = x.cara_bayar; $("#ivMsg").textContent = ""; ivRenderItems(); $("#ivForm").scrollIntoView({behavior: "smooth", block: "start"});
+  });
+  const TX = {kirim: x => `Kirim ${x.nomor} ke pembeli? Stok gudang untuk item bertautan akan dibooking.`, tarik: x => `Tarik ${x.nomor} kembali ke Draft? Booking stok dilepas dan link pembeli tidak aktif.`,
+    lunas: x => `Tandai ${x.nomor} LUNAS?\n${rp(x.total)} otomatis masuk Kas (Penjualan) dan stok gudang dikurangi.`, batal: x => `Batalkan ${x.nomor}?` + (x.status === "lunas" ? "\nCatatan Kas dihapus dan stok gudang dikembalikan." : "\nBooking stok dilepas."),
+    hapus: x => `Hapus ${x.nomor} permanen?`};
+  $$("[data-iva]").forEach(b => b.onclick = async () => {
+    const x = one(b.dataset.id), a = b.dataset.iva; if (!confirm(TX[a](x))) return; b.disabled = true;
+    try { if (await ivKirimPaksa(x.id, a)) { ivRender(); ivIsiPilih(); pesan({kirim: "Terkirim", tarik: "Kembali ke Draft", lunas: "Lunas ✓ masuk Kas", batal: "Dibatalkan", hapus: "Dihapus"}[a]); inboxBadge(); } else b.disabled = false; }
+    catch (e) { alert(e.message); b.disabled = false; }
+  });
+}
+$("#ivF").onchange = ivRender; $("#ivQ").oninput = ivRender;
+async function loadInvoice() {
+  if (DEMO) { IVD = {items: [], gudang: [], katalog: [], setelan: {nama_usaha: "MCI", cara_bayar: ""}, ringkas: {draft: 0, tunggu: 0, tunggu_rp: 0, bukti: 0, lunas_bulan_rp: 0}}; ivReset(); ivIsiPilih(); ivRender(); return; }
+  try {
+    const first = !IVD; IVD = await api("/api/invoice");
+    if (first) ivReset(); else if (!IVI.length && !$("#ivPembeli").value) $("#ivCara").value = IVD.setelan.cara_bayar;
+    ivIsiPilih(); ivRender(); ivHitung();
+  } catch (e) { $("#ivList").innerHTML = `<tr><td colspan="5" class="er">${esc(e.message)}</td></tr>`; }
+}
 
 /* Perpustakaan: semua boleh baca dan mengunggah (ada jatah harian); ubah/hapus milik orang lain khusus Dev */
 let PPD = {items: [], edit: false};
