@@ -213,6 +213,8 @@ def db_init():
         sql(c, f"CREATE TABLE IF NOT EXISTS dokumentasi (id {pk}, judul TEXT NOT NULL, tanggal TEXT, keterangan TEXT, mime TEXT, data TEXT, oleh TEXT, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS hutang (id {pk}, nama TEXT NOT NULL, jumlah {big} NOT NULL, tanggal TEXT NOT NULL, jatuh_tempo TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'belum', lunas TEXT, konfirmasi INTEGER NOT NULL DEFAULT 0, catatan TEXT, dibuat TEXT)")
         sql(c, "CREATE TABLE IF NOT EXISTS dikeluarkan (nama TEXT PRIMARY KEY, tanggal TEXT NOT NULL, alasan TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS perpus (id {pk}, judul TEXT NOT NULL, penulis TEXT, kategori TEXT, ringkasan TEXT, isi TEXT, link TEXT, "
+               "file_nama TEXT, file_mime TEXT, file_data TEXT, sampul_mime TEXT, sampul TEXT, dibuat TEXT, diubah TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS stok (id {pk}, nama TEXT NOT NULL, jumlah {big} NOT NULL DEFAULT 0, satuan TEXT, kategori TEXT, minimum {big} NOT NULL DEFAULT 0, catatan TEXT, mime TEXT, gambar TEXT, diubah TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS laporan (id {pk}, minggu TEXT, dibuat TEXT, dari TEXT, sampai TEXT, sumber TEXT, isi TEXT, data TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS pemakaian (tanggal TEXT NOT NULL, model TEXT NOT NULL, masuk {big} NOT NULL DEFAULT 0, keluar {big} NOT NULL DEFAULT 0, pikir {big} NOT NULL DEFAULT 0, panggilan {big} NOT NULL DEFAULT 0, PRIMARY KEY (tanggal, model))")
@@ -2971,6 +2973,128 @@ def api_stok_one(i):
     except (TypeError, ValueError):
         return jsonify({"error": "jumlah harus angka"}), 400
     return jsonify({"diubah": stok_jumlah(i, j), "items": STOK})
+
+
+# ---------- PERPUSTAKAAN: semua orang yang bisa membuka web boleh membaca; tambah/ubah/hapus khusus Dev ----------
+PERPUS_MAKS, PERPUS_FILE_MAKS = 300, 8_000_000
+_PERPUS_KOLOM = "id,judul,penulis,kategori,ringkasan,link,file_nama,file_mime,dibuat,diubah, CASE WHEN sampul IS NULL OR sampul='' THEN 0 ELSE 1 END, LENGTH(isi), LENGTH(file_data)"
+
+
+def perpus_list():
+    with db() as c:
+        rows = sql(c, f"SELECT {_PERPUS_KOLOM} FROM perpus ORDER BY LOWER(kategori), LOWER(judul)").fetchall()
+    return [{"id": int(i), "judul": j, "penulis": pn or "", "kategori": k or "Umum", "ringkasan": r or "", "link": ln or "", "file_nama": fn or "",
+             "file_mime": fm or "", "dibuat": d or "", "diubah": u or "", "sampul": bool(sp), "ada_isi": bool(li), "file_kb": round((lf or 0) * 3 / 4 / 1024),
+             "v": abs(hash(u or "")) % 100000} for i, j, pn, k, r, ln, fn, fm, d, u, sp, li, lf in rows]
+
+
+def _url_aman(u):
+    u = str(u or "").strip()[:500]
+    if u and not re.match(r"^https?://", u, re.I):
+        raise ValueError("Link harus diawali http:// atau https://")
+    return u
+
+
+def perpus_simpan(d, file=None, sampul=None):
+    judul = re.sub(r"\s+", " ", str(d.get("judul", ""))).strip()[:150]
+    if not judul:
+        raise ValueError("Judul wajib diisi")
+    vals = (judul, str(d.get("penulis") or "").strip()[:100], str(d.get("kategori") or "Umum").strip()[:40] or "Umum",
+            str(d.get("ringkasan") or "").strip()[:1000], str(d.get("isi") or "").strip()[:200_000], _url_aman(d.get("link")), _now())
+    i = str(d.get("id") or "")
+    with db() as c:
+        if i.isdigit():
+            n = sql(c, "UPDATE perpus SET judul=?,penulis=?,kategori=?,ringkasan=?,isi=?,link=?,diubah=? WHERE id=?", (*vals, int(i))).rowcount
+            if not n:
+                raise ValueError("Buku tidak ditemukan")
+            pid = int(i)
+        else:
+            if sql(c, "SELECT COUNT(*) FROM perpus").fetchone()[0] >= PERPUS_MAKS:
+                raise ValueError(f"Maksimal {PERPUS_MAKS} koleksi")
+            sql(c, "INSERT INTO perpus (judul,penulis,kategori,ringkasan,isi,link,diubah,dibuat) VALUES (?,?,?,?,?,?,?,?)", (*vals, _now()))
+            pid = int(sql(c, "SELECT MAX(id) FROM perpus").fetchone()[0])
+        if file:
+            sql(c, "UPDATE perpus SET file_nama=?, file_mime=?, file_data=? WHERE id=?", (file[0], file[1], base64.b64encode(file[2]).decode(), pid))
+        elif d.get("hapus_file") == "1":
+            sql(c, "UPDATE perpus SET file_nama=NULL, file_mime=NULL, file_data=NULL WHERE id=?", (pid,))
+        if sampul:
+            sql(c, "UPDATE perpus SET sampul_mime=?, sampul=? WHERE id=?", (sampul[0], base64.b64encode(sampul[1]).decode(), pid))
+        elif d.get("hapus_sampul") == "1":
+            sql(c, "UPDATE perpus SET sampul_mime=NULL, sampul=NULL WHERE id=?", (pid,))
+    return pid
+
+
+@app.route("/api/perpus", methods=["GET", "POST"])
+def api_perpus():
+    """GET: semua yang sudah masuk web (anggota & viewer). POST khusus Dev, multipart: judul, penulis, kategori, ringkasan, isi, link, file, sampul, id."""
+    r = role()
+    if not r:
+        abort(401)
+    if request.method == "POST":
+        need("admin")
+        file = sampul = None
+        f = request.files.get("file")
+        if f and f.filename:
+            data = f.read(PERPUS_FILE_MAKS + 1)
+            if len(data) > PERPUS_FILE_MAKS:
+                return jsonify({"error": "File maksimal 8 MB. Untuk file besar, taruh di Google Drive lalu isi kolom Link."}), 400
+            nama = re.sub(r"[^A-Za-z0-9._\- ()]", "_", f.filename)[:120]
+            file = (nama, f.mimetype or "application/octet-stream", data)
+        sp = request.files.get("sampul")
+        if sp and sp.filename:
+            data, mime = sp.read(1_500_001), sp.mimetype or "image/jpeg"
+            if len(data) > 1_500_000 or not mime.startswith("image/"):
+                return jsonify({"error": "Sampul harus gambar, maksimal 1,5 MB"}), 400
+            sampul = (mime, data)
+        try:
+            perpus_simpan(request.form, file, sampul)
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+    return jsonify({"items": perpus_list(), "edit": is_admin(r)})
+
+
+@app.route("/api/perpus/<int:i>", methods=["GET", "DELETE"])
+def api_perpus_one(i):
+    """GET: isi bacaan lengkap. DELETE khusus Dev."""
+    if request.method == "DELETE":
+        need("admin")
+        with db() as c:
+            sql(c, "DELETE FROM perpus WHERE id=?", (i,))
+        return jsonify({"items": perpus_list(), "edit": True})
+    need("viewer")
+    with db() as c:
+        row = sql(c, "SELECT judul, isi FROM perpus WHERE id=?", (i,)).fetchone()
+    if not row:
+        abort(404)
+    return jsonify({"id": i, "judul": row[0], "isi": row[1] or ""})
+
+
+@app.route("/api/perpus/<int:i>/file")
+def api_perpus_file(i):
+    need("viewer")
+    with db() as c:
+        row = sql(c, "SELECT file_nama, file_mime, file_data FROM perpus WHERE id=?", (i,)).fetchone()
+    if not row or not row[2]:
+        abort(404)
+    mime = row[1] or "application/octet-stream"
+    aman = mime == "application/pdf" or mime == "text/plain" or (mime.startswith("image/") and "svg" not in mime)   # HTML/SVG selalu diunduh
+    inline = request.args.get("unduh") != "1" and aman
+    nama = re.sub(r"[^A-Za-z0-9._\- ()]", "_", row[0] or f"perpus-{i}")
+    h = {"Content-Disposition": f'{"inline" if inline else "attachment"}; filename="{nama}"', "X-Content-Type-Options": "nosniff",
+         "Cache-Control": "private, max-age=3600"}
+    if mime != "application/pdf":
+        h["Content-Security-Policy"] = "sandbox"   # PDF viewer Chrome tidak jalan di dalam sandbox
+    return Response(base64.b64decode(row[2]), mimetype=mime, headers=h)
+
+
+@app.route("/api/perpus/<int:i>/sampul")
+def api_perpus_sampul(i):
+    need("viewer")
+    with db() as c:
+        row = sql(c, "SELECT sampul_mime, sampul FROM perpus WHERE id=?", (i,)).fetchone()
+    if not row or not row[1]:
+        abort(404)
+    return Response(base64.b64decode(row[1]), mimetype=row[0] or "image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
 
 
 @app.route("/api/stok/<int:i>/gambar")

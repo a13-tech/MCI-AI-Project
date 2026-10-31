@@ -60,7 +60,7 @@ h2{margin:22px 0 10px;font-size:17px}
 .seg{display:inline-flex;background:rgba(255,255,255,.1);border-radius:12px;padding:4px;gap:4px;margin-top:12px}
 .seg button{border:0;background:transparent;color:#DCE6FB;border-radius:9px;padding:8px 14px;font-weight:700;cursor:pointer;min-height:38px}
 .seg button.on{background:var(--gold);color:var(--navy)}
-textarea,input[type=text],input[type=number],input[type=search],input[type=file],select{width:100%;border-radius:12px;border:1px solid #BFD0F2;padding:11px 12px;color:var(--ink);background:#fff}
+textarea,input[type=text],input[type=number],input[type=search],input[type=url],input[type=file],select{width:100%;border-radius:12px;border:1px solid #BFD0F2;padding:11px 12px;color:var(--ink);background:#fff}
 textarea{resize:vertical}
 .boss textarea{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.3);color:#fff;margin:10px 0}
 .boss textarea::placeholder{color:#AFC2EA}
@@ -151,6 +151,14 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 .sk .ph span{font-size:42px}.sk .low{position:absolute;top:8px;left:8px;background:#ef4444;color:#fff;font-size:11px;font-weight:800;padding:3px 8px;border-radius:999px}
 .sk .bd{padding:10px 12px 12px;display:grid;gap:4px}.sk .bd b{font-size:14px}.sk .q{font-size:22px;font-weight:800;color:var(--navy,#0A2A6B)}
 .sk .bd .bar{margin:6px 0 0;gap:6px}.sk .bd .bar button{padding:5px 10px;min-height:34px;font-size:12px}
+.pp{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;margin-top:12px}
+.pp .it{background:#F3F7FF;border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.pp .cv2{aspect-ratio:3/4;display:grid;place-items:center;position:relative;color:#fff;text-align:center;padding:14px;font-weight:800;font-size:15px;line-height:1.3;background:linear-gradient(160deg,#0A2A6B,#1d4ed8)}
+.pp .cv2 img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.pp .cv2 i{position:absolute;left:0;top:0;bottom:0;width:10px;background:rgba(0,0,0,.25)}
+.pp .bd{padding:10px 12px 12px;display:grid;gap:5px}.pp .bd b{font-size:14px}.pp .bd .bar{margin:6px 0 0;gap:6px}.pp .bd .bar .bt{padding:5px 10px;min-height:34px;font-size:12px;text-decoration:none;display:inline-flex;align-items:center}
+.baca{position:fixed;inset:0;z-index:60;background:rgba(4,12,34,.72);display:grid;place-items:center;padding:16px}.baca[hidden]{display:none}
+.baca article{width:min(760px,100%);max-height:88vh;overflow:auto;background:#fffdf7;color:#1f2937;border-radius:18px;padding:26px 28px;box-shadow:0 20px 60px rgba(0,0,0,.4);font-size:15.5px;line-height:1.75}
+.baca h2{margin:0 0 4px;font-size:22px}.baca .tx{white-space:pre-wrap;margin-top:14px}
 .gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:12px}
 .gal figure{margin:0;background:#F3F7FF;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
 .gal img{width:100%;aspect-ratio:1;object-fit:cover;cursor:zoom-in;display:block;background:#EAF1FF}
@@ -230,6 +238,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
  <button class="nv" data-p="blacklist">Blacklist</button>
  <button class="nv" data-p="anggota">Anggota</button>
  <button class="nv" data-p="stok">Stok Barang</button>
+ <button class="nv" data-p="perpus">Perpustakaan</button>
  <button class="nv" data-p="tentang">Tentang Kami</button>
  <div class="cv"><b>Hemat token</b><br>Router lokal, skill, model Lite, cache, dan mode Caveman.</div>
  <div class="who"><span id="whoRole">Memuat…</span><a class="lo" id="logout" href="/logout">Keluar</a></div>
@@ -548,6 +557,32 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
   </div>
  </section>
 
+ <section id="p-perpus" class="pg" hidden>
+  <h1>Perpustakaan</h1>
+  <p class="mu">Koleksi bacaan MCI: buku, modul, datasheet, catatan materi, dan arsip. Semua orang yang bisa membuka web ini boleh membaca dan mengunduh; yang bisa menambah, mengubah, dan menghapus hanya Dev. Ruangannya ada di LT 3 kantor 3D.</p>
+  <div class="cd" id="ppForm" hidden><b id="ppTitle">Tambah koleksi</b>
+   <div class="fl" style="margin-top:12px">
+    <label>Judul<input type="text" id="ppJudul" maxlength="150" placeholder="contoh: Dasar Pemrograman ESP32"></label>
+    <label>Penulis / sumber<input type="text" id="ppPenulis" maxlength="100" placeholder="contoh: Tim MCI, Espressif"></label>
+    <label>Kategori<input type="text" id="ppKat" maxlength="40" list="ppKats" placeholder="Modul, Buku, Datasheet, Arsip…"></label>
+    <label>Link (opsional)<input type="url" id="ppLink" maxlength="500" placeholder="https://drive.google.com/…"></label>
+    <label>File (PDF dll, maks 8 MB)<input type="file" id="ppFile"></label>
+    <label>Sampul (opsional)<input type="file" id="ppSampul" accept="image/*"></label>
+    <label class="full">Ringkasan<textarea id="ppRing" maxlength="1000" rows="2" placeholder="Isinya tentang apa, cocok untuk siapa"></textarea></label>
+    <label class="full">Isi bacaan (opsional, bisa dibaca langsung di web)<textarea id="ppIsi" rows="6" placeholder="Tempel teks materi di sini…"></textarea></label>
+   </div>
+   <datalist id="ppKats"></datalist>
+   <div class="bar" style="margin:12px 0 0"><button class="bt g" id="ppSave">Simpan</button><button class="bt o" id="ppReset">Kosongkan</button>
+    <label class="mu" id="ppHfW" hidden style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="ppHf">Hapus file lama</label>
+    <label class="mu" id="ppHsW" hidden style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="ppHs">Hapus sampul</label><span id="ppMsg" class="mu"></span></div>
+  </div>
+  <div class="cd">
+   <div class="bar" style="justify-content:space-between;margin:0"><b id="ppJml">Koleksi</b><div class="bar" style="margin:0"><input type="search" id="ppQ" placeholder="Cari judul, penulis, isi ringkasan…" style="width:auto;min-width:200px"><select id="ppF" style="width:auto"><option value="">Semua kategori</option></select><button class="bt o" id="ppView">Lihat ruang Perpustakaan 3D</button></div></div>
+   <div class="pp" id="ppList"></div>
+  </div>
+  <div class="baca" id="ppBaca" hidden><article role="dialog" aria-modal="true" aria-labelledby="ppBJ"><div class="bar" style="justify-content:space-between;margin:0"><span class="mu" id="ppBK"></span><button class="bt o" id="ppBX">Tutup</button></div><h2 id="ppBJ"></h2><div class="mu" id="ppBP"></div><div class="tx" id="ppBT"></div></article></div>
+ </section>
+
  <section id="p-tentang" class="pg" hidden>
   <div class="bar" style="justify-content:space-between;margin:0 0 4px"><h1 style="margin:0">Tentang Kami</h1><button class="bt o" id="te" hidden>Edit halaman</button></div>
   <p class="mu">Kenalan dengan anggota dan perjalanan MCI.</p>
@@ -823,6 +858,7 @@ function show(p) {
   if (p === "tentang") loadTentang();
   if (p === "laporan") loadLaporan();
   if (p === "stok") loadStok();
+  if (p === "perpus") loadPerpus();
   if (p === "hutang") loadHutang();
   if (p === "anggota") loadAnggota();
   if (p === "catatan") loadCatatan();
@@ -1360,6 +1396,58 @@ $("#stSave").onclick = async () => {
     STK = Object.assign(STK, await api("/api/stok", {method: "POST", body: fd})); renderStok(); stReset(); $("#stMsg").textContent = "Tersimpan.";
   } catch (e) { $("#stMsg").textContent = e.message; }
   $("#stSave").disabled = false;
+};
+
+/* Perpustakaan: semua boleh baca, Dev yang mengisi */
+let PPD = {items: [], edit: false};
+const ppWarna = k => { let h = 0; for (const c of k) h = (h * 31 + c.charCodeAt(0)) % 360; return `linear-gradient(160deg,hsl(${h} 55% 28%),hsl(${(h + 40) % 360} 60% 42%))`; };
+function ppReset() { $("#ppTitle").textContent = "Tambah koleksi"; $("#ppForm").dataset.id = ""; ["#ppJudul", "#ppPenulis", "#ppKat", "#ppLink", "#ppRing", "#ppIsi"].forEach(q => $(q).value = ""); $("#ppFile").value = ""; $("#ppSampul").value = ""; $("#ppHf").checked = $("#ppHs").checked = false; $("#ppHfW").hidden = $("#ppHsW").hidden = true; $("#ppMsg").textContent = ""; }
+function renderPerpus() {
+  const it = PPD.items, q = $("#ppQ").value.trim().toLowerCase(), kf = $("#ppF").value, kats = [...new Set(it.map(x => x.kategori))].sort();
+  const cur = $("#ppF").value; $("#ppF").innerHTML = '<option value="">Semua kategori</option>' + kats.map(k => `<option ${k === cur ? "selected" : ""}>${esc(k)}</option>`).join("");
+  $("#ppKats").innerHTML = kats.map(k => `<option value="${esc(k)}">`).join("");
+  const vis = it.filter(x => (!kf || x.kategori === kf) && (!q || [x.judul, x.penulis, x.kategori, x.ringkasan].join(" ").toLowerCase().includes(q)));
+  $("#ppJml").textContent = `Koleksi (${num(it.length)})`;
+  $("#ppList").innerHTML = vis.map(x => `<div class="it"><div class="cv2" style="background:${ppWarna(x.kategori)}"><i></i>${x.sampul ? `<img src="/api/perpus/${x.id}/sampul?v=${x.v}" alt="" loading="lazy">` : esc(x.judul)}</div>
+    <div class="bd"><b>${esc(x.judul)}</b>${x.penulis ? `<span class="mu" style="font-size:12.5px">${esc(x.penulis)}</span>` : ""}<span><span class="ch">${esc(x.kategori)}</span></span>${x.ringkasan ? `<span style="font-size:13px">${esc(x.ringkasan)}</span>` : ""}
+    <div class="bar">${x.ada_isi ? `<button class="bt g" data-ppb="${x.id}">Baca</button>` : ""}${x.file_nama ? `<a class="bt o" href="/api/perpus/${x.id}/file" target="_blank" rel="noopener">Buka file</a><a class="bt o" href="/api/perpus/${x.id}/file?unduh=1">Unduh${x.file_kb ? ` (${x.file_kb > 1024 ? (x.file_kb / 1024).toFixed(1) + " MB" : x.file_kb + " KB"})` : ""}</a>` : ""}${x.link ? `<a class="bt o" href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">Buka link</a>` : ""}
+    ${PPD.edit ? `<button class="bt o" data-ppe="${x.id}">Ubah</button><button class="bt o" data-ppd="${x.id}">Hapus</button>` : ""}</div></div></div>`).join("")
+    || `<p class="mu">${it.length ? "Tidak ada yang cocok." : "Rak masih kosong." + (PPD.edit ? " Tambah koleksi pertama lewat formulir di atas." : " Dev belum menambahkan koleksi.")}</p>`;
+  const one = id => it.find(x => x.id == id);
+  $$("[data-ppb]").forEach(b => b.onclick = async () => {
+    const x = one(b.dataset.ppb); $("#ppBK").textContent = x.kategori; $("#ppBJ").textContent = x.judul; $("#ppBP").textContent = x.penulis; $("#ppBT").textContent = "Memuat…"; $("#ppBaca").hidden = false;
+    try { $("#ppBT").textContent = (await api("/api/perpus/" + x.id)).isi; } catch (e) { $("#ppBT").textContent = e.message; }
+  });
+  $$("[data-ppd]").forEach(b => b.onclick = async () => { const x = one(b.dataset.ppd); if (!confirm(`Hapus "${x.judul}" dari perpustakaan?`)) return; try { PPD = await api("/api/perpus/" + x.id, {method: "DELETE"}); renderPerpus(); } catch (e) { alert(e.message); } });
+  $$("[data-ppe]").forEach(b => b.onclick = async () => {
+    const x = one(b.dataset.ppe); let isi = "";
+    if (x.ada_isi) try { isi = (await api("/api/perpus/" + x.id)).isi; } catch (e) {}
+    $("#ppForm").dataset.id = x.id; $("#ppTitle").textContent = "Ubah " + x.judul; $("#ppJudul").value = x.judul; $("#ppPenulis").value = x.penulis; $("#ppKat").value = x.kategori; $("#ppLink").value = x.link; $("#ppRing").value = x.ringkasan; $("#ppIsi").value = isi;
+    $("#ppFile").value = ""; $("#ppSampul").value = ""; $("#ppHfW").hidden = !x.file_nama; $("#ppHsW").hidden = !x.sampul; $("#ppHf").checked = $("#ppHs").checked = false; $("#ppMsg").textContent = x.file_nama ? "File sekarang: " + x.file_nama : "";
+    $("#ppForm").scrollIntoView({behavior: "smooth", block: "start"});
+  });
+}
+async function loadPerpus() {
+  try { PPD = DEMO ? {items: [], edit: false} : await api("/api/perpus"); $("#ppForm").hidden = !PPD.edit; renderPerpus(); } catch (e) { $("#ppList").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
+}
+$("#ppQ").oninput = renderPerpus; $("#ppF").onchange = renderPerpus; $("#ppReset").onclick = ppReset;
+$("#ppBX").onclick = () => $("#ppBaca").hidden = true;
+$("#ppBaca").onclick = e => { if (e.target.id === "ppBaca") $("#ppBaca").hidden = true; };
+document.addEventListener("keydown", e => { if (e.key === "Escape") $("#ppBaca").hidden = true; });
+$("#ppView").onclick = () => { show("office"); setTimeout(() => { const b = $('[data-view="perpus"]'); if (b) b.click(); }, 300); };
+$("#ppSave").onclick = async () => {
+  const fd = new FormData(), id = $("#ppForm").dataset.id, f = $("#ppFile").files[0], sp = $("#ppSampul").files[0];
+  if (id) fd.append("id", id);
+  [["judul", "#ppJudul"], ["penulis", "#ppPenulis"], ["kategori", "#ppKat"], ["link", "#ppLink"], ["ringkasan", "#ppRing"], ["isi", "#ppIsi"]].forEach(([k, q]) => fd.append(k, $(q).value));
+  if ($("#ppHf").checked) fd.append("hapus_file", "1"); if ($("#ppHs").checked) fd.append("hapus_sampul", "1");
+  if (f && f.size > 8e6) { $("#ppMsg").textContent = "File maksimal 8 MB. Untuk file besar, taruh di Google Drive lalu isi kolom Link."; return; }
+  $("#ppSave").disabled = true; $("#ppMsg").textContent = "Menyimpan…";
+  try {
+    if (f) fd.append("file", f, f.name);
+    if (sp) fd.append("sampul", (await resizeFoto(sp, 512)).blob, "sampul.jpg");
+    PPD = await api("/api/perpus", {method: "POST", body: fd}); renderPerpus(); ppReset(); $("#ppMsg").textContent = "Tersimpan.";
+  } catch (e) { $("#ppMsg").textContent = e.message; }
+  $("#ppSave").disabled = false;
 };
 
 /* Stok dari foto (AI) */
