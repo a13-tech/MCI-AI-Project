@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Katalog MCI</title>
+<meta name="description" content="Katalog produk MCI (Mahardika Cakrawala Indonesia): daftar harga, jenis barang, dan mitra.">
+<style>
+:root{--navy:#0A2A6B;--navy2:#0b1d4a;--gold:#D4AF5A;--gold2:#F1D58A;--ink:#10203f;--mute:#5b6b8c;--line:#E1E8F5;--bg:#F4F7FD;--g:#0E6B3A;--gbg:#DDF5E7;--r:#B42318;--rbg:#FDE3E1;--y:#6B4E0A;--ybg:#F6E9C3}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg);font-size:15px;line-height:1.5}
+header{background:linear-gradient(135deg,var(--navy2),var(--navy));color:#fff;padding:22px 16px 26px}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+header .wrap{padding:0}
+.brand{font-weight:900;letter-spacing:.16em;color:var(--gold2);font-size:13px}
+h1{margin:6px 0 4px;font-size:clamp(24px,5vw,34px)}
+header p{margin:0;color:#C9D7F5;max-width:640px}
+.jam{display:inline-flex;gap:8px;align-items:center;margin-top:14px;padding:7px 12px;border-radius:99px;background:rgba(255,255,255,.1);font-size:13px}
+.dot{width:9px;height:9px;border-radius:50%;background:#94a3b8}.dot.on{background:#22c55e;box-shadow:0 0 0 4px rgba(34,197,94,.25)}
+main{padding:18px 0 40px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.chip{all:unset;cursor:pointer;padding:8px 14px;border-radius:99px;border:1px solid #BFD0F2;background:#fff;font-size:13.5px;font-weight:600;color:var(--navy)}
+.chip.on{background:var(--navy);color:var(--gold2);border-color:var(--navy)}
+.chip:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+input,textarea,select{font:inherit;width:100%;padding:11px 12px;border:1px solid #BFD0F2;border-radius:12px;background:#fff;color:var(--ink)}
+.cari{max-width:340px}
+h2{font-size:18px;margin:22px 0 10px;display:flex;gap:8px;align-items:center}h2 small{font-size:12.5px;color:var(--mute);font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+.ph{aspect-ratio:4/3;background:linear-gradient(150deg,#14295e,#1D4ED8);display:grid;place-items:center;color:var(--gold2);font-weight:800;padding:12px;text-align:center}
+.ph img{width:100%;height:100%;object-fit:cover}
+.bd{padding:12px 14px 14px;display:flex;flex-direction:column;gap:6px;flex:1}
+.bd b{font-size:15.5px}.harga{font-size:18px;font-weight:800;color:var(--navy)}.harga small{font-size:12px;color:var(--mute);font-weight:600}
+.tag{display:inline-block;padding:3px 9px;border-radius:99px;font-size:11.5px;font-weight:700;background:#DCE8FF;color:#0B3FBF;margin-right:4px}
+.s-tersedia{background:var(--gbg);color:var(--g)}.s-terbatas,.s-preorder{background:var(--ybg);color:var(--y)}.s-habis{background:var(--rbg);color:var(--r)}
+.ds{font-size:13.5px;color:#334155;white-space:pre-wrap}
+.btn{all:unset;cursor:pointer;text-align:center;padding:10px 14px;border-radius:12px;font-weight:700;background:var(--gold);color:var(--navy)}
+.btn.o{background:#fff;border:1px solid #BFD0F2}.btn[disabled]{opacity:.5;cursor:not-allowed}
+.tbl{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line)}th{background:#EEF3FC;font-size:12.5px;color:var(--mute)}
+td.rt,th.rt{text-align:right;white-space:nowrap}tr.grp td{background:#F7F9FE;font-weight:800;color:var(--navy)}
+.tanya{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;margin-top:26px}
+.tanya .fl{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.tanya .full{grid-column:1/-1}
+label{font-size:12.5px;font-weight:700;color:var(--mute);display:flex;flex-direction:column;gap:4px}
+.msg{font-size:13.5px;color:var(--mute)}.er{color:var(--r);font-weight:600}
+.th{border-top:1px solid var(--line);padding:12px 0}.th:first-child{border-top:0}
+.q{background:#EEF3FC;border-radius:12px 12px 12px 4px;padding:9px 12px;display:inline-block;max-width:100%}
+.a{background:#FFFBEF;border:1px solid #F3E3B2;border-radius:12px 12px 4px 12px;padding:9px 12px;margin-top:6px;white-space:pre-wrap}
+.a.adm{background:var(--gbg);border-color:#9fdcb8}
+.kecil{font-size:12px;color:var(--mute)}
+footer{text-align:center;color:var(--mute);font-size:12.5px;padding:20px 16px 34px}
+@media(max-width:560px){.tanya .fl{grid-template-columns:1fr}.cari{max-width:none}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+ <div class="brand">MCI · MAHARDIKA CAKRAWALA INDONESIA</div>
+ <h1>Katalog Produk</h1>
+ <p>Daftar barang dan harga dari MCI dan mitra. Mau tanya detail barang? Pakai kolom tanya di bawah: asisten AI menjawab langsung, soal pembayaran dijawab admin.</p>
+ <div class="jam" id="jam"><span class="dot" id="jamDot"></span><span id="jamT">Memuat jam kerja…</span></div>
+</div></header>
+<main class="wrap">
+ <div class="bar" id="mitra" role="tablist" aria-label="Pilih mitra"></div>
+ <div class="bar" id="kat" aria-label="Pilih jenis barang"></div>
+ <div class="bar"><input type="search" class="cari" id="q" placeholder="Cari nama barang…" aria-label="Cari barang">
+  <button class="chip on" id="vK" aria-pressed="true">Kartu</button><button class="chip" id="vD" aria-pressed="false">Daftar harga</button></div>
+ <div id="list"><p class="msg">Memuat katalog…</p></div>
+
+ <section class="tanya" id="tanya" aria-labelledby="tj">
+  <h2 id="tj" style="margin-top:0">Tanya barang</h2>
+  <div class="msg" id="kuota"></div>
+  <div class="fl">
+   <label>Nama (opsional)<input type="text" id="tNama" maxlength="60" autocomplete="name"></label>
+   <label>WhatsApp / kontak (opsional)<input type="text" id="tKontak" maxlength="80" autocomplete="tel" placeholder="biar admin bisa menghubungi"></label>
+   <label class="full">Barang yang ditanya<select id="tProduk"><option value="">Umum / beberapa barang</option></select></label>
+   <label class="full">Pertanyaan<textarea id="tPesan" rows="3" maxlength="500" placeholder="contoh: Modul ini sudah termasuk kabel? Ada warna lain?"></textarea></label>
+  </div>
+  <div class="bar" style="margin:12px 0 0"><button class="btn" id="tKirim">Kirim pertanyaan</button><span class="msg" id="tMsg" role="status"></span></div>
+  <div id="riw" style="margin-top:14px"></div>
+ </section>
+</main>
+<footer>© MCI · Trimatra Vijaya Mahe · Harga dapat berubah sewaktu-waktu, konfirmasi ke admin sebelum membayar.</footer>
+<script>
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const rp = n => "Rp " + Number(n || 0).toLocaleString("id-ID");
+let D = {items: []}, MITRA = "", KAT = "", VIEW = "k", POLL = 0;
+async function api(u, o = {}) {
+  o.headers = Object.assign({"X-MCI": "1"}, o.headers || {});
+  if (o.json) { o.method = "POST"; o.headers["Content-Type"] = "application/json"; o.body = JSON.stringify(o.json); delete o.json; }
+  const r = await fetch(u, o); let d = {}; try { d = await r.json(); } catch (e) {}
+  if (!r.ok) { const e = new Error(d.error || "Gagal (" + r.status + ")"); e.d = d; throw e; }
+  return d;
+}
+function render() {
+  const it = D.items || [], mitras = [...new Set(it.map(x => x.mitra))].sort();
+  if (MITRA && !mitras.includes(MITRA)) MITRA = "";
+  $("#mitra").innerHTML = mitras.length > 1 ? ["", ...mitras].map(m => `<button class="chip ${m === MITRA ? "on" : ""}" role="tab" aria-selected="${m === MITRA}" data-m="${esc(m)}">${m ? esc(m) : "Semua mitra"}</button>`).join("") : "";
+  const pool = it.filter(x => !MITRA || x.mitra === MITRA), kats = [...new Set(pool.map(x => x.kategori))].sort();
+  if (KAT && !kats.includes(KAT)) KAT = "";
+  $("#kat").innerHTML = kats.length > 1 ? ["", ...kats].map(k => `<button class="chip ${k === KAT ? "on" : ""}" data-k="${esc(k)}">${k ? esc(k) : "Semua jenis"}</button>`).join("") : "";
+  $$("[data-m]").forEach(b => b.onclick = () => { MITRA = b.dataset.m; render(); });
+  $$("[data-k]").forEach(b => b.onclick = () => { KAT = b.dataset.k; render(); });
+  const q = $("#q").value.trim().toLowerCase(), vis = pool.filter(x => (!KAT || x.kategori === KAT) && (!q || (x.nama + " " + x.deskripsi + " " + x.kategori).toLowerCase().includes(q)));
+  const grup = {}; vis.forEach(x => (grup[x.kategori] = grup[x.kategori] || []).push(x));
+  const keys = Object.keys(grup).sort();
+  if (!vis.length) { $("#list").innerHTML = `<p class="msg">${it.length ? "Tidak ada barang yang cocok." : "Katalog masih kosong. Cek lagi nanti ya."}</p>`; return; }
+  if (VIEW === "d") {
+    $("#list").innerHTML = `<div class="tbl"><table><thead><tr><th>Barang</th><th>Mitra</th><th>Ketersediaan</th><th class="rt">Harga</th></tr></thead><tbody>${keys.map(k => `<tr class="grp"><td colspan="4">${esc(k)}</td></tr>` + grup[k].map(x => `<tr><td>${esc(x.nama)}</td><td>${esc(x.mitra)}</td><td><span class="tag s-${x.sedia}">${esc(x.sedia_label)}</span></td><td class="rt"><b>${rp(x.harga)}</b> <span class="kecil">/${esc(x.satuan)}</span></td></tr>`).join("")).join("")}</tbody></table></div>`;
+  } else {
+    $("#list").innerHTML = keys.map(k => `<h2>${esc(k)} <small>${grup[k].length} barang</small></h2><div class="grid">${grup[k].map(x => `<article class="card">
+      <div class="ph">${x.foto ? `<img src="/api/produk/${x.id}/foto?v=${x.v}" alt="${esc(x.nama)}" loading="lazy">` : esc(x.nama)}</div>
+      <div class="bd"><span><span class="tag">${esc(x.mitra)}</span><span class="tag s-${x.sedia}">${esc(x.sedia_label)}</span></span><b>${esc(x.nama)}</b>
+      <div class="harga">${rp(x.harga)} <small>/ ${esc(x.satuan)}</small></div>${x.deskripsi ? `<div class="ds">${esc(x.deskripsi)}</div>` : ""}
+      ${x.spesifikasi ? `<details><summary class="kecil" style="cursor:pointer">Spesifikasi</summary><div class="ds" style="margin-top:6px">${esc(x.spesifikasi)}</div></details>` : ""}
+      <button class="btn o" style="margin-top:auto" data-t="${x.id}">Tanya barang ini</button></div></article>`).join("")}</div>`).join("");
+  }
+  $$("[data-t]").forEach(b => b.onclick = () => { $("#tProduk").value = b.dataset.t; $("#tanya").scrollIntoView({behavior: "smooth"}); setTimeout(() => $("#tPesan").focus(), 400); });
+}
+function renderKuota(sisa) {
+  D.sisa_tanya = sisa;
+  $("#kuota").innerHTML = sisa > 0 ? `Sisa <b>${sisa}</b> dari ${D.batas_tanya || 2} pesan untuk 24 jam ke depan. Tulis pertanyaan selengkap mungkin dalam satu pesan.`
+    : `<span class="er">Batas ${D.batas_tanya || 2} pesan per 24 jam sudah tercapai.</span> Balasan admin tetap muncul di bawah.`;
+  $("#tKirim").disabled = sisa <= 0;
+}
+async function riwayat() {
+  try {
+    const d = await api("/api/publik/tanya");
+    $("#riw").innerHTML = d.items.length ? '<b style="font-size:14px">Riwayat pertanyaanmu</b>' + d.items.map(x => `<div class="th"><div class="kecil">${new Date(x.dibuat).toLocaleString("id-ID", {dateStyle: "medium", timeStyle: "short"})}${x.produk ? " · " + esc(x.produk) : ""}</div>
+      <div class="q">${esc(x.pesan)}</div>${x.jawaban_ai ? `<div class="a"><span class="kecil">${x.status === "dijawab_ai" ? "Asisten AI" : "Info"}</span>\n${esc(x.jawaban_ai)}</div>` : ""}
+      ${x.balasan ? `<div class="a adm"><span class="kecil">Admin MCI</span>\n${esc(x.balasan)}</div>` : x.status === "menunggu_admin" ? '<div class="kecil" style="margin-top:6px">⏳ Menunggu balasan admin…</div>' : ""}</div>`).join("") : "";
+    clearInterval(POLL); if (d.items.some(x => x.status === "menunggu_admin")) POLL = setInterval(() => { if (!document.hidden) riwayat(); }, 30000);
+  } catch (e) {}
+}
+async function muat() {
+  try { D = await api("/api/publik/produk"); } catch (e) { $("#list").innerHTML = '<p class="er">Katalog gagal dimuat. Coba muat ulang.</p>'; return; }
+  const j = D.jam; $("#jamDot").classList.toggle("on", j.buka);
+  $("#jamT").textContent = (j.buka ? "Admin online sekarang · " : "Admin offline · ") + "Jam kerja " + j.teks;
+  $("#tProduk").innerHTML = '<option value="">Umum / beberapa barang</option>' + D.items.map(x => `<option value="${x.id}">${esc(x.nama)} (${esc(x.mitra)})</option>`).join("");
+  renderKuota(D.sisa_tanya); render();
+}
+$("#q").oninput = render;
+$("#vK").onclick = () => { VIEW = "k"; $("#vK").classList.add("on"); $("#vD").classList.remove("on"); $("#vK").setAttribute("aria-pressed", "true"); $("#vD").setAttribute("aria-pressed", "false"); render(); };
+$("#vD").onclick = () => { VIEW = "d"; $("#vD").classList.add("on"); $("#vK").classList.remove("on"); $("#vD").setAttribute("aria-pressed", "true"); $("#vK").setAttribute("aria-pressed", "false"); render(); };
+$("#tKirim").onclick = async () => {
+  const pesan = $("#tPesan").value.trim();
+  if (pesan.length < 3) { $("#tMsg").textContent = "Tulis pertanyaanmu dulu."; return; }
+  $("#tKirim").disabled = true; $("#tMsg").textContent = "Mengirim… asisten sedang membaca katalog";
+  try {
+    const d = await api("/api/publik/tanya", {json: {pesan, nama: $("#tNama").value, kontak: $("#tKontak").value, produk_id: $("#tProduk").value || null}});
+    $("#tPesan").value = ""; $("#tMsg").textContent = d.status === "dijawab_ai" ? "Terjawab ✓" : "Diteruskan ke admin ✓"; renderKuota(d.sisa_tanya); await riwayat();
+  } catch (e) { $("#tMsg").innerHTML = '<span class="er">' + esc(e.message) + "</span>"; if (e.d && e.d.sisa_tanya === 0) renderKuota(0); else $("#tKirim").disabled = false; }
+};
+muat(); riwayat();
+</script>
+</body>
+</html>

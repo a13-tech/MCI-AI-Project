@@ -248,6 +248,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
  <button class="nv" data-p="blacklist">Blacklist</button>
  <button class="nv" data-p="anggota">Anggota</button>
  <button class="nv" data-p="stok">Stok Barang</button>
+ <button class="nv" data-p="produk">Produk</button>
  <button class="nv" data-p="perpus">Perpustakaan</button>
  <button class="nv" data-p="tentang">Tentang Kami</button>
  <div class="cv"><b>Hemat token</b><br>Router lokal, skill, model Lite, cache, dan mode Caveman.</div>
@@ -543,6 +544,41 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
   </div>
   <div class="cd" style="padding:0"><div class="bar" style="padding:16px 20px 0;margin:0"><b id="bkRT">Riwayat pembayaran</b></div>
    <div class="tb"><table><thead><tr><th>Tanggal</th><th>Nama</th><th>Minggu</th><th class="rt">Jumlah</th><th>Status</th><th></th></tr></thead><tbody id="bkRiw"></tbody></table></div></div>
+ </section>
+
+ <section id="p-produk" class="pg" hidden>
+  <h1>Produk</h1>
+  <p class="mu">Katalog barang yang dijual MCI dan mitra: daftar harga, jenis barang, dan mitra. Yang bisa menambah dan mengubah: <b>Dev, Manager, dan Bendahara</b>. Pembeli membuka katalog publik (tanpa login), bisa bertanya <b>maks 2 pesan per IP per 24 jam</b>: detail barang dijawab AI, soal pembayaran dijawab admin pada jam kerja <b>Senin–Sabtu 17.00–20.30 WIB</b>.</p>
+  <div class="cd" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><b>Link katalog publik:</b><code id="prLink" style="background:#EEF3FC;padding:6px 10px;border-radius:8px;word-break:break-all"></code>
+   <button class="bt o" id="prCopy">Salin link</button><a class="bt o" id="prOpen" target="_blank" rel="noopener">Buka</a><span class="ch" id="prJam"></span></div>
+  <div class="gr">
+   <div class="cd"><div class="k">Produk aktif</div><div class="v" id="pr1">-</div></div>
+   <div class="cd"><div class="k">Jenis barang</div><div class="v" id="pr2">-</div></div>
+   <div class="cd"><div class="k">Mitra</div><div class="v" id="pr3">-</div></div>
+   <div class="cd" id="pr4c" hidden><div class="k">Pertanyaan menunggu admin</div><div class="v" id="pr4">-</div></div>
+  </div>
+  <div class="cd" id="prForm" hidden><b id="prTitle">Tambah produk</b>
+   <div class="fl" style="margin-top:12px">
+    <label>Nama produk<input type="text" id="prNama" maxlength="120" placeholder="contoh: Modul ESP32 DevKit V4"></label>
+    <label>Harga (Rp)<input type="number" id="prHarga" min="0" step="500" placeholder="contoh: 75000"></label>
+    <label>Jenis barang<input type="text" id="prKat" maxlength="40" list="prKats" placeholder="Mikrokontroler, Sensor, Merchandise…"></label>
+    <label>Mitra<input type="text" id="prMitra" maxlength="60" list="prMitras" placeholder="MCI, atau nama mitra"></label>
+    <label>Satuan<input type="text" id="prSat" maxlength="20" placeholder="pcs, set, meter"></label>
+    <label>Ketersediaan<select id="prSedia"></select></label>
+    <label>Foto (opsional)<input type="file" id="prFoto" accept="image/*"></label>
+    <div style="display:flex;align-items:flex-end;padding-bottom:10px"><label class="mu" style="display:inline-flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="prAktif" checked style="width:auto"> Tampil di katalog publik</label></div>
+    <label class="full">Deskripsi<textarea id="prDesk" rows="2" maxlength="1500" placeholder="Singkat: fungsi, kelebihan, isi paket"></textarea></label>
+    <label class="full">Spesifikasi (dipakai AI untuk menjawab pembeli)<textarea id="prSpek" rows="3" maxlength="3000" placeholder="Tegangan, ukuran, bahan, garansi, kompatibilitas…"></textarea></label>
+   </div>
+   <datalist id="prKats"></datalist><datalist id="prMitras"></datalist>
+   <div class="bar" style="margin:12px 0 0"><button class="bt g" id="prSave">Simpan</button><button class="bt o" id="prReset">Kosongkan</button>
+    <label class="mu" id="prHfW" hidden style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="prHf" style="width:auto">Hapus foto</label><span class="mu" id="prMsg"></span></div>
+  </div>
+  <div class="cd">
+   <div class="bar" style="justify-content:space-between;margin:0"><b>Daftar harga</b><div class="bar" style="margin:0"><select id="prFM" style="width:auto"></select><select id="prFK" style="width:auto"></select><input type="search" id="prQ" placeholder="Cari barang…" style="width:auto;min-width:180px"></div></div>
+   <div class="tb" style="margin-top:10px"><table><thead><tr><th>Barang</th><th>Mitra</th><th>Ketersediaan</th><th class="rt">Harga</th><th></th></tr></thead><tbody id="prList"></tbody></table></div>
+  </div>
+  <div class="cd" id="prTanyaC" hidden><div class="bar" style="justify-content:space-between;margin:0"><b>Pertanyaan pembeli</b><span class="mu" id="prTanyaI" style="font-size:12.5px"></span></div><div id="prTanya" style="margin-top:8px"></div></div>
  </section>
 
  <section id="p-hutang" class="pg" hidden>
@@ -916,6 +952,7 @@ function show(p) {
   if (p === "inbox") loadInbox();
   if (p === "berita") loadBerita();
   if (p === "bayarkas") loadBayarKas();
+  if (p === "produk") loadProduk();
   if (p === "hutang") loadHutang();
   if (p === "anggota") loadAnggota();
   if (p === "catatan") loadCatatan();
@@ -1466,7 +1503,7 @@ async function inboxBadge(n) {
   const b = $("#nbInbox"); b.textContent = n > 99 ? "99+" : n; b.hidden = !n;
 }
 let IBD = {items: []};
-const IB_IKON = {bayar_kas: "💸", bayar_ok: "✅", bayar_tolak: "⛔", info: "📢"};
+const IB_IKON = {bayar_kas: "💸", bayar_ok: "✅", bayar_tolak: "⛔", info: "📢", tanya_produk: "🛒"};
 async function bayarAksi(id, aksi) {
   let alasan = "";
   if (aksi === "tolak") { alasan = prompt("Alasan ditolak (opsional, dikirim ke anggota):", "Foto bukti tidak jelas"); if (alasan === null) return false; }
@@ -1482,12 +1519,12 @@ function renderInbox() {
     return `<div class="cd ib${x.dibaca ? "" : " baru"}" data-ibr="${x.id}"><div class="ibh"><span class="ibi" aria-hidden="true">${IB_IKON[x.jenis] || "🔔"}</span><div style="flex:1;min-width:0"><b>${esc(x.judul)}</b><div class="mu" style="font-size:12.5px">${relW(x.dibuat)} ${st}</div></div><button class="bt o ibx" data-ibd="${x.id}" aria-label="Hapus notifikasi">×</button></div>
       ${x.isi ? `<div style="margin-top:8px">${esc(x.isi)}</div>` : ""}
       ${x.jenis === "bayar_kas" && x.ref && x.bayar_status !== "dihapus" && kf ? `<div class="bar" style="margin:10px 0 0"><a href="/api/iuran/${x.ref}/foto" target="_blank" rel="noopener"><img class="ibf" src="/api/iuran/${x.ref}/foto" alt="Foto bukti bayar" loading="lazy"></a>${tunggu ? `<button class="bt g" data-ibt="${x.ref}">Terima</button><button class="bt o" data-ibn="${x.ref}">Tolak</button>` : ""}</div>` : ""}
-      ${x.jenis.startsWith("bayar") ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="1">Buka Bayar Kas</button></div>' : ""}</div>`;
+      ${x.jenis.startsWith("bayar") ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="bayarkas">Buka Bayar Kas</button></div>' : x.jenis === "tanya_produk" ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="produk">Balas di halaman Produk</button></div>' : ""}</div>`;
   }).join("") || '<p class="mu">Inbox kosong. Notifikasi baru akan muncul di sini.</p>';
   $$("[data-ibr]").forEach(e => e.onclick = async ev => { if (ev.target.closest("button,a")) return; const x = it.find(y => y.id == e.dataset.ibr); if (x && !x.dibaca) { IBD = await api("/api/inbox/baca", {json: {id: x.id}}); renderInbox(); inboxBadge(IBD.belum); } });
   $$("[data-ibd]").forEach(b => b.onclick = async () => { IBD = await api("/api/inbox/" + b.dataset.ibd, {method: "DELETE"}); renderInbox(); inboxBadge(IBD.belum); });
   $$("[data-ibt],[data-ibn]").forEach(b => b.onclick = async () => { b.disabled = true; if (await bayarAksi(b.dataset.ibt || b.dataset.ibn, b.dataset.ibt ? "terima" : "tolak")) await loadInbox(); b.disabled = false; });
-  $$("[data-ibgo]").forEach(b => b.onclick = () => show("bayarkas"));
+  $$("[data-ibgo]").forEach(b => b.onclick = () => show(b.dataset.ibgo));
 }
 async function loadInbox() { if (DEMO) { IBD = {items: [], belum: 0}; renderInbox(); return; } try { IBD = await api("/api/inbox"); renderInbox(); inboxBadge(IBD.belum); } catch (e) { $("#ibList").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; } }
 $("#ibAll").onclick = async () => { IBD = await api("/api/inbox/baca", {json: {semua: true}}); renderInbox(); inboxBadge(0); };
@@ -1597,6 +1634,67 @@ $("#bkCS").onclick = async () => {
     BKD = await api("/api/iuran/bayar", {method: "POST", body: fd}); $("#bkCF").value = ""; renderBayarKas(); $("#bkMsgC").textContent = "Tercatat lunas ✓"; }
   catch (e) { $("#bkMsgC").textContent = e.message; }
   $("#bkCS").disabled = false;
+};
+
+/* ===== Produk: katalog jual, kelola Dev/Manager/Bendahara, balas pertanyaan pembeli ===== */
+let PRD = null, PRT = [];
+function prReset() { $("#prTitle").textContent = "Tambah produk"; $("#prForm").dataset.id = ""; ["#prNama", "#prHarga", "#prKat", "#prMitra", "#prSat", "#prDesk", "#prSpek"].forEach(q => $(q).value = ""); $("#prSedia").value = "tersedia"; $("#prAktif").checked = true; $("#prFoto").value = ""; $("#prHf").checked = false; $("#prHfW").hidden = true; $("#prMsg").textContent = ""; }
+function renderProduk() {
+  const d = PRD; if (!d) return;
+  const it = d.items, ak = it.filter(x => x.aktif), mitras = [...new Set(it.map(x => x.mitra))].sort(), kats = [...new Set(it.map(x => x.kategori))].sort();
+  $("#pr1").textContent = num(ak.length); $("#pr2").textContent = num(new Set(ak.map(x => x.kategori)).size); $("#pr3").textContent = num(new Set(ak.map(x => x.mitra)).size);
+  $("#pr4c").hidden = !d.edit; $("#pr4").textContent = num(d.menunggu || 0);
+  $("#prJam").className = "ch " + (d.jam.buka ? "g" : "n"); $("#prJam").textContent = d.jam.buka ? "Jam kerja admin: sekarang buka" : "Di luar jam kerja admin";
+  $("#prForm").hidden = !d.edit; $("#prTanyaC").hidden = !d.edit;
+  if (!$("#prSedia").options.length) { $("#prSedia").innerHTML = Object.entries(d.sedia).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join(""); $("#prSedia").value = "tersedia"; }
+  $("#prKats").innerHTML = kats.map(k => `<option value="${esc(k)}">`).join(""); $("#prMitras").innerHTML = mitras.map(k => `<option value="${esc(k)}">`).join("");
+  const fm = $("#prFM").value, fk = $("#prFK").value;
+  $("#prFM").innerHTML = '<option value="">Semua mitra</option>' + mitras.map(m => `<option ${m === fm ? "selected" : ""}>${esc(m)}</option>`).join("");
+  $("#prFK").innerHTML = '<option value="">Semua jenis</option>' + kats.map(k => `<option ${k === fk ? "selected" : ""}>${esc(k)}</option>`).join("");
+  const q = $("#prQ").value.trim().toLowerCase(), vis = it.filter(x => (!fm || x.mitra === fm) && (!fk || x.kategori === fk) && (!q || (x.nama + " " + x.deskripsi).toLowerCase().includes(q)));
+  const grup = {}; vis.forEach(x => (grup[x.kategori] = grup[x.kategori] || []).push(x));
+  const SC = {tersedia: "g", terbatas: "y", preorder: "y", habis: "r"};
+  $("#prList").innerHTML = Object.keys(grup).sort().map(k => `<tr><td colspan="5" style="background:#F3F7FF;font-weight:800;color:#0A2A6B">${esc(k)} <span class="mu" style="font-weight:600;font-size:12px">${grup[k].length} barang</span></td></tr>` + grup[k].map(x => `<tr${x.aktif ? "" : ' style="opacity:.55"'}>
+    <td><div style="display:flex;gap:10px;align-items:center">${x.foto ? `<img src="/api/produk/${x.id}/foto?v=${x.v}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:8px">` : ""}<div><b>${esc(x.nama)}</b>${x.aktif ? "" : ' <span class="ch n">Disembunyikan</span>'}${x.deskripsi ? `<div class="mu" style="font-size:12.5px">${esc(x.deskripsi.slice(0, 90))}${x.deskripsi.length > 90 ? "…" : ""}</div>` : ""}</div></div></td>
+    <td>${esc(x.mitra)}</td><td><span class="ch ${SC[x.sedia]}">${esc(x.sedia_label)}</span></td><td class="rt"><b>${rp(x.harga)}</b> <span class="mu">/${esc(x.satuan)}</span></td>
+    <td>${d.edit ? `<button class="bt o" data-pre="${x.id}">Ubah</button> <button class="bt o" data-prd="${x.id}">Hapus</button>` : ""}</td></tr>`).join("")).join("")
+    || `<tr><td colspan="5" class="mu">${it.length ? "Tidak ada yang cocok." : "Belum ada produk." + (d.edit ? " Tambah lewat formulir di atas." : "")}</td></tr>`;
+  const one = id => it.find(x => x.id == id);
+  $$("[data-pre]").forEach(b => b.onclick = () => { const x = one(b.dataset.pre); $("#prForm").dataset.id = x.id; $("#prTitle").textContent = "Ubah " + x.nama;
+    $("#prNama").value = x.nama; $("#prHarga").value = x.harga; $("#prKat").value = x.kategori; $("#prMitra").value = x.mitra; $("#prSat").value = x.satuan; $("#prSedia").value = x.sedia; $("#prAktif").checked = x.aktif;
+    $("#prDesk").value = x.deskripsi; $("#prSpek").value = x.spesifikasi; $("#prFoto").value = ""; $("#prHfW").hidden = !x.foto; $("#prHf").checked = false; $("#prMsg").textContent = ""; $("#prForm").scrollIntoView({behavior: "smooth", block: "start"}); });
+  $$("[data-prd]").forEach(b => b.onclick = async () => { const x = one(b.dataset.prd); if (!confirm(`Hapus produk "${x.nama}"?`)) return; try { PRD = Object.assign(PRD, await api("/api/produk/" + x.id, {method: "DELETE"})); renderProduk(); } catch (e) { alert(e.message); } });
+}
+const TS = {menunggu_admin: ["y", "Menunggu admin"], dijawab_ai: ["g", "Dijawab AI"], dibalas: ["g", "Dibalas admin"], selesai: ["n", "Selesai"], proses: ["n", "Diproses"]};
+function renderTanya() {
+  const n = PRT.filter(x => x.status === "menunggu_admin").length;
+  $("#prTanyaI").textContent = n ? `${n} menunggu balasan` : "Semua sudah ditangani";
+  $("#prTanya").innerHTML = PRT.map(x => `<div style="border-top:1px solid var(--line);padding:12px 0">
+    <div class="bar" style="margin:0;justify-content:space-between"><span><b>${esc(x.nama || "Pembeli")}</b>${x.kontak ? ` · <span class="mu">${esc(x.kontak)}</span>` : ""}${x.produk ? ` · ${esc(x.produk)}` : ""}</span><span><span class="ch ${(TS[x.status] || TS.proses)[0]}">${(TS[x.status] || TS.proses)[1]}</span> <span class="mu" style="font-size:12px">${relW(x.dibuat)}</span></span></div>
+    <div style="margin-top:6px;background:#EEF3FC;border-radius:10px;padding:8px 11px">${esc(x.pesan)}</div>
+    ${x.jawaban_ai ? `<div class="mu" style="font-size:12.5px;margin-top:6px;white-space:pre-wrap">Jawaban otomatis: ${esc(x.jawaban_ai)}</div>` : ""}
+    ${x.balasan ? `<div style="margin-top:6px;background:#E3F8EC;border-radius:10px;padding:8px 11px;white-space:pre-wrap"><span class="mu" style="font-size:12px">Balasan ${esc(x.dibalas_oleh)}:</span> ${esc(x.balasan)}</div>` : ""}
+    ${x.status === "menunggu_admin" || x.status === "dijawab_ai" ? `<div class="bar" style="margin:8px 0 0"><input type="text" data-prbi="${x.id}" maxlength="2000" placeholder="Tulis balasan untuk pembeli (muncul di halaman katalog)…" style="flex:1;min-width:200px"><button class="bt g" data-prb="${x.id}">Kirim balasan</button>${x.status === "menunggu_admin" ? `<button class="bt o" data-prs="${x.id}">Tandai selesai</button>` : ""}</div>` : ""}</div>`).join("") || '<p class="mu">Belum ada pertanyaan dari pembeli.</p>';
+  $$("[data-prb]").forEach(b => b.onclick = async () => { const v = $(`[data-prbi="${b.dataset.prb}"]`).value.trim(); if (!v) return; b.disabled = true;
+    try { PRT = (await api("/api/produk/tanya/" + b.dataset.prb, {json: {balasan: v}})).items; renderTanya(); pesan("Balasan terkirim ke halaman pembeli"); inboxBadge(); } catch (e) { alert(e.message); b.disabled = false; } });
+  $$("[data-prs]").forEach(b => b.onclick = async () => { try { PRT = (await api("/api/produk/tanya/" + b.dataset.prs, {json: {selesai: true}})).items; renderTanya(); inboxBadge(); } catch (e) { alert(e.message); } });
+}
+async function loadProduk() {
+  const link = location.origin + "/produk"; $("#prLink").textContent = link; $("#prOpen").href = DEMO ? "#" : "/produk";
+  if (DEMO) { PRD = {items: [], sedia: {tersedia: "Tersedia"}, edit: false, jam: {buka: false}}; renderProduk(); return; }
+  try { PRD = await api("/api/produk"); renderProduk(); if (PRD.edit) { PRT = (await api("/api/produk/tanya")).items; renderTanya(); } } catch (e) { $("#prList").innerHTML = `<tr><td colspan="5" class="er">${esc(e.message)}</td></tr>`; }
+}
+$("#prCopy").onclick = async () => { try { await navigator.clipboard.writeText($("#prLink").textContent); pesan("Link katalog disalin"); } catch (e) { prompt("Salin link ini:", $("#prLink").textContent); } };
+$("#prFM").onchange = renderProduk; $("#prFK").onchange = renderProduk; $("#prQ").oninput = renderProduk; $("#prReset").onclick = prReset;
+$("#prSave").onclick = async () => {
+  const fd = new FormData(), id = $("#prForm").dataset.id, f = $("#prFoto").files[0];
+  if (id) fd.append("id", id);
+  [["nama", "#prNama"], ["harga", "#prHarga"], ["kategori", "#prKat"], ["mitra", "#prMitra"], ["satuan", "#prSat"], ["sedia", "#prSedia"], ["deskripsi", "#prDesk"], ["spesifikasi", "#prSpek"]].forEach(([k, q]) => fd.append(k, $(q).value));
+  fd.append("aktif", $("#prAktif").checked ? "1" : "0"); if ($("#prHf").checked) fd.append("hapus_foto", "1");
+  $("#prSave").disabled = true; $("#prMsg").textContent = "Menyimpan…";
+  try { if (f) fd.append("foto", (await resizeFoto(f, 900)).blob, "produk.jpg"); PRD = Object.assign(PRD || {}, await api("/api/produk", {method: "POST", body: fd})); renderProduk(); prReset(); $("#prMsg").textContent = "Tersimpan."; }
+  catch (e) { $("#prMsg").textContent = e.message; }
+  $("#prSave").disabled = false;
 };
 
 /* Perpustakaan: semua boleh baca dan mengunggah (ada jatah harian); ubah/hapus milik orang lain khusus Dev */
