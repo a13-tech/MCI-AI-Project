@@ -63,6 +63,7 @@ textarea{resize:vertical}
 .boss textarea::placeholder{color:#AFC2EA}
 .picks{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px}
 .picks label{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:99px;padding:5px 11px;font-size:12.5px;cursor:pointer}
+.cd .picks label{background:#F3F7FF;border-color:#BFD0F2;color:var(--ink)}
 .res{white-space:pre-wrap;background:rgba(255,255,255,.08);border-radius:12px;padding:14px;margin-top:10px}
 .op{background:rgba(255,255,255,.06);border-left:3px solid var(--gold);border-radius:10px;padding:10px 12px;margin-top:8px;white-space:pre-wrap}
 .rw{display:grid;grid-template-columns:120px 1fr auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid #E6EDFB}
@@ -219,13 +220,18 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
  <button class="nv" data-p="laporan">Laporan</button>
  <button class="nv" data-p="skills">Skills</button>
  <button class="nv" data-p="tim">Tim & Token</button>
+ <button class="nv" data-p="catatan">Catatan</button>
+ <button class="nv" data-p="polling">Voting</button>
+ <button class="nv" data-p="dokumentasi">Dokumentasi</button>
  <button class="nv" data-p="hutang">Hutang</button>
+ <button class="nv" data-p="blacklist">Blacklist</button>
+ <button class="nv" data-p="anggota">Anggota</button>
  <button class="nv" data-p="stok">Stok Barang</button>
  <button class="nv" data-p="tentang">Tentang Kami</button>
  <div class="cv"><b>Hemat token</b><br>Router lokal, skill, model Lite, cache, dan mode Caveman.</div>
  <div class="who"><span id="whoRole">Memuat…</span><a class="lo" id="logout" href="/logout">Keluar</a></div>
 </aside>
-<div class="adm" id="adm" hidden><form id="admF"><b>MASUK</b><p>Masukkan token admin atau token divisi (Bendahara, Designer, Anggota).</p>
+<div class="adm" id="adm" hidden><form id="admF"><b>MASUK</b><p>Masukkan token pribadi kamu (diawali nama depan) atau token admin.</p>
  <input type="password" id="admT" autocomplete="current-password" aria-label="Token akses" placeholder="Token akses">
  <div class="er" id="admE" role="alert"></div><div class="bar"><button type="button" class="bt o" id="admX">Batal</button><button class="bt g">Masuk</button></div></form></div>
 <div class="tst" id="tst" hidden></div>
@@ -399,6 +405,71 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
    </div>
   </div>
   <div id="lpList"></div>
+ </section>
+
+ <section id="p-anggota" class="pg" hidden>
+  <h1>Anggota</h1>
+  <p class="mu">Khusus Dev. Tiap anggota punya token pribadi (diawali nama depan). Hak akses mengikuti jabatan dan divisinya: maksimal 2 divisi dan 3 jabatan per orang. Ganti jabatan tidak perlu ganti token.</p>
+  <div class="cd" id="agForm"><b id="agTitle">Tambah anggota</b>
+   <div class="fl" style="margin-top:12px"><label class="full">Nama<input type="text" id="agNama" maxlength="60" placeholder="contoh: Budi Santoso"></label></div>
+   <div style="margin-top:10px"><b style="font-size:13px">Divisi</b> <span class="mu" style="font-size:12px">(maks 2)</span><div class="picks" id="agDiv" style="margin-top:6px"></div></div>
+   <div style="margin-top:10px"><b style="font-size:13px">Jabatan</b> <span class="mu" style="font-size:12px">(maks 3)</span><div class="picks" id="agJab" style="margin-top:6px"></div></div>
+   <div class="bar" style="margin:12px 0 0"><button class="bt g" id="agSave">Simpan</button><button class="bt o" id="agReset">Kosongkan</button><label class="mu" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="agAktif" checked>Aktif</label><span id="agMsg" class="mu"></span></div>
+  </div>
+  <div class="cd" style="padding:0"><div class="tb"><table><thead><tr><th>Nama</th><th>Divisi</th><th>Jabatan</th><th>Token pribadi</th><th></th></tr></thead><tbody id="agList"></tbody></table></div></div>
+ </section>
+
+ <section id="p-catatan" class="pg" hidden>
+  <h1>Catatan</h1>
+  <p class="mu">Catatan pribadi hanya bisa dibaca pemiliknya. Catatan bersama tampil untuk semua anggota; Sekretaris dan Dev bisa merapikan dan menyematkannya di atas.</p>
+  <div class="cd"><b id="ctTitle">Catatan baru</b>
+   <div class="fl" style="margin-top:12px"><label class="full">Judul<input type="text" id="ctJudul" maxlength="120"></label><label class="full">Isi<textarea id="ctIsi" rows="4"></textarea></label></div>
+   <div class="bar" style="margin:12px 0 0"><button class="bt g" id="ctSave">Simpan</button><button class="bt o" id="ctReset">Kosongkan</button>
+    <label class="mu" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="ctBersama">Bagikan ke semua anggota</label>
+    <label class="mu" id="ctSemW" hidden style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="ctSem">Sematkan</label><span id="ctMsg" class="mu"></span></div>
+  </div>
+  <div class="tm" id="ctList"></div>
+ </section>
+
+ <section id="p-polling" class="pg" hidden>
+  <h1>Voting</h1>
+  <p class="mu">Pemilihan divisi, manager, dan lainnya. 1 anggota = 1 suara dan suaranya rahasia. Hasil tampil setelah polling ditutup; pemenangnya ditetapkan Dev di halaman Anggota.</p>
+  <div class="cd" id="plForm" hidden><b>Buat polling</b>
+   <div class="fl" style="margin-top:12px">
+    <label class="full">Judul<input type="text" id="plJudul" maxlength="150" placeholder="contoh: Pemilihan Manager 2027"></label>
+    <label class="full">Keterangan<input type="text" id="plDesk" maxlength="500"></label>
+    <label class="full">Pilihan (satu per baris, 2–12)<textarea id="plOpsi" rows="4" placeholder="Agha&#10;Raihan"></textarea></label>
+    <label>Untuk<select id="plDiv"></select></label>
+    <label>Batas waktu (opsional)<input type="datetime-local" id="plBatas"></label>
+   </div>
+   <div class="bar" style="margin:12px 0 0"><button class="bt g" id="plSave">Mulai polling</button><span id="plMsg" class="mu"></span></div>
+  </div>
+  <div id="plList"></div>
+ </section>
+
+ <section id="p-dokumentasi" class="pg" hidden>
+  <h1>Dokumentasi</h1>
+  <p class="mu">Album foto kegiatan MCI. Tim Dokumentasi mengunggah dan merapikan; semua anggota bisa melihat dan mengunduh. Tim Dokumentasi juga dapat jatah Studio Gambar 5x/hari untuk poster dan konten.</p>
+  <div class="cd" id="dkForm" hidden><b>Unggah foto kegiatan</b>
+   <div class="fl" style="margin-top:12px">
+    <label>Judul kegiatan<input type="text" id="dkJudul" maxlength="120" placeholder="contoh: Uji kapal di danau"></label>
+    <label>Tanggal<input type="date" id="dkTgl"></label>
+    <label class="full">Keterangan<input type="text" id="dkKet" maxlength="500"></label>
+    <label class="full">Foto (bisa pilih banyak)<input type="file" id="dkFoto" accept="image/*" multiple></label>
+   </div>
+   <div class="bar" style="margin:12px 0 0"><button class="bt g" id="dkSave">Unggah</button><span id="dkMsg" class="mu"></span></div>
+  </div>
+  <div class="cd"><div class="gal" id="dkList"></div></div>
+ </section>
+
+ <section id="p-blacklist" class="pg" hidden>
+  <h1>Blacklist</h1>
+  <p class="mu">Khusus tim Secret Service. Daftar orang yang diblokir dari kegiatan MCI. Catat seperlunya: nama, alasan singkat, dan keterangan.</p>
+  <div class="cd"><b>Tambah ke blacklist</b>
+   <div class="fl" style="margin-top:12px"><label>Nama<input type="text" id="blNama" maxlength="80"></label><label>Alasan<input type="text" id="blAlasan" maxlength="200"></label><label class="full">Keterangan<input type="text" id="blKet" maxlength="500"></label></div>
+   <div class="bar" style="margin:12px 0 0"><button class="bt g" id="blSave">Tambahkan</button><span id="blMsg" class="mu"></span></div>
+  </div>
+  <div class="cd" style="padding:0"><div class="tb"><table><thead><tr><th>Nama</th><th>Alasan</th><th>Keterangan</th><th>Dicatat</th><th></th></tr></thead><tbody id="blList"></tbody></table></div></div>
  </section>
 
  <section id="p-hutang" class="pg" hidden>
@@ -706,12 +777,12 @@ async function api(u, o = {}) {
 let IOTD = [];
 const ADM = () => ME.role === "admin";
 const can = p => { if (ME.role === "admin") return true; const z = ME.izin || []; return z.includes("*") || z.includes(p); };
-const PAGE_PERM = {hutang: "hutang", stok: "stok", cmd: "boss", kas: "kas", gambar: "gambar_lihat", memori: "memori", iot: "iot", laporan: "laporan", skills: "skills", tim: "tim"};
+const PAGE_PERM = {anggota: "anggota_kelola", catatan: "catatan", polling: "polling", dokumentasi: "dok_lihat", blacklist: "blacklist", hutang: "hutang", stok: "stok", cmd: "boss", kas: "kas", gambar: "gambar_lihat", memori: "memori", iot: "iot", laporan: "laporan_lihat", skills: "skills", tim: "tim"};
 function kuotaTxt(j) { return j ? `${j.pakai} dari ${j.batas} hari ini` : ""; }
 async function refreshMe() { try { const m = await api("/api/me"); ME = Object.assign(ME, m); renderKuota(); } catch (e) {} }
 function renderKuota() {
   const k = ME.kuota || {};
-  $("#bq").textContent = k.boss ? `Jatah Boss divisi ${ME.nama_peran}: ${kuotaTxt(k.boss)} (reset 00.00 WIB)` : "";
+  $("#bq").textContent = k.boss ? `Jatah Boss kamu: ${kuotaTxt(k.boss)} (reset 00.00 WIB)` : "";
   $("#bq").hidden = !k.boss;
 }
 let ME = {}, DATA = [], LOG = [], KAS = null, PV = [], USE = null, MODE = "boss", SKL = {skills: [], bots: []};
@@ -729,6 +800,11 @@ function show(p) {
   if (p === "laporan") loadLaporan();
   if (p === "stok") loadStok();
   if (p === "hutang") loadHutang();
+  if (p === "anggota") loadAnggota();
+  if (p === "catatan") loadCatatan();
+  if (p === "blacklist") loadBlacklist();
+  if (p === "polling") loadPolling();
+  if (p === "dokumentasi") loadDok();
   clearInterval(iotTimer); if (p === "iot") { loadIot(true); iotTimer = setInterval(() => { if (!document.hidden) loadIot(); }, 3000); }
 }
 $$(".nv").forEach(b => b.onclick = () => show(b.dataset.p));
@@ -771,12 +847,13 @@ async function loadTg() {
   const el = $("#tgu"); if (!ADM() || DEMO) return; el.hidden = false;
   try {
     const d = await api("/api/tg");
-    const peran = {bendahara: "Bendahara", designer: "Designer", anggota: "Anggota"};
-    const row = (id, x, wait) => `<tr><td>${esc(x.nama)}${x.user ? ` <span class="mu">@${esc(x.user)}</span>` : ""}<div class="mu" style="font-size:12px">ID ${esc(id)} · ${esc(wait ? x.waktu : "sejak " + x.sejak)}</div></td><td>${wait ? '<span class="ch y">Menunggu</span>' : `<span class="ch">${esc(peran[x.peran] || x.peran)}</span>`}</td>
-      <td class="rt">${wait ? Object.keys(peran).map(p => `<button class="bt o" data-tgid="${esc(id)}" data-tgp="${p}" style="padding:5px 10px;min-height:34px">${peran[p]}</button>`).join(" ") + ` <button class="bt o" data-tgid="${esc(id)}" data-tgp="tolak" style="padding:5px 10px;min-height:34px">Tolak</button>` : `<button class="bt o" data-tgid="${esc(id)}" data-tgp="cabut" style="padding:5px 10px;min-height:34px">Cabut</button>`}</td></tr>`;
+    const pilih = id => `<select data-tgsel="${esc(id)}" style="width:auto;min-width:140px"><option value="">Pilih anggota…</option>${d.anggota.map(a => `<option value="m${a.id}">${esc(a.nama)}</option>`).join("")}</select> <button class="bt o" data-tgok="${esc(id)}" style="padding:5px 10px;min-height:34px">Setujui</button>`;
+    const row = (id, x, wait) => `<tr><td>${esc(x.nama)}${x.user ? ` <span class="mu">@${esc(x.user)}</span>` : ""}<div class="mu" style="font-size:12px">ID ${esc(id)} · ${esc(wait ? x.waktu : "sejak " + x.sejak)}</div></td><td>${wait ? '<span class="ch y">Menunggu</span>' : `<span class="ch">${esc(x.nama_anggota || "?")}</span>`}</td>
+      <td class="rt">${wait ? pilih(id) + ` <button class="bt o" data-tgid="${esc(id)}" data-tgp="tolak" style="padding:5px 10px;min-height:34px">Tolak</button>` : `<button class="bt o" data-tgid="${esc(id)}" data-tgp="cabut" style="padding:5px 10px;min-height:34px">Cabut</button>`}</td></tr>`;
     const rows = Object.entries(d.menunggu).map(([i, x]) => row(i, x, true)).concat(Object.entries(d.users).map(([i, x]) => row(i, x, false))).join("");
     el.innerHTML = `<b>Izin Telegram (!izin)</b><div class="mu" style="margin:4px 0 10px;font-size:12.5px">Orang baru kirim <code>!izin</code> ke bot mana saja → notif ke admin Telegram${d.email ? " + email" : " (email belum aktif: isi MAIL_WEBHOOK)"}. Admin (${d.admin} ID) diatur lewat ALLOWED_USER_IDS.</div>
-      <div class="tb"><table><thead><tr><th>Nama</th><th>Divisi</th><th class="rt">Aksi</th></tr></thead><tbody>${rows || '<tr><td colspan="3" class="mu">Belum ada.</td></tr>'}</tbody></table></div>`;
+      <div class="tb"><table><thead><tr><th>Akun Telegram</th><th>Anggota</th><th class="rt">Aksi</th></tr></thead><tbody>${rows || '<tr><td colspan="3" class="mu">Belum ada.</td></tr>'}</tbody></table></div>`;
+    $$("[data-tgok]").forEach(b => b.onclick = async () => { const v = $(`[data-tgsel="${b.dataset.tgok}"]`).value; if (!v) return alert("Pilih anggotanya dulu"); await api("/api/tg", {json: {id: b.dataset.tgok, peran: v}}); loadTg(); });
     $$("[data-tgid]").forEach(b => b.onclick = async () => { if (["cabut", "tolak"].includes(b.dataset.tgp) && !confirm("Yakin?")) return; await api("/api/tg", {json: {id: b.dataset.tgid, peran: b.dataset.tgp}}); loadTg(); });
   } catch (e) { el.innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
 }
@@ -856,7 +933,7 @@ async function loadLaporan() {
     $("#lpOn").checked = d.aktif;
     $("#lpInfo").textContent = (d.penerima ? `Dikirim Apex ke ${d.penerima} akun Telegram (ALLOWED_USER_IDS).` : "Isi ALLOWED_USER_IDS di Render supaya laporan bisa dikirim ke Telegram.") + (d.terakhir ? ` Terakhir otomatis: ${d.terakhir}.` : "");
     $("#lpList").innerHTML = d.items.map((r, i) => `<details class="cd"${i ? "" : " open"}><summary><span><b>Minggu ${esc(r.minggu)}</b> <span class="mu" style="font-size:12.5px">· ${esc(r.dari)} s/d ${esc(r.sampai)} · dibuat ${esc(String(r.dibuat).slice(0, 16).replace("T", " "))}</span> <span class="ch ${r.sumber === "otomatis" ? "g" : "n"}">${r.sumber === "otomatis" ? "Otomatis" : "Manual"}</span></span></summary>
-      <div class="lp">${esc(r.isi)}</div><div class="bar" style="margin:12px 0 0"><button class="bt o" style="min-height:34px;padding:6px 12px;font-size:12px" data-lc="${r.id}">Salin</button><button class="bt o" style="min-height:34px;padding:6px 12px;font-size:12px" data-ld="${r.id}">Hapus</button></div></details>`).join("") ||
+      <div class="lp">${esc(r.isi)}</div><div class="bar" style="margin:12px 0 0"><button class="bt o" style="min-height:34px;padding:6px 12px;font-size:12px" data-lc="${r.id}">Salin</button>${ADM() ? `<button class="bt o" style="min-height:34px;padding:6px 12px;font-size:12px" data-ld="${r.id}">Hapus</button>` : ""}</div></details>`).join("") ||
       '<div class="cd mu">Belum ada laporan. Tekan "Buat laporan sekarang" untuk mencoba.</div>';
     $$("[data-lc]").forEach(b => b.onclick = () => copyTo(d.items.find(r => r.id == b.dataset.lc).isi, b));
     $$("[data-ld]").forEach(b => b.onclick = async () => { if (confirm("Hapus laporan ini?")) { await api("/api/laporan/" + b.dataset.ld, {method: "DELETE"}); loadLaporan(); } });
@@ -898,7 +975,7 @@ $("#lpBuat").onclick = async () => {
     if (DEMO) { $("#admE").textContent = "(DEMO) Di server asli, token yang benar langsung membuka mode admin/divisi."; return; }
     try { const r = await fetch("/api/masuk", {method: "POST", headers: {"X-MCI": "1", "Content-Type": "application/json"}, body: JSON.stringify({token: t})});
       const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || "Gagal masuk");
-      $("#admE").textContent = ""; toast("Masuk sebagai " + ({admin: "Admin", bendahara: "Bendahara", designer: "Designer", anggota: "Anggota"}[d.role] || d.role)); setTimeout(() => location.replace("/"), 400);
+      $("#admE").textContent = ""; toast("Masuk sebagai " + (d.nama || d.role)); setTimeout(() => location.replace("/"), 400);
     } catch (er) { $("#admE").textContent = er.message; }
   };
 })();
@@ -1032,6 +1109,116 @@ $("#te").onclick = () => {
   };
 };
 
+/* Anggota (khusus Dev) */
+let AGD = null;
+function agForm(m) {
+  m = m || {divisi: [], jabatan: ["anggota"], aktif: true};
+  $("#agForm").dataset.id = m.id || ""; $("#agTitle").textContent = m.id ? "Ubah " + m.nama : "Tambah anggota"; $("#agNama").value = m.nama || ""; $("#agAktif").checked = m.aktif !== false;
+  $("#agDiv").innerHTML = Object.entries(AGD.divisi).map(([k, v]) => `<label><input type="checkbox" value="${k}" ${m.divisi.includes(k) ? "checked" : ""}>${esc(v)}</label>`).join("");
+  $("#agJab").innerHTML = Object.entries(AGD.jabatan).map(([k, v]) => `<label><input type="checkbox" value="${k}" ${m.jabatan.includes(k) ? "checked" : ""}>${esc(v)}</label>`).join("");
+  const lim = (sel, n) => { const on = $$(sel + " input:checked").length; $$(sel + " input").forEach(x => { x.disabled = !x.checked && on >= n; x.parentElement.style.opacity = x.disabled ? .45 : 1; }); };
+  $$("#agDiv input").forEach(x => x.onchange = () => lim("#agDiv", 2)); $$("#agJab input").forEach(x => x.onchange = () => lim("#agJab", 3)); lim("#agDiv", 2); lim("#agJab", 3);
+}
+function renderAnggota() {
+  const tg = m => m.telegram.length ? ' <span class="ch g">Telegram</span>' : "";
+  $("#agList").innerHTML = AGD.items.map(m => `<tr style="${m.aktif ? "" : "opacity:.5"}"><td><b>${esc(m.nama)}</b>${tg(m)}${m.aktif ? "" : ' <span class="ch r">Nonaktif</span>'}</td><td>${m.divisi.map(d => `<span class="ch">${esc(AGD.divisi[d])}</span>`).join(" ") || "-"}</td><td>${m.jabatan.map(j => `<span class="ch y">${esc(AGD.jabatan[j])}</span>`).join(" ")}</td>
+    <td><code class="tk" data-tk="${m.id}">••••••••</code> <button class="bt o" data-tks="${m.id}" style="padding:4px 9px;min-height:30px;font-size:12px">Lihat</button> <button class="bt o" data-tkc="${m.id}" style="padding:4px 9px;min-height:30px;font-size:12px">Salin</button> <button class="bt o" data-tkr="${m.id}" style="padding:4px 9px;min-height:30px;font-size:12px">Buat ulang</button></td>
+    <td class="rt" style="white-space:nowrap"><button class="bt o" data-age="${m.id}" style="padding:5px 10px;min-height:34px">Ubah</button> <button class="bt o" data-agd="${m.id}" style="padding:5px 10px;min-height:34px">Hapus</button></td></tr>`).join("") || '<tr><td colspan="5" class="mu">Belum ada anggota.</td></tr>';
+  const one = id => AGD.items.find(m => m.id == id);
+  $$("[data-tks]").forEach(b => b.onclick = () => { const c = $(`[data-tk="${b.dataset.tks}"]`); const show = c.textContent.startsWith("•"); c.textContent = show ? one(b.dataset.tks).token : "••••••••"; b.textContent = show ? "Sembunyikan" : "Lihat"; });
+  $$("[data-tkc]").forEach(b => b.onclick = () => copyTo(one(b.dataset.tkc).token, b));
+  $$("[data-tkr]").forEach(b => b.onclick = async () => { if (!confirm("Buat token baru untuk " + one(b.dataset.tkr).nama + "? Token lama langsung tidak berlaku.")) return; AGD = Object.assign(AGD, await api(`/api/anggota/${b.dataset.tkr}/token`, {method: "POST"})); renderAnggota(); });
+  $$("[data-age]").forEach(b => b.onclick = () => { agForm(one(b.dataset.age)); scrollTo({top: 0, behavior: "smooth"}); });
+  $$("[data-agd]").forEach(b => b.onclick = async () => { if (!confirm("Hapus " + one(b.dataset.agd).nama + " dari daftar anggota? Tokennya langsung tidak berlaku.")) return; AGD = Object.assign(AGD, await api("/api/anggota/" + b.dataset.agd, {method: "DELETE"})); renderAnggota(); });
+}
+async function loadAnggota() {
+  if (!ADM()) return;
+  try { AGD = await api("/api/anggota"); agForm(); renderAnggota(); } catch (e) { $("#agList").innerHTML = '<tr><td colspan="5" class="er">' + esc(e.message) + "</td></tr>"; }
+}
+$("#agReset").onclick = () => agForm();
+$("#agSave").onclick = async () => {
+  const body = {id: $("#agForm").dataset.id || null, nama: $("#agNama").value, aktif: $("#agAktif").checked, divisi: $$("#agDiv input:checked").map(x => x.value), jabatan: $$("#agJab input:checked").map(x => x.value)};
+  try { AGD = Object.assign(AGD, await api("/api/anggota", {json: body})); renderAnggota(); agForm(); $("#agMsg").textContent = "Tersimpan."; } catch (e) { $("#agMsg").textContent = e.message; }
+};
+
+/* Catatan (pribadi + bersama) */
+let CTD = null;
+function ctForm(x) { x = x || {}; $("#ctTitle").textContent = x.id ? "Ubah catatan" : "Catatan baru"; $("#ctJudul").value = x.judul || ""; $("#ctIsi").value = x.isi || ""; $("#ctBersama").checked = !!x.bersama; $("#ctSem").checked = !!x.sematkan; $("#ctJudul").dataset.id = x.id || ""; $("#ctMsg").textContent = ""; }
+function renderCatatan() {
+  $("#ctSemW").hidden = !CTD.kelola;
+  $("#ctList").innerHTML = CTD.items.map(x => `<div class="cd" style="margin:0">${x.sematkan ? '<span class="ch y">📌 Disematkan</span> ' : ""}<span class="ch ${x.bersama ? "g" : "n"}">${x.bersama ? "Bersama" : "Pribadi"}</span><div style="margin:8px 0 4px"><b>${esc(x.judul || "(tanpa judul)")}</b></div><div style="white-space:pre-wrap;font-size:13.5px">${esc(x.isi)}</div>
+    <div class="mu" style="font-size:12px;margin-top:8px">${esc(x.pemilik)} · ${esc(String(x.diubah || x.dibuat).slice(0, 16).replace("T", " "))}</div>${x.bisa_ubah ? `<div class="bar" style="margin:10px 0 0"><button class="bt o" data-cte="${x.id}" style="padding:5px 10px;min-height:34px">Ubah</button><button class="bt o" data-ctd="${x.id}" style="padding:5px 10px;min-height:34px">Hapus</button></div>` : ""}</div>`).join("") || '<p class="mu">Belum ada catatan.</p>';
+  $$("[data-cte]").forEach(b => b.onclick = () => { ctForm(CTD.items.find(x => x.id == b.dataset.cte)); scrollTo({top: 0, behavior: "smooth"}); });
+  $$("[data-ctd]").forEach(b => b.onclick = async () => { if (!confirm("Hapus catatan ini?")) return; try { CTD = await api("/api/catatan/" + b.dataset.ctd, {method: "DELETE"}); renderCatatan(); } catch (e) { alert(e.message); } });
+}
+async function loadCatatan() { try { CTD = await api("/api/catatan"); renderCatatan(); } catch (e) { $("#ctList").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; } }
+$("#ctReset").onclick = () => ctForm();
+$("#ctSave").onclick = async () => {
+  try { CTD = await api("/api/catatan", {json: {id: $("#ctJudul").dataset.id || null, judul: $("#ctJudul").value, isi: $("#ctIsi").value, bersama: $("#ctBersama").checked, sematkan: $("#ctSem").checked}}); renderCatatan(); ctForm(); $("#ctMsg").textContent = "Tersimpan."; }
+  catch (e) { $("#ctMsg").textContent = e.message; }
+};
+
+/* Voting / polling */
+let PLD = null;
+function renderPolling() {
+  $("#plForm").hidden = !PLD.bisa_buat;
+  if (PLD.bisa_buat && !$("#plDiv").options.length) {
+    const own = ME.anggota ? ME.anggota.divisi_key : [], all = ADM() || (ME.anggota && ME.anggota.jabatan.includes("Manager"));
+    $("#plDiv").innerHTML = (all ? '<option value="">Semua anggota</option>' : "") + Object.entries(ME.daftar_divisi || {}).filter(([k]) => all || own.includes(k)).map(([k, v]) => `<option value="${k}">Divisi ${esc(v)}</option>`).join("");
+  }
+  $("#plList").innerHTML = PLD.items.map(p => {
+    const tot = (p.hasil || []).reduce((a, b) => a + b, 0), max = Math.max(0, ...(p.hasil || [0]));
+    const opsi = p.opsi.map((o, k) => p.tutup ? `<div style="margin:6px 0"><div class="bar" style="margin:0;justify-content:space-between"><span>${p.hasil[k] === max && max ? "🏆 " : ""}${esc(o)}${p.pilihan_saya === k ? ' <span class="ch g">pilihanmu</span>' : ""}</span><b>${p.hasil[k]} suara</b></div><div style="height:8px;border-radius:6px;background:#E3EBFA;overflow:hidden"><div style="height:100%;width:${tot ? p.hasil[k] / tot * 100 : 0}%;background:#D4AF5A"></div></div></div>`
+      : `<button class="bt ${p.pilihan_saya === k ? "g" : "o"}" data-plv="${p.id}" data-k="${k}" ${p.pilihan_saya != null ? "disabled" : ""} style="margin:4px 6px 0 0">${esc(o)}${p.pilihan_saya === k ? " ✓" : ""}</button>`).join("");
+    return `<div class="cd"><div class="bar" style="margin:0;justify-content:space-between"><b>${esc(p.judul)}</b><span class="ch ${p.tutup ? "n" : "g"}">${p.tutup ? "Ditutup" : "Berlangsung"}</span></div>
+      <div class="mu" style="font-size:12.5px;margin:4px 0 8px">${esc(p.divisi_nama)} · dibuat ${esc(p.pembuat)} · ${p.pemilih} suara masuk${p.batas ? " · batas " + esc(p.batas.replace("T", " ")) : ""}</div>${p.deskripsi ? `<p style="margin:0 0 8px">${esc(p.deskripsi)}</p>` : ""}
+      ${opsi}${!p.tutup && p.pilihan_saya != null ? '<div class="mu" style="font-size:12.5px;margin-top:8px">Suaramu sudah masuk. Hasil tampil setelah polling ditutup.</div>' : ""}
+      <div class="bar" style="margin:10px 0 0">${p.bisa_tutup ? `<button class="bt o" data-plt="${p.id}" style="padding:5px 10px;min-height:34px">Tutup & tampilkan hasil</button>` : ""}${ADM() ? `<button class="bt o" data-pld="${p.id}" style="padding:5px 10px;min-height:34px">Hapus</button>` : ""}</div></div>`;
+  }).join("") || '<div class="cd mu">Belum ada polling.</div>';
+  $$("[data-plv]").forEach(b => b.onclick = async () => { const p = PLD.items.find(x => x.id == b.dataset.plv); if (!confirm(`Pilih "${p.opsi[+b.dataset.k]}"? Suara tidak bisa diubah.`)) return; try { PLD = await api(`/api/polling/${p.id}/pilih`, {json: {pilihan: +b.dataset.k}}); renderPolling(); } catch (e) { alert(e.message); } });
+  $$("[data-plt]").forEach(b => b.onclick = async () => { if (!confirm("Tutup polling dan tampilkan hasil?")) return; PLD = await api("/api/polling/" + b.dataset.plt, {method: "POST"}); renderPolling(); });
+  $$("[data-pld]").forEach(b => b.onclick = async () => { if (!confirm("Hapus polling beserta semua suaranya?")) return; PLD = await api("/api/polling/" + b.dataset.pld, {method: "DELETE"}); renderPolling(); });
+}
+async function loadPolling() { try { PLD = await api("/api/polling"); renderPolling(); } catch (e) { $("#plList").innerHTML = '<div class="cd er">' + esc(e.message) + "</div>"; } }
+$("#plSave").onclick = async () => {
+  try { PLD = await api("/api/polling", {json: {judul: $("#plJudul").value, deskripsi: $("#plDesk").value, opsi: $("#plOpsi").value.split("\n"), divisi: $("#plDiv").value || null, batas: $("#plBatas").value || null}});
+    renderPolling(); ["#plJudul", "#plDesk", "#plOpsi", "#plBatas"].forEach(q => $(q).value = ""); $("#plMsg").textContent = "Polling dimulai."; } catch (e) { $("#plMsg").textContent = e.message; }
+};
+
+/* Dokumentasi: album foto kegiatan */
+let DKD = null;
+const dkImg = id => "/api/dokumentasi/" + id;
+function renderDok() {
+  $("#dkForm").hidden = !DKD.kelola;
+  $("#dkList").innerHTML = DKD.items.map(x => `<figure><img src="${dkImg(x.id)}" alt="${esc(x.judul)}" loading="lazy" data-dkz="${x.id}"><figcaption title="${esc(x.keterangan)}"><b>${esc(x.judul)}</b> · ${esc(x.tanggal)}${x.keterangan ? "<br>" + esc(x.keterangan) : ""}</figcaption>
+    <div class="bar"><a class="bt o" href="${dkImg(x.id)}?unduh=1" download>Unduh</a>${DKD.kelola ? `<button class="bt o" data-dkd="${x.id}">Hapus</button>` : ""}</div></figure>`).join("") || '<div class="mu">Belum ada foto kegiatan.</div>';
+  $$("[data-dkz]").forEach(i => i.onclick = () => window.open(i.src, "_blank"));
+  $$("[data-dkd]").forEach(b => b.onclick = async () => { if (!confirm("Hapus foto ini?")) return; DKD = await api("/api/dokumentasi/" + b.dataset.dkd, {method: "DELETE"}); renderDok(); });
+}
+async function loadDok() { if (!$("#dkTgl").value) $("#dkTgl").value = new Date().toISOString().slice(0, 10); try { DKD = await api("/api/dokumentasi"); renderDok(); } catch (e) { $("#dkList").innerHTML = '<div class="er">' + esc(e.message) + "</div>"; } }
+$("#dkSave").onclick = async () => {
+  const fs = [...$("#dkFoto").files]; if (!fs.length) { $("#dkMsg").textContent = "Pilih foto dulu."; return; }
+  $("#dkSave").disabled = true;
+  for (let i = 0; i < fs.length; i++) {
+    $("#dkMsg").textContent = `Mengunggah ${i + 1} dari ${fs.length}…`;
+    try { const r = await resizeFoto(fs[i], 1600); const fd = new FormData(); fd.append("foto", r.blob, "foto.jpg"); fd.append("judul", $("#dkJudul").value); fd.append("tanggal", $("#dkTgl").value); fd.append("keterangan", $("#dkKet").value);
+      DKD = await api("/api/dokumentasi", {method: "POST", body: fd}); } catch (e) { $("#dkMsg").textContent = e.message; break; }
+  }
+  renderDok(); $("#dkFoto").value = ""; $("#dkSave").disabled = false; if ($("#dkMsg").textContent.startsWith("Mengunggah")) $("#dkMsg").textContent = "Selesai.";
+};
+
+/* Blacklist (khusus Secret Service + Dev) */
+async function loadBlacklist(d) {
+  try { d = d || await api("/api/blacklist");
+    $("#blList").innerHTML = d.items.map(x => `<tr><td><b>${esc(x.nama)}</b></td><td>${esc(x.alasan)}</td><td>${esc(x.keterangan)}</td><td class="mu" style="font-size:12px">${esc(x.tanggal)} · ${esc(x.oleh)}</td><td class="rt"><button class="bt o" data-bld="${x.id}" style="padding:5px 10px;min-height:34px">Hapus</button></td></tr>`).join("") || '<tr><td colspan="5" class="mu">Belum ada.</td></tr>';
+    $$("[data-bld]").forEach(b => b.onclick = async () => { if (confirm("Hapus dari blacklist?")) loadBlacklist(await api("/api/blacklist/" + b.dataset.bld, {method: "DELETE"})); });
+  } catch (e) { $("#blList").innerHTML = '<tr><td colspan="5" class="er">' + esc(e.message) + "</td></tr>"; }
+}
+$("#blSave").onclick = async () => {
+  try { loadBlacklist(await api("/api/blacklist", {json: {nama: $("#blNama").value, alasan: $("#blAlasan").value, keterangan: $("#blKet").value}})); ["#blNama", "#blAlasan", "#blKet"].forEach(q => $(q).value = ""); $("#blMsg").textContent = "Ditambahkan."; }
+  catch (e) { $("#blMsg").textContent = e.message; }
+};
+
 /* Hutang anggota (khusus Bendahara + admin) */
 let HB = null;
 function renderHutang() {
@@ -1118,7 +1305,7 @@ let GFOTO = null;   // {blob, w, h} hasil resize di browser
 function gQuota(d) {
   if (!d) return;
   $("#gmOff").hidden = !!d.aktif;
-  $("#gq").textContent = d.kuota ? `Jatah divisi Designer: ${kuotaTxt(d.kuota)}` : d.batas ? `${d.hari_ini} dari ${d.batas} gambar hari ini` : `${d.hari_ini} gambar hari ini`;
+  $("#gq").textContent = d.kuota ? `Jatah gambar kamu: ${kuotaTxt(d.kuota)}` : d.batas ? `${d.hari_ini} dari ${d.batas} gambar hari ini` : `${d.hari_ini} gambar hari ini`;
 }
 function gImg(id) { return DEMO ? MOCK_IMG(id) : "/api/gambar/" + id; }
 async function loadGambar() {
@@ -2895,10 +3082,11 @@ const OFFICE = (() => {
   if (DEMO) { $("#demoBanner").hidden = false; $("#csv").removeAttribute("href"); $("#csv").onclick = e => { e.preventDefault(); alert("Ekspor CSV aktif di versi server."); }; }
   try { ME = await api("/api/me"); if (ME.lantai) LANTAI = ME.lantai; } catch (e) { return; }
   $$(".nv").forEach(b => { const p = PAGE_PERM[b.dataset.p]; if (p && !can(p)) b.style.display = "none"; });
-  const NP = ME.nama_peran || "Viewer";
+  const NP = ME.anggota ? ME.anggota.nama + " · " + ME.anggota.jabatan.join(", ") : (ME.nama_peran || "Viewer");
   $("#whoRole").innerHTML = ADM() ? `<span class="wl">Masuk sebagai</span><span class="wh">Masuk sebagai</span> <b>Admin</b>`
     : `<span class="wl">Masuk sebagai</span><span class="wh">⚡ Hemat token</span> <b>${esc(NP)}</b>`;
   if (ME.role === "viewer") $("#logout").style.display = "none";   // viewer tidak perlu tombol keluar
+  if (!ADM()) { const lb = $("#lpBuat"); if (lb) lb.closest(".cd").hidden = true; }   // Manager/Sekretaris cuma lihat laporan
   if (!ADM()) { const dw = $('[data-mode="dewan"]'); if (dw) dw.remove(); }   // Sidang Dewan khusus admin/dev
   if (!can("kas_edit")) { $("#kCatat").hidden = true; }
   if (!can("gambar_buat")) { $("#gBuat").hidden = true; }

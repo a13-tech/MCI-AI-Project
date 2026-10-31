@@ -46,20 +46,23 @@ MAX_TASKS = max(1, min(4, int(os.getenv("BOSS_MAX_TASKS", "3"))))
 COUNCIL_MAX = max(2, min(6, int(os.getenv("COUNCIL_MAX", "4"))))
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 VIEW_TOKEN = os.getenv("VIEW_TOKEN", "")
-# Token divisi: tiap divisi satu token, kuota harian dihitung per divisi (web + Telegram digabung)
-ROLE_TOKENS = {"bendahara": os.getenv("BENDAHARA_TOKEN", "").strip(), "designer": os.getenv("DESIGNER_TOKEN", "").strip(),
-               "anggota": os.getenv("ANGGOTA_TOKEN", "").strip()}
-DIVISI = ("bendahara", "designer", "anggota")
-NAMA_PERAN = {"admin": "Admin", "bendahara": "Bendahara", "designer": "Designer", "anggota": "Anggota", "viewer": "Viewer"}
-# Hak akses: admin = semua. "kas" = lihat buku kas, "kas_edit" = catat/hapus, "gambar_buat" = Studio Gambar,
-# "gambar_lihat" = galeri, "tim" = halaman Tim & Token (lihat saja). Sidang Dewan, Lab IoT, Laporan, Tentang Kami (edit) = admin.
-PERM = {
+# Anggota: tiap orang punya token pribadi (diawali nama depan). Hak akses = gabungan jabatan + divisi.
+# Maks 2 divisi dan 3 jabatan per orang. Dev mengatur lewat web → Anggota.
+DIVISI = {"management": "Management", "creative": "Creative Project", "ss": "Secret Service", "dokumentasi": "Dokumentasi"}
+JABATAN = {"admin": "Admin/Dev", "manager": "Manager", "pj": "PJ Divisi", "sekretaris": "Sekretaris", "bendahara": "Bendahara",
+           "designer": "Designer", "anggota": "Anggota biasa"}
+_BASE = {"boss", "kas", "gambar_lihat", "memori", "skills", "tim", "stok", "catatan", "polling", "dok_lihat"}
+JABATAN_PERM = {
     "admin": {"*"},
-    "bendahara": {"boss", "kas", "kas_edit", "gambar_lihat", "memori", "skills", "tim", "stok", "hutang"},
-    "designer": {"boss", "kas", "gambar_lihat", "gambar_buat", "memori", "skills", "tim", "stok"},
-    "anggota": {"boss", "kas", "gambar_lihat", "memori", "skills", "tim", "stok"},
-    "viewer": set(),
+    "manager": _BASE | {"laporan_lihat", "polling_buat"},
+    "pj": _BASE | {"polling_buat"},
+    "sekretaris": _BASE | {"catatan_kelola", "laporan_lihat"},
+    "bendahara": _BASE | {"kas_edit", "hutang"},
+    "designer": _BASE | {"gambar_buat"},
+    "anggota": set(_BASE),
 }
+DIVISI_PERM = {"ss": {"blacklist"}, "dokumentasi": {"dok_kelola", "gambar_buat"}}
+MEMBERS = {}   # id -> {id, nama, token, divisi[], jabatan[], aktif}
 HUTANG_MAX = max(0, int(os.getenv("HUTANG_MAX", "15000")))      # batas pinjaman per anggota per bulan
 HUTANG_HARI = max(1, int(os.getenv("HUTANG_HARI", "3")))         # jatuh tempo H+3
 KUOTA = {"boss": max(0, int(os.getenv("KUOTA_BOSS", "3"))), "gambar": max(0, int(os.getenv("KUOTA_GAMBAR", "5")))}
@@ -190,6 +193,12 @@ def db_init():
         sql(c, f"CREATE TABLE IF NOT EXISTS iot (id {pk}, ts {big} NOT NULL, perangkat TEXT NOT NULL, data TEXT NOT NULL)")
         sql(c, f"CREATE TABLE IF NOT EXISTS gambar (id {pk}, prompt TEXT NOT NULL, prompt_en TEXT, sumber TEXT, mime TEXT NOT NULL, data TEXT NOT NULL, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS aktivitas (id {pk}, waktu TEXT NOT NULL, bot TEXT, tugas TEXT, status TEXT, jalur TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS anggota (id {pk}, nama TEXT NOT NULL, token TEXT NOT NULL, divisi TEXT, jabatan TEXT, aktif INTEGER NOT NULL DEFAULT 1, dibuat TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS catatan (id {pk}, pemilik INTEGER NOT NULL, judul TEXT, isi TEXT, bersama INTEGER NOT NULL DEFAULT 0, sematkan INTEGER NOT NULL DEFAULT 0, dibuat TEXT, diubah TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS blacklist (id {pk}, nama TEXT NOT NULL, alasan TEXT, keterangan TEXT, oleh TEXT, tanggal TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS polling (id {pk}, judul TEXT NOT NULL, deskripsi TEXT, opsi TEXT NOT NULL, pembuat INTEGER, pembuat_nama TEXT, divisi TEXT, status TEXT NOT NULL DEFAULT 'buka', batas TEXT, dibuat TEXT, ditutup TEXT)")
+        sql(c, "CREATE TABLE IF NOT EXISTS suara (poll INTEGER NOT NULL, pemilih INTEGER NOT NULL, pilihan INTEGER NOT NULL, waktu TEXT, PRIMARY KEY (poll, pemilih))")
+        sql(c, f"CREATE TABLE IF NOT EXISTS dokumentasi (id {pk}, judul TEXT NOT NULL, tanggal TEXT, keterangan TEXT, mime TEXT, data TEXT, oleh TEXT, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS hutang (id {pk}, nama TEXT NOT NULL, jumlah {big} NOT NULL, tanggal TEXT NOT NULL, jatuh_tempo TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'belum', lunas TEXT, konfirmasi INTEGER NOT NULL DEFAULT 0, catatan TEXT, dibuat TEXT)")
         sql(c, "CREATE TABLE IF NOT EXISTS dikeluarkan (nama TEXT PRIMARY KEY, tanggal TEXT NOT NULL, alasan TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS stok (id {pk}, nama TEXT NOT NULL, jumlah {big} NOT NULL DEFAULT 0, satuan TEXT, kategori TEXT, minimum {big} NOT NULL DEFAULT 0, catatan TEXT, mime TEXT, gambar TEXT, diubah TEXT)")
@@ -1762,14 +1771,109 @@ FAILS = {}
 _KLOCK = threading.Lock()
 
 
+def member_of(r):
+    if r and r.startswith("m:"):
+        m = MEMBERS.get(int(r[2:]))
+        return m if m and m["aktif"] else None
+    return None
+
+
+def perms_of(r):
+    if r == "admin":
+        return {"*"}
+    m = member_of(r)
+    if not m:
+        return set()
+    out = set()
+    for j in m["jabatan"]:
+        out |= JABATAN_PERM.get(j, set())
+    for d in m["divisi"]:
+        out |= DIVISI_PERM.get(d, set())
+    return out
+
+
 def can(perm, r):
-    p = PERM.get(r or "", set())
+    p = perms_of(r)
     return "*" in p or perm in p
 
 
-def kuota_pakai(r, jenis, cek_saja=False):
-    """True kalau masih ada jatah hari ini (lalu dihitung). Admin tanpa batas. Jatah = per divisi per hari WIB."""
+def is_admin(r):
+    return "*" in perms_of(r)
+
+
+def mid_of(r):
+    """id anggota untuk suara/catatan; token admin master = 0 (Dev)."""
+    m = member_of(r)
+    return m["id"] if m else (0 if r == "admin" else None)
+
+
+def nama_peran(r):
     if r == "admin":
+        return "Admin"
+    m = member_of(r)
+    if m:
+        return m["nama"]
+    return "Viewer" if r == "viewer" else "-"
+
+
+def jabatan_teks(m):
+    return ", ".join(JABATAN.get(j, j) for j in m["jabatan"]) or "-"
+
+
+def members_load():
+    with db() as c:
+        rows = sql(c, "SELECT id,nama,token,divisi,jabatan,aktif FROM anggota ORDER BY id").fetchall()
+    MEMBERS.clear()
+    for i, n, t, d, j, a in rows:
+        try:
+            dv, jb = json.loads(d or "[]"), json.loads(j or "[]")
+        except ValueError:
+            dv, jb = [], []
+        MEMBERS[int(i)] = {"id": int(i), "nama": n, "token": t, "divisi": [x for x in dv if x in DIVISI][:2],
+                           "jabatan": [x for x in jb if x in JABATAN][:3], "aktif": bool(a)}
+    return MEMBERS
+
+
+def token_baru(nama):
+    depan = re.sub(r"[^a-z0-9]", "", (str(nama).strip().split() or ["anggota"])[0].lower()) or "anggota"
+    return f"{depan}-" + "".join(secrets.choice("abcdefghjkmnpqrstuvwxyz23456789") for _ in range(6))
+
+
+def member_simpan(d):
+    nama = re.sub(r"\s+", " ", str(d.get("nama", ""))).strip()[:60]
+    if not nama:
+        raise ValueError("Nama wajib diisi")
+    dv = [x for x in dict.fromkeys(d.get("divisi") or []) if x in DIVISI]
+    jb = [x for x in dict.fromkeys(d.get("jabatan") or []) if x in JABATAN]
+    if len(dv) > 2:
+        raise ValueError("Maksimal 2 divisi per orang")
+    if not jb:
+        jb = ["anggota"]
+    if len(jb) > 3:
+        raise ValueError("Maksimal 3 jabatan per orang")
+    aktif = 0 if d.get("aktif") is False else 1
+    i = str(d.get("id") or "")
+    with db() as c:
+        if i.isdigit():
+            sql(c, "UPDATE anggota SET nama=?, divisi=?, jabatan=?, aktif=? WHERE id=?", (nama, json.dumps(dv), json.dumps(jb), aktif, int(i)))
+        else:
+            sql(c, "INSERT INTO anggota (nama,token,divisi,jabatan,aktif,dibuat) VALUES (?,?,?,?,?,?)",
+                (nama, token_baru(nama), json.dumps(dv), json.dumps(jb), aktif, _now()))
+    members_load()
+
+
+def member_token_ulang(i):
+    m = MEMBERS.get(i)
+    if not m:
+        raise ValueError("Anggota tidak ditemukan")
+    with db() as c:
+        sql(c, "UPDATE anggota SET token=? WHERE id=?", (token_baru(m["nama"]), i))
+    members_load()
+
+
+def kuota_pakai(r, jenis, cek_saja=False):
+    """True kalau masih ada jatah hari ini (lalu dihitung). Admin tanpa batas. Jatah = per orang per hari WIB."""
+    if is_admin(r):
         return True
     with _KLOCK:
         k = SET.setdefault("kuota", {})
@@ -1790,7 +1894,7 @@ def kuota_pakai(r, jenis, cek_saja=False):
 
 
 def kuota_info(r):
-    if r == "admin" or r not in DIVISI:
+    if is_admin(r) or not member_of(r):
         return {}
     k = SET.get("kuota", {})
     tgl = k.get("tgl") == today()
@@ -1801,7 +1905,7 @@ def kuota_info(r):
 
 
 def kuota_teks(r, jenis):
-    return f"Jatah {'Boss bagi tugas' if jenis == 'boss' else 'Studio Gambar'} divisi {NAMA_PERAN[r]} hari ini sudah habis ({KUOTA[jenis]}/{KUOTA[jenis]}). Reset jam 00.00 WIB."
+    return f"Jatah {'Boss bagi tugas' if jenis == 'boss' else 'Studio Gambar'} kamu ({nama_peran(r)}) hari ini sudah habis ({KUOTA[jenis]}/{KUOTA[jenis]}). Reset jam 00.00 WIB."
 
 
 def _eq(a, b):
@@ -1811,9 +1915,10 @@ def _eq(a, b):
 def role_of(t):
     if _eq(t, ADMIN_TOKEN):
         return "admin"
-    for r, tok in ROLE_TOKENS.items():
-        if _eq(t, tok):
-            return r
+    if t:
+        for m in MEMBERS.values():
+            if m["aktif"] and _eq(t, m["token"]):
+                return f"m:{m['id']}"
     return "viewer" if _eq(t, VIEW_TOKEN) else None
 
 
@@ -1859,7 +1964,7 @@ def need(r):
     cur = role()
     if not cur:
         abort(401)
-    if r == "admin" and cur != "admin":
+    if r == "admin" and not is_admin(cur):
         abort(403)
 
 
@@ -1889,8 +1994,8 @@ def api_masuk():
         return jsonify({"error": "Terlalu banyak percobaan. Coba lagi 10 menit lagi."}), 429
     tok = str((request.get_json(silent=True) or {}).get("token", "")).strip()
     r = role_of(tok)
-    if r and r != "viewer":   # admin atau token divisi
-        return _setcookie(jsonify({"role": r}), tok)
+    if r and r != "viewer":   # admin atau token pribadi anggota
+        return _setcookie(jsonify({"role": "admin" if is_admin(r) else "anggota", "nama": nama_peran(r)}), tok)
     FAILS[ip].append(now)
     return jsonify({"error": "Token salah."}), 401
 
@@ -1931,7 +2036,10 @@ def healthz():
 def api_me():
     need("viewer")
     r = role()
-    return jsonify({"role": r, "nama_peran": NAMA_PERAN.get(r, r), "izin": sorted(PERM.get(r, set())), "kuota": kuota_info(r),
+    m = member_of(r)
+    return jsonify({"role": "admin" if is_admin(r) else ("anggota" if m else r), "nama_peran": nama_peran(r), "izin": sorted(perms_of(r)), "kuota": kuota_info(r),
+                    "anggota": {"id": m["id"], "nama": m["nama"], "divisi": [DIVISI[x] for x in m["divisi"]], "jabatan": [JABATAN[x] for x in m["jabatan"]],
+                                "divisi_key": m["divisi"]} if m else None, "daftar_divisi": DIVISI,
                     **{k: v for k, v in SET.items() if k not in ("kuota", "tg_users", "tg_izin")}, "mcp_siap": bool(MCP_SERVERS and ClientSession), "db_permanen": PG, "lantai": LANTAI,
                     "gambar": img_status()})
 
@@ -1940,7 +2048,7 @@ def api_me():
 def api_office():
     need("viewer")
     r_ = role()
-    adm = r_ == "admin"
+    adm = is_admin(r_)
     ck = adm
     c = _OFFICE_CACHE.get(ck)
     if c and time.time() - c[0] < 0.8:   # banyak viewer = satu hitungan per 0,8 detik
@@ -1983,7 +2091,7 @@ def start_job(coro):
 def api_boss():
     r = need_perm("boss")
     d = request.get_json(silent=True) or {}
-    if d.get("mode") == "dewan" and r != "admin":
+    if d.get("mode") == "dewan" and not is_admin(r):
         return jsonify({"error": "Sidang Dewan khusus admin/dev."}), 403
     teks = str(d.get("perintah", "")).strip()[:3000]
     if not teks:
@@ -2196,7 +2304,7 @@ def api_iot():
         iot_rules_check(pr, data)
         return jsonify({"ok": True})
     need("viewer")
-    adm = role() == "admin"
+    adm = is_admin(role())
     out = {"devices": iot_public(adm, full=True), "aktif": bool(IOT_KEY)}
     if adm:
         out.update(rules=IOT_RULES, key=IOT_KEY, endpoint=request.host_url.rstrip("/") + "/api/iot", hari=IOT_DAYS)
@@ -2235,8 +2343,9 @@ def api_iot_del(perangkat):
 
 @app.route("/api/laporan", methods=["GET", "POST"])
 def api_laporan():
-    need("admin")
+    need_perm("laporan_lihat")
     if request.method == "POST":
+        need("admin")
         d = request.get_json(silent=True) or {}
         return jsonify({"job": start_job(laporan_buat(kirim=bool(d.get("kirim")), sumber="web"))})
     return jsonify({"items": laporan_list(), "aktif": SET.get("laporan_on", True), "hari": HARI_ID[LAP_HARI], "jam": LAP_JAM,
@@ -2264,6 +2373,254 @@ def api_usage():
     return jsonify(usage_report())
 
 
+def _member_out(m, token=False):
+    tg = [k for k, v in SET.get("tg_users", {}).items() if v.get("anggota") == m["id"]]
+    return {"id": m["id"], "nama": m["nama"], "divisi": m["divisi"], "jabatan": m["jabatan"], "aktif": m["aktif"], "telegram": tg,
+            **({"token": m["token"]} if token else {})}
+
+
+@app.route("/api/anggota", methods=["GET", "POST"])
+def api_anggota():
+    """Khusus admin/dev: daftar anggota + token pribadi. POST {id?, nama, divisi[], jabatan[], aktif}."""
+    need("admin")
+    if request.method == "POST":
+        try:
+            member_simpan(request.get_json(silent=True) or {})
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+    return jsonify({"items": [_member_out(m, True) for m in MEMBERS.values()], "divisi": DIVISI, "jabatan": JABATAN})
+
+
+@app.route("/api/anggota/<int:i>/token", methods=["POST"])
+def api_anggota_token(i):
+    need("admin")
+    try:
+        member_token_ulang(i)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"items": [_member_out(m, True) for m in MEMBERS.values()]})
+
+
+@app.route("/api/anggota/<int:i>", methods=["DELETE"])
+def api_anggota_del(i):
+    need("admin")
+    with db() as c:
+        sql(c, "DELETE FROM anggota WHERE id=?", (i,))
+    members_load()
+    for k in [k for k, v in SET.get("tg_users", {}).items() if v.get("anggota") == i]:
+        SET["tg_users"].pop(k, None)
+    set_save()
+    return jsonify({"items": [_member_out(m, True) for m in MEMBERS.values()]})
+
+
+# Catatan: pribadi (hanya pemilik) atau bersama (semua anggota). Catatan bersama boleh diubah pemilik, Sekretaris, atau Dev.
+def catatan_list(r):
+    me = mid_of(r)
+    with db() as c:
+        rows = sql(c, "SELECT id,pemilik,judul,isi,bersama,sematkan,dibuat,diubah FROM catatan WHERE bersama=1 OR pemilik=? ORDER BY sematkan DESC, id DESC LIMIT 300", (me,)).fetchall()
+    nm = lambda i: "Dev" if i == 0 else (MEMBERS.get(i) or {}).get("nama", "?")
+    return [{"id": int(i), "pemilik": nm(int(p)), "milik_saya": int(p) == me, "judul": j or "", "isi": s_ or "", "bersama": bool(b), "sematkan": bool(se),
+             "dibuat": d, "diubah": u, "bisa_ubah": int(p) == me or (bool(b) and can("catatan_kelola", r))} for i, p, j, s_, b, se, d, u in rows]
+
+
+@app.route("/api/catatan", methods=["GET", "POST"])
+def api_catatan():
+    r = need_perm("catatan")
+    if request.method == "POST":
+        d = request.get_json(silent=True) or {}
+        judul, isi = str(d.get("judul", "")).strip()[:120], str(d.get("isi", "")).strip()[:5000]
+        if not (judul or isi):
+            return jsonify({"error": "Catatan kosong"}), 400
+        bersama, sem = 1 if d.get("bersama") else 0, 1 if d.get("sematkan") and can("catatan_kelola", r) else 0
+        i = str(d.get("id") or "")
+        with db() as c:
+            if i.isdigit():
+                row = sql(c, "SELECT pemilik, bersama FROM catatan WHERE id=?", (int(i),)).fetchone()
+                if not row or not (int(row[0]) == mid_of(r) or (row[1] and can("catatan_kelola", r))):
+                    return jsonify({"error": "Tidak boleh mengubah catatan ini"}), 403
+                sql(c, "UPDATE catatan SET judul=?, isi=?, bersama=?, sematkan=?, diubah=? WHERE id=?", (judul, isi, bersama, sem, _now(), int(i)))
+            else:
+                sql(c, "INSERT INTO catatan (pemilik,judul,isi,bersama,sematkan,dibuat,diubah) VALUES (?,?,?,?,?,?,?)", (mid_of(r), judul, isi, bersama, sem, _now(), _now()))
+    return jsonify({"items": catatan_list(r), "kelola": can("catatan_kelola", r)})
+
+
+@app.route("/api/catatan/<int:i>", methods=["DELETE"])
+def api_catatan_del(i):
+    r = need_perm("catatan")
+    with db() as c:
+        row = sql(c, "SELECT pemilik, bersama FROM catatan WHERE id=?", (i,)).fetchone()
+        if not row or not (int(row[0]) == mid_of(r) or (row[1] and can("catatan_kelola", r))):
+            return jsonify({"error": "Tidak boleh menghapus catatan ini"}), 403
+        sql(c, "DELETE FROM catatan WHERE id=?", (i,))
+    return jsonify({"items": catatan_list(r), "kelola": can("catatan_kelola", r)})
+
+
+# Blacklist: khusus tim Secret Service (+ Dev)
+def blacklist_list():
+    with db() as c:
+        rows = sql(c, "SELECT id,nama,alasan,keterangan,oleh,tanggal FROM blacklist ORDER BY id DESC").fetchall()
+    return [{"id": int(i), "nama": n, "alasan": a or "", "keterangan": k or "", "oleh": o or "", "tanggal": t or ""} for i, n, a, k, o, t in rows]
+
+
+@app.route("/api/blacklist", methods=["GET", "POST"])
+def api_blacklist():
+    r = need_perm("blacklist")
+    if request.method == "POST":
+        d = request.get_json(silent=True) or {}
+        nama = str(d.get("nama", "")).strip()[:80]
+        if not nama:
+            return jsonify({"error": "Nama wajib diisi"}), 400
+        with db() as c:
+            sql(c, "INSERT INTO blacklist (nama,alasan,keterangan,oleh,tanggal) VALUES (?,?,?,?,?)",
+                (nama, str(d.get("alasan", "")).strip()[:200], str(d.get("keterangan", "")).strip()[:500], nama_peran(r), today()))
+    return jsonify({"items": blacklist_list()})
+
+
+@app.route("/api/blacklist/<int:i>", methods=["DELETE"])
+def api_blacklist_del(i):
+    need_perm("blacklist")
+    with db() as c:
+        sql(c, "DELETE FROM blacklist WHERE id=?", (i,))
+    return jsonify({"items": blacklist_list()})
+
+
+# Polling: 1 anggota = 1 suara, anonim. Hasil terlihat setelah ditutup / lewat batas waktu. Pemenang ditetapkan Dev manual.
+def _poll_boleh(r, div):
+    if is_admin(r) or not div:
+        return True
+    m = member_of(r)
+    return bool(m and div in m["divisi"])
+
+
+def polling_list(r):
+    me, now = mid_of(r), datetime.now(WIB).strftime("%Y-%m-%dT%H:%M")
+    with db() as c:
+        rows = sql(c, "SELECT id,judul,deskripsi,opsi,pembuat,pembuat_nama,divisi,status,batas,dibuat,ditutup FROM polling ORDER BY id DESC LIMIT 100").fetchall()
+        votes = sql(c, "SELECT poll,pemilih,pilihan FROM suara").fetchall()
+    out = []
+    for i, j, ds, op, pb, pn, dv, st, bt, db_, dt_ in rows:
+        if not _poll_boleh(r, dv):
+            continue
+        tutup = st != "buka" or bool(bt and bt <= now)
+        opsi = json.loads(op or "[]")
+        vs = [v for v in votes if int(v[0]) == int(i)]
+        mine = next((int(v[2]) for v in vs if int(v[1]) == me), None)
+        hasil = [sum(1 for v in vs if int(v[2]) == k) for k in range(len(opsi))] if tutup else None
+        out.append({"id": int(i), "judul": j, "deskripsi": ds or "", "opsi": opsi, "pembuat": pn or "", "divisi": dv, "divisi_nama": DIVISI.get(dv, "Semua anggota"),
+                    "tutup": tutup, "batas": bt, "dibuat": db_, "pemilih": len(vs), "pilihan_saya": mine, "hasil": hasil,
+                    "bisa_tutup": not tutup and (is_admin(r) or int(pb or -1) == me)})
+    return out
+
+
+@app.route("/api/polling", methods=["GET", "POST"])
+def api_polling():
+    r = need_perm("polling")
+    if request.method == "POST":
+        if not can("polling_buat", r):
+            return jsonify({"error": "Membuat polling khusus Dev, Manager, dan PJ Divisi"}), 403
+        d = request.get_json(silent=True) or {}
+        judul = str(d.get("judul", "")).strip()[:150]
+        opsi = [str(x).strip()[:80] for x in (d.get("opsi") or []) if str(x).strip()][:12]
+        if not judul or len(opsi) < 2:
+            return jsonify({"error": "Isi judul dan minimal 2 pilihan"}), 400
+        div = d.get("divisi") or None
+        if div and div not in DIVISI:
+            return jsonify({"error": "Divisi tidak dikenal"}), 400
+        m = member_of(r)
+        if not is_admin(r) and "manager" not in (m or {}).get("jabatan", []) and (not div or div not in m["divisi"]):
+            return jsonify({"error": "PJ Divisi hanya bisa membuat polling untuk divisinya sendiri"}), 403
+        batas = str(d.get("batas") or "")[:16] or None
+        with db() as c:
+            sql(c, "INSERT INTO polling (judul,deskripsi,opsi,pembuat,pembuat_nama,divisi,status,batas,dibuat) VALUES (?,?,?,?,?,?,?,?,?)",
+                (judul, str(d.get("deskripsi", "")).strip()[:500], json.dumps(opsi), mid_of(r), nama_peran(r), div, "buka", batas, _now()))
+    return jsonify({"items": polling_list(r), "bisa_buat": can("polling_buat", r)})
+
+
+@app.route("/api/polling/<int:i>/pilih", methods=["POST"])
+def api_polling_pilih(i):
+    r = need_perm("polling")
+    k = (request.get_json(silent=True) or {}).get("pilihan")
+    p = next((x for x in polling_list(r) if x["id"] == i), None)
+    if not p:
+        return jsonify({"error": "Polling tidak ditemukan"}), 404
+    if p["tutup"]:
+        return jsonify({"error": "Polling sudah ditutup"}), 400
+    if p["pilihan_saya"] is not None:
+        return jsonify({"error": "Kamu sudah memilih. 1 orang = 1 suara."}), 400
+    if not isinstance(k, int) or not 0 <= k < len(p["opsi"]):
+        return jsonify({"error": "Pilihan tidak valid"}), 400
+    with db() as c:
+        sql(c, "INSERT INTO suara (poll,pemilih,pilihan,waktu) VALUES (?,?,?,?)", (i, mid_of(r), k, _now()))
+    return jsonify({"items": polling_list(r), "bisa_buat": can("polling_buat", r)})
+
+
+@app.route("/api/polling/<int:i>", methods=["POST", "DELETE"])
+def api_polling_aksi(i):
+    r = need_perm("polling")
+    with db() as c:
+        row = sql(c, "SELECT pembuat FROM polling WHERE id=?", (i,)).fetchone()
+        if not row:
+            return jsonify({"error": "Polling tidak ditemukan"}), 404
+        if request.method == "DELETE":
+            if not is_admin(r):
+                return jsonify({"error": "Hapus polling khusus Dev"}), 403
+            sql(c, "DELETE FROM suara WHERE poll=?", (i,))
+            sql(c, "DELETE FROM polling WHERE id=?", (i,))
+        else:
+            if not (is_admin(r) or int(row[0] or -1) == mid_of(r)):
+                return jsonify({"error": "Yang bisa menutup: pembuat polling atau Dev"}), 403
+            sql(c, "UPDATE polling SET status='tutup', ditutup=? WHERE id=?", (_now(), i))
+    return jsonify({"items": polling_list(r), "bisa_buat": can("polling_buat", r)})
+
+
+# Dokumentasi: album foto kegiatan. Upload/hapus = divisi Dokumentasi + Dev; lihat = semua anggota.
+def dok_list():
+    with db() as c:
+        rows = sql(c, "SELECT id,judul,tanggal,keterangan,oleh,dibuat FROM dokumentasi ORDER BY tanggal DESC, id DESC LIMIT 300").fetchall()
+    return [{"id": int(i), "judul": j, "tanggal": t or "", "keterangan": k or "", "oleh": o or "", "dibuat": d} for i, j, t, k, o, d in rows]
+
+
+@app.route("/api/dokumentasi", methods=["GET", "POST"])
+def api_dok():
+    r = need_perm("dok_lihat")
+    if request.method == "POST":
+        if not can("dok_kelola", r):
+            return jsonify({"error": "Upload dokumentasi khusus tim Dokumentasi dan Dev"}), 403
+        f = request.files.get("foto")
+        if not f:
+            return jsonify({"error": "Pilih foto dulu"}), 400
+        foto = f.read(2_000_001)
+        if len(foto) > 2_000_000 or not (f.mimetype or "").startswith("image/"):
+            return jsonify({"error": "Foto harus gambar, maksimal 2 MB"}), 400
+        judul = request.form.get("judul", "").strip()[:120] or "Kegiatan MCI"
+        with db() as c:
+            n = sql(c, "SELECT COUNT(*) FROM dokumentasi").fetchone()[0]
+            if int(n) >= 300:
+                return jsonify({"error": "Album penuh (300 foto). Hapus foto lama dulu."}), 400
+            sql(c, "INSERT INTO dokumentasi (judul,tanggal,keterangan,mime,data,oleh,dibuat) VALUES (?,?,?,?,?,?,?)",
+                (judul, _tgl(request.form.get("tanggal"), today()), request.form.get("keterangan", "").strip()[:500], f.mimetype,
+                 base64.b64encode(foto).decode(), nama_peran(r), _now()))
+    return jsonify({"items": dok_list(), "kelola": can("dok_kelola", r)})
+
+
+@app.route("/api/dokumentasi/<int:i>", methods=["GET", "DELETE"])
+def api_dok_one(i):
+    r = need_perm("dok_lihat")
+    with db() as c:
+        if request.method == "DELETE":
+            if not can("dok_kelola", r):
+                return jsonify({"error": "Khusus tim Dokumentasi dan Dev"}), 403
+            sql(c, "DELETE FROM dokumentasi WHERE id=?", (i,))
+            return jsonify({"items": dok_list(), "kelola": True})
+        row = sql(c, "SELECT mime, data FROM dokumentasi WHERE id=?", (i,)).fetchone()
+    if not row:
+        abort(404)
+    h = {"Cache-Control": "private, max-age=86400"}
+    if request.args.get("unduh"):
+        h["Content-Disposition"] = f"attachment; filename=mci-dokumentasi-{i}.jpg"
+    return Response(base64.b64decode(row[1]), mimetype=row[0], headers=h)
+
+
 @app.route("/api/hutang", methods=["GET", "POST"])
 def api_hutang():
     """Khusus Bendahara + admin. POST {nama, jumlah, catatan?, kas?} = catat pinjaman baru."""
@@ -2284,7 +2641,7 @@ def api_hutang_aksi(i):
     r = need_perm("hutang")
     d = request.get_json(silent=True) or {}
     aksi = str(d.get("aksi", ""))
-    if aksi == "hapus" and r != "admin":
+    if aksi == "hapus" and not is_admin(r):
         return jsonify({"error": "Hapus data hutang khusus admin/dev"}), 403
     try:
         hutang_aksi(i, aksi, d.get("kas", True) is not False)
@@ -2308,7 +2665,7 @@ def api_stok():
     """GET admin + divisi (viewer TIDAK boleh). POST khusus admin: multipart nama, jumlah, satuan, kategori, minimum, catatan, foto, id (ubah), hapus_foto."""
     need_perm("stok")
     if request.method == "GET":
-        return jsonify({"items": STOK, "menipis": len(stok_menipis()), "edit": role() == "admin"})
+        return jsonify({"items": STOK, "menipis": len(stok_menipis()), "edit": is_admin(role())})
     need("admin")
     f, foto, mime = request.files.get("foto"), None, None
     if f:
@@ -2345,15 +2702,17 @@ def api_stok_img(i):
 
 @app.route("/api/tg", methods=["GET", "POST"])
 def api_tg():
-    """Daftar pengguna Telegram yang diizinkan lewat !izin, plus yang menunggu. POST {id, peran: bendahara|designer|anggota|cabut|tolak}."""
+    """Daftar pengguna Telegram (!izin) + yang menunggu. POST {id, peran: m<idAnggota> | cabut | tolak}."""
     need("admin")
     if request.method == "POST":
         d = request.get_json(silent=True) or {}
         uid, peran = str(d.get("id", "")), str(d.get("peran", ""))
-        if not uid.isdigit() or peran not in (*DIVISI, "cabut", "tolak"):
+        if not uid.isdigit() or not (peran in ("cabut", "tolak") or (peran[:1] == "m" and peran[1:].isdigit() and int(peran[1:]) in MEMBERS)):
             return jsonify({"error": "data tidak valid"}), 400
         izin_putus(uid, peran)
-    return jsonify({"users": SET.get("tg_users", {}), "menunggu": SET.get("tg_izin", {}), "email": bool(MAIL_WEBHOOK), "admin": len(ALLOWED)})
+    users = {k: {**v, "nama_anggota": (MEMBERS.get(v.get("anggota")) or {}).get("nama", "?")} for k, v in SET.get("tg_users", {}).items()}
+    return jsonify({"users": users, "menunggu": SET.get("tg_izin", {}), "email": bool(MAIL_WEBHOOK), "admin": len(ALLOWED),
+                    "anggota": [{"id": m["id"], "nama": m["nama"]} for m in MEMBERS.values() if m["aktif"]]})
 
 
 @app.route("/api/settings", methods=["POST"])
@@ -2390,7 +2749,10 @@ def tg_role(u):
     if not ALLOWED or u.id in ALLOWED:
         return "admin"
     x = SET.get("tg_users", {}).get(str(u.id))
-    return x["peran"] if x and x.get("peran") in DIVISI else None
+    r = f"m:{x['anggota']}" if x and x.get("anggota") in MEMBERS else None
+    if r and is_admin(r):
+        return "admin"
+    return r if member_of(r) else None
 
 
 def _ok(u):
@@ -2408,7 +2770,7 @@ async def _gate(m, u, perm, kuota=None):
         await m.reply_text(f"Akses ditolak. Kirim !izin untuk minta akses ke admin.\nID kamu: {u.id}")
         return None
     if not can(perm, r):
-        await m.reply_text(f"Fitur ini tidak tersedia untuk divisi {NAMA_PERAN[r]}.")
+        await m.reply_text(f"Fitur ini tidak tersedia untuk jabatan/divisi kamu ({nama_peran(r)}).")
         return None
     if kuota and not await asyncio.to_thread(kuota_pakai, r, kuota):
         await m.reply_text(kuota_teks(r, kuota))
@@ -2438,17 +2800,17 @@ def _tg_app(key):
 
 
 def _izin_tombol(uid):
-    return InlineKeyboardMarkup([[InlineKeyboardButton("💰 Bendahara", callback_data=f"izin:{uid}:bendahara"),
-                                  InlineKeyboardButton("🎨 Designer", callback_data=f"izin:{uid}:designer")],
-                                 [InlineKeyboardButton("👤 Anggota", callback_data=f"izin:{uid}:anggota"),
-                                  InlineKeyboardButton("❌ Tolak", callback_data=f"izin:{uid}:tolak")]])
+    """Admin memilih orang ini siapa di daftar anggota; jabatan & divisinya ikut dari data anggota."""
+    btn = [InlineKeyboardButton(f"👤 {m['nama']}", callback_data=f"izin:{uid}:m{m['id']}") for m in MEMBERS.values() if m["aktif"]][:24]
+    rows = [btn[i:i + 3] for i in range(0, len(btn), 3)] + [[InlineKeyboardButton("❌ Tolak", callback_data=f"izin:{uid}:tolak")]]
+    return InlineKeyboardMarkup(rows)
 
 
 async def izin_minta(m, c, key):
     u = m.from_user
     r = tg_role(u)
     if r:
-        await m.reply_text(f"Kamu sudah punya akses sebagai {NAMA_PERAN[r]}. 👍")
+        await m.reply_text(f"Kamu sudah punya akses sebagai {nama_peran(r)}. 👍")
         return
     if not ALLOWED:
         await m.reply_text("Admin belum mengisi ALLOWED_USER_IDS, jadi izin belum bisa diproses.")
@@ -2468,7 +2830,7 @@ async def izin_minta(m, c, key):
     app_ = _tg_app("apex") or _tg_app(key)
     for aid in ALLOWED:
         try:
-            await app_.bot.send_message(aid, "🔔 " + info + "\n\nPilih divisinya:", reply_markup=_izin_tombol(u.id))
+            await app_.bot.send_message(aid, "🔔 " + info + "\n\nPilih orang ini siapa:", reply_markup=_izin_tombol(u.id))
         except Exception:
             log.warning("Notif izin ke admin %s gagal (admin belum /start bot Apex?)", aid)
     asyncio.create_task(kirim_email(f"[MCI HQ] Permintaan izin Telegram: {nama}",
@@ -2479,8 +2841,8 @@ def izin_putus(uid, peran):
     """Simpan keputusan admin. Return teks status. Pesan ke pemohon dikirim terpisah (async)."""
     tunggu, users = SET.setdefault("tg_izin", {}), SET.setdefault("tg_users", {})
     data = tunggu.pop(uid, None) or users.get(uid) or {}
-    if peran in DIVISI:
-        users[uid] = {"peran": peran, "nama": data.get("nama", "-"), "user": data.get("user", ""), "bot": data.get("bot", "apex"),
+    if peran[:1] == "m" and peran[1:].isdigit():
+        users[uid] = {"anggota": int(peran[1:]), "nama": data.get("nama", "-"), "user": data.get("user", ""), "bot": data.get("bot", "apex"),
                       "sejak": datetime.now(WIB).strftime("%Y-%m-%d %H:%M")}
     elif peran == "cabut":
         users.pop(uid, None)
@@ -2494,9 +2856,10 @@ async def _izin_kabari(uid, peran, bot):
     app_ = _tg_app(bot) or _tg_app("apex")
     if not app_:
         return
-    if peran in DIVISI:
-        batas = f"Boss bagi tugas maks {KUOTA['boss']}x/hari per divisi" + (f", Studio Gambar maks {KUOTA['gambar']}x/hari" if can("gambar_buat", peran) else "")
-        t = f"✅ Izin diterima! Kamu terdaftar sebagai {NAMA_PERAN[peran]}.\n{batas}. Sidang Dewan khusus admin.\nKetik /start untuk daftar perintah."
+    if peran[:1] == "m" and peran[1:].isdigit() and int(peran[1:]) in MEMBERS:
+        mm, r = MEMBERS[int(peran[1:])], f"m:{peran[1:]}"
+        batas = "Tanpa batas (Dev)" if is_admin(r) else f"Boss bagi tugas maks {KUOTA['boss']}x/hari" + (f", Studio Gambar maks {KUOTA['gambar']}x/hari" if can("gambar_buat", r) else "")
+        t = f"✅ Izin diterima! Kamu terdaftar sebagai {mm['nama']} ({jabatan_teks(mm)}).\n{batas}.\nKetik /start untuk daftar perintah."
     elif peran == "cabut":
         t = "Akses Telegram MCI kamu sudah dicabut admin."
     else:
@@ -2517,7 +2880,8 @@ async def izin_klik(u, c):
     except ValueError:
         return await q.answer()
     data = await asyncio.to_thread(izin_putus, uid, peran)
-    hasil = f"✅ Disetujui sebagai {NAMA_PERAN[peran]}" if peran in DIVISI else "❌ Ditolak"
+    mm = MEMBERS.get(int(peran[1:])) if peran[:1] == "m" and peran[1:].isdigit() else None
+    hasil = f"✅ Disetujui sebagai {mm['nama']} ({jabatan_teks(mm)})" if mm else "❌ Ditolak"
     await q.answer(hasil)
     try:
         await q.edit_message_text(f"{q.message.text.split(chr(10) + chr(10) + 'Pilih')[0]}\n\n{hasil} oleh {q.from_user.first_name}.")
@@ -2608,7 +2972,7 @@ def make_handlers(key):
             menu = "/status  /id  /budget\n/caveman on|off\n/council <pertanyaan>\n/skills  /skill <nama> <teks>\n/gambar <deskripsi>\n/stok (sisa stok barang)\n/laporan (laporan mingguan, ke Apex)"
         else:
             k = kuota_info(r)
-            menu = (f"Kamu: {NAMA_PERAN[r]}\n/status  /id  /budget  /stok  /skills  /skill <nama> <teks>\n"
+            menu = (f"Kamu: {nama_peran(r)} ({jabatan_teks(member_of(r))})\n/status  /id  /budget  /stok  /skills  /skill <nama> <teks>\n"
                     + ("/gambar <deskripsi>\n" if can("gambar_buat", r) else "") + ("Kirim catatan kas ke Ledger\n" if can("kas_edit", r) else "")
                     + f"Jatah hari ini: Boss {k['boss']['pakai']}/{k['boss']['batas']}" + (f", gambar {k['gambar']['pakai']}/{k['gambar']['batas']}" if "gambar" in k else ""))
         await u.message.reply_text(head + menu)
@@ -2928,13 +3292,14 @@ async def run_bots():
 if __name__ == "__main__":
     if not (ADMIN_TOKEN and VIEW_TOKEN):
         log.warning("ADMIN_TOKEN / VIEW_TOKEN belum diisi: web tidak bisa dibuka.")
-    log.info("Token divisi aktif: %s", ", ".join(r for r, t in ROLE_TOKENS.items() if t) or "belum ada")
+    log.info("Anggota aktif dengan token pribadi: %d", sum(1 for m in MEMBERS.values() if m["aktif"]))
     try:
         db_init()
         usage_load()
         iot_load()
         gal_load()
         stok_load()
+        members_load()
     except Exception:
         log.exception("Database gagal diinisialisasi (cek DATABASE_URL)")
     threading.Thread(target=run_flask, daemon=True).start()
