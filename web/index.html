@@ -1727,13 +1727,53 @@ const OFFICE = (() => {
     wall(BX, -7.05, BW, 0); wall(-12.05, (lo - 7.2) / 2, lo + 7.2, PI / 2); wall(-12.05, (hi + 7.2) / 2, 7.2 - hi, PI / 2);
     wall(EX - .08, 0, 14.4, -PI / 2, true); wall(WX + .08, 0, 14.4, PI / 2, true);
     add(CAP(.05, 14.2), "#D4AF5A", WX - .02, -.17, 0, null, GOLD).rotation.x = PI / 2;
-    const tube = new THREE.Mesh(G("tube", () => new THREE.CylinderGeometry(.85, .85, FH, 40, 1, true, .55, PI * 2 - 1.1)), new THREE.MeshStandardMaterial({color: LIN("#bfe0ff"), transparent: true, opacity: .2, roughness: .05, metalness: .2, side: THREE.DoubleSide, depthWrite: false}));
-    tube.position.set(LIFT[0], FH / 2 - .3, LIFT[1]); CUR.add(tube);
-    [.02, WH - .05].forEach(y => add(TO(.87, .04), "#D4AF5A", LIFT[0], y, LIFT[1], null, GOLD).rotation.x = PI / 2);
-    add(CY(.8, .8, .03, 40), "#0A2A6B", LIFT[0], .012, LIFT[1]);
-    [-1, 1].forEach(s => add(CY(.05, .05, WH, 12), "#D4AF5A", LIFT[0] + Math.sin(.55 * s) * .87, WH / 2, LIFT[1] + Math.cos(.55 * s) * .87, null, GOLD));
-    label("LIFT · LT " + (f + 1), LIFT[0], 3.45, LIFT[1] + 1.3, .42);
+    liftBox(f);
     FLAB.push(label(`LT ${f + 1} · ${(LANTAI[f + 1] || "").toUpperCase()}`, -7.2, 3.5, 6.6, .85, "#F1D58A", true));
+  }
+  /* ---------- LIFT KOTAK: rangka baja gelap + list emas, pintu geser otomatis, layar lantai & lampu LED ---------- */
+  const LIFTD = [];
+  function liftBox(f) {
+    const [lx, lz] = LIFT, H = .95, zf = lz + H, zb = lz - H, DH = 2.55;
+    const steel = {roughness: .28, metalness: .75}, dark = "#1b2a52";
+    CAST = true;
+    add(PANEL(.08, WH, H * 2, .02), dark, lx - H, WH / 2, lz, null, steel); add(PANEL(.08, WH, H * 2, .02), dark, lx + H, WH / 2, lz, null, steel);   // dinding samping
+    add(PANEL(H * 2, WH, .08, .02), dark, lx, WH / 2, zb, null, steel);                                                                             // dinding belakang
+    [-1, 1].forEach(sd => add(PANEL(H - .66, DH, .1, .02), "#24396e", lx + sd * (.66 + (H - .66) / 2), DH / 2, zf, null, steel));             // tiang depan
+    add(PANEL(H * 2, WH - DH, .1, .02), "#24396e", lx, DH + (WH - DH) / 2, zf, null, steel);                                                      // kepala pintu
+    CAST = false;
+    // list emas di tepi kotak + strip LED biru di kusen pintu
+    [[-H, zf], [H, zf], [-H, zb], [H, zb]].forEach(p => add(PANEL(.06, WH, .06, .01), "#D4AF5A", lx + p[0], WH / 2, p[1], null, GOLD));
+    [0, WH - .03].forEach(y => { add(PANEL(H * 2 + .06, .05, .06, .01), "#D4AF5A", lx, y + .025, zf, null, GOLD); add(PANEL(.06, .05, H * 2, .01), "#D4AF5A", lx - H, y + .025, lz, null, GOLD); add(PANEL(.06, .05, H * 2, .01), "#D4AF5A", lx + H, y + .025, lz, null, GOLD); });
+    const led = {emissive: "#5ee6ff", emissiveIntensity: 1.6};
+    [-1, 1].forEach(sd => add(PANEL(.03, DH, .03, .01), "#5ee6ff", lx + sd * .68, DH / 2, zf + .055, null, led)); add(PANEL(1.4, .03, .03, .01), "#5ee6ff", lx, DH + .01, zf + .055, null, led);
+    // lantai kabin + lampu plafon + pegangan
+    add(PANEL(H * 2 - .1, .03, H * 2 - .1, .01), "#0A2A6B", lx, .016, lz, null, {roughness: .4, metalness: .3});
+    add(PANEL(1.2, .03, 1.2, .02), "#e0f2fe", lx, WH - .12, lz, null, {emissive: "#e0f2fe", emissiveIntensity: 1.2});
+    add(CAP(.025, 1.2), "#D4AF5A", lx, 1.0, zb + .1, null, GOLD).rotation.z = PI / 2;
+    // layar lantai di atas pintu (angka + panah) dan tombol panggil
+    const disp = CT(256, 96, (g, w, h) => { g.fillStyle = "#020617"; g.fillRect(0, 0, w, h); g.fillStyle = "#5ee6ff"; g.font = "800 58px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(`▲▼  ${f + 1}`, w / 2, h / 2 + 3); });
+    const dm = plane(disp, .7, .26, lx, DH + .45, zf + .056); dm.userData.dyn = true; ANI.push({o: dm.material, k: "glow"});
+    add(PANEL(.16, .34, .03, .02), "#0f172a", lx + .82, 1.3, zf + .06, null, steel);
+    [1.38, 1.22].forEach((y, i) => { const b = add(CY(.035, .035, .02, 14), i ? "#22c55e" : "#38bdf8", lx + .82, y, zf + .08, null, {emissive: i ? "#22c55e" : "#38bdf8", emissiveIntensity: 1.5}); b.rotation.x = PI / 2; });
+    label("LIFT · LT " + (f + 1), lx, 3.55, zf + .3, .42);
+    // pintu geser teleskopik: tiap sisi 2 daun baja + kaca, menyelinap rapi di balik tiang depan saat terbuka
+    const doors = [];
+    [-1, 1].forEach(sd => [[.165, .62, zf - .13], [.495, .31, zf - .085]].forEach(([x0, run, z]) => {
+      const d = grp(lx + sd * x0, 0, z, 0); d.userData.dyn = true;
+      add(PANEL(.33, DH - .04, .035, .01), "#94a3b8", 0, (DH - .04) / 2, 0, d, {roughness: .22, metalness: .85});
+      add(PANEL(.05, DH - .6, .04, .01), "#bfe0ff", 0, DH / 2, 0, d, {transparent: true, opacity: .55, roughness: .05});
+      if (x0 < .2) add(PANEL(.02, DH - .2, .045, .005), "#D4AF5A", -sd * .16, DH / 2, 0, d, GOLD);
+      doors.push({d, sd, x0, run});
+    }));
+    LIFTD[f] = {doors, open: 0, x: lx, z: lz};
+  }
+  function liftTick(dt) {
+    LIFTD.forEach((L2, f) => {
+      if (!L2) return;
+      const near = AG.some(a => Math.abs(a.baseY - FY[f]) < 1.2 && Math.hypot(a.g.position.x - L2.x, a.g.position.z - L2.z) < 2.6) || AG.some(a => a.riding && Math.hypot(a.g.position.x - L2.x, a.g.position.z - L2.z) < 1 && Math.abs(a.baseY - FY[f]) < 1.5);
+      L2.open += ((near ? 1 : 0) - L2.open) * Math.min(1, dt * 4);
+      L2.doors.forEach(o => o.d.position.x = L2.x + o.sd * (o.x0 + L2.open * o.run));
+    });
   }
   function roof() {
     ROOF = new THREE.Group(); ROOF.position.y = FY[3] + FH; sc.add(ROOF); CUR = ROOF;
@@ -2745,12 +2785,13 @@ const OFFICE = (() => {
   function frame() {
     requestAnimationFrame(frame);
     const dt = Math.min(clock.getDelta(), .1), t = clock.elapsedTime;
-    AG.forEach(a => step(a, dt, t));
+    AG.forEach(a => step(a, dt, t)); liftTick(dt);
     if (!visible || document.hidden) return;
     ANI.forEach(o => {
       if (o.k === "spin") o.o.rotation.y += dt * (o.s || 1);
       else if (o.k === "scroll") o.o.offset.y += dt * .05;
       else if (o.k === "pulse") o.o.emissiveIntensity = 1 + Math.abs(Math.sin(t * 3)) * 2;
+      else if (o.k === "glow") o.o.opacity = .82 + Math.abs(Math.sin(t * 2)) * .18;
       else if (o.k === "bar") o.o.scale.y = 1 + Math.sin(t * 2 + o.i) * .25;
       else if (o.k === "nozzle") { o.o.position.x = Math.sin(t * 1.3) * .3; o.o.position.z = -.25 + Math.cos(t * 2.1) * .2; }
       else if (o.k === "drone") { o.o.position.y = 1.2 + Math.sin(t * 1.6) * .12; o.o.rotation.y = Math.sin(t * .4) * .6; o.props.forEach(p => p.rotation.y += dt * 40); }
@@ -2841,7 +2882,7 @@ const OFFICE = (() => {
       renderList();
     },
     states() { const o = {}; AG.forEach(a => o[a.key] = status(a)); return o; },
-    _demo() { return DEMO ? {AG, showProp, setFollow} : null; },
+    _demo() { return DEMO ? {AG, showProp, setFollow, cam, ctl, LIFTD} : null; },
     iot(list) { iotFeed(list); },
     follow(k) { if (!ready) return; const a = AG.find(x => x.key === k); if (a) setFollow(a); },
     galeri(ids) { if (ready) galeriSet(ids); },
