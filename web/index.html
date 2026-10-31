@@ -502,6 +502,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
   <p class="mu">Khusus tim Secret Service. Daftar orang yang diblokir dari kegiatan MCI. Catat seperlunya: nama, alasan singkat, dan keterangan.</p>
   <div class="cd"><b>Tambah ke blacklist</b>
    <div class="fl" style="margin-top:12px"><label>Nama<input type="text" id="blNama" maxlength="80"></label><label>Alasan<input type="text" id="blAlasan" maxlength="200"></label><label class="full">Keterangan<input type="text" id="blKet" maxlength="500"></label></div>
+   <div id="blPrev" hidden style="margin-top:14px;padding:12px;border:1px dashed #BFD0F2;border-radius:12px;background:#F7F9FE"></div>
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="blSave">Tambahkan</button><span id="blMsg" class="mu"></span></div>
   </div>
   <div class="cd" style="padding:0"><div class="tb"><table><thead><tr><th>Nama</th><th>Alasan</th><th>Keterangan</th><th>Dicatat</th><th></th></tr></thead><tbody id="blList"></tbody></table></div></div>
@@ -1455,6 +1456,30 @@ async function loadBlacklist(d) {
     $$("[data-bld]").forEach(b => b.onclick = async () => { if (confirm("Hapus dari blacklist?")) loadBlacklist(await api("/api/blacklist/" + b.dataset.bld, {method: "DELETE"})); });
   } catch (e) { $("#blList").innerHTML = '<tr><td colspan="5" class="er">' + esc(e.message) + "</td></tr>"; }
 }
+/* Isi pakai AI untuk banyak orang: satu baris = satu orang. AI mencerna dulu, hasilnya dicek di pratinjau, lalu tiap orang disimpan sebagai entri sendiri. */
+let BLP = [];
+function blPreview(isi) {
+  BLP = (isi.orang || []).map(o => ({...o, pilih: !o.sudah_ada})); const el = $("#blPrev");
+  if (BLP.length < 2) { el.hidden = true; el.innerHTML = ""; return 0; }
+  const n = () => BLP.filter(o => o.pilih).length;
+  el.hidden = false;
+  el.innerHTML = `<b>AI membaca ${BLP.length} orang. Satu baris = satu entri.</b> <span class="mu" style="font-size:12.5px">Cek dan ubah dulu; yang dicentang disimpan terpisah. Yang sudah ada di daftar tidak dicentang.</span>
+   <div class="tb" style="margin-top:8px"><table><thead><tr><th></th><th>Nama</th><th>Alasan</th><th>Keterangan</th></tr></thead><tbody>${BLP.map((o, i) => `<tr><td><input type="checkbox" data-blc="${i}" ${o.pilih ? "checked" : ""} style="width:auto" aria-label="Simpan ${esc(o.nama)}"></td>
+    <td style="min-width:140px"><input type="text" data-blf="nama" data-i="${i}" value="${esc(o.nama)}" maxlength="80">${o.sudah_ada ? '<span class="ch y" style="margin-top:4px">Sudah ada</span>' : ""}</td>
+    <td style="min-width:160px"><input type="text" data-blf="alasan" data-i="${i}" value="${esc(o.alasan)}" maxlength="200"></td><td style="min-width:200px"><input type="text" data-blf="keterangan" data-i="${i}" value="${esc(o.keterangan)}" maxlength="500"></td></tr>`).join("")}</tbody></table></div>
+   <div class="bar" style="margin:10px 0 0"><button class="bt g" type="button" id="blSemua"></button><button class="bt o" type="button" id="blBatal">Batal</button></div>`;
+  const lbl = () => { $("#blSemua").textContent = `Simpan ${n()} orang`; $("#blSemua").disabled = !n(); }; lbl();
+  $$("#blPrev [data-blc]").forEach(c => c.onchange = () => { BLP[c.dataset.blc].pilih = c.checked; lbl(); });
+  $$("#blPrev [data-blf]").forEach(c => c.oninput = () => { BLP[c.dataset.i][c.dataset.blf] = c.value; });
+  $("#blBatal").onclick = () => { BLP = []; el.hidden = true; el.innerHTML = ""; };
+  $("#blSemua").onclick = async () => {
+    $("#blSemua").disabled = true;
+    try { const d = await api("/api/blacklist", {json: {items: BLP.filter(o => o.pilih).map(({nama, alasan, keterangan}) => ({nama, alasan, keterangan}))}});
+      loadBlacklist(d); BLP = []; el.hidden = true; el.innerHTML = ""; $("#blMsg").textContent = `${d.ditambah} orang ditambahkan${d.dilewati ? `, ${d.dilewati} dilewati (sudah ada / kosong)` : ""}.`; }
+    catch (e) { $("#blMsg").textContent = e.message; $("#blSemua").disabled = false; }
+  };
+  return BLP.length;
+}
 $("#blSave").onclick = async () => {
   try { loadBlacklist(await api("/api/blacklist", {json: {nama: $("#blNama").value, alasan: $("#blAlasan").value, keterangan: $("#blKet").value}})); ["#blNama", "#blAlasan", "#blKet"].forEach(q => $(q).value = ""); $("#blMsg").textContent = "Ditambahkan."; }
   catch (e) { $("#blMsg").textContent = e.message; }
@@ -1545,7 +1570,8 @@ $("#stSave").onclick = async () => {
 /* ===== Isi pakai AI: satu komponen untuk semua form pencatatan. AI hanya mengisi kolom; manusia yang menekan Simpan ===== */
 const AI_FORM = {
   hutang: {at: "#hbNama", ph: "contoh: Budi pinjem ceban buat beli timah solder", isi: {nama: "#hbNama", jumlah: "#hbJml", catatan: "#hbCat"}},
-  blacklist: {at: "#blNama", ph: "contoh: akun IG @tokoabal nipu DP 200rb, setelah transfer kita diblokir (atau lampirkan screenshot chat)", isi: {nama: "#blNama", alasan: "#blAlasan", keterangan: "#blKet"}},
+  blacklist: {at: "#blNama", ph: "contoh: akun IG @tokoabal nipu DP 200rb, setelah transfer kita diblokir. Banyak orang? tulis SATU BARIS PER ORANG (atau lampirkan screenshot chat)", isi: {nama: "#blNama", alasan: "#blAlasan", keterangan: "#blKet"},
+    after: isi => blPreview(isi), pesan: (isi, n) => (isi.orang || []).length > 1 ? `AI membaca ${isi.orang.length} orang. Cek pratinjau di bawah, lalu tekan Simpan.` : null},
   catatan: {at: "#ctJudul", ph: "tempel catatan mentah, atau foto papan tulis / kertas rapat", isi: {judul: "#ctJudul", isi: "#ctIsi"}},
   dokumentasi: {at: "#dkJudul", ph: "contoh: kemarin uji kapal di danau, GPS aman, baterai drop di menit 20 (atau lampirkan foto kegiatan)", isi: {judul: "#dkJudul", tanggal: "#dkTgl", keterangan: "#dkKet"}},
   polling: {at: "#plJudul", ph: "contoh: voting ketua divisi creative, kandidat Nico, Sunan, Alkhalifi", isi: {judul: "#plJudul", deskripsi: "#plDesk", opsi: ["#plOpsi", v => (v || []).join("\n")]}},
@@ -1581,7 +1607,8 @@ function pasangAI() {
           const e = $(q); if (!e) continue; e.value = v; e.dispatchEvent(new Event("input", {bubbles: true})); e.classList.add("aiok"); setTimeout(() => e.classList.remove("aiok"), 2500); n++;
         }
         if (c.after) n += c.after(d.isi) || 0;
-        msg.textContent = n ? `Terisi ${n} kolom. Cek dulu, ubah kalau perlu, lalu tekan Simpan.` : "AI tidak menemukan data yang bisa diisi. Coba tulis lebih jelas.";
+        const khusus = c.pesan ? c.pesan(d.isi, n) : null;
+        msg.textContent = khusus ? khusus : n ? `Terisi ${n} kolom. Cek dulu, ubah kalau perlu, lalu tekan Simpan.` : "AI tidak menemukan data yang bisa diisi. Coba tulis lebih jelas.";
         if (n) { ta.value = ""; fi.value = ""; fl.textContent = "Foto"; }
       } catch (e) { msg.textContent = e.message; }
       bt.disabled = false;

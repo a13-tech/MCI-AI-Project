@@ -2723,6 +2723,7 @@ def api_catatan_del(i):
 
 
 # Blacklist: khusus tim Secret Service (+ Dev)
+BL_BANYAK_MAKS = 30
 def blacklist_list():
     with db() as c:
         rows = sql(c, "SELECT id,nama,alasan,keterangan,oleh,tanggal FROM blacklist ORDER BY id DESC").fetchall()
@@ -2734,6 +2735,20 @@ def api_blacklist():
     r = need_perm("blacklist")
     if request.method == "POST":
         d = request.get_json(silent=True) or {}
+        if isinstance(d.get("items"), list):   # simpan banyak sekaligus (hasil Isi pakai AI): satu entri per orang
+            ada = {x["nama"].strip().casefold() for x in blacklist_list()}
+            tambah = dilewati = 0
+            with db() as c:
+                for it in d["items"][:BL_BANYAK_MAKS]:
+                    nama = re.sub(r"\s+", " ", str((it or {}).get("nama", ""))).strip()[:80]
+                    if not nama or nama.casefold() in ada:
+                        dilewati += 1
+                        continue
+                    ada.add(nama.casefold())
+                    sql(c, "INSERT INTO blacklist (nama,alasan,keterangan,oleh,tanggal) VALUES (?,?,?,?,?)",
+                        (nama, str(it.get("alasan", "")).strip()[:200], str(it.get("keterangan", "")).strip()[:500], nama_peran(r), today()))
+                    tambah += 1
+            return jsonify({"items": blacklist_list(), "ditambah": tambah, "dilewati": dilewati})
         nama = str(d.get("nama", "")).strip()[:80]
         if not nama:
             return jsonify({"error": "Nama wajib diisi"}), 400
@@ -4188,6 +4203,10 @@ class IsiBlacklist(BaseModel):
     keterangan: str
 
 
+class IsiBlacklistBanyak(BaseModel):
+    orang: list[IsiBlacklist]
+
+
 class IsiCatatan(BaseModel):
     judul: str
     isi: str
@@ -4270,6 +4289,20 @@ def inv_ai_rapikan(isi):
     return isi
 
 
+def bl_ai_rapikan(isi):
+    """Satu entri per orang: potong panjang kolom, buang nama kembar dalam satu kiriman, tandai yang sudah ada di blacklist. Satu orang = kolom form terisi; banyak = pratinjau."""
+    ada = {x["nama"].strip().casefold() for x in blacklist_list()}
+    seen, orang = set(), []
+    for o in (isi.get("orang") or [])[:BL_BANYAK_MAKS]:
+        nama = re.sub(r"\s+", " ", str(o.get("nama") or "")).strip()[:80]
+        if not nama or nama.casefold() in seen:
+            continue
+        seen.add(nama.casefold())
+        orang.append({"nama": nama, "alasan": str(o.get("alasan") or "").strip()[:200], "keterangan": str(o.get("keterangan") or "").strip()[:500], "sudah_ada": nama.casefold() in ada})
+    first = orang[0] if len(orang) == 1 else {"nama": "", "alasan": "", "keterangan": ""}   # satu orang: isi form biasa
+    return {"orang": orang, "nama": first["nama"], "alasan": first["alasan"], "keterangan": first["keterangan"]}
+
+
 class CekBukti(BaseModel):
     jenis: str
     jumlah_terbaca: int
@@ -4288,9 +4321,12 @@ def _ai_isi_cfg(jenis, r):
         return can("hutang", r), "ledger", IsiHutang, (f"Catat pinjaman anggota MCI. Nama anggota yang ada: {anggota}. Samakan ejaan nama dengan daftar itu kalau mirip. "
                                                         f"{_UANG} Batas pinjaman {rp(HUTANG_MAX)} per bulan (tetap tulis jumlah apa adanya). catatan = untuk apa, singkat.")
     if jenis == "blacklist":
-        return can("blacklist", r), "aegis", IsiBlacklist, ("Catat entri blacklist (orang/akun yang tidak boleh dilayani). nama = nama orang/akun/nomor yang disebut; "
-                                                            "alasan = 1 kalimat inti (maks 200 karakter); keterangan = kronologi & bukti ringkas, faktual, tanpa menambah tuduhan (maks 500 karakter). "
-                                                            "Kalau dari foto (tangkapan layar chat), ambil nama akun dan inti masalahnya.")
+        return can("blacklist", r), "aegis", IsiBlacklistBanyak, (
+            "Catat entri blacklist (orang/akun yang tidak boleh dilayani). ATURAN PENTING: setiap BARIS teks = SATU orang/akun. Jangan menggabungkan dua baris jadi satu entri "
+            "dan jangan memecah satu baris jadi beberapa entri; baris kosong diabaikan; urutan sama dengan teks. Kalau hanya satu baris atau satu orang, kembalikan satu entri. "
+            "Kalau dari foto (tangkapan layar chat/daftar), satu entri per orang/akun yang berbeda. "
+            "Tiap entri: nama = nama orang/akun/nomor yang disebut (maks 80 karakter); alasan = 1 kalimat inti (maks 200 karakter); "
+            "keterangan = kronologi & bukti ringkas, faktual, tanpa menambah tuduhan (maks 500 karakter). Baris tanpa alasan: alasan dikosongkan, jangan mengarang.")
     if jenis == "catatan":
         return can("catatan", r), "scribe", IsiCatatan, ("Rapikan jadi catatan: judul maks 10 kata; isi terstruktur dengan poin '- ' dan bagian (Keputusan / Tugas / Lainnya) kalau cocok. "
                                                          "Kalau foto papan tulis/kertas, salin isinya dengan rapi. Jangan menambah informasi yang tidak ada.")
@@ -4368,6 +4404,8 @@ def api_ai_isi():
         isi["opsi"] = [str(x).strip()[:80] for x in (isi.get("opsi") or []) if str(x).strip()][:10]
     if jenis == "invoice":
         isi = inv_ai_rapikan(isi)
+    if jenis == "blacklist":
+        isi = bl_ai_rapikan(isi)
     return jsonify({"isi": isi, "kuota": kuota_info(r)})
 
 
