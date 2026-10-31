@@ -1290,7 +1290,7 @@ class StokFoto(BaseModel):
     cocok_id: int
 
 
-async def stok_parse(foto, mime="image/jpeg", petunjuk=""):
+async def stok_parse(foto, mime="image/jpeg", petunjuk="", idx=0):
     """MCI.Nexus menghitung barang di foto. Hasilnya usulan; Dev memeriksa dulu sebelum disimpan."""
     stok_load()
     ada = "\n".join(f"- id {x['id']}: {x['nama']} ({x['jumlah']} {x['satuan']}, kategori {x['kategori']})" for x in STOK[:150]) or "(stok masih kosong)"
@@ -1327,28 +1327,62 @@ async def stok_parse(foto, mime="image/jpeg", petunjuk=""):
         lama = ids.get(cid)
         out.append({"nama": lama["nama"] if lama else nama, "nama_ai": nama, "kategori": (lama or {}).get("kategori") or str(r.get("kategori") or "Umum").strip()[:40] or "Umum",
                     "jumlah": jml, "satuan": (lama or {}).get("satuan") or str(r.get("satuan") or "pcs").strip()[:20] or "pcs",
-                    "catatan": str(r.get("catatan") or "").strip()[:300], "cocok_id": cid, "jumlah_lama": lama["jumlah"] if lama else None})
+                    "catatan": str(r.get("catatan") or "").strip()[:300], "cocok_id": cid, "jumlah_lama": lama["jumlah"] if lama else None,
+                    "foto": [idx]})
     return out[:40]
 
 
-def stok_simpan_ai(rows, foto=None, mime=None):
-    """rows: [{cocok_id, mode: ganti|tambah, nama, kategori, jumlah, satuan, catatan, pakai_foto}] → simpan semuanya."""
+STOK_FOTO_MAKS = 10
+
+
+async def stok_parse_banyak(fotos, petunjuk=""):
+    """Maks 10 foto sekaligus, dibaca paralel. Barang yang sama di beberapa foto digabung (jumlahnya dijumlahkan)."""
+    hasil = await asyncio.gather(*(stok_parse(f, m, petunjuk, i) for i, (f, m) in enumerate(fotos)), return_exceptions=True)
+    gagal = [i + 1 for i, h in enumerate(hasil) if isinstance(h, Exception)]
+    for h in hasil:
+        if isinstance(h, Exception):
+            log.warning("Foto stok gagal dibaca: %s", h)
+    if len(gagal) == len(hasil):
+        raise hasil[0]
+    gab = {}
+    for h in hasil:
+        for r in h if isinstance(h, list) else []:
+            k = ("id", r["cocok_id"]) if r["cocok_id"] else ("nama", re.sub(r"[^a-z0-9]", "", r["nama"].lower()))
+            if k in gab:
+                g = gab[k]
+                g["jumlah"] += r["jumlah"]
+                g["foto"] = sorted(set(g["foto"] + r["foto"]))
+                if r["catatan"] and r["catatan"] not in g["catatan"]:
+                    g["catatan"] = (g["catatan"] + "; " + r["catatan"]).strip("; ")[:300]
+            else:
+                gab[k] = dict(r)
+    return list(gab.values())[:60], gagal
+
+
+def stok_simpan_ai(rows, fotos=None):
+    """rows: [{cocok_id, mode: ganti|tambah, nama, kategori, jumlah, satuan, catatan, pakai_foto, foto_idx}] → simpan semuanya.
+    fotos: daftar (bytes, mime) sesuai urutan foto yang diunggah; foto_idx menunjuk foto mana yang ditempel di kardus."""
+    fotos = fotos or []
     stok_load()
     ids, n = {x["id"]: x for x in STOK}, 0
-    for r in rows[:40]:   # periksa semua dulu supaya tidak tersimpan setengah
+    for r in rows[:60]:   # periksa semua dulu supaya tidak tersimpan setengah
         try:
             float(r.get("jumlah") or 0)
         except (TypeError, ValueError, AttributeError):
             raise ValueError("Jumlah harus angka")
         if not str(r.get("nama") or "").strip() and not ids.get(int(r.get("cocok_id") or 0)):
             raise ValueError("Ada barang yang namanya kosong")
-    for r in rows[:40]:
+    for r in rows[:60]:
         try:
             jml = int(float(r.get("jumlah") or 0))
         except (TypeError, ValueError):
             raise ValueError("Jumlah harus angka")
         lama = ids.get(int(r.get("cocok_id") or 0))
-        pf = foto if r.get("pakai_foto") and foto else None
+        try:
+            fi = int(r.get("foto_idx") or 0)
+        except (TypeError, ValueError):
+            fi = 0
+        pf, mime = fotos[fi] if r.get("pakai_foto") and 0 <= fi < len(fotos) else (None, None)
         if lama:
             baru = lama["jumlah"] + jml if r.get("mode") == "tambah" else jml
             stok_save({"id": lama["id"], "nama": r.get("nama") or lama["nama"], "kategori": r.get("kategori") or lama["kategori"], "jumlah": baru,
@@ -2880,46 +2914,48 @@ def api_stok():
     return jsonify({"id": sid, "items": STOK})
 
 
-def _foto_req(maks=4_000_000):
-    f = request.files.get("foto")
-    if not f:
-        return None, None
-    foto, mime = f.read(maks + 1), f.mimetype or "image/jpeg"
-    if len(foto) > maks or not mime.startswith("image/"):
-        raise ValueError(f"Foto harus gambar, maksimal {maks // 1_000_000} MB")
-    return foto, mime
+def _fotos_req(maks=4_000_000, n=STOK_FOTO_MAKS):
+    fs = [f for f in request.files.getlist("foto") if f and f.filename]
+    if len(fs) > n:
+        raise ValueError(f"Maksimal {n} foto sekali proses")
+    out = []
+    for f in fs:
+        foto, mime = f.read(maks + 1), f.mimetype or "image/jpeg"
+        if len(foto) > maks or not mime.startswith("image/"):
+            raise ValueError(f"Tiap foto harus gambar, maksimal {maks // 1_000_000} MB")
+        out.append((foto, mime))
+    return out
 
 
 @app.route("/api/stok/olah", methods=["POST"])
 def api_stok_olah():
-    """Khusus Dev: foto barang → MCI.Nexus mengusulkan nama, kategori, jumlah, satuan (belum disimpan)."""
+    """Khusus Dev: 1–10 foto barang → MCI.Nexus mengusulkan nama, kategori, jumlah, satuan (belum disimpan)."""
     need("admin")
     try:
-        foto, mime = _foto_req()
+        fotos = _fotos_req()
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    if not foto:
+    if not fotos:
         return jsonify({"error": "Unggah foto barangnya dulu"}), 400
     if not LOOP:
         return jsonify({"error": "Mesin AI belum siap"}), 503
     try:
-        rows = asyncio.run_coroutine_threadsafe(stok_parse(foto, mime, request.form.get("petunjuk", "")[:500]), LOOP).result(90)
+        rows, gagal = asyncio.run_coroutine_threadsafe(stok_parse_banyak(fotos, request.form.get("petunjuk", "")[:500]), LOOP).result(180)
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 503
     except Exception:
         log.exception("olah stok gagal")
         return jsonify({"error": "AI gagal membaca foto, coba lagi atau foto lebih terang/dekat"}), 502
-    return jsonify({"rows": rows})
+    return jsonify({"rows": rows, "gagal": gagal, "jumlah_foto": len(fotos)})
 
 
 @app.route("/api/stok/simpan", methods=["POST"])
 def api_stok_simpan():
-    """Khusus Dev: simpan hasil periksa AI. multipart: rows (JSON) + foto (opsional, ditempel ke barang yang dicentang)."""
+    """Khusus Dev: simpan hasil periksa AI. multipart: rows (JSON) + foto (maks 10, urutan sama dengan saat diproses)."""
     need("admin")
     try:
         rows = json.loads(request.form.get("rows") or "[]")
-        foto, mime = _foto_req(1_500_000)
-        n = stok_simpan_ai(rows if isinstance(rows, list) else [], foto, mime)
+        n = stok_simpan_ai(rows if isinstance(rows, list) else [], _fotos_req(1_500_000))
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     return jsonify({"disimpan": n, "items": STOK})

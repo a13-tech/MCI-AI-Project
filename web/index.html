@@ -517,12 +517,12 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
    <div class="cd"><div class="k">Perlu restock</div><div class="v" id="st3">-</div></div>
   </div>
   <div class="cd" id="saiBox" hidden><b>📷 Isi stok dari foto (AI)</b>
-   <p class="mu" style="margin:6px 0 10px;font-size:13px">Foto barangnya (boleh banyak jenis sekaligus, usahakan terang dan tidak bertumpuk). MCI.Nexus menghitung jumlahnya, menebak nama, kategori, dan satuan, lalu mencocokkan dengan stok yang sudah ada. Hasilnya diperiksa dulu di sini sebelum disimpan.</p>
+   <p class="mu" style="margin:6px 0 10px;font-size:13px">Pilih <b>1–10 foto</b> sekaligus (tiap foto boleh berisi banyak jenis barang, usahakan terang dan tidak bertumpuk). Barang yang sama di beberapa foto otomatis digabung dan jumlahnya dijumlahkan. MCI.Nexus menghitung jumlahnya, menebak nama, kategori, dan satuan, lalu mencocokkan dengan stok yang sudah ada. Hasilnya diperiksa dulu di sini sebelum disimpan.</p>
    <div class="fl">
-    <label>Foto barang<input type="file" id="saiFoto" accept="image/*" capture="environment"></label>
+    <label>Foto barang (maks 10)<input type="file" id="saiFoto" accept="image/*" multiple></label>
     <label>Petunjuk (opsional)<input type="text" id="saiHint" maxlength="300" placeholder="contoh: ini belanjaan baru, hitung per dus"></label>
    </div>
-   <img id="saiPrev" alt="Pratinjau foto" hidden style="max-width:220px;max-height:160px;border-radius:12px;margin-top:10px;object-fit:cover">
+   <div id="saiPrev" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px"></div>
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="saiGo">Proses dengan AI</button><span id="saiMsg" class="mu"></span></div>
    <div id="saiHasil" hidden style="margin-top:14px">
     <div class="tb"><table><thead><tr><th></th><th>Barang</th><th>Kategori</th><th>Jumlah</th><th>Satuan</th><th>Masuk ke</th><th>Cara</th><th>Foto</th></tr></thead><tbody id="saiRows"></tbody></table></div>
@@ -1363,18 +1363,31 @@ $("#stSave").onclick = async () => {
 };
 
 /* Stok dari foto (AI) */
-let SAI = null;   // {rows, blob}
-$("#saiFoto").onchange = () => { const f = $("#saiFoto").files[0]; const im = $("#saiPrev"); if (f) { im.src = URL.createObjectURL(f); im.hidden = false; } else im.hidden = true; };
+let SAI = null;   // {rows, blobs[]} blobs = foto kecil untuk kardus, urutan sama dengan foto yang diunggah
+const SAI_MAX = 10;
+let SAIF = [];    // file yang dipilih
+function saiThumbs() {
+  $("#saiPrev").innerHTML = SAIF.map((f, i) => `<figure style="margin:0;position:relative"><img src="${URL.createObjectURL(f)}" alt="Foto ${i + 1}" style="width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid #BFD0F2"><figcaption style="position:absolute;left:4px;top:4px;background:var(--navy);color:#fff;font-size:11px;font-weight:700;border-radius:6px;padding:1px 6px">${i + 1}</figcaption><button class="bt o" data-sax="${i}" aria-label="Buang foto ${i + 1}" style="position:absolute;right:2px;top:2px;min-height:22px;padding:0 6px;font-size:12px">×</button></figure>`).join("");
+  $$("[data-sax]").forEach(b => b.onclick = () => { SAIF.splice(+b.dataset.sax, 1); saiThumbs(); });
+  $("#saiMsg").textContent = SAIF.length ? `${SAIF.length} dari ${SAI_MAX} foto dipilih.` : "";
+}
+$("#saiFoto").onchange = () => {
+  const baru = [...$("#saiFoto").files].filter(f => f.type.startsWith("image/"));
+  const muat = SAI_MAX - SAIF.length;
+  SAIF = SAIF.concat(baru.slice(0, muat)); $("#saiFoto").value = ""; saiThumbs();
+  if (baru.length > muat) $("#saiMsg").textContent = `Maksimal ${SAI_MAX} foto; ${baru.length - muat} foto tidak ikut.`;
+};
 function saiRender() {
   const it = STK.items || [], opt = sel => '<option value="0">Barang baru</option>' + it.map(x => `<option value="${x.id}" ${x.id == sel ? "selected" : ""}>${esc(x.nama)} (${num(x.jumlah)} ${esc(x.satuan)})</option>`).join("");
+  const fsel = r => r.foto.length > 1 ? `<select data-f="foto_idx" aria-label="Foto untuk kardus">${r.foto.map(i => `<option value="${i}">Foto ${i + 1}</option>`).join("")}</select>` : `<input type="hidden" data-f="foto_idx" value="${r.foto[0]}">`;
   $("#saiRows").innerHTML = SAI.rows.map((r, i) => `<tr data-i="${i}"><td><input type="checkbox" data-f="on" checked aria-label="Simpan baris ${i + 1}"></td>
-    <td><input type="text" data-f="nama" value="${esc(r.nama)}" maxlength="80" style="min-width:150px">${r.catatan ? `<div class="mu" style="font-size:11.5px;margin-top:3px">${esc(r.catatan)}</div>` : ""}</td>
+    <td><input type="text" data-f="nama" value="${esc(r.nama)}" maxlength="80" style="min-width:150px"><div class="mu" style="font-size:11.5px;margin-top:3px">Foto ${r.foto.map(x => x + 1).join(" + ")}${r.catatan ? " · " + esc(r.catatan) : ""}</div></td>
     <td><input type="text" data-f="kategori" value="${esc(r.kategori)}" maxlength="40" list="stKats" style="min-width:110px"></td>
     <td><input type="number" data-f="jumlah" value="${r.jumlah}" min="0" style="width:80px"></td>
     <td><input type="text" data-f="satuan" value="${esc(r.satuan)}" maxlength="20" style="width:70px"></td>
     <td><select data-f="cocok_id" style="max-width:200px">${opt(r.cocok_id)}</select></td>
     <td><select data-f="mode"><option value="ganti">Ganti jumlah</option><option value="tambah">Tambahkan</option></select><div class="mu" data-hint style="font-size:11.5px;margin-top:3px"></div></td>
-    <td><input type="checkbox" data-f="pakai_foto" ${r.pakai_foto ? "checked" : ""} aria-label="Tempel foto ke kardus"></td></tr>`).join("");
+    <td style="white-space:nowrap"><input type="checkbox" data-f="pakai_foto" ${r.pakai_foto ? "checked" : ""} aria-label="Tempel foto ke kardus"> ${fsel(r)}</td></tr>`).join("");
   const hint = tr => {
     const g = n => tr.querySelector(`[data-f="${n}"]`), x = it.find(y => y.id == g("cocok_id").value), j = +g("jumlah").value || 0;
     g("mode").disabled = !x;
@@ -1383,18 +1396,19 @@ function saiRender() {
   $$("#saiRows tr").forEach(tr => { tr.querySelectorAll("input,select").forEach(e => e.oninput = () => hint(tr)); hint(tr); });
 }
 $("#saiGo").onclick = async () => {
-  const f = $("#saiFoto").files[0];
-  if (!f) { $("#saiMsg").textContent = "Pilih atau ambil foto dulu."; return; }
-  $("#saiGo").disabled = true; $("#saiMsg").textContent = "MCI.Nexus sedang menghitung barang di foto… (10–30 detik)"; $("#saiHasil").hidden = true;
+  if (!SAIF.length) { $("#saiMsg").textContent = "Pilih atau ambil foto dulu (maks 10)."; return; }
+  $("#saiGo").disabled = true; $("#saiHasil").hidden = true;
   try {
-    const big = await resizeFoto(f, 1536), kecil = await resizeFoto(f, 512);
-    const fd = new FormData(); fd.append("foto", big.blob, "foto.jpg"); fd.append("petunjuk", $("#saiHint").value);
+    $("#saiMsg").textContent = "Menyiapkan foto…";
+    const besar = [], kecil = [];
+    for (const f of SAIF) { besar.push((await resizeFoto(f, 1280)).blob); kecil.push((await resizeFoto(f, 512)).blob); }
+    const fd = new FormData(); besar.forEach((b, i) => fd.append("foto", b, `foto${i + 1}.jpg`)); fd.append("petunjuk", $("#saiHint").value);
+    $("#saiMsg").textContent = `MCI.Nexus sedang menghitung barang di ${SAIF.length} foto… (bisa 20–60 detik)`;
     const d = await api("/api/stok/olah", {method: "POST", body: fd});
     if (!d.rows.length) { $("#saiMsg").textContent = "Tidak ada barang yang terbaca. Coba foto lebih dekat dan terang."; return; }
-    const satu = d.rows.length === 1;
-    d.rows.forEach(r => { const x = (STK.items || []).find(y => y.id == r.cocok_id); r.pakai_foto = satu && !(x && x.foto); });
-    SAI = {rows: d.rows, blob: kecil.blob}; saiRender(); $("#saiHasil").hidden = false;
-    $("#saiMsg").textContent = `Ketemu ${d.rows.length} jenis barang. Periksa dulu, ubah kalau ada yang salah, lalu simpan.`;
+    d.rows.forEach(r => { const x = (STK.items || []).find(y => y.id == r.cocok_id); r.pakai_foto = !(x && x.foto); });
+    SAI = {rows: d.rows, blobs: kecil}; saiRender(); $("#saiHasil").hidden = false;
+    $("#saiMsg").textContent = `Ketemu ${d.rows.length} jenis barang dari ${d.jumlah_foto} foto.` + (d.gagal && d.gagal.length ? ` Foto ${d.gagal.join(", ")} gagal dibaca, coba ulang foto itu.` : "") + " Periksa dulu, lalu simpan.";
   } catch (e) { $("#saiMsg").textContent = e.message; }
   finally { $("#saiGo").disabled = false; }
 };
@@ -1402,15 +1416,15 @@ $("#saiBatal").onclick = () => { SAI = null; $("#saiHasil").hidden = true; $("#s
 $("#saiSave").onclick = async () => {
   const rows = $$("#saiRows tr").filter(tr => tr.querySelector('[data-f="on"]').checked).map(tr => {
     const g = n => tr.querySelector(`[data-f="${n}"]`);
-    return {nama: g("nama").value, kategori: g("kategori").value, jumlah: g("jumlah").value, satuan: g("satuan").value, cocok_id: +g("cocok_id").value, mode: g("mode").value, pakai_foto: g("pakai_foto").checked, catatan: SAI.rows[+tr.dataset.i].catatan};
+    return {nama: g("nama").value, kategori: g("kategori").value, jumlah: g("jumlah").value, satuan: g("satuan").value, cocok_id: +g("cocok_id").value, mode: g("mode").value, pakai_foto: g("pakai_foto").checked, foto_idx: +g("foto_idx").value, catatan: SAI.rows[+tr.dataset.i].catatan};
   });
   if (!rows.length) { $("#saiMsg2").textContent = "Belum ada baris yang dicentang."; return; }
   const fd = new FormData(); fd.append("rows", JSON.stringify(rows));
-  if (rows.some(r => r.pakai_foto)) fd.append("foto", SAI.blob, "foto.jpg");
+  if (rows.some(r => r.pakai_foto)) SAI.blobs.forEach((b, i) => fd.append("foto", b, `foto${i + 1}.jpg`));
   $("#saiSave").disabled = true; $("#saiMsg2").textContent = "Menyimpan…";
   try {
     const d = await api("/api/stok/simpan", {method: "POST", body: fd});
-    STK = Object.assign(STK, d); renderStok(); $("#saiBatal").click(); $("#saiFoto").value = ""; $("#saiPrev").hidden = true; $("#saiHint").value = "";
+    STK = Object.assign(STK, d); renderStok(); $("#saiBatal").click(); SAIF = []; saiThumbs(); $("#saiHint").value = "";
     $("#saiMsg").textContent = `✅ ${d.disimpan} barang tersimpan.`;
   } catch (e) { $("#saiMsg2").textContent = e.message; }
   finally { $("#saiSave").disabled = false; }
