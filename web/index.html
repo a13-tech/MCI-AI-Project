@@ -559,17 +559,17 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 
  <section id="p-perpus" class="pg" hidden>
   <h1>Perpustakaan</h1>
-  <p class="mu">Koleksi bacaan MCI: buku, modul, datasheet, catatan materi, dan arsip. Semua orang yang bisa membuka web ini boleh membaca dan mengunduh; yang bisa menambah, mengubah, dan menghapus hanya Dev. Ruangannya ada di LT 3 kantor 3D.</p>
-  <div class="cd" id="ppForm" hidden><b id="ppTitle">Tambah koleksi</b>
+  <p class="mu">Koleksi bacaan MCI: buku, modul, datasheet, catatan materi, dan arsip. Semua orang yang bisa membuka web ini, termasuk viewer, boleh membaca, mengunduh, dan mengunggah buku sendiri (PDF, Word, atau e-book). Yang bisa mengubah koleksi orang lain dan menghapus sembarang koleksi hanya Dev. Ruangannya ada di LT 3 kantor 3D.</p>
+  <div class="cd" id="ppForm" hidden><b id="ppTitle">Unggah koleksi</b><div class="mu" id="ppNote" style="margin-top:4px">Unggahanmu langsung tampil untuk semua orang. Isi salah satu: file, link, atau teks bacaan. Jatah unggah dibatasi per hari.</div>
    <div class="fl" style="margin-top:12px">
     <label>Judul<input type="text" id="ppJudul" maxlength="150" placeholder="contoh: Dasar Pemrograman ESP32"></label>
     <label>Penulis / sumber<input type="text" id="ppPenulis" maxlength="100" placeholder="contoh: Tim MCI, Espressif"></label>
     <label>Kategori<input type="text" id="ppKat" maxlength="40" list="ppKats" placeholder="Modul, Buku, Datasheet, Arsip…"></label>
     <label>Link (opsional)<input type="url" id="ppLink" maxlength="500" placeholder="https://drive.google.com/…"></label>
-    <label>File (PDF dll, maks 8 MB)<input type="file" id="ppFile"></label>
+    <label>File (PDF, Word, e-book; maks 8 MB)<input type="file" id="ppFile" accept=".pdf,.doc,.docx,.epub,.mobi,.azw3,.odt,.rtf,.txt,.md"></label>
     <label>Sampul (opsional)<input type="file" id="ppSampul" accept="image/*"></label>
     <label class="full">Ringkasan<textarea id="ppRing" maxlength="1000" rows="2" placeholder="Isinya tentang apa, cocok untuk siapa"></textarea></label>
-    <label class="full">Isi bacaan (opsional, bisa dibaca langsung di web)<textarea id="ppIsi" rows="6" placeholder="Tempel teks materi di sini…"></textarea></label>
+    <label class="full">Isi bacaan (opsional; untuk Word, EPUB, dan TXT terisi otomatis dari file)<textarea id="ppIsi" rows="6" placeholder="Tempel teks materi di sini…"></textarea></label>
    </div>
    <datalist id="ppKats"></datalist>
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="ppSave">Simpan</button><button class="bt o" id="ppReset">Kosongkan</button>
@@ -1398,10 +1398,10 @@ $("#stSave").onclick = async () => {
   $("#stSave").disabled = false;
 };
 
-/* Perpustakaan: semua boleh baca, Dev yang mengisi */
+/* Perpustakaan: semua boleh baca dan mengunggah (ada jatah harian); ubah/hapus milik orang lain khusus Dev */
 let PPD = {items: [], edit: false};
 const ppWarna = k => { let h = 0; for (const c of k) h = (h * 31 + c.charCodeAt(0)) % 360; return `linear-gradient(160deg,hsl(${h} 55% 28%),hsl(${(h + 40) % 360} 60% 42%))`; };
-function ppReset() { $("#ppTitle").textContent = "Tambah koleksi"; $("#ppForm").dataset.id = ""; ["#ppJudul", "#ppPenulis", "#ppKat", "#ppLink", "#ppRing", "#ppIsi"].forEach(q => $(q).value = ""); $("#ppFile").value = ""; $("#ppSampul").value = ""; $("#ppHf").checked = $("#ppHs").checked = false; $("#ppHfW").hidden = $("#ppHsW").hidden = true; $("#ppMsg").textContent = ""; }
+function ppReset() { $("#ppTitle").textContent = "Unggah koleksi"; $("#ppForm").dataset.id = ""; ["#ppJudul", "#ppPenulis", "#ppKat", "#ppLink", "#ppRing", "#ppIsi"].forEach(q => $(q).value = ""); $("#ppFile").value = ""; $("#ppSampul").value = ""; $("#ppHf").checked = $("#ppHs").checked = false; $("#ppHfW").hidden = $("#ppHsW").hidden = true; $("#ppMsg").textContent = ""; }
 function renderPerpus() {
   const it = PPD.items, q = $("#ppQ").value.trim().toLowerCase(), kf = $("#ppF").value, kats = [...new Set(it.map(x => x.kategori))].sort();
   const cur = $("#ppF").value; $("#ppF").innerHTML = '<option value="">Semua kategori</option>' + kats.map(k => `<option ${k === cur ? "selected" : ""}>${esc(k)}</option>`).join("");
@@ -1409,10 +1409,10 @@ function renderPerpus() {
   const vis = it.filter(x => (!kf || x.kategori === kf) && (!q || [x.judul, x.penulis, x.kategori, x.ringkasan].join(" ").toLowerCase().includes(q)));
   $("#ppJml").textContent = `Koleksi (${num(it.length)})`;
   $("#ppList").innerHTML = vis.map(x => `<div class="it"><div class="cv2" style="background:${ppWarna(x.kategori)}"><i></i>${x.sampul ? `<img src="/api/perpus/${x.id}/sampul?v=${x.v}" alt="" loading="lazy">` : esc(x.judul)}</div>
-    <div class="bd"><b>${esc(x.judul)}</b>${x.penulis ? `<span class="mu" style="font-size:12.5px">${esc(x.penulis)}</span>` : ""}<span><span class="ch">${esc(x.kategori)}</span></span>${x.ringkasan ? `<span style="font-size:13px">${esc(x.ringkasan)}</span>` : ""}
+    <div class="bd"><b>${esc(x.judul)}</b>${x.penulis ? `<span class="mu" style="font-size:12.5px">${esc(x.penulis)}</span>` : ""}<span><span class="ch">${esc(x.kategori)}</span> <span class="mu" style="font-size:12px">oleh ${esc(x.oleh)}</span></span>${x.ringkasan ? `<span style="font-size:13px">${esc(x.ringkasan)}</span>` : ""}
     <div class="bar">${x.ada_isi ? `<button class="bt g" data-ppb="${x.id}">Baca</button>` : ""}${x.file_nama ? `<a class="bt o" href="/api/perpus/${x.id}/file" target="_blank" rel="noopener">Buka file</a><a class="bt o" href="/api/perpus/${x.id}/file?unduh=1">Unduh${x.file_kb ? ` (${x.file_kb > 1024 ? (x.file_kb / 1024).toFixed(1) + " MB" : x.file_kb + " KB"})` : ""}</a>` : ""}${x.link ? `<a class="bt o" href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">Buka link</a>` : ""}
-    ${PPD.edit ? `<button class="bt o" data-ppe="${x.id}">Ubah</button><button class="bt o" data-ppd="${x.id}">Hapus</button>` : ""}</div></div></div>`).join("")
-    || `<p class="mu">${it.length ? "Tidak ada yang cocok." : "Rak masih kosong." + (PPD.edit ? " Tambah koleksi pertama lewat formulir di atas." : " Dev belum menambahkan koleksi.")}</p>`;
+    ${PPD.edit ? `<button class="bt o" data-ppe="${x.id}">Ubah</button>` : ""}${PPD.edit || x.milikku ? `<button class="bt o" data-ppd="${x.id}">Hapus</button>` : ""}</div></div></div>`).join("")
+    || `<p class="mu">${it.length ? "Tidak ada yang cocok." : "Rak masih kosong. Jadi yang pertama: unggah lewat formulir di atas."}</p>`;
   const one = id => it.find(x => x.id == id);
   $$("[data-ppb]").forEach(b => b.onclick = async () => {
     const x = one(b.dataset.ppb); $("#ppBK").textContent = x.kategori; $("#ppBJ").textContent = x.judul; $("#ppBP").textContent = x.penulis; $("#ppBT").textContent = "Memuat…"; $("#ppBaca").hidden = false;
@@ -1428,7 +1428,7 @@ function renderPerpus() {
   });
 }
 async function loadPerpus() {
-  try { PPD = DEMO ? {items: [], edit: false} : await api("/api/perpus"); $("#ppForm").hidden = !PPD.edit; renderPerpus(); } catch (e) { $("#ppList").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
+  try { PPD = DEMO ? {items: [], edit: false} : await api("/api/perpus"); $("#ppForm").hidden = DEMO; renderPerpus(); } catch (e) { $("#ppList").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
 }
 $("#ppQ").oninput = renderPerpus; $("#ppF").onchange = renderPerpus; $("#ppReset").onclick = ppReset;
 $("#ppBX").onclick = () => $("#ppBaca").hidden = true;
@@ -1440,6 +1440,7 @@ $("#ppSave").onclick = async () => {
   if (id) fd.append("id", id);
   [["judul", "#ppJudul"], ["penulis", "#ppPenulis"], ["kategori", "#ppKat"], ["link", "#ppLink"], ["ringkasan", "#ppRing"], ["isi", "#ppIsi"]].forEach(([k, q]) => fd.append(k, $(q).value));
   if ($("#ppHf").checked) fd.append("hapus_file", "1"); if ($("#ppHs").checked) fd.append("hapus_sampul", "1");
+  if (f && !/\.(pdf|docx?|epub|mobi|azw3|odt|rtf|txt|md)$/i.test(f.name)) { $("#ppMsg").textContent = "Format belum didukung. Boleh: PDF, Word, EPUB, MOBI, ODT, RTF, TXT."; return; }
   if (f && f.size > 8e6) { $("#ppMsg").textContent = "File maksimal 8 MB. Untuk file besar, taruh di Google Drive lalu isi kolom Link."; return; }
   $("#ppSave").disabled = true; $("#ppMsg").textContent = "Menyimpan…";
   try {
@@ -2191,6 +2192,70 @@ const OFFICE = (() => {
       L2.doors.forEach(o => o.d.position.x = L2.x + o.sd * (o.x0 + L2.open * o.run));
     });
   }
+  /* ---------- FASAD FUTURISTIK (tetap simpel): fascia putih-perak + garis neon cyan, sirip vertikal di dua ujung, tiang sudut ramping.
+     LT 2 punya "sky garden": teras taman di ujung timur + sabuk tanaman dengan sulur menjuntai di tepi depan. ---------- */
+  const FW = {roughness: .22, metalness: .55}, NEON = {emissive: "#5ee6ff", emissiveIntensity: 1.7};
+  function futurisLantai(f) {
+    add(PANEL(BW + .3, .3, .1, .06), "#eef3fb", BX, -.17, 7.34, null, FW);
+    add(CAP(.02, BW + .1), "#5ee6ff", BX, -.36, 7.37, null, NEON).rotation.z = PI / 2;
+    [EX + .14, WX - .14].forEach((x, k) => { for (let z = -6.6; z <= 6.7; z += 1.65) add(PANEL(.05, WH - .1, .42, .02), "#f4f7fd", x, WH / 2, z, null, FW).rotation.y = (k ? -1 : 1) * .5; });
+    [WX + .05, EX - .05].forEach(x => { add(CY(.09, .09, WH + .3, 20), "#f4f7fd", x, WH / 2 - .02, 7.12, null, FW); [.5, WH - .45].forEach(y => add(TO(.095, .018), "#5ee6ff", x, y, 7.12, null, NEON).rotation.x = PI / 2); });
+  }
+  function glassRail(x0, z0, x1, z1, h) {
+    const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz), g = grp((x0 + x1) / 2, 0, (z0 + z1) / 2, Math.atan2(-dz, dx));
+    const gl = new THREE.Mesh(new THREE.PlaneGeometry(len, h), new THREE.MeshStandardMaterial({color: LIN("#bfe0ff"), transparent: true, opacity: .2, roughness: .05, metalness: .1, side: THREE.DoubleSide, depthWrite: false}));
+    gl.position.y = h / 2 + .06; g.add(gl);
+    add(CAP(.025, len), "#f4f7fd", 0, h + .08, 0, g, FW).rotation.z = PI / 2;
+    for (let i = 0; i <= Math.round(len / 1.6); i++) add(CY(.025, .025, h + .04, 8), "#f4f7fd", -len / 2 + i * len / Math.round(len / 1.6), h / 2 + .06, 0, g, FW);
+  }
+  function skyGarden() {   // CUR = FG[1]
+    let sd = 11; const rnd = () => (sd = (sd * 9301 + 49297) % 233280) / 233280;
+    const Wt = 6.4, Dt = 13.0, gx = EX + Wt / 2, GR = ["#2f9e57", "#3dae62", "#2a8f4f", "#46b86b"], FL = ["#f472b6", "#facc15", "#ffffff", "#fb923c", "#c084fc"];
+    CAST = true; add(SLAB(Wt, Dt, .3, .3), "#eef3fb", gx, -.17, 0, null, FW); CAST = false;
+    add(CAP(.022, Dt), "#5ee6ff", EX + Wt + .02, -.3, 0, null, NEON).rotation.x = PI / 2;
+    [-1, 1].forEach(sg => add(CAP(.022, Wt), "#5ee6ff", gx, -.3, sg * (Dt / 2 + .02), null, NEON).rotation.z = PI / 2);
+    for (let i = 0; i < 9; i++) add(SLAB(.62, Dt - .9, .05, .02), GR[i % 2 ? 1 : 0], EX + .6 + i * .62, .035, 0, null, {roughness: .95});   // rumput bergaris
+    for (let i = 0; i < 10; i++) { const m = add(CY(.3, .3, .05, 20), "#e5e9f2", EX + .5 + i * .55, .09, Math.sin(i * .7) * 1.7, null, {roughness: .5}); m.scale.set(1, 1, .75); }   // jalur batu berkelok
+    const bak = (x, z, w, d, vert) => {   // bak tanaman putih + semak berbunga
+      add(SLAB(w, d, .5, .12), "#eef3fb", x, .27, z, null, FW); add(SLAB(w - .14, d - .14, .04, .06), "#4a3321", x, .53, z, null, {roughness: 1});
+      const n = Math.round((vert ? d : w) / .7);
+      for (let i = 0; i < n; i++) { const t = (i + .5) / n - .5, px = vert ? x : x + t * w, pz = vert ? z + t * d : z, r = .26 + rnd() * .12;
+        add(SP(r, 12, 9), GR[(rnd() * 4) | 0], px, .55 + r * .7, pz, null, {roughness: .85}).scale.y = .8;
+        if (i % 2) add(SP(.07, 8, 6), FL[(rnd() * 5) | 0], px + (rnd() - .5) * .2, .55 + r * 1.35, pz + (rnd() - .5) * .2, null, {roughness: .6}); }
+    };
+    CAST = true;
+    bak(EX + Wt - .6, 0, .72, Dt - .5, true); bak(gx - .4, -(Dt / 2 - .38), Wt - 1.4, .62, false); bak(gx - .4, Dt / 2 - .38, Wt - 1.4, .62, false);
+    const tree = (x, z, h, c1, c2) => { const g = grp(x, .06, z, 0); add(CY(.09, .14, h * .55, 10), "#6b4423", 0, h * .275, 0, g);
+      [[0, h * .72, 0, .95, c1], [.4, h * .92, .15, .68, c2], [-.35, h * .88, -.2, .74, c2], [.1, h * 1.12, -.1, .52, c1]].forEach(a => add(SP(a[3], 16, 12), a[4], a[0], a[1], a[2], g, {roughness: .85})); };
+    tree(gx + .1, -3.4, 3.0, "#2fa35e", "#3dbd72"); tree(gx - .5, 3.3, 3.3, "#2a9456", "#46c27a"); tree(gx + 1.1, .2, 2.5, "#34a860", "#52cc84");
+    CAST = false;
+    // bangku + pergola kisi putih, lampu taman cyan
+    const bn = grp(gx - 1.5, .06, -1.0, -PI / 2); add(PANEL(1.3, .08, .42, .03), "#f4f7fd", 0, .42, 0, bn, FW); add(PANEL(1.3, .4, .06, .03), "#f4f7fd", 0, .66, -.2, bn, FW); [-.55, .55].forEach(x => add(PANEL(.06, .4, .4, .02), "#334155", x, .2, 0, bn, FW));
+    add(PANEL(1.2, .02, .03, .005), "#5ee6ff", 0, .15, .15, bn, NEON);
+    const pg = grp(gx - 1.5, .06, -1.0, 0); [[-1.2, -1.0], [1.2, -1.0], [-1.2, 1.0], [1.2, 1.0]].forEach(c => add(PANEL(.1, 2.4, .1, .02), "#f4f7fd", c[0], 1.2, c[1], pg, FW));
+    for (let i = -4; i <= 4; i++) add(PANEL(.07, .09, 2.3, .015), "#f4f7fd", i * .3, 2.45, 0, pg, FW);
+    add(PANEL(2.6, .06, .06, .01), "#5ee6ff", 0, 2.38, -1.0, pg, NEON); add(PANEL(2.6, .06, .06, .01), "#5ee6ff", 0, 2.38, 1.0, pg, NEON);
+    [[EX + 1.6, -4.6], [EX + 1.6, 4.6], [EX + 3.8, -5.0], [EX + 3.8, 5.0], [EX + 3.4, -2.0], [EX + 3.4, 2.4]].forEach(c => { add(CY(.03, .04, .35, 8), "#334155", c[0], .2, c[1]); add(SP(.07, 10, 8), "#5ee6ff", c[0], .42, c[1], null, {emissive: "#5ee6ff", emissiveIntensity: 2.2}); });
+    glassRail(EX + Wt - .04, -Dt / 2 + .1, EX + Wt - .04, Dt / 2 - .1, 1.1); glassRail(EX + .1, -Dt / 2 + .06, EX + Wt - .04, -Dt / 2 + .06, 1.1); glassRail(EX + .1, Dt / 2 - .06, EX + Wt - .04, Dt / 2 - .06, 1.1);
+    label("SKY GARDEN · LT 2", gx - .5, 3.9, 0, .5, "#4ade80");
+    // sabuk tanaman di tepi depan LT 2 dengan sulur menjuntai: tanaman "muncul" di tengah fasad putih
+    const bw = BW - 1.4;
+    add(SLAB(bw, .56, .1, .04), "#eef3fb", BX, -.07, 7.66, null, FW); add(SLAB(bw, .44, .3, .06), "#eef3fb", BX, .13, 7.66, null, FW); add(SLAB(bw - .1, .34, .03, .04), "#4a3321", BX, .29, 7.66, null, {roughness: 1});
+    add(CAP(.015, bw), "#5ee6ff", BX, -.05, 7.95, null, NEON).rotation.z = PI / 2;
+    for (let x = BX - bw / 2 + .3; x < BX + bw / 2 - .2; x += .5) {
+      const r = .17 + rnd() * .1; add(SP(r, 10, 8), GR[(rnd() * 4) | 0], x, .3 + r * .8, 7.66 + (rnd() - .5) * .14, null, {roughness: .85}).scale.y = .8;
+      if (rnd() < .33) add(SP(.055, 8, 6), FL[(rnd() * 5) | 0], x + (rnd() - .5) * .2, .3 + r * 1.6, 7.66, null, {roughness: .6});
+      if (rnd() < .62) { const L = .5 + rnd() * 1.7, vz = 7.9 + (rnd() - .5) * .08; add(CY(.011, .011, L, 5), "#2c8f4e", x, -.1 - L / 2, vz, null, {roughness: .8});
+        for (let y = -.3; y > -.1 - L; y -= .3) add(SP(.045, 6, 5), GR[(rnd() * 4) | 0], x + (rnd() - .5) * .06, y, vz + .02, null, {roughness: .8}).scale.y = .6; }
+    }
+  }
+  function beacon(x, z) {   // menara cahaya ramping di atap: cincin giroskop berputar
+    add(CY(.4, .52, .35, 24), "#14295e", x, .17, z, null, FW); add(CY(.08, .13, 4.6, 16), "#f4f7fd", x, 2.6, z, null, FW);
+    const gy = grp(x, 3.5, z, 0); gy.userData.dyn = true;
+    [[.62, 0], [.5, PI / 3], [.38, 2 * PI / 3]].forEach(a => add(TO(a[0], .028), "#5ee6ff", 0, 0, 0, gy, NEON).rotation.set(PI / 2 - a[1] * .5, a[1], 0));
+    ANI.push({o: gy, k: "spin", s: .9});
+    const orb = add(SP(.17, 14, 10), "#e0fbff", x, 4.95, z, null, {emissive: "#5ee6ff", emissiveIntensity: 2.4}); orb.userData.dyn = true; ANI.push({o: orb.material, k: "pulse"});
+  }
   function roof() {
     ROOF = new THREE.Group(); ROOF.position.y = FY[3] + FH; sc.add(ROOF); CUR = ROOF;
     add(SLAB(BW, 14.4, .35, .5), new THREE.MeshStandardMaterial({color: LIN("#14295e"), roughness: .6}), BX, -.175, 0);
@@ -2207,6 +2272,7 @@ const OFFICE = (() => {
     const ant = grp(8.5, 0, -4.5, 0); add(CY(.08, .14, 4, 12), "#cbd5e1", 0, 2, 0, ant, CHROME); [1, 2, 3].forEach(y => add(TO(.25 - y * .05, .02), "#cbd5e1", 0, y, 0, ant, CHROME).rotation.x = PI / 2);
     const bl = add(SP(.14), "#ef4444", 0, 4.1, 0, ant, {emissive: "#ef4444", emissiveIntensity: 2}); ANI.push({o: bl.material, k: "pulse"});
     [[2, -4.5], [5, -4.5]].forEach(p => { add(SLAB(2.4, 1.4, .08, .12), "#1e3a8a", p[0], .9, p[1], null, {roughness: .2, metalness: .5}).rotation.x = -.5; add(CY(.04, .04, .8, 8), "#cbd5e1", p[0], .45, p[1] + .2, null, CHROME); });
+    beacon(-8.9, 5.3);
     plant(-10.8, 6, 1.2); plant(10.8, 6, 1.2); plant(-10.8, -6, 1); plant(10.8, 2, 1); plant(20.2, 6, 1.1); plant(-24.6, 6, 1.1); plant(-24.6, -6, 1);
     /* panel surya + tandon air di atas sayap barat */
     for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) { add(SLAB(2.4, 1.4, .08, .12), "#1e3a8a", -15.5 - i * 2.7, .9, -4.5 + j * 2.2, null, {roughness: .2, metalness: .5}).rotation.x = -.5; add(CY(.04, .04, .8, 8), "#cbd5e1", -15.5 - i * 2.7, .45, -4.3 + j * 2.2, null, CHROME); }
@@ -2780,7 +2846,25 @@ const OFFICE = (() => {
     add(PANEL(.52, .12, .46, .05), "#111827", 0, 1.08, -.3, g, {roughness: .7});      // jok
     add(PANEL(.52, .5, .1, .05), "#111827", 0, 1.36, -.53, g, {roughness: .7});
     const st = add(CY(.025, .025, .55, 10), K, 0, 1.08, .28, g); st.rotation.x = -.45;
-    add(TO(.14, .02), "#111827", 0, 1.32, .4, g).rotation.x = -PI / 2 + .45;
+    // setir yang bisa berputar + operator forklift: robot petugas gudang (helm putih, rompi lime) duduk di jok, tangan di setir
+    const wh = grp(0, 1.32, .4, 0, g); wh.rotation.x = -PI / 2 + .45; wh.userData.dyn = true;
+    const wspin = grp(0, 0, 0, 0, wh); wspin.userData.dyn = true;
+    add(TO(.14, .02), "#111827", 0, 0, 0, wspin); add(PANEL(.26, .014, .02, .005), "#111827", 0, 0, 0, wspin); add(PANEL(.014, .13, .02, .005), "#111827", 0, -.065, 0, wspin); add(SP(.022, 8, 6), "#facc15", .12, .03, .03, wspin);
+    const OR = "#EA8A3C", NV = "#0b1d4a", op = grp(0, 0, 0, 0, g); op.userData.dyn = true;
+    const limb = (a, b, r, col) => { const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], L = Math.hypot(dx, dy, dz);
+      const m = add(CAP(r, Math.max(.01, L - 2 * r)), col, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, op, {roughness: .45});
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx, dy, dz).normalize()); return m; };
+    add(SP(.2, 20, 14), OR, 0, 1.42, -.24, op, {roughness: .45}).scale.set(1, 1.15, .9);                                    // badan
+    add(G("opVest", () => new THREE.SphereGeometry(.208, 22, 10, 0, PI * 2, .55, .95)), "#c6f432", 0, 1.42, -.24, op, {roughness: .6, side: THREE.DoubleSide}).scale.set(1, 1.15, .9);   // rompi
+    add(TO(.205, .011), "#e2e8f0", 0, 1.37, -.24, op, {roughness: .2, metalness: .6, emissive: "#cbd5e1", emissiveIntensity: .25}).rotation.x = PI / 2;                    // strip reflektif
+    const hd = grp(0, 1.8, -.22, 0, op); hd.userData.dyn = true;
+    add(SP(.18, 20, 14), OR, 0, 0, 0, hd, {roughness: .45});
+    add(SP(.15, 18, 12), NV, 0, -.005, .09, hd, {roughness: .12, metalness: .3}).scale.set(1.12, .72, .6);                  // visor
+    add(G("opHat", () => new THREE.SphereGeometry(.2, 22, 10, 0, PI * 2, 0, PI / 2)), "#f8fafc", 0, .045, 0, hd, {roughness: .4});   // helm
+    add(CY(.24, .24, .02, 26), "#f8fafc", 0, .05, .05, hd, {roughness: .4});
+    [-1, 1].forEach(sd => { add(CAP(.017, .03), "#7ff3ff", sd * .055, .0, .165, hd, {emissive: "#5ee6ff", emissiveIntensity: 2.2}); add(CY(.04, .04, .03, 14), "#D4AF5A", sd * .185, -.01, 0, hd, GOLD).rotation.z = PI / 2; });
+    [-1, 1].forEach(sd => { limb([sd * .19, 1.55, -.22], [sd * .24, 1.4, .06], .05, OR); limb([sd * .24, 1.4, .06], [sd * .1, 1.34, .37], .045, OR); add(SP(.055, 10, 8), "#FFE4C7", sd * .1, 1.34, .38, op); });   // lengan ke setir
+    [-1, 1].forEach(sd => { limb([sd * .1, 1.22, -.24], [sd * .11, 1.27, .1], .06, NV); limb([sd * .11, 1.27, .1], [sd * .1, .86, .2], .055, NV); add(SP(.075, 10, 8), "#111827", sd * .1, .82, .27, op).scale.set(1, .6, 1.5); });   // kaki
     [[-.5, .42], [.5, .42], [-.5, -.58], [.5, -.58]].forEach(c => add(PANEL(.06, 1.32, .06, .01), K, c[0], 1.48, c[1], g, STEEL));   // tiang pelindung
     add(PANEL(1.12, .05, 1.12, .02), K, 0, 2.15, -.08, g, STEEL);
     for (let i = -2; i <= 2; i++) add(PANEL(.04, .03, 1.0, .005), "#374151", i * .2, 2.19, -.08, g, STEEL);
@@ -2803,7 +2887,7 @@ const OFFICE = (() => {
     const tl = CT(256, 96, (q, w, h) => { q.fillStyle = Y; q.fillRect(0, 0, w, h); q.fillStyle = "#0A2A6B"; q.font = "900 52px system-ui,sans-serif"; q.textAlign = "center"; q.fillText("MCI · FL-01", w / 2, 66); });
     [-1, 1].forEach(sd => plane(tl, .7, .26, sd * .565, .55, -.2, sd * PI / 2, g));
     plane(tl, .7, .26, 0, .7, -1.035, PI, g);
-    return {g, inner, car, roda};
+    return {g, inner, car, roda, hd, wspin};
   }
   function gudangBesar(f) {
     lantaiGudang();
@@ -2885,10 +2969,13 @@ const OFFICE = (() => {
     if (!FORK) return;
     const F = FORK, step = F.Q[F.i];
     F.t += dt; const k = Math.min(1, F.t / step.d), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
-    const px = F.st.x, pz = F.st.z;
+    const px = F.st.x, pz = F.st.z, pry = F.st.ry;
     for (const key in step.to) F.st[key] = F.from[key] + (step.to[key] - F.from[key]) * e;
     const dist = Math.hypot(F.st.x - px, F.st.z - pz) * (step.to.z != null && step.to.z < F.from.z ? -1 : 1);
     F.fk.roda.forEach(w => w.w.rotation.x += dist / w.r);
+    F.ws = (F.ws || 0) * Math.max(0, 1 - dt * 1.2) + (F.st.ry - pry) * 5;   // setir ikut diputar saat belok, lalu kembali lurus
+    F.fk.wspin.rotation.z = F.ws;
+    F.fk.hd.rotation.set(-Math.min(.4, Math.max(0, F.st.h - .05) * .22), Math.sin(performance.now() / 1000 * .7) * .12 + Math.max(-.5, Math.min(.5, F.ws * .12)), 0);   // operator menoleh ke arah belok & menengadah saat garpu naik
     F.place();
     if (k >= 1) {
       if (step.ev === "ambil") { F.fk.car.add(F.pal); F.pal.position.set(0, -.04, F.PZ - .95); F.pal.rotation.set(0, 0, 0); }
@@ -3452,6 +3539,7 @@ const OFFICE = (() => {
     [lt1, lt2, lt3, lt4].forEach((fn, i) => { CUR = FG[i]; fn(); });
     [wing1, wing2, wing3, wing4].forEach((fn, i) => { CUR = FG[i]; fn(); });
     [0, 1, 2, 3].forEach(i => { CUR = FG[i]; westWing(i); bekasMeja(i); });
+    [0, 1, 2, 3].forEach(i => { CUR = FG[i]; futurisLantai(i); }); CUR = FG[1]; skyGarden();
     roof(); CUR = sc;
     const order = [...list].sort((a, b) => (b.boss ? 1 : 0) - (a.boss ? 1 : 0));
     AG = order.map(build).filter(Boolean);
@@ -3483,7 +3571,7 @@ const OFFICE = (() => {
       renderList();
     },
     states() { const o = {}; AG.forEach(a => o[a.key] = status(a)); return o; },
-    _demo() { return DEMO ? {AG, showProp, setFollow, cam, ctl, LIFTD} : null; },
+    _demo() { return DEMO ? {AG, showProp, setFollow, cam, ctl, LIFTD, get FORK() { return FORK; }} : null; },
     iot(list) { iotFeed(list); },
     follow(k) { if (!ready) return; const a = AG.find(x => x.key === k); if (a) setFollow(a); },
     galeri(ids) { if (ready) galeriSet(ids); },

@@ -10,9 +10,10 @@ Prinsip hemat token (Gemini Tier 1):
 
 Studio Gambar: Cloudflare Workers AI (FLUX schnell + img2img), gratis 10.000 neuron/hari.
 """
-import os, io, csv, json, re, time, gzip, base64, asyncio, secrets, logging, sqlite3, threading, contextlib, hashlib
+import os, io, csv, json, re, time, gzip, base64, asyncio, secrets, logging, sqlite3, threading, contextlib, hashlib, zipfile
 from collections import deque, OrderedDict
 from datetime import datetime, timedelta, timezone
+from html import unescape as _unesc
 
 import httpx, pytz, psutil
 from flask import Flask, jsonify, abort, request, send_from_directory, make_response, redirect, Response
@@ -225,6 +226,12 @@ def db_init():
             now = datetime.now(WIB).isoformat(timespec="seconds")
             for s in SKILL_SEED:
                 sql(c, "INSERT INTO skills (nama,bot,deskripsi,pemicu,isi,dibuat) VALUES (?,?,?,?,?,?)", (*s, now))
+    for kol in ("oleh TEXT", "oleh_role TEXT", "ip TEXT"):   # kolom pengunggah (Perpustakaan terbuka untuk semua)
+        try:
+            with db() as c:
+                sql(c, f"ALTER TABLE perpus ADD COLUMN {kol}")
+        except Exception:
+            pass   # sudah ada
     skills_reload()
     if not PG:
         log.warning("DATABASE_URL kosong: memakai SQLite sementara, data kas, skill, dan pemakaian HILANG saat restart Render.")
@@ -2975,17 +2982,26 @@ def api_stok_one(i):
     return jsonify({"diubah": stok_jumlah(i, j), "items": STOK})
 
 
-# ---------- PERPUSTAKAAN: semua orang yang bisa membuka web boleh membaca; tambah/ubah/hapus khusus Dev ----------
+# ---------- PERPUSTAKAAN: semua yang bisa membuka web boleh membaca DAN mengunggah; ubah/hapus milik orang lain khusus Dev ----------
 PERPUS_MAKS, PERPUS_FILE_MAKS = 300, 8_000_000
-_PERPUS_KOLOM = "id,judul,penulis,kategori,ringkasan,link,file_nama,file_mime,dibuat,diubah, CASE WHEN sampul IS NULL OR sampul='' THEN 0 ELSE 1 END, LENGTH(isi), LENGTH(file_data)"
+PERPUS_JATAH = {"viewer_ip": 3, "viewer_semua": 30, "anggota": 10}   # unggahan per hari (WIB); Dev tanpa batas
+PERPUS_BYTE_MAKS = 150_000_000                                         # total file kiriman non-Dev (karakter base64)
+PERPUS_EXT = {   # ekstensi -> tipe yang DISET SERVER (tipe dari browser tidak dipercaya)
+    "pdf": "application/pdf", "doc": "application/msword",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "epub": "application/epub+zip", "odt": "application/vnd.oasis.opendocument.text", "rtf": "application/rtf",
+    "txt": "text/plain", "md": "text/plain", "mobi": "application/x-mobipocket-ebook", "azw3": "application/vnd.amazon.ebook"}
+_PERPUS_KOLOM = ("id,judul,penulis,kategori,ringkasan,link,file_nama,file_mime,dibuat,diubah, CASE WHEN sampul IS NULL OR sampul='' THEN 0 ELSE 1 END, "
+                 "LENGTH(isi), LENGTH(file_data), oleh, oleh_role")
 
 
-def perpus_list():
+def perpus_list(r=None):
     with db() as c:
         rows = sql(c, f"SELECT {_PERPUS_KOLOM} FROM perpus ORDER BY LOWER(kategori), LOWER(judul)").fetchall()
-    return [{"id": int(i), "judul": j, "penulis": pn or "", "kategori": k or "Umum", "ringkasan": r or "", "link": ln or "", "file_nama": fn or "",
+    return [{"id": int(i), "judul": j, "penulis": pn or "", "kategori": k or "Umum", "ringkasan": r_ or "", "link": ln or "", "file_nama": fn or "",
              "file_mime": fm or "", "dibuat": d or "", "diubah": u or "", "sampul": bool(sp), "ada_isi": bool(li), "file_kb": round((lf or 0) * 3 / 4 / 1024),
-             "v": abs(hash(u or "")) % 100000} for i, j, pn, k, r, ln, fn, fm, d, u, sp, li, lf in rows]
+             "oleh": ol or "Dev", "milikku": bool(r and r != "viewer" and orl == r),
+             "v": abs(hash(u or "")) % 100000} for i, j, pn, k, r_, ln, fn, fm, d, u, sp, li, lf, ol, orl in rows]
 
 
 def _url_aman(u):
@@ -2995,72 +3011,209 @@ def _url_aman(u):
     return u
 
 
-def perpus_simpan(d, file=None, sampul=None):
+def _gambar_mime(b):
+    """Tipe gambar dari isi file (bukan dari browser). SVG sengaja tidak diterima: bisa membawa script."""
+    if b[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if b[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if b[:4] == b"GIF8":
+        return "image/gif"
+    if b[:4] == b"RIFF" and b[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+def _zip_buka(data):
+    try:
+        z = zipfile.ZipFile(io.BytesIO(data))
+    except Exception:
+        raise ValueError("Isi file tidak cocok dengan ekstensinya (bukan dokumen yang sah)")
+    inf = z.infolist()
+    if len(inf) > 4000 or sum(i.file_size for i in inf) > 400_000_000:
+        raise ValueError("Isi file terlalu besar setelah dibuka")
+    return z
+
+
+def _strip_tag(x):
+    return _unesc(re.sub(r"[ \t]+", " ", re.sub(r"<[^>]+>", "", x)))
+
+
+def perpus_cek_file(nama, data):
+    """Periksa ekstensi + isi file. Mengembalikan (nama_aman, mime, teks_bacaan). ValueError kalau ditolak."""
+    ext = nama.rsplit(".", 1)[-1].lower() if "." in nama else ""
+    if ext not in PERPUS_EXT:
+        raise ValueError("Format belum didukung. Boleh: PDF, Word (doc/docx), e-book (epub/mobi/azw3), ODT, RTF, TXT. Format lain: taruh di Google Drive lalu isi kolom Link.")
+    if not data:
+        raise ValueError("File kosong")
+    teks = ""
+    if ext == "pdf":
+        if b"%PDF-" not in data[:1024]:
+            raise ValueError("Isi file bukan PDF yang sah")
+    elif ext == "doc":
+        if data[:4] != b"\xd0\xcf\x11\xe0":
+            raise ValueError("Isi file bukan dokumen Word (.doc) yang sah")
+    elif ext == "rtf":
+        if not data.lstrip()[:5] == b"{\\rtf":
+            raise ValueError("Isi file bukan RTF yang sah")
+    elif ext in ("mobi", "azw3"):
+        if data[60:68] not in (b"BOOKMOBI", b"TEXtREAd"):
+            raise ValueError("Isi file bukan e-book Kindle/Mobi yang sah")
+    elif ext in ("txt", "md"):
+        if b"\x00" in data[:4096]:
+            raise ValueError("Isi file bukan teks biasa")
+        teks = data.decode("utf-8", "replace")
+    else:   # docx, epub, odt = arsip zip
+        z = _zip_buka(data)
+        names = set(z.namelist())
+        if ext == "docx":
+            if "word/document.xml" not in names:
+                raise ValueError("Isi file bukan dokumen Word (.docx) yang sah")
+            x = z.open("word/document.xml").read(8_000_000).decode("utf-8", "ignore")
+            x = re.sub(r"<w:instrText.*?</w:instrText>", "", x, flags=re.S)
+            x = re.sub(r"<w:(?:br|cr)[^>]*/>", "\n", x).replace("</w:p>", "\n").replace("<w:tab/>", "\t")
+            teks = _strip_tag(x)
+        elif ext == "odt":
+            if "content.xml" not in names:
+                raise ValueError("Isi file bukan dokumen ODT yang sah")
+            x = z.open("content.xml").read(8_000_000).decode("utf-8", "ignore")
+            teks = _strip_tag(re.sub(r"</text:(?:p|h)>", "\n", x))
+        else:
+            if "META-INF/container.xml" not in names:
+                raise ValueError("Isi file bukan e-book EPUB yang sah")
+            bag = []
+            for n in sorted(names):
+                if n.lower().endswith((".xhtml", ".html", ".htm")):
+                    x = z.open(n).read(2_000_000).decode("utf-8", "ignore")
+                    x = re.sub(r"<(script|style)\b.*?</\1>", "", x, flags=re.S | re.I)
+                    x = re.sub(r"</(p|div|h[1-6]|li|br)\s*>", "\n", x, flags=re.I)
+                    bag.append(_strip_tag(x))
+                    if sum(len(b) for b in bag) > 250_000:
+                        break
+            teks = "\n\n".join(bag)
+    teks = re.sub(r"\n{3,}", "\n\n", teks).strip()[:200_000]
+    aman = re.sub(r"[^A-Za-z0-9._\- ()]", "_", nama)[:120]
+    return aman, PERPUS_EXT[ext], teks
+
+
+def perpus_jatah_ok(r):
+    """Batas unggah harian untuk non-Dev (cegah penyalahgunaan link viewer). Mengembalikan pesan error atau None."""
+    if is_admin(r):
+        return None
+    tgl = today()
+    with db() as c:
+        total = sql(c, "SELECT COUNT(*) FROM perpus").fetchone()[0]
+        if total >= PERPUS_MAKS:
+            return f"Perpustakaan penuh ({PERPUS_MAKS} koleksi). Minta Dev merapikan dulu."
+        byte = sql(c, "SELECT COALESCE(SUM(LENGTH(file_data)),0) FROM perpus WHERE oleh_role IS NOT NULL AND oleh_role<>'admin'").fetchone()[0] or 0
+        if int(byte) > PERPUS_BYTE_MAKS:
+            return "Kapasitas unggahan non-Dev sudah penuh. Hubungi Dev."
+        if r == "viewer":
+            n_ip = sql(c, "SELECT COUNT(*) FROM perpus WHERE oleh_role='viewer' AND ip=? AND dibuat>=?", (_ip(), tgl)).fetchone()[0]
+            n_all = sql(c, "SELECT COUNT(*) FROM perpus WHERE oleh_role='viewer' AND dibuat>=?", (tgl,)).fetchone()[0]
+            if n_ip >= PERPUS_JATAH["viewer_ip"] or n_all >= PERPUS_JATAH["viewer_semua"]:
+                return "Jatah unggah viewer hari ini sudah habis. Coba lagi besok (reset 00.00 WIB)."
+        else:
+            n = sql(c, "SELECT COUNT(*) FROM perpus WHERE oleh_role=? AND dibuat>=?", (r, tgl)).fetchone()[0]
+            if n >= PERPUS_JATAH["anggota"]:
+                return f"Jatah unggah kamu hari ini sudah habis ({PERPUS_JATAH['anggota']}/hari)."
+    return None
+
+
+def perpus_simpan(d, file=None, sampul=None, r="admin", teks_auto=""):
+    admin = is_admin(r)
     judul = re.sub(r"\s+", " ", str(d.get("judul", ""))).strip()[:150]
     if not judul:
         raise ValueError("Judul wajib diisi")
+    isi = str(d.get("isi") or "").strip()[:200_000 if admin else 60_000] or teks_auto
     vals = (judul, str(d.get("penulis") or "").strip()[:100], str(d.get("kategori") or "Umum").strip()[:40] or "Umum",
-            str(d.get("ringkasan") or "").strip()[:1000], str(d.get("isi") or "").strip()[:200_000], _url_aman(d.get("link")), _now())
+            str(d.get("ringkasan") or "").strip()[:1000], isi, _url_aman(d.get("link")), _now())
     i = str(d.get("id") or "")
     with db() as c:
         if i.isdigit():
+            if not admin:
+                raise PermissionError
             n = sql(c, "UPDATE perpus SET judul=?,penulis=?,kategori=?,ringkasan=?,isi=?,link=?,diubah=? WHERE id=?", (*vals, int(i))).rowcount
             if not n:
                 raise ValueError("Buku tidak ditemukan")
             pid = int(i)
         else:
+            if not (file or vals[5] or isi):
+                raise ValueError("Isi salah satu: file, link, atau teks bacaan")
             if sql(c, "SELECT COUNT(*) FROM perpus").fetchone()[0] >= PERPUS_MAKS:
                 raise ValueError(f"Maksimal {PERPUS_MAKS} koleksi")
-            sql(c, "INSERT INTO perpus (judul,penulis,kategori,ringkasan,isi,link,diubah,dibuat) VALUES (?,?,?,?,?,?,?,?)", (*vals, _now()))
+            oleh = "Dev" if r == "admin" else nama_peran(r)
+            sql(c, "INSERT INTO perpus (judul,penulis,kategori,ringkasan,isi,link,diubah,dibuat,oleh,oleh_role,ip) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (*vals, _now(), oleh, r, _ip()))
             pid = int(sql(c, "SELECT MAX(id) FROM perpus").fetchone()[0])
         if file:
             sql(c, "UPDATE perpus SET file_nama=?, file_mime=?, file_data=? WHERE id=?", (file[0], file[1], base64.b64encode(file[2]).decode(), pid))
-        elif d.get("hapus_file") == "1":
+        elif d.get("hapus_file") == "1" and admin:
             sql(c, "UPDATE perpus SET file_nama=NULL, file_mime=NULL, file_data=NULL WHERE id=?", (pid,))
         if sampul:
             sql(c, "UPDATE perpus SET sampul_mime=?, sampul=? WHERE id=?", (sampul[0], base64.b64encode(sampul[1]).decode(), pid))
-        elif d.get("hapus_sampul") == "1":
+        elif d.get("hapus_sampul") == "1" and admin:
             sql(c, "UPDATE perpus SET sampul_mime=NULL, sampul=NULL WHERE id=?", (pid,))
     return pid
 
 
 @app.route("/api/perpus", methods=["GET", "POST"])
 def api_perpus():
-    """GET: semua yang sudah masuk web (anggota & viewer). POST khusus Dev, multipart: judul, penulis, kategori, ringkasan, isi, link, file, sampul, id."""
+    """GET: semua koleksi (anggota & viewer). POST multipart: tambah baru = semua yang sudah masuk (ada jatah harian); ubah (id) = Dev."""
     r = role()
     if not r:
         abort(401)
     if request.method == "POST":
-        need("admin")
+        admin = is_admin(r)
+        if str(request.form.get("id") or "").isdigit() and not admin:
+            abort(403)
+        if not str(request.form.get("id") or "").isdigit():
+            msg = perpus_jatah_ok(r)
+            if msg:
+                return jsonify({"error": msg}), 429
         file = sampul = None
+        teks = ""
         f = request.files.get("file")
         if f and f.filename:
             data = f.read(PERPUS_FILE_MAKS + 1)
             if len(data) > PERPUS_FILE_MAKS:
                 return jsonify({"error": "File maksimal 8 MB. Untuk file besar, taruh di Google Drive lalu isi kolom Link."}), 400
-            nama = re.sub(r"[^A-Za-z0-9._\- ()]", "_", f.filename)[:120]
-            file = (nama, f.mimetype or "application/octet-stream", data)
+            try:
+                nama, mime, teks = perpus_cek_file(f.filename, data)
+            except ValueError as e:
+                return jsonify({"error": str(e)}), 400
+            file = (nama, mime, data)
         sp = request.files.get("sampul")
         if sp and sp.filename:
-            data, mime = sp.read(1_500_001), sp.mimetype or "image/jpeg"
-            if len(data) > 1_500_000 or not mime.startswith("image/"):
-                return jsonify({"error": "Sampul harus gambar, maksimal 1,5 MB"}), 400
+            data = sp.read(1_500_001)
+            mime = _gambar_mime(data)
+            if len(data) > 1_500_000 or not mime:
+                return jsonify({"error": "Sampul harus gambar JPG, PNG, WEBP, atau GIF, maksimal 1,5 MB"}), 400
             sampul = (mime, data)
         try:
-            perpus_simpan(request.form, file, sampul)
+            perpus_simpan(request.form, file, sampul, r, teks)
+        except PermissionError:
+            abort(403)
         except ValueError as e:
             return jsonify({"error": str(e)}), 400
-    return jsonify({"items": perpus_list(), "edit": is_admin(r)})
+    return jsonify({"items": perpus_list(r), "edit": is_admin(r)})
 
 
 @app.route("/api/perpus/<int:i>", methods=["GET", "DELETE"])
 def api_perpus_one(i):
-    """GET: isi bacaan lengkap. DELETE khusus Dev."""
+    """GET: isi bacaan lengkap. DELETE: Dev (semua) atau anggota untuk unggahannya sendiri."""
     if request.method == "DELETE":
-        need("admin")
+        r = role()
+        if not r:
+            abort(401)
         with db() as c:
+            row = sql(c, "SELECT oleh_role FROM perpus WHERE id=?", (i,)).fetchone()
+            if not row:
+                abort(404)
+            if not is_admin(r) and not (r != "viewer" and row[0] == r):
+                abort(403)
             sql(c, "DELETE FROM perpus WHERE id=?", (i,))
-        return jsonify({"items": perpus_list(), "edit": True})
+        return jsonify({"items": perpus_list(r), "edit": is_admin(r)})
     need("viewer")
     with db() as c:
         row = sql(c, "SELECT judul, isi FROM perpus WHERE id=?", (i,)).fetchone()
@@ -3076,8 +3229,8 @@ def api_perpus_file(i):
         row = sql(c, "SELECT file_nama, file_mime, file_data FROM perpus WHERE id=?", (i,)).fetchone()
     if not row or not row[2]:
         abort(404)
-    mime = row[1] or "application/octet-stream"
-    aman = mime == "application/pdf" or mime == "text/plain" or (mime.startswith("image/") and "svg" not in mime)   # HTML/SVG selalu diunduh
+    mime = row[1] if row[1] in PERPUS_EXT.values() else "application/octet-stream"
+    aman = mime in ("application/pdf", "text/plain")   # selain PDF dan teks polos selalu diunduh
     inline = request.args.get("unduh") != "1" and aman
     nama = re.sub(r"[^A-Za-z0-9._\- ()]", "_", row[0] or f"perpus-{i}")
     h = {"Content-Disposition": f'{"inline" if inline else "attachment"}; filename="{nama}"', "X-Content-Type-Options": "nosniff",
@@ -3094,7 +3247,9 @@ def api_perpus_sampul(i):
         row = sql(c, "SELECT sampul_mime, sampul FROM perpus WHERE id=?", (i,)).fetchone()
     if not row or not row[1]:
         abort(404)
-    return Response(base64.b64decode(row[1]), mimetype=row[0] or "image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
+    mime = row[0] if row[0] in ("image/jpeg", "image/png", "image/gif", "image/webp") else "image/jpeg"
+    return Response(base64.b64decode(row[1]), mimetype=mime, headers={"Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff",
+                                                                        "Content-Security-Policy": "sandbox"})
 
 
 @app.route("/api/stok/<int:i>/gambar")
