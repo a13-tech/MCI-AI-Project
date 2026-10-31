@@ -14,12 +14,15 @@ html,body{margin:0}
 body{font:14px/1.45 'Plus Jakarta Sans',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink)}
 button,input,select,textarea{font:inherit}
 #app{display:flex;min-height:100vh}
-#sd{width:236px;flex:none;background:var(--navy);padding:24px 14px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+#sd{width:236px;flex:none;background:var(--navy);padding:24px 14px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(212,175,90,.45) transparent}
+#sd>*{flex:none}
+#sd [data-p=tentang]{margin-bottom:12px}
+#sd::-webkit-scrollbar{width:6px}#sd::-webkit-scrollbar-thumb{background:rgba(212,175,90,.45);border-radius:6px}
 .brand{padding:0 12px 22px}
 .brand b{display:block;font-size:30px;letter-spacing:.16em;color:var(--gold2);font-weight:800}
 .brand small{font-size:11px;letter-spacing:.2em;color:#9DB4E8}
 .brand i{display:block;width:48px;height:2px;background:var(--gold);margin-top:12px}
-.nv{all:unset;box-sizing:border-box;cursor:pointer;display:block;padding:12px 14px;border-radius:10px;color:#C9D7F5;font-size:14px;white-space:nowrap}
+.nv{all:unset;box-sizing:border-box;cursor:pointer;display:block;padding:10px 14px;border-radius:10px;color:#C9D7F5;font-size:14px;white-space:nowrap}
 .nv:hover{background:rgba(255,255,255,.06)}
 .nv.on{background:rgba(212,175,90,.18);color:var(--gold2);font-weight:700}
 .nv:focus-visible{outline:2px solid var(--gold2)}
