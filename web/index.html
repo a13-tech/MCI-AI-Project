@@ -510,11 +510,24 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 
  <section id="p-stok" class="pg" hidden>
   <h1>Stok Barang</h1>
-  <p class="mu">Persediaan barang MCI, dijaga <b>MCI.Nexus</b> di ruang <b>Storage Barang</b> (LT 3, sayap barat). Foto barang ikut ditempel di kardusnya di kantor 3D. Halaman ini untuk admin dan semua divisi (Bendahara, Designer, Anggota); yang bisa mengubah hanya dev. Viewer cuma bisa melihat kardusnya di ruang Storage 3D.</p>
+  <p class="mu">Persediaan barang MCI, dijaga <b>MCI.Nexus</b> di ruang <b>Storage Barang</b> (LT 3, sayap barat). Foto barang ikut ditempel di kardusnya di kantor 3D. Halaman ini untuk semua anggota; yang bisa mengubah hanya Dev (bisa langsung dari foto, dihitung AI). Viewer cuma bisa melihat kardusnya di ruang Storage 3D.</p>
   <div class="gr">
    <div class="cd"><div class="k">Jenis barang</div><div class="v" id="st1">-</div></div>
    <div class="cd"><div class="k">Total unit</div><div class="v" id="st2">-</div></div>
    <div class="cd"><div class="k">Perlu restock</div><div class="v" id="st3">-</div></div>
+  </div>
+  <div class="cd" id="saiBox" hidden><b>📷 Isi stok dari foto (AI)</b>
+   <p class="mu" style="margin:6px 0 10px;font-size:13px">Foto barangnya (boleh banyak jenis sekaligus, usahakan terang dan tidak bertumpuk). MCI.Nexus menghitung jumlahnya, menebak nama, kategori, dan satuan, lalu mencocokkan dengan stok yang sudah ada. Hasilnya diperiksa dulu di sini sebelum disimpan.</p>
+   <div class="fl">
+    <label>Foto barang<input type="file" id="saiFoto" accept="image/*" capture="environment"></label>
+    <label>Petunjuk (opsional)<input type="text" id="saiHint" maxlength="300" placeholder="contoh: ini belanjaan baru, hitung per dus"></label>
+   </div>
+   <img id="saiPrev" alt="Pratinjau foto" hidden style="max-width:220px;max-height:160px;border-radius:12px;margin-top:10px;object-fit:cover">
+   <div class="bar" style="margin:12px 0 0"><button class="bt g" id="saiGo">Proses dengan AI</button><span id="saiMsg" class="mu"></span></div>
+   <div id="saiHasil" hidden style="margin-top:14px">
+    <div class="tb"><table><thead><tr><th></th><th>Barang</th><th>Kategori</th><th>Jumlah</th><th>Satuan</th><th>Masuk ke</th><th>Cara</th><th>Foto</th></tr></thead><tbody id="saiRows"></tbody></table></div>
+    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="saiSave">Simpan yang dicentang</button><button class="bt o" id="saiBatal">Batal</button><span id="saiMsg2" class="mu"></span></div>
+   </div>
   </div>
   <div class="cd" id="stForm" hidden><b id="stTitle">Tambah barang</b>
    <div class="fl" style="margin-top:12px">
@@ -1329,7 +1342,7 @@ function renderStok() {
   $$("[data-se]").forEach(b => b.onclick = () => { const x = one(b.dataset.se); $("#stForm").dataset.id = x.id; $("#stTitle").textContent = "Ubah " + x.nama; $("#stNama").value = x.nama; $("#stKat").value = x.kategori; $("#stJml").value = x.jumlah; $("#stSat").value = x.satuan; $("#stMin").value = x.minimum; $("#stCat").value = x.catatan; $("#stFoto").value = ""; $("#stHfW").hidden = !x.foto; $("#stHf").checked = false; scrollTo({top: 0, behavior: "smooth"}); });
 }
 async function loadStok() {
-  $("#stForm").hidden = !ADM();
+  $("#stForm").hidden = !ADM(); $("#saiBox").hidden = !ADM() || DEMO;
   try { STK = await api("/api/stok"); renderStok(); } catch (e) { $("#stList").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
 }
 $("#stQ").oninput = renderStok;
@@ -1347,6 +1360,60 @@ $("#stSave").onclick = async () => {
     STK = Object.assign(STK, await api("/api/stok", {method: "POST", body: fd})); renderStok(); stReset(); $("#stMsg").textContent = "Tersimpan.";
   } catch (e) { $("#stMsg").textContent = e.message; }
   $("#stSave").disabled = false;
+};
+
+/* Stok dari foto (AI) */
+let SAI = null;   // {rows, blob}
+$("#saiFoto").onchange = () => { const f = $("#saiFoto").files[0]; const im = $("#saiPrev"); if (f) { im.src = URL.createObjectURL(f); im.hidden = false; } else im.hidden = true; };
+function saiRender() {
+  const it = STK.items || [], opt = sel => '<option value="0">Barang baru</option>' + it.map(x => `<option value="${x.id}" ${x.id == sel ? "selected" : ""}>${esc(x.nama)} (${num(x.jumlah)} ${esc(x.satuan)})</option>`).join("");
+  $("#saiRows").innerHTML = SAI.rows.map((r, i) => `<tr data-i="${i}"><td><input type="checkbox" data-f="on" checked aria-label="Simpan baris ${i + 1}"></td>
+    <td><input type="text" data-f="nama" value="${esc(r.nama)}" maxlength="80" style="min-width:150px">${r.catatan ? `<div class="mu" style="font-size:11.5px;margin-top:3px">${esc(r.catatan)}</div>` : ""}</td>
+    <td><input type="text" data-f="kategori" value="${esc(r.kategori)}" maxlength="40" list="stKats" style="min-width:110px"></td>
+    <td><input type="number" data-f="jumlah" value="${r.jumlah}" min="0" style="width:80px"></td>
+    <td><input type="text" data-f="satuan" value="${esc(r.satuan)}" maxlength="20" style="width:70px"></td>
+    <td><select data-f="cocok_id" style="max-width:200px">${opt(r.cocok_id)}</select></td>
+    <td><select data-f="mode"><option value="ganti">Ganti jumlah</option><option value="tambah">Tambahkan</option></select><div class="mu" data-hint style="font-size:11.5px;margin-top:3px"></div></td>
+    <td><input type="checkbox" data-f="pakai_foto" ${r.pakai_foto ? "checked" : ""} aria-label="Tempel foto ke kardus"></td></tr>`).join("");
+  const hint = tr => {
+    const g = n => tr.querySelector(`[data-f="${n}"]`), x = it.find(y => y.id == g("cocok_id").value), j = +g("jumlah").value || 0;
+    g("mode").disabled = !x;
+    tr.querySelector("[data-hint]").textContent = x ? `${num(x.jumlah)} → ${num(g("mode").value === "tambah" ? x.jumlah + j : j)} ${x.satuan}` : "barang baru";
+  };
+  $$("#saiRows tr").forEach(tr => { tr.querySelectorAll("input,select").forEach(e => e.oninput = () => hint(tr)); hint(tr); });
+}
+$("#saiGo").onclick = async () => {
+  const f = $("#saiFoto").files[0];
+  if (!f) { $("#saiMsg").textContent = "Pilih atau ambil foto dulu."; return; }
+  $("#saiGo").disabled = true; $("#saiMsg").textContent = "MCI.Nexus sedang menghitung barang di foto… (10–30 detik)"; $("#saiHasil").hidden = true;
+  try {
+    const big = await resizeFoto(f, 1536), kecil = await resizeFoto(f, 512);
+    const fd = new FormData(); fd.append("foto", big.blob, "foto.jpg"); fd.append("petunjuk", $("#saiHint").value);
+    const d = await api("/api/stok/olah", {method: "POST", body: fd});
+    if (!d.rows.length) { $("#saiMsg").textContent = "Tidak ada barang yang terbaca. Coba foto lebih dekat dan terang."; return; }
+    const satu = d.rows.length === 1;
+    d.rows.forEach(r => { const x = (STK.items || []).find(y => y.id == r.cocok_id); r.pakai_foto = satu && !(x && x.foto); });
+    SAI = {rows: d.rows, blob: kecil.blob}; saiRender(); $("#saiHasil").hidden = false;
+    $("#saiMsg").textContent = `Ketemu ${d.rows.length} jenis barang. Periksa dulu, ubah kalau ada yang salah, lalu simpan.`;
+  } catch (e) { $("#saiMsg").textContent = e.message; }
+  finally { $("#saiGo").disabled = false; }
+};
+$("#saiBatal").onclick = () => { SAI = null; $("#saiHasil").hidden = true; $("#saiMsg").textContent = ""; $("#saiMsg2").textContent = ""; };
+$("#saiSave").onclick = async () => {
+  const rows = $$("#saiRows tr").filter(tr => tr.querySelector('[data-f="on"]').checked).map(tr => {
+    const g = n => tr.querySelector(`[data-f="${n}"]`);
+    return {nama: g("nama").value, kategori: g("kategori").value, jumlah: g("jumlah").value, satuan: g("satuan").value, cocok_id: +g("cocok_id").value, mode: g("mode").value, pakai_foto: g("pakai_foto").checked, catatan: SAI.rows[+tr.dataset.i].catatan};
+  });
+  if (!rows.length) { $("#saiMsg2").textContent = "Belum ada baris yang dicentang."; return; }
+  const fd = new FormData(); fd.append("rows", JSON.stringify(rows));
+  if (rows.some(r => r.pakai_foto)) fd.append("foto", SAI.blob, "foto.jpg");
+  $("#saiSave").disabled = true; $("#saiMsg2").textContent = "Menyimpan…";
+  try {
+    const d = await api("/api/stok/simpan", {method: "POST", body: fd});
+    STK = Object.assign(STK, d); renderStok(); $("#saiBatal").click(); $("#saiFoto").value = ""; $("#saiPrev").hidden = true; $("#saiHint").value = "";
+    $("#saiMsg").textContent = `✅ ${d.disimpan} barang tersimpan.`;
+  } catch (e) { $("#saiMsg2").textContent = e.message; }
+  finally { $("#saiSave").disabled = false; }
 };
 
 /* Studio Gambar */
