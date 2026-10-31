@@ -1513,7 +1513,7 @@ const OFFICE = (() => {
     const trail = grp(0, .72, -.42, 0, g);
     [0, 1, 2].forEach(i => add(SP(.17 - i * .04, 12, 8), "#F1D58A", 0, -i * .06, -i * .3, trail, {transparent: true, opacity: .5 - i * .14, emissive: "#F1D58A", emissiveIntensity: .9, depthWrite: false}).scale.set(1, .8, 2.4));
     trail.visible = false;
-    return {g, body, aL, aR, lL, lR, eyes, disk, trail, props: key === "kilap" ? {cup, mop, rag} : {cup, donut, paper, paddle, club}};
+    return {g, body, aL, aR, lL, lR, eyes, disk, trail, props: key === "kilap" ? {cup, mop, rag, paper} : {cup, donut, paper, paddle, club}};   // paper wajib ada: kalau tidak, ikut di-bake ke badan dan selalu kelihatan
   }
 
   /* ---------- graf jalur 3D ---------- */
