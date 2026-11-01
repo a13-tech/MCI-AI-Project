@@ -581,6 +581,18 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
     <label>Ketersediaan<select id="prSedia"></select></label>
     <label>Foto (opsional)<input type="file" id="prFoto" accept="image/*"></label>
     <label>Tertaut ke barang gudang (untuk stok di Invoice)<select id="prStok"></select></label>
+    <div class="full" id="prHit" style="border:1px solid #BFD3F7;background:#F6F9FF;border-radius:12px;padding:12px 14px">
+     <b>🧮 Kalkulator harga (tanpa AI, rahasia: tidak tampil di katalog publik)</b>
+     <div class="fl" style="margin-top:8px">
+      <label>Harga modal / beli (Rp)<input type="number" id="prModal" min="0" step="500" placeholder="harga awal barang"></label>
+      <label>Biaya lain per unit (ongkir, packing)<input type="number" id="prBiaya" min="0" step="100" placeholder="0"></label>
+      <label>Untung % manual (kosongkan = otomatis)<input type="number" id="prMargin" min="0" max="1000" step="1" placeholder="otomatis"></label>
+      <label>Harga minimum kalau ditawar (Rp)<input type="number" id="prMin" min="0" step="500" placeholder="batas tawar"></label>
+     </div>
+     <div id="prHasil" class="mu" style="margin-top:8px;font-size:13.5px;line-height:1.6">Isi harga modal, hasil langsung muncul.</div>
+     <div class="bar" style="margin:8px 0 0"><button class="bt o" id="prPakai" type="button" hidden>Pakai harga rekomendasi</button><button class="bt o" id="prAturanB" type="button">⚙ Atur persen untung</button></div>
+     <div id="prAturan" hidden style="margin-top:10px"></div>
+    </div>
     <div style="display:flex;align-items:flex-end;padding-bottom:10px"><label class="mu" style="display:inline-flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="prAktif" checked style="width:auto"> Tampil di katalog publik</label></div>
     <label class="full">Deskripsi<textarea id="prDesk" rows="2" maxlength="1500" placeholder="Singkat: fungsi, kelebihan, isi paket"></textarea></label>
     <label class="full">Spesifikasi (dipakai AI untuk menjawab pembeli)<textarea id="prSpek" rows="3" maxlength="3000" placeholder="Tegangan, ukuran, bahan, garansi, kompatibilitas…"></textarea></label>
@@ -1790,7 +1802,7 @@ $("#bkCS").onclick = async () => {
 
 /* ===== Produk: katalog jual, kelola Dev/Manager/Bendahara, balas pertanyaan pembeli ===== */
 let PRD = null, PRT = [];
-function prReset() { $("#prTitle").textContent = "Tambah produk"; $("#prForm").dataset.id = ""; ["#prNama", "#prHarga", "#prKat", "#prMitra", "#prSat", "#prDesk", "#prSpek"].forEach(q => $(q).value = ""); $("#prSedia").value = "tersedia"; $("#prStok").value = ""; $("#prAktif").checked = true; $("#prFoto").value = ""; $("#prHf").checked = false; $("#prHfW").hidden = true; $("#prMsg").textContent = ""; }
+function prReset() { $("#prTitle").textContent = "Tambah produk"; $("#prForm").dataset.id = ""; ["#prNama", "#prHarga", "#prKat", "#prMitra", "#prSat", "#prDesk", "#prSpek"].forEach(q => $(q).value = ""); $("#prSedia").value = "tersedia"; $("#prStok").value = ""; ["#prModal", "#prBiaya", "#prMargin", "#prMin"].forEach(q => $(q).value = ""); prHitung(); $("#prAktif").checked = true; $("#prFoto").value = ""; $("#prHf").checked = false; $("#prHfW").hidden = true; $("#prMsg").textContent = ""; }
 function renderProduk() {
   const d = PRD; if (!d) return;
   const it = d.items, ak = it.filter(x => x.aktif), mitras = [...new Set(it.map(x => x.mitra))].sort(), kats = [...new Set(it.map(x => x.kategori))].sort();
@@ -1809,12 +1821,12 @@ function renderProduk() {
   const SC = {tersedia: "g", terbatas: "y", preorder: "y", habis: "r"};
   $("#prList").innerHTML = Object.keys(grup).sort().map(k => `<tr><td colspan="5" style="background:#F3F7FF;font-weight:800;color:#0A2A6B">${esc(k)} <span class="mu" style="font-weight:600;font-size:12px">${grup[k].length} barang</span></td></tr>` + grup[k].map(x => `<tr${x.aktif ? "" : ' style="opacity:.55"'}>
     <td><div style="display:flex;gap:10px;align-items:center">${x.foto ? `<img src="/api/produk/${x.id}/foto?v=${x.v}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:8px">` : ""}<div><b>${esc(x.nama)}</b>${x.aktif ? "" : ' <span class="ch n">Disembunyikan</span>'}${d.edit && x.stok_id ? ' <span class="ch g" title="Tertaut ke stok gudang">📦 gudang</span>' : ""}${x.deskripsi ? `<div class="mu" style="font-size:12.5px">${esc(x.deskripsi.slice(0, 90))}${x.deskripsi.length > 90 ? "…" : ""}</div>` : ""}</div></div></td>
-    <td>${esc(x.mitra)}</td><td><span class="ch ${SC[x.sedia]}">${esc(x.sedia_label)}</span></td><td class="rt"><b>${rp(x.harga)}</b> <span class="mu">/${esc(x.satuan)}</span></td>
+    <td>${esc(x.mitra)}</td><td><span class="ch ${SC[x.sedia]}">${esc(x.sedia_label)}</span></td><td class="rt"><b>${rp(x.harga)}</b> <span class="mu">/${esc(x.satuan)}</span>${d.edit && x.modal ? `<div class="mu" style="font-size:12px;white-space:nowrap">modal ${rp(x.modal + x.biaya_lain)} · cuan <b style="color:${x.cuan > 0 ? "#0B7A3E" : "#C0392B"}">${rp(x.cuan)}</b>${x.harga_min ? `<br>min ${rp(x.harga_min)}` : ""}</div>` : d.edit ? '<div class="mu" style="font-size:12px">modal belum diisi</div>' : ""}</td>
     <td>${d.edit ? `<button class="bt o" data-pre="${x.id}">Ubah</button> <button class="bt o" data-prd="${x.id}">Hapus</button>` : ""}</td></tr>`).join("")).join("")
     || `<tr><td colspan="5" class="mu">${it.length ? "Tidak ada yang cocok." : "Belum ada produk." + (d.edit ? " Tambah lewat formulir di atas." : "")}</td></tr>`;
   const one = id => it.find(x => x.id == id);
   $$("[data-pre]").forEach(b => b.onclick = () => { const x = one(b.dataset.pre); $("#prForm").dataset.id = x.id; $("#prTitle").textContent = "Ubah " + x.nama;
-    $("#prNama").value = x.nama; $("#prHarga").value = x.harga; $("#prKat").value = x.kategori; $("#prMitra").value = x.mitra; $("#prSat").value = x.satuan; $("#prSedia").value = x.sedia; $("#prStok").value = x.stok_id || ""; $("#prAktif").checked = x.aktif;
+    $("#prNama").value = x.nama; $("#prHarga").value = x.harga; $("#prKat").value = x.kategori; $("#prMitra").value = x.mitra; $("#prSat").value = x.satuan; $("#prSedia").value = x.sedia; $("#prStok").value = x.stok_id || ""; $("#prAktif").checked = x.aktif; $("#prModal").value = x.modal || ""; $("#prBiaya").value = x.biaya_lain || ""; $("#prMargin").value = ""; $("#prMin").value = x.harga_min || ""; prHitung();
     $("#prDesk").value = x.deskripsi; $("#prSpek").value = x.spesifikasi; $("#prFoto").value = ""; $("#prHfW").hidden = !x.foto; $("#prHf").checked = false; $("#prMsg").textContent = ""; $("#prForm").scrollIntoView({behavior: "smooth", block: "start"}); });
   $$("[data-prd]").forEach(b => b.onclick = async () => { const x = one(b.dataset.prd); if (!confirm(`Hapus produk "${x.nama}"?`)) return; try { PRD = Object.assign(PRD, await api("/api/produk/" + x.id, {method: "DELETE"})); renderProduk(); } catch (e) { alert(e.message); } });
 }
@@ -1837,13 +1849,51 @@ async function loadProduk() {
   if (DEMO) { PRD = {items: [], sedia: {tersedia: "Tersedia"}, edit: false, jam: {buka: false}}; renderProduk(); return; }
   try { PRD = await api("/api/produk"); renderProduk(); if (PRD.edit) { PRT = (await api("/api/produk/tanya")).items; renderTanya(); } } catch (e) { $("#prList").innerHTML = `<tr><td colspan="5" class="er">${esc(e.message)}</td></tr>`; }
 }
+
+// ---- Kalkulator harga (aturan pasti, tanpa AI) ----
+let HIT = null, HITT = 0;
+function prHitung() {
+  clearTimeout(HITT); HITT = setTimeout(async () => {
+    const box = $("#prHasil"), mo = $("#prModal").value; $("#prPakai").hidden = true; HIT = null;
+    if (!mo || +mo <= 0) { box.className = "mu"; box.textContent = "Isi harga modal, hasil langsung muncul."; return; }
+    const g = ((PRD && PRD.gudang) || []).find(x => x.id == $("#prStok").value), q = new URLSearchParams({modal: mo, biaya: $("#prBiaya").value || 0});
+    if ($("#prMargin").value !== "") q.set("margin", $("#prMargin").value);
+    if ($("#prHarga").value) q.set("jual", $("#prHarga").value);
+    if (g && g.jumlah > 0) q.set("stok", g.jumlah);
+    try {
+      const h = await api("/api/produk/hitung?" + q); HIT = h; box.className = "";
+      const c = h.cek_harga, CK = {rugi: "#C0392B", impas: "#B9770E", di_bawah_batas: "#B9770E", aman: "#0B7A3E"};
+      box.innerHTML = `Biaya total <b>${rp(h.biaya)}</b> · untung <b>${h.untung_persen}%</b><br>
+        Harga jual rekomendasi <b>${rp(h.harga_jual)}</b> → cuan <b style="color:#0B7A3E">${rp(h.cuan)}</b> per unit (${h.cuan_persen_dari_jual}% dari harga jual)<br>
+        Boleh ditawar sampai <b>${rp(h.harga_min)}</b> → cuan tetap <b>${rp(h.cuan_min)}</b> (ruang tawar ${rp(h.ruang_tawar)}, ${h.ruang_tawar_persen}%)<br>
+        <span class="mu">Mau pasang harga lebih tinggi untuk ruang nego 10%: ${rp(h.harga_pasang_nego10)}</span>
+        ${h.stok ? `<br>Stok gudang ${num(h.stok.jumlah)}: modal tertahan <b>${rp(h.stok.modal_tertahan)}</b>, potensi cuan <b>${rp(h.stok.potensi_cuan)}</b> (minimal ${rp(h.stok.potensi_cuan_min)})` : ""}
+        ${c ? `<br>Harga yang kamu isi (${rp(c.harga)}): <b style="color:${CK[c.status]}">${esc(c.teks)}</b> Cuan ${rp(c.cuan)} (${c.untung_persen}%).` : ""}
+        <details style="margin-top:4px"><summary class="mu" style="cursor:pointer">Kenapa angka ini?</summary><div class="mu">${h.alasan.map(esc).join(" ")} ${esc(h.batas_tawar_aturan)}</div></details>`;
+      $("#prPakai").hidden = false;
+    } catch (e) { box.className = "er"; box.textContent = e.message; }
+  }, 250);
+}
+["#prModal", "#prBiaya", "#prMargin", "#prHarga", "#prStok"].forEach(q => $(q).addEventListener("input", prHitung));
+$("#prStok").addEventListener("change", prHitung);
+$("#prPakai").onclick = () => { if (!HIT) return; $("#prHarga").value = HIT.harga_jual; $("#prMin").value = HIT.harga_min; prHitung(); pesan("Harga jual & batas tawar diisi dari rekomendasi, jangan lupa Simpan"); };
+function prAturanDraw() {
+  const a = PRD && PRD.aturan; if (!a) return;
+  const r = (t, i) => `<div class="bar" style="margin:4px 0"><span class="mu" style="min-width:90px">${t[0] ? "Modal sampai" : "Sisanya (di atas)"}</span><input type="number" data-ab="${i}" value="${t[0]}" ${t[0] ? "" : "disabled"} style="width:130px"><span class="mu">untung</span><input type="number" data-ap="${i}" value="${t[1]}" min="0" max="1000" style="width:80px"><span class="mu">%</span></div>`;
+  $("#prAturan").innerHTML = a.tier.map(r).join("") + `<div class="bar" style="margin:6px 0"><span class="mu">Batas tawar: cuan minimal</span><input type="number" id="prAT" value="${a.tawar_persen}" min="0" max="100" style="width:80px"><span class="mu">% dari cuan target, tidak kurang dari Rp</span><input type="number" id="prAM" value="${a.min_cuan}" min="0" style="width:110px"></div>
+   <div class="bar" style="margin:6px 0"><button class="bt g" type="button" id="prASv">Simpan aturan</button><button class="bt o" type="button" id="prARs">Kembalikan bawaan</button><span class="mu" id="prAMsg"></span></div>`;
+  const kirim = async b => { try { const o = await api("/api/produk/aturan", {json: b}); PRD.aturan = o.aturan; prAturanDraw(); prHitung(); $("#prAMsg").textContent = "Tersimpan."; } catch (e) { $("#prAMsg").textContent = e.message; } };
+  $("#prASv").onclick = () => kirim({tier: a.tier.map((t, i) => [t[0] ? +$(`[data-ab="${i}"]`).value : 0, +$(`[data-ap="${i}"]`).value]), tawar_persen: +$("#prAT").value, min_cuan: +$("#prAM").value});
+  $("#prARs").onclick = () => confirm("Kembalikan semua persen untung ke bawaan?") && kirim({reset: true});
+}
+$("#prAturanB").onclick = () => { const h = $("#prAturan").hidden; $("#prAturan").hidden = !h; if (h) prAturanDraw(); };
 $("#prCopy").onclick = async () => { try { await navigator.clipboard.writeText($("#prLink").textContent); pesan("Link katalog disalin"); } catch (e) { prompt("Salin link ini:", $("#prLink").textContent); } };
 $("#prFM").onchange = renderProduk; $("#prFK").onchange = renderProduk; $("#prQ").oninput = renderProduk; $("#prReset").onclick = prReset;
 $("#prSave").onclick = async () => {
   const fd = new FormData(), id = $("#prForm").dataset.id, f = $("#prFoto").files[0];
   if (id) fd.append("id", id);
   [["nama", "#prNama"], ["harga", "#prHarga"], ["kategori", "#prKat"], ["mitra", "#prMitra"], ["satuan", "#prSat"], ["sedia", "#prSedia"], ["deskripsi", "#prDesk"], ["spesifikasi", "#prSpek"]].forEach(([k, q]) => fd.append(k, $(q).value));
-  fd.append("stok_id", $("#prStok").value); fd.append("aktif", $("#prAktif").checked ? "1" : "0"); if ($("#prHf").checked) fd.append("hapus_foto", "1");
+  fd.append("stok_id", $("#prStok").value); fd.append("modal", $("#prModal").value); fd.append("biaya_lain", $("#prBiaya").value); fd.append("harga_min", $("#prMin").value); fd.append("aktif", $("#prAktif").checked ? "1" : "0"); if ($("#prHf").checked) fd.append("hapus_foto", "1");
   $("#prSave").disabled = true; $("#prMsg").textContent = "Menyimpan…";
   try { if (f) fd.append("foto", (await resizeFoto(f, 900)).blob, "produk.jpg"); PRD = Object.assign(PRD || {}, await api("/api/produk", {method: "POST", body: fd})); renderProduk(); prReset(); $("#prMsg").textContent = "Tersimpan."; }
   catch (e) { $("#prMsg").textContent = e.message; }
