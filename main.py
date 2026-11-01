@@ -4633,11 +4633,11 @@ async def apex_tanya(pesan, riwayat):
 
 @app.route("/api/apex", methods=["POST"])
 def api_apex():
-    """{pesan, riwayat: [{role: user|model, text}]}. Khusus token admin (Dev). Balik: {jawaban, alat: [{alat, arg}]}."""
+    """{pesan, riwayat: [{role: user|model, text}]}. Khusus admin/Dev (token admin master atau anggota berjabatan admin). Balik: {jawaban, alat: [{alat, arg}]}."""
     r = role()
     if not r:
         abort(401)
-    if r != "admin":
+    if not is_admin(r):   # sama dengan aturan menu di web: token admin master atau anggota berjabatan admin (Dev)
         abort(403)
     d = request.get_json(silent=True) or {}
     pesan = str(d.get("pesan") or "").strip()[:APEX_TEKS]
