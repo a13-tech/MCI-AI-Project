@@ -226,6 +226,14 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
  .rw{grid-template-columns:90px 1fr auto}
  .fl{grid-template-columns:1fr}
 }
+.apx{display:flex;flex-direction:column;gap:10px;max-height:58vh;min-height:220px;overflow:auto;padding:4px 2px}
+.apx .m{max-width:88%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-break:break-word;line-height:1.55}
+.apx .u{align-self:flex-end;background:#0A2A6B;color:#fff;border-bottom-right-radius:4px}
+.apx .a{align-self:flex-start;background:#EEF3FC;border-bottom-left-radius:4px}.apx .a.g{background:#FDE3E1;color:#B42318}
+.apx .al{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}.apx .al .ch{font-size:11.5px;padding:3px 9px}
+.apx .tp{align-self:flex-start;color:var(--mute);font-size:13px}
+.apxs{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 0}.apxs button{all:unset;cursor:pointer;padding:7px 13px;border-radius:99px;border:1px solid #BFD0F2;background:#fff;font-size:13px;font-weight:600;color:#0A2A6B}
+.apxs button:hover{background:#EEF3FC}.apxs button:focus-visible{outline:3px solid #D4AF5A;outline-offset:2px}
 </style>
 </head>
 <body>
@@ -233,6 +241,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 <aside id="sd">
  <div class="brand"><b>MCI</b><small>AI COMMAND CENTER</small><i></i></div>
  <button class="nv on" data-p="cmd">Command Center</button>
+ <button class="nv" data-p="apex" id="nvApex">Tanya Apex</button>
  <button class="nv" data-p="inbox">Inbox <span class="nb" id="nbInbox" hidden>0</span></button>
  <button class="nv" data-p="berita">Berita Hari Ini</button>
  <button class="nv" data-p="office">Virtual Office</button>
@@ -585,6 +594,18 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
    <div class="tb" style="margin-top:10px"><table><thead><tr><th>Barang</th><th>Mitra</th><th>Ketersediaan</th><th class="rt">Harga</th><th></th></tr></thead><tbody id="prList"></tbody></table></div>
   </div>
   <div class="cd" id="prTanyaC" hidden><div class="bar" style="justify-content:space-between;margin:0"><b>Pertanyaan pembeli</b><span class="mu" id="prTanyaI" style="font-size:12.5px"></span></div><div id="prTanya" style="margin-top:8px"></div></div>
+ </section>
+
+ <section id="p-apex" class="pg" hidden>
+  <h1>Tanya Apex</h1>
+  <p class="mu">Khusus kamu (token admin). Apex bisa <b>membaca</b> data MCI lewat alat: stok gudang, produk, kas, invoice, hutang, iuran, anggota, blacklist, catatan, perpustakaan, sensor IoT, dan status bot. Dia cek datanya dulu baru menjawab, dan label di bawah jawaban menunjukkan apa saja yang dia cek. Apex <b>tidak mengubah</b> data dan tidak pernah membuka token atau foto bukti.</p>
+  <div class="cd">
+   <div class="apx" id="apxLog" aria-live="polite"></div>
+   <div class="apxs" id="apxSaran"></div>
+   <div class="bar" style="margin:12px 0 0;align-items:flex-end"><textarea id="apxIn" rows="2" maxlength="1500" placeholder="Tanya apa saja, misal: LED sisa berapa?" style="flex:1 1 60%;min-width:220px" aria-label="Pertanyaan untuk Apex"></textarea>
+    <button class="bt g" type="button" id="apxKirim">Kirim</button><button class="bt o" type="button" id="apxHapus">Obrolan baru</button></div>
+   <div class="mu" id="apxMsg" style="font-size:12.5px;margin-top:6px">Enter = kirim · Shift+Enter = baris baru. Apex ingat 12 pesan terakhir di obrolan ini; "Obrolan baru" mengosongkan.</div>
+  </div>
  </section>
 
  <section id="p-invoice" class="pg" hidden>
@@ -1003,6 +1024,7 @@ function show(p) {
   if (p === "bayarkas") loadBayarKas();
   if (p === "produk") loadProduk();
   if (p === "invoice") loadInvoice();
+  if (p === "apex") { apxRender(); setTimeout(() => $("#apxIn").focus(), 50); }
   if (p === "hutang") loadHutang();
   if (p === "anggota") loadAnggota();
   if (p === "catatan") loadCatatan();
@@ -1827,6 +1849,34 @@ $("#prSave").onclick = async () => {
   catch (e) { $("#prMsg").textContent = e.message; }
   $("#prSave").disabled = false;
 };
+
+/* ===== Tanya Apex: chat khusus Dev; Apex memanggil alat baca-saja di server dan menjawab dari data asli ===== */
+const APX_LABEL = {cek_stok: "📦 Stok gudang", cek_produk: "🛒 Katalog produk", cek_kas: "💰 Buku kas", cek_invoice: "🧾 Invoice", cek_hutang: "📒 Hutang", cek_iuran: "💸 Iuran kas", cek_anggota: "👥 Anggota",
+  cek_blacklist: "⛔ Blacklist", cek_catatan: "📝 Catatan", cek_perpustakaan: "📚 Perpustakaan", cek_dokumentasi_dan_voting: "🗳️ Dokumentasi & voting", cek_iot: "📡 Sensor IoT", cek_status_bot: "🤖 Status bot"};
+const APX_SARAN = ["LED sisa berapa?", "Barang apa yang perlu restock?", "Saldo kas sekarang berapa?", "Siapa yang belum bayar kas minggu ini?", "Invoice mana yang belum lunas?", "Siapa yang hutangnya telat?", "Bot mana yang lagi kerja?"];
+let APX = [], APX_BUSY = false;
+const apxMd = t => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/^\s*[*\-] /gm, "• ");
+function apxRender() {
+  const lg = $("#apxLog");
+  lg.innerHTML = (APX.length ? "" : '<div class="m a">Halo Alvaro. Mau cek apa? Stok, kas, invoice, iuran… tinggal tanya, nanti gw cek datanya dulu.</div>')
+    + APX.map(x => x.role === "user" ? `<div class="m u">${esc(x.text)}</div>` : `<div class="m a${x.galat ? " g" : ""}">${apxMd(x.text)}${(x.alat || []).length ? `<div class="al">${x.alat.map(a => `<span class="ch n" title="${esc(JSON.stringify(a.arg || {}))}">${esc(APX_LABEL[a.alat] || a.alat)}${a.arg && Object.keys(a.arg).length ? ": " + esc(Object.values(a.arg).join(", ")) : ""}</span>`).join("")}</div>` : ""}</div>`).join("")
+    + (APX_BUSY ? '<div class="tp">Apex lagi mengecek data…</div>' : "");
+  lg.scrollTop = lg.scrollHeight; $("#apxKirim").disabled = APX_BUSY; $("#apxSaran").hidden = APX.length > 0;
+}
+async function apxTanya(teks) {
+  teks = String(teks == null ? $("#apxIn").value : teks).trim(); if (!teks || APX_BUSY) return;
+  const riwayat = APX.filter(x => !x.galat).slice(-12).map(x => ({role: x.role, text: x.text}));
+  APX.push({role: "user", text: teks}); $("#apxIn").value = ""; $("#apxMsg").textContent = ""; APX_BUSY = true; apxRender();
+  try { const d = await api("/api/apex", {json: {pesan: teks, riwayat}}); APX.push({role: "model", text: d.jawaban, alat: d.alat}); }
+  catch (e) { APX.push({role: "model", text: "⚠️ " + e.message, galat: true}); }
+  APX_BUSY = false; apxRender(); $("#apxIn").focus();
+}
+$("#apxSaran").innerHTML = APX_SARAN.map(q => `<button type="button">${esc(q)}</button>`).join("");
+$$("#apxSaran button").forEach(b => b.onclick = () => apxTanya(b.textContent));
+$("#apxKirim").onclick = () => apxTanya();
+$("#apxIn").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); apxTanya(); } };
+$("#apxHapus").onclick = () => { if (APX_BUSY) return; APX = []; apxRender(); };
+apxRender();
 
 /* ===== Invoice digital: item dari produk / stok gudang / manual; stok dibooking saat dikirim, dikurangi saat lunas ===== */
 let IVD = null, IVI = [], IVEDIT = "";
@@ -4153,6 +4203,7 @@ const OFFICE = (() => {
   try { ME = await api("/api/me"); if (ME.lantai) LANTAI = ME.lantai; } catch (e) { return; }
   $$(".nv").forEach(b => { const p = PAGE_PERM[b.dataset.p]; if (p && !can(p)) b.style.display = "none"; });
   if (!PUNYA_INBOX()) ["inbox", "bayarkas"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // viewer tidak punya inbox & iuran
+  if (!ADM()) $("#nvApex").style.display = "none";   // Tanya Apex khusus token admin
   inboxBadge(); setInterval(() => { if (!document.hidden) inboxBadge(); }, 20000);
   pasangAI();
   const NP = ME.anggota ? ME.anggota.nama + " · " + ME.anggota.jabatan.join(", ") : (ME.nama_peran || "Viewer");
