@@ -453,7 +453,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="agSave">Simpan</button><button class="bt o" id="agReset">Kosongkan</button><label class="mu" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="agAktif" checked>Aktif</label><span id="agMsg" class="mu"></span></div>
   </div>
   <div class="cd" style="padding:0"><div class="tb"><table><thead><tr><th>Nama</th><th>Divisi</th><th>Jabatan</th><th>Token pribadi</th><th></th></tr></thead><tbody id="agList"></tbody></table></div></div>
-  <h2>Divisi &amp; Jabatan</h2>
+  <details style="margin-top:18px"><summary style="cursor:pointer;font-weight:800;font-size:17px">Atur Divisi &amp; Jabatan (lanjutan)</summary>
   <p class="mu">Tambah divisi atau jabatan baru, lalu centang izinnya. Izin seseorang = gabungan semua jabatan + divisinya. Yang bawaan tidak bisa dihapus tapi izinnya bisa diubah; Admin/Dev selalu bisa semua. Sidang Dewan, Lab IoT, dan menu Anggota tetap khusus Dev.</p>
   <div class="cd" id="sxForm"><b id="sxTitle">Tambah divisi / jabatan</b>
    <div class="fl" style="margin-top:12px"><label>Jenis<select id="sxJenis"><option value="divisi">Divisi</option><option value="jabatan">Jabatan</option></select></label><label>Nama<input type="text" id="sxNama" maxlength="40" placeholder="contoh: Humas, Wakil Manager"></label></div>
@@ -461,6 +461,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="sxSave">Simpan</button><button class="bt o" id="sxReset">Kosongkan</button><span id="sxMsg" class="mu"></span></div>
   </div>
   <div class="cd" style="padding:0"><div class="tb"><table><thead><tr><th>Nama</th><th>Jenis</th><th>Izin</th><th>Dipakai</th><th></th></tr></thead><tbody id="sxList"></tbody></table></div></div>
+  </details>
  </section>
 
  <section id="p-catatan" class="pg" hidden>
@@ -536,7 +537,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 
  <section id="p-bayarkas" class="pg" hidden>
   <h1>Bayar Kas</h1>
-  <p class="mu">Iuran kas <b>mingguan</b>. Setiap pembayaran <b>wajib foto bukti</b> (foto uangnya atau bukti transfer). Setelah kamu menekan <b>Saya sudah bayar</b>, Bendahara dapat notifikasi di Inbox untuk konfirmasi. Begitu diterima, namamu jadi <b style="color:#0E6B3A">hijau</b> dan uangnya tercatat otomatis di buku kas. Anggota berstatus <b>Tidak bayar</b> adalah <b>peminjam</b>: tidak punya hak atas barang dan komponen MCI, hanya boleh meminjam.</p>
+  <p class="mu">Iuran kas <b>mingguan</b> (Minggu ke-1, ke-2, dst; Bendahara mengumumkan minggu ke berapa yang ditagih di grup WA). Setiap pembayaran <b>wajib foto bukti</b> (foto uangnya atau bukti transfer). Setelah kamu menekan <b>Saya sudah bayar</b>, Bendahara dapat notifikasi di Inbox untuk konfirmasi. Begitu diterima, namamu jadi <b style="color:#0E6B3A">hijau</b> dan uangnya tercatat otomatis di buku kas. Anggota berstatus <b>Tidak bayar</b> adalah <b>peminjam</b>: tidak punya hak atas barang dan komponen MCI, hanya boleh meminjam.</p>
   <div class="bar" style="flex-wrap:nowrap"><button class="bt o" id="bkPrev" aria-label="Minggu sebelumnya">‹</button><b id="bkLabel" style="flex:0 1 auto;min-width:0;text-align:center">Memuat…</b><button class="bt o" id="bkNext" aria-label="Minggu berikutnya">›</button><button class="bt o" id="bkNow">Minggu ini</button></div>
   <div class="gr">
    <div class="cd"><div class="k">Sudah lunas</div><div class="v" id="bk1">-</div></div>
@@ -547,7 +548,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
   <div class="cd"><b>Status anggota</b><div class="mu" style="font-size:12.5px;margin-top:4px">Hijau = lunas · Kuning = menunggu konfirmasi Bendahara · Merah = belum bayar · Abu-abu = tidak bayar (peminjam)</div><div class="bkg" id="bkList"></div></div>
   <div class="cd" id="bkKonf" hidden><b>Menunggu konfirmasi</b><div id="bkMenunggu" style="margin-top:10px"></div></div>
   <div class="cd" id="bkAtur" hidden><b>Atur iuran (Bendahara)</b>
-   <div class="fl" style="margin-top:12px"><label>Tarif Biasa per minggu (Rp)<input type="number" id="bkTB" min="1" step="500"></label><label>Tarif Keringanan per minggu (Rp)<input type="number" id="bkTR" min="1" step="500"></label></div>
+   <div class="fl" style="margin-top:12px"><label>Tarif Biasa per minggu (Rp)<input type="number" id="bkTB" min="1" step="500"></label><label>Tarif Keringanan per minggu (Rp)<input type="number" id="bkTR" min="1" step="500"></label><label>Minggu ke-1 dimulai tanggal<input type="date" id="bkMulai"></label></div>
    <div class="tb" style="margin-top:12px"><table><thead><tr><th>Anggota</th><th>Tingkat</th><th class="rt">Per minggu</th></tr></thead><tbody id="bkTk"></tbody></table></div>
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="bkSaveT">Simpan pengaturan</button><span class="mu" id="bkMsgT"></span></div>
    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
@@ -575,12 +576,6 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
    <div class="fl" style="margin-top:12px">
     <label>Nama produk<input type="text" id="prNama" maxlength="120" placeholder="contoh: Modul ESP32 DevKit V4"></label>
     <label>Harga (Rp)<input type="number" id="prHarga" min="0" step="500" placeholder="contoh: 75000"></label>
-    <label>Jenis barang<input type="text" id="prKat" maxlength="40" list="prKats" placeholder="Mikrokontroler, Sensor, Merchandise…"></label>
-    <label>Mitra<input type="text" id="prMitra" maxlength="60" list="prMitras" placeholder="MCI, atau nama mitra"></label>
-    <label>Satuan<input type="text" id="prSat" maxlength="20" placeholder="pcs, set, meter"></label>
-    <label>Ketersediaan<select id="prSedia"></select></label>
-    <label>Foto (opsional)<input type="file" id="prFoto" accept="image/*"></label>
-    <label>Tertaut ke barang gudang (untuk stok di Invoice)<select id="prStok"></select></label>
     <div class="full" id="prHit" style="border:1px solid #BFD3F7;background:#F6F9FF;border-radius:12px;padding:12px 14px">
      <b>🧮 Kalkulator harga (tanpa AI, rahasia: tidak tampil di katalog publik)</b>
      <div class="fl" style="margin-top:8px">
@@ -593,9 +588,17 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
      <div class="bar" style="margin:8px 0 0"><button class="bt o" id="prPakai" type="button" hidden>Pakai harga rekomendasi</button><button class="bt o" id="prAturanB" type="button">⚙ Atur persen untung</button></div>
      <div id="prAturan" hidden style="margin-top:10px"></div>
     </div>
+    <details class="full" id="prEx" style="margin:2px 0 6px"><summary class="mu" style="cursor:pointer">Detail lain: jenis, mitra, foto, gudang, deskripsi, tampil di katalog (opsional)</summary><div class="fl" style="margin-top:8px">
+    <label>Jenis barang<input type="text" id="prKat" maxlength="40" list="prKats" placeholder="Mikrokontroler, Sensor, Merchandise…"></label>
+    <label>Mitra<input type="text" id="prMitra" maxlength="60" list="prMitras" placeholder="MCI, atau nama mitra"></label>
+    <label>Satuan<input type="text" id="prSat" maxlength="20" placeholder="pcs, set, meter"></label>
+    <label>Ketersediaan<select id="prSedia"></select></label>
+    <label>Foto (opsional)<input type="file" id="prFoto" accept="image/*"></label>
+    <label>Tertaut ke barang gudang (untuk stok di Invoice)<select id="prStok"></select></label>
     <div style="display:flex;align-items:flex-end;padding-bottom:10px"><label class="mu" style="display:inline-flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="prAktif" checked style="width:auto"> Tampil di katalog publik</label></div>
     <label class="full">Deskripsi<textarea id="prDesk" rows="2" maxlength="1500" placeholder="Singkat: fungsi, kelebihan, isi paket"></textarea></label>
     <label class="full">Spesifikasi (dipakai AI untuk menjawab pembeli)<textarea id="prSpek" rows="3" maxlength="3000" placeholder="Tegangan, ukuran, bahan, garansi, kompatibilitas…"></textarea></label>
+    </div></details>
    </div>
    <datalist id="prKats"></datalist><datalist id="prMitras"></datalist>
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="prSave">Simpan</button><button class="bt o" id="prReset">Kosongkan</button>
@@ -633,10 +636,13 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
    <div class="fl" style="margin-top:12px">
     <label>Nama pembeli<input type="text" id="ivPembeli" maxlength="100" placeholder="contoh: Budi Santoso"></label>
     <label>Kontak (HP / IG)<input type="text" id="ivKontak" maxlength="80" placeholder="08xxxxxxxxxx"></label>
+   </div>
+   <details id="ivEx1" style="margin-top:10px"><summary class="mu" style="cursor:pointer">Tanggal, jatuh tempo & alamat (otomatis, buka kalau mau diubah)</summary>
+    <div class="fl" style="margin-top:8px">
     <label>Tanggal<input type="date" id="ivTgl"></label>
     <label>Jatuh tempo (opsional)<input type="date" id="ivJt"></label>
     <label class="full">Alamat / keterangan pembeli (opsional)<input type="text" id="ivAlamat" maxlength="300" placeholder="alamat kirim, kelas, atau instansi"></label>
-   </div>
+    </div></details>
    <div style="margin-top:14px;padding:12px;border:1px dashed #BFD0F2;border-radius:12px;background:#F7F9FE"><b>Tambah item</b>
     <div class="bar" style="margin:8px 0 0">
      <select id="ivSumber" style="width:auto" aria-label="Sumber item"><option value="produk">Dari produk jualan</option><option value="stok">Dari stok gudang</option><option value="manual">Ketik manual</option></select>
@@ -648,12 +654,14 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
     <div class="mu" id="ivInfo" style="font-size:12.5px;margin-top:6px"></div>
    </div>
    <div class="tb" style="margin-top:12px"><table><thead><tr><th>Item</th><th class="rt">Jumlah</th><th>Satuan</th><th class="rt">Harga</th><th class="rt">Subtotal</th><th>Stok</th><th></th></tr></thead><tbody id="ivItems"></tbody></table></div>
-   <div class="fl" style="margin-top:12px">
+   <details id="ivEx2" style="margin-top:10px"><summary class="mu" style="cursor:pointer">Diskon, ongkir, catatan & cara bayar (opsional)</summary>
+   <div class="fl" style="margin-top:8px">
     <label>Diskon (Rp)<input type="number" id="ivDis" min="0" step="500" value="0"></label>
     <label>Ongkir (Rp)<input type="number" id="ivOng" min="0" step="500" value="0"></label>
     <label class="full">Catatan untuk pembeli (opsional)<textarea id="ivCat" rows="2" maxlength="600" placeholder="contoh: Barang diambil di sekretariat hari Jumat"></textarea></label>
     <label class="full">Cara pembayaran (rekening / QRIS / instruksi, tampil di invoice pembeli)<textarea id="ivCara" rows="2" maxlength="600" placeholder="contoh: BCA 1234567890 a.n. MCI"></textarea></label>
    </div>
+   </details>
    <div style="margin-top:12px;text-align:right;font-size:15px">Subtotal <b id="ivSub">Rp 0</b> · Total <b id="ivTot" style="font-size:20px;color:#0A2A6B">Rp 0</b></div>
    <div class="bar" style="margin:12px 0 0"><button class="bt g" type="button" id="ivSimpan">Simpan draft</button><button class="bt g" type="button" id="ivKirim">Simpan &amp; kirim</button><button class="bt o" type="button" id="ivReset">Kosongkan</button><button class="bt o" type="button" id="ivBawaan" title="Jadikan teks cara pembayaran ini bawaan untuk invoice baru">Jadikan cara bayar bawaan</button><span class="mu" id="ivMsg" role="status"></span></div>
   </div>
@@ -1623,8 +1631,8 @@ function pasangAI() {
     const el = $(c.at), card = el && el.closest(".cd");
     if (!card || card.querySelector(".aibox")) continue;
     const box = document.createElement("div"); box.className = "aibox";
-    box.innerHTML = `<div class="aih"><span aria-hidden="true">✨</span><b>Isi pakai AI</b><span class="mu">Ketik bebas atau lampirkan foto, AI mengisi kolom di bawah. Cek dulu, lalu tekan Simpan.</span></div>
-      <div class="air"><textarea rows="2" maxlength="3000" aria-label="Keterangan untuk AI" placeholder="${esc(c.ph)}"></textarea>
+    box.innerHTML = `<div class="aih"><span aria-hidden="true">✨</span><b>Isi pakai AI</b><span class="mu">Ketik atau foto, AI isi kolomnya.</span></div>
+      <div class="air"><textarea rows="1" maxlength="3000" aria-label="Keterangan untuk AI" placeholder="${esc(c.ph)}"></textarea>
       <label class="bt o aif" title="Lampirkan foto">📷 <span>Foto</span><input type="file" accept="image/*" hidden></label><button class="bt g" type="button">Isi otomatis</button></div><div class="mu aim" role="status"></div>`;
     const t = card.firstElementChild && card.firstElementChild.tagName === "B" ? card.firstElementChild : null;
     if (t) t.after(box); else card.prepend(box);
@@ -1641,7 +1649,7 @@ function pasangAI() {
         for (const [k, sel] of Object.entries(c.isi)) {
           const [q, fn] = Array.isArray(sel) ? sel : [sel, null], v = fn ? fn(d.isi[k]) : d.isi[k];
           if (v === "" || v == null || v === 0) continue;
-          const e = $(q); if (!e) continue; e.value = v; e.dispatchEvent(new Event("input", {bubbles: true})); e.classList.add("aiok"); setTimeout(() => e.classList.remove("aiok"), 2500); n++;
+          const e = $(q); if (!e) continue; const dt = e.closest("details"); if (dt) dt.open = true; e.value = v; e.dispatchEvent(new Event("input", {bubbles: true})); e.classList.add("aiok"); setTimeout(() => e.classList.remove("aiok"), 2500); n++;
         }
         if (c.after) n += c.after(d.isi) || 0;
         const khusus = c.pesan ? c.pesan(d.isi, n) : null;
@@ -1761,7 +1769,7 @@ function renderBayarKas() {
   // pengaturan
   $("#bkAtur").hidden = !d.bisa_konfirmasi;
   if (d.bisa_konfirmasi) {
-    if (document.activeElement !== $("#bkTB")) $("#bkTB").value = d.tarif.biasa; if (document.activeElement !== $("#bkTR")) $("#bkTR").value = d.tarif.ringan;
+    if (document.activeElement !== $("#bkMulai")) $("#bkMulai").value = d.mulai_tgl; if (document.activeElement !== $("#bkTB")) $("#bkTB").value = d.tarif.biasa; if (document.activeElement !== $("#bkTR")) $("#bkTR").value = d.tarif.ringan;
     $("#bkTk").innerHTML = d.anggota.map(a => `<tr><td>${esc(a.nama)}</td><td><select data-tk="${a.id}" style="max-width:240px">${Object.entries(d.tingkat_nama).map(([k, v]) => `<option value="${k}" ${k === a.tingkat ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></td><td class="rt">${a.nominal ? rp(a.nominal) : "-"}</td></tr>`).join("");
     const cur = $("#bkCA").value, wajib = d.anggota.filter(a => a.tingkat !== "bebas");
     $("#bkCA").innerHTML = wajib.map(a => `<option value="${a.id}" ${String(a.id) === cur ? "selected" : ""}>${esc(a.nama)} (${rp(a.nominal)}/minggu)</option>`).join("");
@@ -1784,7 +1792,7 @@ $("#bkNow").onclick = () => loadBayarKas();
 $("#bkSaveT").onclick = async () => {
   const tingkat = {}; $$("[data-tk]").forEach(s => tingkat[s.dataset.tk] = s.value);
   $("#bkSaveT").disabled = true; $("#bkMsgT").textContent = "Menyimpan…";
-  try { BKD = await api("/api/iuran/atur", {json: {biasa: +$("#bkTB").value, ringan: +$("#bkTR").value, tingkat, minggu: BKD.minggu}}); renderBayarKas(); $("#bkMsgT").textContent = "Tersimpan. Anggota yang tingkatnya berubah dapat notifikasi."; }
+  try { BKD = await api("/api/iuran/atur", {json: {biasa: +$("#bkTB").value, ringan: +$("#bkTR").value, mulai_tgl: $("#bkMulai").value, tingkat, minggu: BKD.minggu}}); renderBayarKas(); $("#bkMsgT").textContent = "Tersimpan. Anggota yang tingkatnya berubah dapat notifikasi."; }
   catch (e) { $("#bkMsgT").textContent = e.message; }
   $("#bkSaveT").disabled = false;
 };
@@ -1802,7 +1810,7 @@ $("#bkCS").onclick = async () => {
 
 /* ===== Produk: katalog jual, kelola Dev/Manager/Bendahara, balas pertanyaan pembeli ===== */
 let PRD = null, PRT = [];
-function prReset() { $("#prTitle").textContent = "Tambah produk"; $("#prForm").dataset.id = ""; ["#prNama", "#prHarga", "#prKat", "#prMitra", "#prSat", "#prDesk", "#prSpek"].forEach(q => $(q).value = ""); $("#prSedia").value = "tersedia"; $("#prStok").value = ""; ["#prModal", "#prBiaya", "#prMargin", "#prMin"].forEach(q => $(q).value = ""); prHitung(); $("#prAktif").checked = true; $("#prFoto").value = ""; $("#prHf").checked = false; $("#prHfW").hidden = true; $("#prMsg").textContent = ""; }
+function prReset() { $("#prTitle").textContent = "Tambah produk"; $("#prForm").dataset.id = ""; ["#prNama", "#prHarga", "#prKat", "#prMitra", "#prSat", "#prDesk", "#prSpek"].forEach(q => $(q).value = ""); $("#prSedia").value = "tersedia"; $("#prStok").value = ""; $("#prEx").open = false; ["#prModal", "#prBiaya", "#prMargin", "#prMin"].forEach(q => $(q).value = ""); prHitung(); $("#prAktif").checked = true; $("#prFoto").value = ""; $("#prHf").checked = false; $("#prHfW").hidden = true; $("#prMsg").textContent = ""; }
 function renderProduk() {
   const d = PRD; if (!d) return;
   const it = d.items, ak = it.filter(x => x.aktif), mitras = [...new Set(it.map(x => x.mitra))].sort(), kats = [...new Set(it.map(x => x.kategori))].sort();
@@ -1826,7 +1834,7 @@ function renderProduk() {
     || `<tr><td colspan="5" class="mu">${it.length ? "Tidak ada yang cocok." : "Belum ada produk." + (d.edit ? " Tambah lewat formulir di atas." : "")}</td></tr>`;
   const one = id => it.find(x => x.id == id);
   $$("[data-pre]").forEach(b => b.onclick = () => { const x = one(b.dataset.pre); $("#prForm").dataset.id = x.id; $("#prTitle").textContent = "Ubah " + x.nama;
-    $("#prNama").value = x.nama; $("#prHarga").value = x.harga; $("#prKat").value = x.kategori; $("#prMitra").value = x.mitra; $("#prSat").value = x.satuan; $("#prSedia").value = x.sedia; $("#prStok").value = x.stok_id || ""; $("#prAktif").checked = x.aktif; $("#prModal").value = x.modal || ""; $("#prBiaya").value = x.biaya_lain || ""; $("#prMargin").value = ""; $("#prMin").value = x.harga_min || ""; prHitung();
+    $("#prNama").value = x.nama; $("#prHarga").value = x.harga; $("#prKat").value = x.kategori; $("#prMitra").value = x.mitra; $("#prSat").value = x.satuan; $("#prSedia").value = x.sedia; $("#prStok").value = x.stok_id || ""; $("#prAktif").checked = x.aktif; $("#prEx").open = true; $("#prModal").value = x.modal || ""; $("#prBiaya").value = x.biaya_lain || ""; $("#prMargin").value = ""; $("#prMin").value = x.harga_min || ""; prHitung();
     $("#prDesk").value = x.deskripsi; $("#prSpek").value = x.spesifikasi; $("#prFoto").value = ""; $("#prHfW").hidden = !x.foto; $("#prHf").checked = false; $("#prMsg").textContent = ""; $("#prForm").scrollIntoView({behavior: "smooth", block: "start"}); });
   $$("[data-prd]").forEach(b => b.onclick = async () => { const x = one(b.dataset.prd); if (!confirm(`Hapus produk "${x.nama}"?`)) return; try { PRD = Object.assign(PRD, await api("/api/produk/" + x.id, {method: "DELETE"})); renderProduk(); } catch (e) { alert(e.message); } });
 }
@@ -1937,7 +1945,7 @@ const ivGud = id => (IVD && IVD.gudang || []).find(g => g.id == id);
 function ivReset() {
   IVEDIT = ""; IVI = []; $("#ivTitle").textContent = "Buat invoice";
   ["#ivPembeli", "#ivKontak", "#ivAlamat", "#ivCat"].forEach(q => $(q).value = "");
-  $("#ivTgl").value = ivHari(); $("#ivJt").value = ivHari(7); $("#ivDis").value = 0; $("#ivOng").value = 0; $("#ivQty").value = 1;
+  $("#ivEx1").open = $("#ivEx2").open = false; $("#ivTgl").value = ivHari(); $("#ivJt").value = ivHari(7); $("#ivDis").value = 0; $("#ivOng").value = 0; $("#ivQty").value = 1;
   $("#ivCara").value = IVD ? IVD.setelan.cara_bayar : ""; $("#ivMsg").textContent = ""; ivRenderItems();
 }
 function ivIsiPilih() {
@@ -2044,7 +2052,7 @@ function ivRender() {
   $$("[data-ivc]").forEach(b => b.onclick = async () => { const l = ivLink(one(b.dataset.ivc)); try { await navigator.clipboard.writeText(l); pesan("Link invoice disalin"); } catch (e) { prompt("Salin link ini:", l); } });
   $$("[data-ive]").forEach(b => b.onclick = () => {
     const x = one(b.dataset.ive); IVEDIT = String(x.id); $("#ivTitle").textContent = "Ubah " + x.nomor; IVI = x.items.map(i => ({...i}));
-    $("#ivPembeli").value = x.pembeli; $("#ivKontak").value = x.kontak; $("#ivAlamat").value = x.alamat; $("#ivTgl").value = x.tanggal; $("#ivJt").value = x.jatuh_tempo; $("#ivDis").value = x.diskon; $("#ivOng").value = x.ongkir;
+    $("#ivEx1").open = $("#ivEx2").open = true; $("#ivPembeli").value = x.pembeli; $("#ivKontak").value = x.kontak; $("#ivAlamat").value = x.alamat; $("#ivTgl").value = x.tanggal; $("#ivJt").value = x.jatuh_tempo; $("#ivDis").value = x.diskon; $("#ivOng").value = x.ongkir;
     $("#ivCat").value = x.catatan; $("#ivCara").value = x.cara_bayar; $("#ivMsg").textContent = ""; ivRenderItems(); $("#ivForm").scrollIntoView({behavior: "smooth", block: "start"});
   });
   const TX = {kirim: x => `Kirim ${x.nomor} ke pembeli? Stok gudang untuk item bertautan akan dibooking.`, tarik: x => `Tarik ${x.nomor} kembali ke Draft? Booking stok dilepas dan link pembeli tidak aktif.`,

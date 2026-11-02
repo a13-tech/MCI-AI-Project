@@ -3180,10 +3180,17 @@ def minggu_geser(k, n):
     return minggu_key(_senin(k) + timedelta(days=7 * n))
 
 
+def minggu_no(k):
+    """Nomor urut minggu sejak Bayar Kas dimulai: Minggu ke-1, ke-2, dst. (0 atau minus = sebelum mulai)."""
+    return (_senin(k) - _senin(iuran_set()["mulai"])).days // 7 + 1
+
+
 def minggu_label(k):
+    n = minggu_no(k)
+    if n >= 1:
+        return f"Minggu ke-{n}"
     a = _senin(k)
-    b = a + timedelta(days=6)
-    return f"Minggu {int(k[-2:])} · {a.day} {_BLN[a.month - 1]} – {b.day} {_BLN[b.month - 1]} {b.year}"
+    return f"Sebelum mulai ({a.day} {_BLN[a.month - 1]} {a.year})"
 
 
 def minggu_valid(k):
@@ -3277,7 +3284,7 @@ def iuran_data(r, minggu=None):
                         "status": "bebas" if t == "bebas" else _st_minggu(rows, m["id"], minggu), "tunggak": len(tg), "tunggak_minggu": tg[-8:]})
     masuk = sum(x["jumlah"] // max(1, len(x["minggu"])) for x in rows if x["status"] == "lunas" and minggu in x["minggu"])
     wajib = [a for a in anggota if a["tingkat"] != "bebas"]
-    out = {"minggu": minggu, "label": minggu_label(minggu), "sekarang": cur, "mulai": d["mulai"], "prev": minggu_geser(minggu, -1) if minggu > d["mulai"] else None,
+    out = {"minggu": minggu, "label": minggu_label(minggu), "sekarang": cur, "mulai": d["mulai"], "mulai_tgl": _senin(d["mulai"]).isoformat(), "no_sekarang": minggu_no(cur), "no": minggu_no(minggu), "prev": minggu_geser(minggu, -1) if minggu > d["mulai"] else None,
            "next": minggu_geser(minggu, 1) if minggu < minggu_geser(cur, 4) else None, "tarif": {"biasa": d["biasa"], "ringan": d["ringan"]}, "tingkat_nama": TINGKAT,
            "anggota": anggota, "lunas": sum(1 for a in wajib if a["status"] == "lunas"), "wajib": len(wajib), "masuk": masuk,
            "bisa_konfirmasi": konf, "saya": None, "menunggu": [], "riwayat": []}
@@ -3294,7 +3301,7 @@ def iuran_data(r, minggu=None):
 
 
 def _kas_iuran(nama, mg, jumlah):
-    return kas_add([{"tanggal": today(), "keterangan": f"Iuran kas {nama} · " + ", ".join(f"M{int(k[-2:])}" for k in mg) + f" ({mg[0][:4]})",
+    return kas_add([{"tanggal": today(), "keterangan": f"Iuran kas {nama} · " + ", ".join(minggu_label(k).replace("Minggu ke-", "M") for k in mg),
                      "kategori": "Iuran", "masuk": int(jumlah), "keluar": 0}], "iuran")[0]
 
 
@@ -3352,7 +3359,7 @@ def api_iuran_bayar():
         p = (m["id"], m["nama"], json.dumps(mg), jumlah, mime, base64.b64encode(data).decode(), "lunas" if auto else "menunggu", catatan, _now(),
              _now() if auto else None, oleh if auto else None)
         pid = int(sql(c, q + " RETURNING id", p).fetchone()[0] if PG else sql(c, q, p).lastrowid)
-    lbl = ", ".join(f"M{int(k[-2:])}" for k in mg)
+    lbl = ", ".join(minggu_label(k) for k in mg)
     if auto:
         kid = _kas_iuran(m["nama"], mg, jumlah)
         with db() as c:
@@ -3380,7 +3387,7 @@ def api_iuran_aksi(i):
         return jsonify({"error": "Data pembayaran tidak ditemukan"}), 404
     mid, nama, per, jumlah, status, kid, oleh0 = row
     mg = json.loads(per or "[]")
-    lbl = ", ".join(f"M{int(k[-2:])}" for k in mg)
+    lbl = ", ".join(minggu_label(k) for k in mg)
     oleh = nama_peran(r)
     if aksi in ("terima", "tolak"):
         if mid == mid_of(r) and not is_admin(r):
@@ -3443,6 +3450,14 @@ def api_iuran_atur():
             if not 0 < v <= 10_000_000:
                 return jsonify({"error": "Tarif harus lebih dari 0"}), 400
             d[k] = v
+    if b.get("mulai_tgl"):   # tanggal Minggu ke-1 dimulai (disesuaikan dengan pengumuman Bendahara di grup WA)
+        try:
+            tg = datetime.strptime(str(b["mulai_tgl"]), "%Y-%m-%d").date()
+        except ValueError:
+            return jsonify({"error": "Tanggal mulai tidak valid"}), 400
+        if tg > datetime.now(WIB).date():
+            return jsonify({"error": "Tanggal mulai tidak boleh di masa depan"}), 400
+        d["mulai"] = minggu_key(tg)
     ubah = []
     for k, v in (b.get("tingkat") or {}).items():
         if str(k).isdigit() and int(k) in MEMBERS and v in TINGKAT:
