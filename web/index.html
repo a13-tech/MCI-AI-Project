@@ -576,6 +576,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
    <div class="fl" style="margin-top:12px">
     <label>Nama produk<input type="text" id="prNama" maxlength="120" placeholder="contoh: Modul ESP32 DevKit V4"></label>
     <label>Harga (Rp)<input type="number" id="prHarga" min="0" step="500" placeholder="contoh: 75000"></label>
+    <label class="full">Pemilik barang / mitra<select id="prMitraSel"></select><input type="text" id="prMitra" maxlength="60" placeholder="Tulis nama mitra baru" hidden style="margin-top:6px"></label>
     <div class="full" id="prHit" style="border:1px solid #BFD3F7;background:#F6F9FF;border-radius:12px;padding:12px 14px">
      <b>🧮 Kalkulator harga (tanpa AI, rahasia: tidak tampil di katalog publik)</b>
      <div class="fl" style="margin-top:8px">
@@ -590,7 +591,6 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
     </div>
     <details class="full" id="prEx" style="margin:2px 0 6px"><summary class="mu" style="cursor:pointer">Detail lain: jenis, mitra, foto, gudang, deskripsi, tampil di katalog (opsional)</summary><div class="fl" style="margin-top:8px">
     <label>Jenis barang<input type="text" id="prKat" maxlength="40" list="prKats" placeholder="Mikrokontroler, Sensor, Merchandise…"></label>
-    <label>Mitra<input type="text" id="prMitra" maxlength="60" list="prMitras" placeholder="MCI, atau nama mitra"></label>
     <label>Satuan<input type="text" id="prSat" maxlength="20" placeholder="pcs, set, meter"></label>
     <label>Ketersediaan<select id="prSedia"></select></label>
     <label>Foto (opsional)<input type="file" id="prFoto" accept="image/*"></label>
@@ -1816,7 +1816,19 @@ $("#bkCS").onclick = async () => {
 
 /* ===== Produk: katalog jual, kelola Dev/Manager/Bendahara, balas pertanyaan pembeli ===== */
 let PRD = null, PRT = [];
-function prReset() { $("#prTitle").textContent = "Tambah produk"; $("#prForm").dataset.id = ""; ["#prNama", "#prHarga", "#prKat", "#prMitra", "#prSat", "#prDesk", "#prSpek"].forEach(q => $(q).value = ""); $("#prSedia").value = "tersedia"; $("#prStok").value = ""; $("#prEx").open = false; ["#prModal", "#prBiaya", "#prMargin", "#prMin"].forEach(q => $(q).value = ""); prHitung(); $("#prAktif").checked = true; $("#prFoto").value = ""; $("#prHf").checked = false; $("#prHfW").hidden = true; $("#prMsg").textContent = ""; }
+function prMitraSync() {
+  const v = ($("#prMitra").value || "").trim() || "MCI", sel = $("#prMitraSel"), ada = [...sel.options].some(o => o.value === v);
+  if (!ada && v) sel.add(new Option(v, v), sel.options.length - 1);
+  sel.value = v; $("#prMitra").hidden = true;
+}
+function prMitraOpsi(mitras) {
+  const sel = $("#prMitraSel"), cur = $("#prMitra").value.trim() || "MCI", daftar = ["MCI", ...mitras.filter(m => m.toLowerCase() !== "mci")];
+  sel.innerHTML = daftar.map(m => `<option value="${esc(m)}">${esc(m)}${m === "MCI" ? " (milik sendiri)" : " (mitra)"}</option>`).join("") + '<option value="__baru">➕ Mitra baru…</option>';
+  $("#prMitra").value = cur === "__baru" ? "MCI" : cur; prMitraSync();
+}
+$("#prMitraSel").onchange = () => { const v = $("#prMitraSel").value; if (v === "__baru") { $("#prMitra").value = ""; $("#prMitra").hidden = false; $("#prMitra").focus(); } else { $("#prMitra").value = v; $("#prMitra").hidden = true; } prHitung(); };
+$("#prMitra").addEventListener("input", () => { if (!$("#prMitra").hidden) return; prMitraSync(); });
+function prReset() { $("#prTitle").textContent = "Tambah produk"; $("#prForm").dataset.id = ""; ["#prNama", "#prHarga", "#prKat", "#prMitra", "#prSat", "#prDesk", "#prSpek"].forEach(q => $(q).value = ""); prMitraSync(); $("#prSedia").value = "tersedia"; $("#prStok").value = ""; $("#prEx").open = false; ["#prModal", "#prBiaya", "#prMargin", "#prMin"].forEach(q => $(q).value = ""); prHitung(); $("#prAktif").checked = true; $("#prFoto").value = ""; $("#prHf").checked = false; $("#prHfW").hidden = true; $("#prMsg").textContent = ""; }
 function prBagi() {
   const b = PRD && PRD.bagi, card = $("#bgCard"); if (!card) return; card.hidden = !(PRD && PRD.edit && b && b.mitra.length); if (card.hidden) return;
   $("#bgList").innerHTML = b.mitra.map((m, i) => `<div class="bar" style="margin:6px 0"><b style="min-width:150px">${esc(m.nama)}</b><span class="mu">${m.produk} produk · MCI</span><input type="number" min="0" max="100" step="1" value="${m.mci_persen}" data-bgp="${i}" style="width:84px"><span class="mu">% · mitra <b data-bgm="${i}">${100 - m.mci_persen}</b>%</span>
@@ -1835,6 +1847,7 @@ function renderProduk() {
   $("#prForm").hidden = !d.edit; $("#prTanyaC").hidden = !d.edit;
   if (!$("#prSedia").options.length) { $("#prSedia").innerHTML = Object.entries(d.sedia).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join(""); $("#prSedia").value = "tersedia"; }
   { const sv = $("#prStok").value; $("#prStok").innerHTML = '<option value="">- tidak tertaut -</option>' + (d.gudang || []).map(g => `<option value="${g.id}">${esc(g.nama)} (stok ${num(g.jumlah)} ${esc(g.satuan)})</option>`).join(""); $("#prStok").value = sv; }
+  prMitraOpsi(mitras);
   $("#prKats").innerHTML = kats.map(k => `<option value="${esc(k)}">`).join(""); $("#prMitras").innerHTML = mitras.map(k => `<option value="${esc(k)}">`).join("");
   const fm = $("#prFM").value, fk = $("#prFK").value;
   $("#prFM").innerHTML = '<option value="">Semua mitra</option>' + mitras.map(m => `<option ${m === fm ? "selected" : ""}>${esc(m)}</option>`).join("");
@@ -1849,7 +1862,7 @@ function renderProduk() {
     || `<tr><td colspan="5" class="mu">${it.length ? "Tidak ada yang cocok." : "Belum ada produk." + (d.edit ? " Tambah lewat formulir di atas." : "")}</td></tr>`;
   const one = id => it.find(x => x.id == id);
   $$("[data-pre]").forEach(b => b.onclick = () => { const x = one(b.dataset.pre); $("#prForm").dataset.id = x.id; $("#prTitle").textContent = "Ubah " + x.nama;
-    $("#prNama").value = x.nama; $("#prHarga").value = x.harga; $("#prKat").value = x.kategori; $("#prMitra").value = x.mitra; $("#prSat").value = x.satuan; $("#prSedia").value = x.sedia; $("#prStok").value = x.stok_id || ""; $("#prAktif").checked = x.aktif; $("#prEx").open = true; $("#prModal").value = x.modal || ""; $("#prBiaya").value = x.biaya_lain || ""; $("#prMargin").value = ""; $("#prMin").value = x.harga_min || ""; prHitung();
+    $("#prNama").value = x.nama; $("#prHarga").value = x.harga; $("#prKat").value = x.kategori; $("#prMitra").value = x.mitra; prMitraSync(); $("#prSat").value = x.satuan; $("#prSedia").value = x.sedia; $("#prStok").value = x.stok_id || ""; $("#prAktif").checked = x.aktif; $("#prEx").open = true; $("#prModal").value = x.modal || ""; $("#prBiaya").value = x.biaya_lain || ""; $("#prMargin").value = ""; $("#prMin").value = x.harga_min || ""; prHitung();
     $("#prDesk").value = x.deskripsi; $("#prSpek").value = x.spesifikasi; $("#prFoto").value = ""; $("#prHfW").hidden = !x.foto; $("#prHf").checked = false; $("#prMsg").textContent = ""; $("#prForm").scrollIntoView({behavior: "smooth", block: "start"}); });
   $$("[data-prd]").forEach(b => b.onclick = async () => { const x = one(b.dataset.prd); if (!confirm(`Hapus produk "${x.nama}"?`)) return; try { PRD = Object.assign(PRD, await api("/api/produk/" + x.id, {method: "DELETE"})); renderProduk(); } catch (e) { alert(e.message); } });
 }
