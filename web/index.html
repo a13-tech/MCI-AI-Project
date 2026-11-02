@@ -508,8 +508,8 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 
  <section id="p-blacklist" class="pg" hidden>
   <h1>Blacklist</h1>
-  <p class="mu">Khusus tim Secret Service. Daftar orang yang diblokir dari kegiatan MCI. Catat seperlunya: nama, alasan singkat, dan keterangan.</p>
-  <div class="cd"><b>Tambah ke blacklist</b>
+  <p class="mu">Daftar orang yang diblokir dari kegiatan MCI. Semua bisa melihat; hanya Dev dan tim Secret Service yang bisa menambah atau menghapus.</p>
+  <div class="cd" id="blForm"><b>Tambah ke blacklist</b>
    <div class="fl" style="margin-top:12px"><label>Nama<input type="text" id="blNama" maxlength="80"></label><label>Alasan<input type="text" id="blAlasan" maxlength="200"></label><label class="full">Keterangan<input type="text" id="blKet" maxlength="500"></label></div>
    <div id="blPrev" hidden style="margin-top:14px;padding:12px;border:1px dashed #BFD0F2;border-radius:12px;background:#F7F9FE"></div>
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="blSave">Tambahkan</button><span id="blMsg" class="mu"></span></div>
@@ -1008,7 +1008,7 @@ async function api(u, o = {}) {
 let IOTD = [];
 const ADM = () => ME.role === "admin";
 const can = p => { if (ME.role === "admin") return true; const z = ME.izin || []; return z.includes("*") || z.includes(p); };
-const PAGE_PERM = {invoice: "produk_kelola", anggota: "anggota_kelola", catatan: "catatan", polling: "polling", dokumentasi: "dok_lihat", blacklist: "blacklist", hutang: "hutang", stok: "stok", cmd: "boss", kas: "kas", gambar: "gambar_lihat", memori: "memori", iot: "iot", laporan: "laporan_lihat", skills: "skills", tim: "tim"};
+const PAGE_PERM = {invoice: "produk_kelola", anggota: "anggota_kelola", catatan: "catatan", polling: "polling", dokumentasi: "dok_lihat", hutang: "hutang", stok: "stok", cmd: "boss", kas: "kas", gambar: "gambar_lihat", memori: "memori", iot: "iot", laporan: "laporan_lihat", skills: "skills", tim: "tim"};
 function kuotaTxt(j) { return j ? `${j.pakai} dari ${j.batas} hari ini` : ""; }
 async function refreshMe() { try { const m = await api("/api/me"); ME = Object.assign(ME, m); renderKuota(); } catch (e) {} }
 function renderKuota() {
@@ -1485,8 +1485,8 @@ $("#dkSave").onclick = async () => {
 
 /* Blacklist (khusus Secret Service + Dev) */
 async function loadBlacklist(d) {
-  try { d = d || await api("/api/blacklist");
-    $("#blList").innerHTML = d.items.map(x => `<tr><td><b>${esc(x.nama)}</b></td><td>${esc(x.alasan)}</td><td>${esc(x.keterangan)}</td><td class="mu" style="font-size:12px">${esc(x.tanggal)} · ${esc(x.oleh)}</td><td class="rt"><button class="bt o" data-bld="${x.id}" style="padding:5px 10px;min-height:34px">Hapus</button></td></tr>`).join("") || '<tr><td colspan="5" class="mu">Belum ada.</td></tr>';
+  try { d = d || await api("/api/blacklist"); const ed = can("blacklist"); $("#blForm").hidden = !ed;
+    $("#blList").innerHTML = d.items.map(x => `<tr><td><b>${esc(x.nama)}</b></td><td>${esc(x.alasan)}</td><td>${esc(x.keterangan)}</td><td class="mu" style="font-size:12px">${esc(x.tanggal)} · ${esc(x.oleh)}</td><td class="rt">${ed ? `<button class="bt o" data-bld="${x.id}" style="padding:5px 10px;min-height:34px">Hapus</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="5" class="mu">Belum ada.</td></tr>';
     $$("[data-bld]").forEach(b => b.onclick = async () => { if (confirm("Hapus dari blacklist?")) loadBlacklist(await api("/api/blacklist/" + b.dataset.bld, {method: "DELETE"})); });
   } catch (e) { $("#blList").innerHTML = '<tr><td colspan="5" class="er">' + esc(e.message) + "</td></tr>"; }
 }

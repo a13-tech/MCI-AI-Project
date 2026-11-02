@@ -2768,8 +2768,13 @@ def blacklist_list():
 
 @app.route("/api/blacklist", methods=["GET", "POST"])
 def api_blacklist():
-    r = need_perm("blacklist")
+    """Lihat: semua yang sudah login (termasuk viewer). Tambah/hapus: hanya yang berizin blacklist (Dev & divisi SS)."""
+    r = role()
+    if not r:
+        abort(401)
     if request.method == "POST":
+        if not can("blacklist", r):
+            abort(403)
         d = request.get_json(silent=True) or {}
         if isinstance(d.get("items"), list):   # simpan banyak sekaligus (hasil Isi pakai AI): satu entri per orang
             ada = {(x["nama"].strip().casefold(), x["keterangan"].strip().casefold()) for x in blacklist_list()}
@@ -2785,14 +2790,14 @@ def api_blacklist():
                     sql(c, "INSERT INTO blacklist (nama,alasan,keterangan,oleh,tanggal) VALUES (?,?,?,?,?)",
                         (nama, str(it.get("alasan", "")).strip()[:200], str(it.get("keterangan", "")).strip()[:500], nama_peran(r), today()))
                     tambah += 1
-            return jsonify({"items": blacklist_list(), "ditambah": tambah, "dilewati": dilewati})
+            return jsonify({"items": blacklist_list(), "edit": True, "ditambah": tambah, "dilewati": dilewati})
         nama = str(d.get("nama", "")).strip()[:80]
         if not nama:
             return jsonify({"error": "Nama wajib diisi"}), 400
         with db() as c:
             sql(c, "INSERT INTO blacklist (nama,alasan,keterangan,oleh,tanggal) VALUES (?,?,?,?,?)",
                 (nama, str(d.get("alasan", "")).strip()[:200], str(d.get("keterangan", "")).strip()[:500], nama_peran(r), today()))
-    return jsonify({"items": blacklist_list()})
+    return jsonify({"items": blacklist_list(), "edit": can("blacklist", r)})
 
 
 @app.route("/api/blacklist/<int:i>", methods=["DELETE"])
@@ -2800,7 +2805,7 @@ def api_blacklist_del(i):
     need_perm("blacklist")
     with db() as c:
         sql(c, "DELETE FROM blacklist WHERE id=?", (i,))
-    return jsonify({"items": blacklist_list()})
+    return jsonify({"items": blacklist_list(), "edit": True})
 
 
 # Polling: 1 anggota = 1 suara, anonim. Hasil terlihat setelah ditutup / lewat batas waktu. Pemenang ditetapkan Dev manual.
