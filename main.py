@@ -233,6 +233,9 @@ def db_init():
         sql(c, "CREATE UNIQUE INDEX IF NOT EXISTS iv_nomor ON invoice (nomor)")
         sql(c, "CREATE UNIQUE INDEX IF NOT EXISTS iv_token ON invoice (token)")
         sql(c, "CREATE INDEX IF NOT EXISTS iv_item ON invoice_item (invoice_id)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS ongkir_titipan (id {pk}, invoice_id INTEGER NOT NULL, nomor TEXT, pembeli TEXT, jumlah {big} NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'gantung', "
+               "dibuat TEXT, diambil_at TEXT, diambil_oleh TEXT, catatan TEXT)")
+        sql(c, "CREATE UNIQUE INDEX IF NOT EXISTS ot_inv ON ongkir_titipan (invoice_id)")
         sql(c, f"CREATE TABLE IF NOT EXISTS tanya (id {pk}, tiket TEXT NOT NULL, ip TEXT NOT NULL, nama TEXT, kontak TEXT, produk_id INTEGER, produk_nama TEXT, pesan TEXT NOT NULL, "
                "jawaban_ai TEXT, balasan TEXT, dibalas_oleh TEXT, status TEXT, dibuat TEXT, dibalas TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS stok (id {pk}, nama TEXT NOT NULL, jumlah {big} NOT NULL DEFAULT 0, satuan TEXT, kategori TEXT, minimum {big} NOT NULL DEFAULT 0, catatan TEXT, mime TEXT, gambar TEXT, diubah TEXT)")
@@ -1769,7 +1772,7 @@ def laporan_data(hari=7):
     rows = [{"tanggal": t, "keterangan": k, "kategori": g, "masuk": m, "keluar": x} for t, k, g, m, x in kas]
     s = kas_summary(rows)
     out["kas"] = {**s, "transaksi": len(rows), "saldo_total": tot[0] - tot[1], "terbesar_keluar": sorted([r for r in rows if r["keluar"]], key=lambda r: -r["keluar"])[:3],
-                  "terbesar_masuk": sorted([r for r in rows if r["masuk"]], key=lambda r: -r["masuk"])[:3], "rows": rows[-30:]}
+                  "terbesar_masuk": sorted([r for r in rows if r["masuk"]], key=lambda r: -r["masuk"])[:3], "rows": rows[-80:]}
     out["lain"] = {"token": pk[0], "panggilan_ai": pk[1], "gambar": gb, "memori": mm, "iot": {p: n for p, n in iot}}
     lama = []
     for (d,) in ide_lama:
@@ -1783,10 +1786,68 @@ def laporan_data(hari=7):
         out["hutang"] = {"total_belum": h["total_belum"], "telat": h["telat"], "dikeluarkan": [x["nama"] for x in h["dikeluarkan"]][:10]}
     except Exception:
         log.exception("ringkasan hutang gagal")
+    out["lengkap"] = laporan_lengkap(t0, d0, d1)
     stok_load()
     out["stok"] = {"jenis": len(STOK), "unit": sum(x["jumlah"] for x in STOK), "menipis": [f"{x['nama']} ({x['jumlah']} {x['satuan']})" for x in stok_menipis()],
                    "teks": stok_teks(60)}
     return out
+
+
+def laporan_lengkap(t0, d0, d1):
+    """Data tambahan rekap Jumat supaya SEMUA bagian web ikut: invoice & ongkir, produk & bagi hasil mitra, Bayar Kas, anggota, blacklist, dokumentasi."""
+    o, iso = {}, t0.isoformat(timespec="seconds")
+    try:
+        ivs = inv_list(limit=3000)
+        lun = [x for x in ivs if x["status"] == "lunas" and (x["lunas_at"] or "")[:10] >= d0]
+        o["invoice"] = {"dibuat": sum(1 for x in ivs if (x["dibuat"] or "")[:10] >= d0), "lunas": len(lun), "lunas_rp": sum(x["total"] for x in lun),
+                        "menunggu": sum(1 for x in ivs if x["status"] == "terkirim"), "menunggu_rp": sum(x["total"] for x in ivs if x["status"] == "terkirim"),
+                        "draft": sum(1 for x in ivs if x["status"] == "draft"), "batal": sum(1 for x in ivs if x["status"] == "batal" and (x["diubah"] or "")[:10] >= d0),
+                        "ongkir_gantung_rp": ongkir_data()["gantung_rp"], "ongkir_gantung_n": ongkir_data()["gantung_n"],
+                        "daftar": [f"{x['nomor']} · {x['pembeli']} · {rp(x['total'])}" for x in lun][:15]}
+    except Exception:
+        log.exception("rekap invoice gagal")
+    try:
+        with db() as c:
+            rows = sql(c, "SELECT i.id,i.subtotal,i.diskon,it.jumlah,it.harga,p.mitra,p.modal,p.biaya_lain,p.nama FROM invoice i JOIN invoice_item it ON it.invoice_id=i.id "
+                          "JOIN produk p ON p.id=it.produk_id WHERE i.status='lunas' AND i.lunas_at >= ?", (iso,)).fetchall()
+        mt, cuan_tot, tanpa = {}, 0, 0
+        for _, sub_, dis, jml, hrg, mitra, mo, bl, nama in rows:
+            sub_, dis, jml, hrg, mo, bl = int(sub_ or 0), int(dis or 0), int(jml or 0), int(hrg or 0), int(mo or 0), int(bl or 0)
+            if not mo:
+                tanpa += 1
+                continue
+            pot = round(dis * (hrg * jml) / sub_) if sub_ else 0
+            cuan = hrg * jml - pot - (mo + bl) * jml
+            a, b = bagi_hasil(mitra or "MCI", cuan)
+            m = mt.setdefault(mitra or "MCI", {"cuan": 0, "mci": 0, "mitra": 0, "persen_mci": bagi_persen(mitra)})
+            m["cuan"] += cuan
+            m["mci"] += a
+            m["mitra"] += b
+            cuan_tot += cuan
+        o["bagi_hasil"] = {"cuan_total": cuan_tot, "per_mitra": mt, "item_tanpa_modal": tanpa}
+    except Exception:
+        log.exception("rekap bagi hasil gagal")
+    try:
+        pr = produk_list(True, privat=True)
+        o["produk"] = {"aktif": sum(1 for x in pr if x["aktif"]), "total": len(pr), "tanpa_modal": sum(1 for x in pr if x["aktif"] and not x["modal"]),
+                       "mitra": sorted({x["mitra"] for x in pr if x["mitra"].casefold() != "mci"}, key=str.casefold)}
+    except Exception:
+        log.exception("rekap produk gagal")
+    try:
+        ik = iuran_data("admin")
+        o["bayar_kas"] = {"minggu": ik["label"], "lunas": ik["lunas"], "wajib": ik["wajib"], "masuk": ik["masuk"], "menunggu": len(ik["menunggu"]),
+                          "nunggak": [f"{a['nama']} ({a['tunggak']} minggu)" for a in ik["anggota"] if a["tunggak"]][:15]}
+    except Exception:
+        log.exception("rekap bayar kas gagal")
+    try:
+        with db() as c:
+            bl_baru = int(sql(c, "SELECT COUNT(*) FROM blacklist WHERE tanggal >= ?", (d0,)).fetchone()[0] or 0)
+            bl_all = int(sql(c, "SELECT COUNT(*) FROM blacklist").fetchone()[0] or 0)
+            dk = int(sql(c, "SELECT COUNT(*) FROM dokumentasi WHERE dibuat >= ?", (iso,)).fetchone()[0] or 0)
+        o["lain2"] = {"anggota_aktif": sum(1 for m in MEMBERS.values() if m["aktif"]), "blacklist_baru": bl_baru, "blacklist_total": bl_all, "dokumentasi_baru": dk}
+    except Exception:
+        log.exception("rekap lain gagal")
+    return o
 
 
 def laporan_teks(d, n):
@@ -1804,12 +1865,37 @@ def laporan_teks(d, n):
         T += ["", "✨ Sorotan:"] + [f"• {x}" for x in n["sorotan"][:6]]
     T += ["", "💰 REKAP KAS MINGGU INI", f"Masuk {rp(k['masuk'])} · Keluar {rp(k['keluar'])} · Selisih {rp(k['saldo'])}",
           f"Saldo total kas sekarang: {rp(k['saldo_total'])} ({k['transaksi']} transaksi minggu ini)"]
-    for g, v in sorted(k["kategori"].items(), key=lambda x: -(x[1]["masuk"] + x[1]["keluar"]))[:6]:
+    for g, v in sorted(k["kategori"].items(), key=lambda x: -(x[1]["masuk"] + x[1]["keluar"])):
         T.append(f"• {g}: " + " / ".join(x for x in (f"+{rp(v['masuk'])}" if v["masuk"] else "", f"-{rp(v['keluar'])}" if v["keluar"] else "") if x))
     if k["terbesar_keluar"]:
         T.append("Pengeluaran terbesar: " + "; ".join(f"{r['keterangan']} {rp(r['keluar'])}" for r in k["terbesar_keluar"]))
+    if k.get("rows"):
+        T += ["Semua transaksi minggu ini:"] + [f"• {r['tanggal']} {r['keterangan'][:70]}: " + (f"+{rp(r['masuk'])}" if r["masuk"] else f"-{rp(r['keluar'])}") for r in k["rows"]]
     if n.get("catatan_kas"):
         T += [f"💡 {n['catatan_kas']}"]
+    lg = d.get("lengkap") or {}
+    iv = lg.get("invoice")
+    if iv:
+        T += ["", "🧾 INVOICE", f"Dibuat {iv['dibuat']} · lunas {iv['lunas']} ({rp(iv['lunas_rp'])}) · menunggu bayar {iv['menunggu']} ({rp(iv['menunggu_rp'])}) · draft {iv['draft']} · batal {iv['batal']}",
+              f"Dana ongkir titipan yang masih gantung: {rp(iv['ongkir_gantung_rp'])} ({iv['ongkir_gantung_n']} invoice)"] + [f"• {x}" for x in iv["daftar"]]
+    bh = lg.get("bagi_hasil")
+    if bh:
+        T += ["", "🤝 CUAN & BAGI HASIL (dari invoice lunas minggu ini)", f"Total cuan {rp(bh['cuan_total'])}"]
+        for m, v in bh["per_mitra"].items():
+            T.append(f"• {m}: cuan {rp(v['cuan'])} → MCI {rp(v['mci'])} ({v['persen_mci']}%) · mitra {rp(v['mitra'])}" if m.casefold() != "mci" else f"• MCI sendiri: cuan {rp(v['cuan'])}")
+        if bh["item_tanpa_modal"]:
+            T.append(f"({bh['item_tanpa_modal']} item belum punya data modal, tidak dihitung)")
+    pr = lg.get("produk")
+    if pr:
+        T += ["", "🛒 PRODUK", f"{pr['aktif']} produk aktif dari {pr['total']} · {pr['tanpa_modal']} belum diisi modalnya" + (f" · mitra: {', '.join(pr['mitra'])}" if pr["mitra"] else "")]
+    bk = lg.get("bayar_kas")
+    if bk:
+        T += ["", f"🐷 BAYAR KAS ({bk['minggu']})", f"Lunas {bk['lunas']} dari {bk['wajib']} wajib · masuk {rp(bk['masuk'])} · menunggu konfirmasi {bk['menunggu']}"]
+        if bk["nunggak"]:
+            T.append("Menunggak: " + ", ".join(bk["nunggak"]))
+    l2 = lg.get("lain2")
+    if l2:
+        T += ["", "👥 LAINNYA", f"Anggota aktif {l2['anggota_aktif']} · blacklist {l2['blacklist_total']} orang ({l2['blacklist_baru']} baru) · foto dokumentasi baru {l2['dokumentasi_baru']}"]
     hu = d.get("hutang") or {}
     if hu:
         T += ["", "🧾 HUTANG ANGGOTA", f"Belum lunas {rp(hu['total_belum'])} · telat bayar {hu['telat']}" + (f" · dikeluarkan: {', '.join(hu['dikeluarkan'])}" if hu["dikeluarkan"] else "")]
@@ -3616,6 +3702,28 @@ def _ip_hash(ip):
     return hashlib.sha256(f"{ADMIN_TOKEN}|{ip}".encode()).hexdigest()[:32]   # IP tidak disimpan mentah
 
 
+BAGI_BAWAAN = 50   # % cuan untuk MCI bila mitra belum diatur (sisanya untuk mitra)
+
+
+def bagi_persen(mitra):
+    """% cuan yang masuk ke MCI untuk produk mitra tertentu. Produk milik MCI sendiri = 100."""
+    m = str(mitra or "MCI").strip()
+    if m.casefold() == "mci":
+        return 100
+    v = (SET.get("mitra_bagi") or {}).get(m.casefold())
+    try:
+        return max(0, min(100, int(v)))
+    except (TypeError, ValueError):
+        return BAGI_BAWAAN
+
+
+def bagi_hasil(mitra, cuan):
+    """Pecah cuan jadi (bagian MCI, bagian mitra). Dibulatkan: MCI dulu, mitra = sisanya, jadi jumlah selalu pas."""
+    cuan = int(cuan or 0)
+    mci = round(cuan * bagi_persen(mitra) / 100)
+    return mci, cuan - mci
+
+
 def produk_list(semua=False, privat=False):
     """privat=True menyertakan modal, biaya lain, harga minimum, dan cuan: HANYA untuk pengelola (Dev/Manager/Bendahara) dan Apex. Default tanpa itu."""
     with db() as c:
@@ -3630,6 +3738,9 @@ def produk_list(semua=False, privat=False):
             mo, bl, hm = int(mo or 0), int(bl or 0), int(hm or 0)
             biaya = mo + bl
             x.update(modal=mo, biaya_lain=bl, harga_min=hm, cuan=(x["harga"] - biaya) if mo else None, cuan_min=(hm - biaya) if (mo and hm) else None)
+            x["bagi_mci_persen"] = bagi_persen(x["mitra"])
+            if x["cuan"] is not None:
+                x["cuan_mci"], x["cuan_mitra"] = bagi_hasil(x["mitra"], x["cuan"])
         out.append(x)
     return out if semua else [x for x in out if x["aktif"]]
 
@@ -3707,7 +3818,7 @@ def _bulat_naik(x, step=None):
     return -(-x // st) * st
 
 
-def hitung_harga(modal, biaya_lain=0, margin=None, jual=None, stok=None):
+def hitung_harga(modal, biaya_lain=0, margin=None, jual=None, stok=None, mitra=None):
     """Aturan pasti (tanpa AI). biaya = modal + biaya lain. untung% = tier berdasar MODAL (barang murah untung % lebih besar, barang mahal lebih kecil) atau margin manual.
     harga jual = biaya x (1 + untung%) dibulatkan ke atas. Batas tawar = biaya + max(untung target x tawar%, min_cuan), dibulatkan ke atas, tak pernah di atas harga jual."""
     modal, biaya_lain = _angka(modal, "Modal", 0, 10_000_000_000), _angka(biaya_lain, "Biaya lain", 0, 10_000_000_000)
@@ -3738,6 +3849,10 @@ def hitung_harga(modal, biaya_lain=0, margin=None, jual=None, stok=None):
            "harga_min": harga_min, "cuan_min": harga_min - biaya, "ruang_tawar": harga_jual - harga_min, "ruang_tawar_persen": round((harga_jual - harga_min) * 100 / harga_jual, 1),
            "harga_pasang_nego10": _bulat_naik(harga_jual / 0.9), "alasan": alasan,
            "batas_tawar_aturan": f"Batas tawar: cuan minimal {a['tawar_persen']}% dari cuan target, tidak kurang dari {rp(a['min_cuan'])} per unit."}
+    if mitra and str(mitra).strip().casefold() != "mci":
+        a_, b_ = bagi_hasil(mitra, cuan)
+        am, bm = bagi_hasil(mitra, out["cuan_min"])
+        out["bagi"] = {"mitra": str(mitra).strip(), "mci_persen": bagi_persen(mitra), "cuan_mci": a_, "cuan_mitra": b_, "cuan_min_mci": am, "cuan_min_mitra": bm}
     try:
         stok = int(stok) if stok not in (None, "") else None
     except (TypeError, ValueError):
@@ -3764,7 +3879,7 @@ def api_produk_hitung():
         abort(403)
     q = request.args
     try:
-        return jsonify(hitung_harga(q.get("modal"), q.get("biaya") or 0, q.get("margin"), q.get("jual"), q.get("stok")))
+        return jsonify(hitung_harga(q.get("modal"), q.get("biaya") or 0, q.get("margin"), q.get("jual"), q.get("stok"), q.get("mitra")))
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
@@ -3796,6 +3911,40 @@ def api_produk_aturan():
             return jsonify({"error": str(e)}), 400
     set_save()
     return jsonify({"aturan": harga_aturan()})
+
+
+def bagi_data(items=None):
+    items = items if items is not None else produk_list(True, privat=True)
+    mitra = sorted({x["mitra"] for x in items if x["mitra"].strip().casefold() != "mci"}, key=str.casefold)
+    return {"bawaan": BAGI_BAWAAN, "mitra": [{"nama": m, "mci_persen": bagi_persen(m), "diatur": m.casefold() in (SET.get("mitra_bagi") or {}),
+                                              "produk": sum(1 for x in items if x["mitra"] == m)} for m in mitra]}
+
+
+@app.route("/api/produk/bagi", methods=["POST"])
+def api_produk_bagi():
+    """{mitra, mci_persen}: bagian cuan untuk MCI (0-100); sisanya untuk mitra. {mitra, reset:true} = kembali ke bawaan. Pengelola produk."""
+    r = role()
+    if not r:
+        abort(401)
+    if not bisa_produk(r):
+        abort(403)
+    d = request.get_json(silent=True) or {}
+    m = re.sub(r"\s+", " ", str(d.get("mitra") or "")).strip()[:60]
+    if not m or m.casefold() == "mci":
+        return jsonify({"error": "Pilih mitra selain MCI"}), 400
+    bag = SET.setdefault("mitra_bagi", {})
+    if d.get("reset"):
+        bag.pop(m.casefold(), None)
+    else:
+        try:
+            v = float(d.get("mci_persen"))
+        except (TypeError, ValueError):
+            return jsonify({"error": "Persen MCI harus angka"}), 400
+        if not 0 <= v <= 100 or v != int(v):
+            return jsonify({"error": "Persen MCI harus bilangan bulat 0-100"}), 400
+        bag[m.casefold()] = int(v)
+    set_save()
+    return jsonify({"bagi": bagi_data(), "items": produk_list(True, privat=True)})
 
 
 class JawabProduk(BaseModel):
@@ -3941,6 +4090,7 @@ def api_produk():
     out = {"items": produk_list(semua=ed, privat=ed), "sedia": SEDIA, "edit": ed, "jam": jam_kerja()}
     if ed:
         out["aturan"] = harga_aturan()
+        out["bagi"] = bagi_data(out["items"])
         out["gudang"] = [{"id": x["id"], "nama": x["nama"], "satuan": x["satuan"], "jumlah": x["jumlah"]} for x in stok_load()]
         with db() as c:
             out["menunggu"] = int(sql(c, "SELECT COUNT(*) FROM tanya WHERE status='menunggu_admin'").fetchone()[0])
@@ -4086,8 +4236,35 @@ def inv_payload(extra=None):
            "ringkas": {"draft": sum(1 for x in ivs if x["status"] == "draft"), "tunggu": sum(1 for x in ivs if x["status"] == "terkirim"),
                        "tunggu_rp": sum(x["total"] for x in ivs if x["status"] == "terkirim"), "bukti": sum(1 for x in ivs if x["status"] == "terkirim" and x["ada_bukti"]),
                        "lunas_bulan_rp": sum(x["total"] for x in ivs if x["status"] == "lunas" and (x["lunas_at"] or "")[:7] == bulan)}}
+    out["ongkir"] = ongkir_data()
     out.update(extra or {})
     return out
+
+
+def ongkir_data():
+    with db() as c:
+        rows = sql(c, "SELECT id,invoice_id,nomor,pembeli,jumlah,status,dibuat,diambil_at,diambil_oleh,catatan FROM ongkir_titipan ORDER BY (status='gantung') DESC, id DESC LIMIT 60").fetchall()
+        gt = sql(c, "SELECT COALESCE(SUM(jumlah),0), COUNT(*) FROM ongkir_titipan WHERE status='gantung'").fetchone()
+    return {"gantung_rp": int(gt[0] or 0), "gantung_n": int(gt[1] or 0),
+            "items": [{"id": int(a), "invoice_id": int(b), "nomor": c_ or "", "pembeli": d or "", "jumlah": int(e or 0), "status": f, "dibuat": g or "", "diambil_at": h or "", "diambil_oleh": o or "", "catatan": k or ""}
+                      for a, b, c_, d, e, f, g, h, o, k in rows]}
+
+
+@app.route("/api/ongkir/<int:i>/ambil", methods=["POST"])
+def api_ongkir_ambil(i):
+    """Verifikasi dana ongkir titipan sudah diambil (dibayarkan ke kurir / ditarik). Hanya Bendahara & Dev (izin kas_edit). Sekali saja."""
+    r = need_perm("kas_edit")
+    d = request.get_json(silent=True) or {}
+    cat = str(d.get("catatan") or "").strip()[:200]
+    with _KLOCK:
+        with db() as c:
+            row = sql(c, "SELECT status FROM ongkir_titipan WHERE id=?", (i,)).fetchone()
+            if not row:
+                return jsonify({"error": "Data ongkir tidak ditemukan"}), 404
+            if row[0] != "gantung":
+                return jsonify({"error": "Dana ongkir ini sudah diverifikasi"}), 409
+            sql(c, "UPDATE ongkir_titipan SET status='diambil', diambil_at=?, diambil_oleh=?, catatan=? WHERE id=?", (_now(), nama_peran(r), cat, i))
+    return jsonify(inv_payload())
 
 
 def inv_nomor(c):
@@ -4199,13 +4376,24 @@ def inv_aksi(i, aksi, r, paksa=False):
                         sql(c, "UPDATE stok SET jumlah=jumlah-?, diubah=? WHERE id=?", (kurang, _now(), int(sid)))
                     sql(c, "UPDATE invoice_item SET stok_kurang=? WHERE id=?", (kurang, int(iid_)))
             stok_load()
-            kas = _kas_inv(nomor, pembeli, int(total)) if int(total) > 0 else None
+            with db() as c:
+                og = int((sql(c, "SELECT ongkir FROM invoice WHERE id=?", (i,)).fetchone() or [0])[0] or 0)
+            jual = max(0, int(total) - og)   # ongkir = dana titipan untuk kurir, TIDAK masuk Kas; dicatat di tabel Dana Ongkir sampai diverifikasi
+            kas = _kas_inv(nomor, pembeli, jual) if jual > 0 else None
             with db() as c:
                 sql(c, "UPDATE invoice SET status='lunas', lunas_at=?, kas_id=?, diubah=? WHERE id=?", (_now(), kas, _now(), i))
+                if og > 0 and not sql(c, "SELECT 1 FROM ongkir_titipan WHERE invoice_id=?", (i,)).fetchone():
+                    sql(c, "INSERT INTO ongkir_titipan (invoice_id,nomor,pembeli,jumlah,status,dibuat) VALUES (?,?,?,?,?,?)", (i, nomor, pembeli, og, "gantung", _now()))
         elif aksi == "batal":
             if st == "batal":
                 raise InvError("Invoice sudah dibatalkan")
             if st == "lunas":
+                with db() as c:
+                    ot = sql(c, "SELECT status FROM ongkir_titipan WHERE invoice_id=?", (i,)).fetchone()
+                if ot and ot[0] == "diambil":
+                    raise InvError("Dana ongkir invoice ini sudah diverifikasi diambil, jadi invoice tidak bisa dibatalkan.")
+                with db() as c:
+                    sql(c, "DELETE FROM ongkir_titipan WHERE invoice_id=? AND status='gantung'", (i,))
                 with db() as c:
                     for iid_, sid, j in its:
                         sk = sql(c, "SELECT stok_kurang FROM invoice_item WHERE id=?", (int(iid_),)).fetchone()
@@ -4696,7 +4884,7 @@ def cek_produk(cari: str = "") -> dict:
     """Cek katalog produk yang dijual MCI dan mitra: harga jual, modal, cuan per unit, harga minimum saat ditawar, jenis, mitra, ketersediaan, dan barang gudang yang tertaut. cari = kata kunci nama/jenis/mitra."""
     _alat("cek_produk", cari=cari)
     gud = {x["id"]: x for x in stok_load()}
-    hasil = [{"nama": x["nama"], "harga": x["harga"], "modal": x["modal"] or None, "biaya_lain": x["biaya_lain"] or None, "cuan_per_unit": x["cuan"], "harga_minimum_tawar": x["harga_min"] or None,
+    hasil = [{"nama": x["nama"], "harga": x["harga"], "modal": x["modal"] or None, "biaya_lain": x["biaya_lain"] or None, "cuan_per_unit": x["cuan"], "cuan_untuk_MCI": x.get("cuan_mci"), "cuan_untuk_mitra": x.get("cuan_mitra"), "persen_cuan_MCI": x["bagi_mci_persen"], "harga_minimum_tawar": x["harga_min"] or None,
               "satuan": x["satuan"], "jenis": x["kategori"], "mitra": x["mitra"], "ketersediaan": x["sedia_label"], "tampil_publik": x["aktif"],
               "stok_gudang_tertaut": (f"{gud[x['stok_id']]['nama']} (sisa {gud[x['stok_id']]['jumlah']} {gud[x['stok_id']]['satuan']})" if x["stok_id"] in gud else None)}
              for x in produk_list(True, privat=True) if _cocok(f"{x['nama']} {x['kategori']} {x['mitra']}", cari)]

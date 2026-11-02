@@ -604,6 +604,9 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="prSave">Simpan</button><button class="bt o" id="prReset">Kosongkan</button>
     <label class="mu" id="prHfW" hidden style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="prHf" style="width:auto">Hapus foto</label><span class="mu" id="prMsg"></span></div>
   </div>
+  <div class="cd" id="bgCard" hidden><b>Bagi hasil mitra</b>
+   <div class="mu" style="font-size:12.5px;margin-top:4px">Untuk produk milik mitra (bukan MCI): dari cuan tiap unit, berapa persen masuk ke MCI dan sisanya ke mitra. Rahasia pengelola, tidak tampil di katalog. Belum diatur = 50% untuk MCI.</div>
+   <div id="bgList" style="margin-top:8px"></div></div>
   <div class="cd">
    <div class="bar" style="justify-content:space-between;margin:0"><b>Daftar harga</b><div class="bar" style="margin:0"><select id="prFM" style="width:auto"></select><select id="prFK" style="width:auto"></select><input type="search" id="prQ" placeholder="Cari barang…" style="width:auto;min-width:180px"></div></div>
    <div class="tb" style="margin-top:10px"><table><thead><tr><th>Barang</th><th>Mitra</th><th>Ketersediaan</th><th class="rt">Harga</th><th></th></tr></thead><tbody id="prList"></tbody></table></div>
@@ -625,13 +628,16 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 
  <section id="p-invoice" class="pg" hidden>
   <h1>Invoice</h1>
-  <p class="mu">Tagihan digital untuk pembeli. Item bisa diambil dari <b>produk jualan</b>, <b>stok gudang</b>, atau diketik manual; harga dibekukan di invoice. Stok gudang <b>dibooking saat dikirim</b>, <b>dikurangi saat lunas</b>, dan <b>kembali kalau dibatalkan</b>. Pembeli membuka link acak (tanpa login) dan bisa mengunggah bukti bayar. Membuat invoice: Dev, Manager, Bendahara. Menandai <b>lunas</b> (otomatis masuk Kas · Penjualan): <b>Bendahara dan Dev</b>.</p>
+  <p class="mu">Tagihan digital untuk pembeli. Item bisa diambil dari <b>produk jualan</b>, <b>stok gudang</b>, atau diketik manual; harga dibekukan di invoice. Stok gudang <b>dibooking saat dikirim</b>, <b>dikurangi saat lunas</b>, dan <b>kembali kalau dibatalkan</b>. Pembeli membuka link acak (tanpa login) dan bisa mengunggah bukti bayar. Membuat invoice: Dev, Manager, Bendahara. Menandai <b>lunas</b> (barang dikurangi diskon masuk Kas · Penjualan; ongkir masuk tabel Dana Ongkir): <b>Bendahara dan Dev</b>.</p>
   <div class="gr">
    <div class="cd"><div class="k">Draft</div><div class="v" id="iv1">-</div></div>
    <div class="cd"><div class="k">Menunggu bayar</div><div class="v" id="iv2">-</div><div class="mu" id="iv2b" style="font-size:12.5px"></div></div>
    <div class="cd"><div class="k">Bukti bayar masuk</div><div class="v" id="iv3">-</div><div class="mu" style="font-size:12.5px">menunggu dicek</div></div>
    <div class="cd"><div class="k">Lunas bulan ini</div><div class="v" id="iv4">-</div></div>
   </div>
+  <div class="cd" id="ogCard"><div class="bar" style="margin:0;justify-content:space-between"><b>Dana Ongkir (titipan, tidak masuk Kas)</b><span class="ch y" id="ogTot">Rp 0 gantung</span></div>
+   <div class="mu" style="font-size:12.5px;margin-top:4px">Ongkir dari invoice yang lunas ditaruh di sini, bukan di buku Kas. Kalau uangnya sudah diambil atau dibayarkan ke kurir, Bendahara menekan <b>Verifikasi diambil</b>.</div>
+   <div class="tb" style="margin-top:10px"><table><thead><tr><th>Invoice</th><th>Pembeli</th><th class="rt">Ongkir</th><th>Status</th><th></th></tr></thead><tbody id="ogList"></tbody></table></div></div>
   <div class="cd" id="ivForm"><b id="ivTitle">Buat invoice</b>
    <div class="fl" style="margin-top:12px">
     <label>Nama pembeli<input type="text" id="ivPembeli" maxlength="100" placeholder="contoh: Budi Santoso"></label>
@@ -1811,11 +1817,20 @@ $("#bkCS").onclick = async () => {
 /* ===== Produk: katalog jual, kelola Dev/Manager/Bendahara, balas pertanyaan pembeli ===== */
 let PRD = null, PRT = [];
 function prReset() { $("#prTitle").textContent = "Tambah produk"; $("#prForm").dataset.id = ""; ["#prNama", "#prHarga", "#prKat", "#prMitra", "#prSat", "#prDesk", "#prSpek"].forEach(q => $(q).value = ""); $("#prSedia").value = "tersedia"; $("#prStok").value = ""; $("#prEx").open = false; ["#prModal", "#prBiaya", "#prMargin", "#prMin"].forEach(q => $(q).value = ""); prHitung(); $("#prAktif").checked = true; $("#prFoto").value = ""; $("#prHf").checked = false; $("#prHfW").hidden = true; $("#prMsg").textContent = ""; }
+function prBagi() {
+  const b = PRD && PRD.bagi, card = $("#bgCard"); if (!card) return; card.hidden = !(PRD && PRD.edit && b && b.mitra.length); if (card.hidden) return;
+  $("#bgList").innerHTML = b.mitra.map((m, i) => `<div class="bar" style="margin:6px 0"><b style="min-width:150px">${esc(m.nama)}</b><span class="mu">${m.produk} produk · MCI</span><input type="number" min="0" max="100" step="1" value="${m.mci_persen}" data-bgp="${i}" style="width:84px"><span class="mu">% · mitra <b data-bgm="${i}">${100 - m.mci_persen}</b>%</span>
+    <button class="bt g" data-bgs="${i}" style="padding:5px 12px;min-height:34px">Simpan</button>${m.diatur ? `<button class="bt o" data-bgr="${i}" style="padding:5px 12px;min-height:34px">Bawaan</button>` : '<span class="ch n">belum diatur</span>'}</div>`).join("");
+  const kirim = async (m, body) => { try { const o = await api("/api/produk/bagi", {json: Object.assign({mitra: m.nama}, body)}); PRD.bagi = o.bagi; PRD.items = o.items; renderProduk(); pesan("Bagi hasil " + m.nama + " disimpan"); } catch (e) { alert(e.message); } };
+  $$("[data-bgp]").forEach(e => e.oninput = () => { const v = Math.max(0, Math.min(100, +e.value || 0)); $(`[data-bgm="${e.dataset.bgp}"]`).textContent = 100 - v; });
+  $$("[data-bgs]").forEach(e => e.onclick = () => kirim(b.mitra[e.dataset.bgs], {mci_persen: +$(`[data-bgp="${e.dataset.bgs}"]`).value}));
+  $$("[data-bgr]").forEach(e => e.onclick = () => kirim(b.mitra[e.dataset.bgr], {reset: true}));
+}
 function renderProduk() {
   const d = PRD; if (!d) return;
   const it = d.items, ak = it.filter(x => x.aktif), mitras = [...new Set(it.map(x => x.mitra))].sort(), kats = [...new Set(it.map(x => x.kategori))].sort();
   $("#pr1").textContent = num(ak.length); $("#pr2").textContent = num(new Set(ak.map(x => x.kategori)).size); $("#pr3").textContent = num(new Set(ak.map(x => x.mitra)).size);
-  $("#pr4c").hidden = !d.edit; $("#pr4").textContent = num(d.menunggu || 0);
+  prBagi(); $("#pr4c").hidden = !d.edit; $("#pr4").textContent = num(d.menunggu || 0);
   $("#prJam").className = "ch " + (d.jam.buka ? "g" : "n"); $("#prJam").textContent = d.jam.buka ? "Jam kerja admin: sekarang buka" : "Di luar jam kerja admin";
   $("#prForm").hidden = !d.edit; $("#prTanyaC").hidden = !d.edit;
   if (!$("#prSedia").options.length) { $("#prSedia").innerHTML = Object.entries(d.sedia).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join(""); $("#prSedia").value = "tersedia"; }
@@ -1829,7 +1844,7 @@ function renderProduk() {
   const SC = {tersedia: "g", terbatas: "y", preorder: "y", habis: "r"};
   $("#prList").innerHTML = Object.keys(grup).sort().map(k => `<tr><td colspan="5" style="background:#F3F7FF;font-weight:800;color:#0A2A6B">${esc(k)} <span class="mu" style="font-weight:600;font-size:12px">${grup[k].length} barang</span></td></tr>` + grup[k].map(x => `<tr${x.aktif ? "" : ' style="opacity:.55"'}>
     <td><div style="display:flex;gap:10px;align-items:center">${x.foto ? `<img src="/api/produk/${x.id}/foto?v=${x.v}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:8px">` : ""}<div><b>${esc(x.nama)}</b>${x.aktif ? "" : ' <span class="ch n">Disembunyikan</span>'}${d.edit && x.stok_id ? ' <span class="ch g" title="Tertaut ke stok gudang">📦 gudang</span>' : ""}${x.deskripsi ? `<div class="mu" style="font-size:12.5px">${esc(x.deskripsi.slice(0, 90))}${x.deskripsi.length > 90 ? "…" : ""}</div>` : ""}</div></div></td>
-    <td>${esc(x.mitra)}</td><td><span class="ch ${SC[x.sedia]}">${esc(x.sedia_label)}</span></td><td class="rt"><b>${rp(x.harga)}</b> <span class="mu">/${esc(x.satuan)}</span>${d.edit && x.modal ? `<div class="mu" style="font-size:12px;white-space:nowrap">modal ${rp(x.modal + x.biaya_lain)} · cuan <b style="color:${x.cuan > 0 ? "#0B7A3E" : "#C0392B"}">${rp(x.cuan)}</b>${x.harga_min ? `<br>min ${rp(x.harga_min)}` : ""}</div>` : d.edit ? '<div class="mu" style="font-size:12px">modal belum diisi</div>' : ""}</td>
+    <td>${esc(x.mitra)}</td><td><span class="ch ${SC[x.sedia]}">${esc(x.sedia_label)}</span></td><td class="rt"><b>${rp(x.harga)}</b> <span class="mu">/${esc(x.satuan)}</span>${d.edit && x.modal ? `<div class="mu" style="font-size:12px;white-space:nowrap">modal ${rp(x.modal + x.biaya_lain)} · cuan <b style="color:${x.cuan > 0 ? "#0B7A3E" : "#C0392B"}">${rp(x.cuan)}</b>${x.harga_min ? `<br>min ${rp(x.harga_min)}` : ""}${x.mitra.toLowerCase() !== "mci" && x.cuan_mci != null ? `<br>MCI ${rp(x.cuan_mci)} · mitra ${rp(x.cuan_mitra)}` : ""}</div>` : d.edit ? '<div class="mu" style="font-size:12px">modal belum diisi</div>' : ""}</td>
     <td>${d.edit ? `<button class="bt o" data-pre="${x.id}">Ubah</button> <button class="bt o" data-prd="${x.id}">Hapus</button>` : ""}</td></tr>`).join("")).join("")
     || `<tr><td colspan="5" class="mu">${it.length ? "Tidak ada yang cocok." : "Belum ada produk." + (d.edit ? " Tambah lewat formulir di atas." : "")}</td></tr>`;
   const one = id => it.find(x => x.id == id);
@@ -1867,6 +1882,7 @@ function prHitung() {
     const g = ((PRD && PRD.gudang) || []).find(x => x.id == $("#prStok").value), q = new URLSearchParams({modal: mo, biaya: $("#prBiaya").value || 0});
     if ($("#prMargin").value !== "") q.set("margin", $("#prMargin").value);
     if ($("#prHarga").value) q.set("jual", $("#prHarga").value);
+    if ($("#prMitra").value.trim()) q.set("mitra", $("#prMitra").value.trim());
     if (g && g.jumlah > 0) q.set("stok", g.jumlah);
     try {
       const h = await api("/api/produk/hitung?" + q); HIT = h; box.className = "";
@@ -1875,6 +1891,7 @@ function prHitung() {
         Harga jual rekomendasi <b>${rp(h.harga_jual)}</b> → cuan <b style="color:#0B7A3E">${rp(h.cuan)}</b> per unit (${h.cuan_persen_dari_jual}% dari harga jual)<br>
         Boleh ditawar sampai <b>${rp(h.harga_min)}</b> → cuan tetap <b>${rp(h.cuan_min)}</b> (ruang tawar ${rp(h.ruang_tawar)}, ${h.ruang_tawar_persen}%)<br>
         <span class="mu">Mau pasang harga lebih tinggi untuk ruang nego 10%: ${rp(h.harga_pasang_nego10)}</span>
+        ${h.bagi ? `<br>Bagi hasil <b>${esc(h.bagi.mitra)}</b> (MCI ${h.bagi.mci_persen}%): cuan MCI <b>${rp(h.bagi.cuan_mci)}</b> · cuan mitra <b>${rp(h.bagi.cuan_mitra)}</b> per unit` : ""}
         ${h.stok ? `<br>Stok gudang ${num(h.stok.jumlah)}: modal tertahan <b>${rp(h.stok.modal_tertahan)}</b>, potensi cuan <b>${rp(h.stok.potensi_cuan)}</b> (minimal ${rp(h.stok.potensi_cuan_min)})` : ""}
         ${c ? `<br>Harga yang kamu isi (${rp(c.harga)}): <b style="color:${CK[c.status]}">${esc(c.teks)}</b> Cuan ${rp(c.cuan)} (${c.untung_persen}%).` : ""}
         <details style="margin-top:4px"><summary class="mu" style="cursor:pointer">Kenapa angka ini?</summary><div class="mu">${h.alasan.map(esc).join(" ")} ${esc(h.batas_tawar_aturan)}</div></details>`;
@@ -1882,7 +1899,7 @@ function prHitung() {
     } catch (e) { box.className = "er"; box.textContent = e.message; }
   }, 250);
 }
-["#prModal", "#prBiaya", "#prMargin", "#prHarga", "#prStok"].forEach(q => $(q).addEventListener("input", prHitung));
+["#prModal", "#prBiaya", "#prMargin", "#prHarga", "#prStok", "#prMitra"].forEach(q => $(q).addEventListener("input", prHitung));
 $("#prStok").addEventListener("change", prHitung);
 $("#prPakai").onclick = () => { if (!HIT) return; $("#prHarga").value = HIT.harga_jual; $("#prMin").value = HIT.harga_min; prHitung(); pesan("Harga jual & batas tawar diisi dari rekomendasi, jangan lupa Simpan"); };
 function prAturanDraw() {
@@ -2025,8 +2042,19 @@ async function ivSimpan(kirim) {
 }
 $("#ivSimpan").onclick = () => ivSimpan(false); $("#ivKirim").onclick = () => ivSimpan(true);
 $("#ivBawaan").onclick = async () => { try { IVD = Object.assign(IVD, await api("/api/invoice/atur", {json: {nama_usaha: IVD.setelan.nama_usaha, cara_bayar: $("#ivCara").value}})); pesan("Cara pembayaran bawaan disimpan"); } catch (e) { $("#ivMsg").textContent = e.message; } };
+function ivOngkir() {
+  const o = IVD && IVD.ongkir; if (!o) return;
+  $("#ogTot").textContent = `${rp(o.gantung_rp)} gantung (${o.gantung_n})`; $("#ogTot").className = "ch " + (o.gantung_n ? "y" : "g");
+  $("#ogList").innerHTML = o.items.map(x => `<tr><td><b>${esc(x.nomor)}</b></td><td>${esc(x.pembeli)}</td><td class="rt">${rp(x.jumlah)}</td>
+    <td>${x.status === "gantung" ? '<span class="ch y">Gantung</span>' : `<span class="ch g">Diambil</span><div class="mu" style="font-size:12px">${esc((x.diambil_at || "").slice(0, 10))} · ${esc(x.diambil_oleh)}${x.catatan ? " · " + esc(x.catatan) : ""}</div>`}</td>
+    <td class="rt">${x.status === "gantung" && can("kas_edit") ? `<button class="bt g" data-ogv="${x.id}" style="padding:5px 10px;min-height:34px">Verifikasi diambil</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="5" class="mu">Belum ada ongkir titipan.</td></tr>';
+  $$("[data-ogv]").forEach(b => b.onclick = async () => {
+    const cat = prompt("Dana ongkir ini sudah diambil / dibayarkan? Tulis catatan singkat (boleh kosong), lalu OK untuk verifikasi.", ""); if (cat === null) return;
+    b.disabled = true; try { IVD = await api("/api/ongkir/" + b.dataset.ogv + "/ambil", {json: {catatan: cat}}); ivRender(); pesan("Dana ongkir diverifikasi diambil"); } catch (e) { alert(e.message); b.disabled = false; } });
+}
 function ivRender() {
   if (!IVD) return;
+  ivOngkir();
   const r = IVD.ringkas;
   $("#iv1").textContent = num(r.draft); $("#iv2").textContent = num(r.tunggu); $("#iv2b").textContent = rp(r.tunggu_rp); $("#iv3").textContent = num(r.bukti); $("#iv4").textContent = rp(r.lunas_bulan_rp);
   const f = $("#ivF").value, q = $("#ivQ").value.trim().toLowerCase(), konf = can("kas_edit");
@@ -2056,7 +2084,7 @@ function ivRender() {
     $("#ivCat").value = x.catatan; $("#ivCara").value = x.cara_bayar; $("#ivMsg").textContent = ""; ivRenderItems(); $("#ivForm").scrollIntoView({behavior: "smooth", block: "start"});
   });
   const TX = {kirim: x => `Kirim ${x.nomor} ke pembeli? Stok gudang untuk item bertautan akan dibooking.`, tarik: x => `Tarik ${x.nomor} kembali ke Draft? Booking stok dilepas dan link pembeli tidak aktif.`,
-    lunas: x => `Tandai ${x.nomor} LUNAS?\n${rp(x.total)} otomatis masuk Kas (Penjualan) dan stok gudang dikurangi.`, batal: x => `Batalkan ${x.nomor}?` + (x.status === "lunas" ? "\nCatatan Kas dihapus dan stok gudang dikembalikan." : "\nBooking stok dilepas."),
+    lunas: x => `Tandai ${x.nomor} LUNAS?\n${rp(x.total - x.ongkir)} otomatis masuk Kas (Penjualan) dan stok gudang dikurangi.` + (x.ongkir ? `\nOngkir ${rp(x.ongkir)} tidak masuk Kas: dicatat di Dana Ongkir (titipan) sampai diverifikasi diambil.` : ""), batal: x => `Batalkan ${x.nomor}?` + (x.status === "lunas" ? "\nCatatan Kas dihapus dan stok gudang dikembalikan." : "\nBooking stok dilepas."),
     hapus: x => `Hapus ${x.nomor} permanen?`};
   $$("[data-iva]").forEach(b => b.onclick = async () => {
     const x = one(b.dataset.id), a = b.dataset.iva; if (!confirm(TX[a](x))) return; b.disabled = true;
