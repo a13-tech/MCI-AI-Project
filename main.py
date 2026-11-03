@@ -3727,8 +3727,10 @@ def bagi_hasil(mitra, cuan):
 def produk_list(semua=False, privat=False):
     """privat=True menyertakan modal, biaya lain, harga minimum, dan cuan: HANYA untuk pengelola (Dev/Manager/Bendahara) dan Apex. Default tanpa itu."""
     with db() as c:
-        rows = sql(c, "SELECT id,nama,kategori,mitra,harga,satuan,sedia,deskripsi,spesifikasi,aktif,diubah, CASE WHEN foto IS NULL OR foto='' THEN 0 ELSE 1 END, stok_id, modal, biaya_lain, harga_min "
-                      "FROM produk ORDER BY LOWER(mitra), LOWER(kategori), LOWER(nama)").fetchall()
+        # foto: milik produk sendiri; kalau kosong dan produk tertaut ke stok gudang, pakai foto stok itu (otomatis)
+        rows = sql(c, "SELECT p.id,p.nama,p.kategori,p.mitra,p.harga,p.satuan,p.sedia,p.deskripsi,p.spesifikasi,p.aktif,p.diubah || COALESCE(s.diubah,''), "
+                      "CASE WHEN (p.foto IS NOT NULL AND p.foto<>'') OR (s.gambar IS NOT NULL AND s.gambar<>'') THEN 1 ELSE 0 END, p.stok_id, p.modal, p.biaya_lain, p.harga_min "
+                      "FROM produk p LEFT JOIN stok s ON s.id=p.stok_id ORDER BY LOWER(p.mitra), LOWER(p.kategori), LOWER(p.nama)").fetchall()
     out = []
     for i, n, k, mt, h, s_, sd, d, sp, a, u, f, sk, mo, bl, hm in rows:
         x = {"id": int(i), "nama": n, "kategori": k or "Lainnya", "mitra": mt or "MCI", "harga": int(h or 0), "satuan": s_ or "pcs", "sedia": sd if sd in SEDIA else "tersedia",
@@ -3997,7 +3999,11 @@ def api_publik_produk():
 @app.route("/api/produk/<int:i>/foto")
 def api_produk_foto(i):
     with db() as c:
-        row = sql(c, "SELECT mime, foto, aktif FROM produk WHERE id=?", (i,)).fetchone()
+        row = sql(c, "SELECT mime, foto, aktif, stok_id FROM produk WHERE id=?", (i,)).fetchone()
+        if row and not row[1] and row[3]:   # tidak punya foto sendiri: pakai foto barang gudang yang tertaut
+            sk = sql(c, "SELECT mime, gambar FROM stok WHERE id=?", (int(row[3]),)).fetchone()
+            if sk and sk[1]:
+                row = (sk[0], sk[1], row[2], row[3])
     if not row or not row[1] or (not row[2] and not bisa_produk(role())):
         abort(404)
     mime = row[0] if row[0] in ("image/jpeg", "image/png", "image/gif", "image/webp") else "image/jpeg"
