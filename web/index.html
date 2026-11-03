@@ -198,6 +198,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 #tools{left:12px;top:12px}
 .ob{border:1px solid rgba(255,255,255,.22);background:rgba(8,20,58,.72);color:#E2EAFB;border-radius:10px;padding:7px 12px;font-weight:700;font-size:13px;min-height:38px;min-width:40px;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .ob.on{background:var(--gold);color:var(--navy);border-color:var(--gold)}
+#stage.hnb #chips{display:none}
 #legend{left:12px;bottom:12px;background:rgba(8,20,58,.72);color:#DCE6FB;border-radius:10px;padding:7px 11px;font-size:11.5px;gap:12px;pointer-events:none}
 #legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
 #pip{position:absolute;right:12px;top:12px;border:2px solid var(--gold);border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.45);background:transparent;padding:0;cursor:pointer}
@@ -308,7 +309,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
   <div id="stage">
    <div id="chips"></div>
    <button id="pip" type="button" aria-label="Peta atas, ketuk untuk ganti lantai"><b id="pipTxt">PETA LT 1</b></button>
-   <div class="ovl" id="tools"><button class="ob" id="pipBtn" aria-pressed="false">Peta atas</button><button class="ob" id="zIn" aria-label="Zoom masuk">+</button><button class="ob" id="zOut" aria-label="Zoom keluar">−</button></div>
+   <div class="ovl" id="tools"><button class="ob on" id="hnBot" aria-pressed="true" title="Tampilkan atau sembunyikan nama bot">Nama bot</button><button class="ob on" id="hnTempat" aria-pressed="true" title="Tampilkan atau sembunyikan nama tempat">Nama tempat</button><button class="ob" id="pipBtn" aria-pressed="false">Peta atas</button><button class="ob" id="zIn" aria-label="Zoom masuk">+</button><button class="ob" id="zOut" aria-label="Zoom keluar">−</button></div>
    <div class="ovl" id="follow" hidden><span id="followTxt"></span><button id="unfollow">Lepas</button></div>
    <div class="ovl" id="where">Gedung MCI</div>
    <div class="ovl" id="legend"><span><i style="background:#ef4444"></i>Bekerja</span><span><i style="background:#f59e0b"></i>Berpikir</span><span><i style="background:#a78bfa"></i>Sidang</span><span><i style="background:#38bdf8"></i>Istirahat</span><span><i style="background:#22c55e"></i>Siaga</span></div>
@@ -2407,17 +2408,23 @@ const OFFICE = (() => {
     const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t;
   }
   function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+  const PLAB = []; let HIDE_TEMPAT = false;   // semua papan nama tempat (bisa disembunyikan lewat tombol "Nama tempat")
   function label(text, x, y, z, s, col, wide) {
     const W = wide ? 1024 : 512;
     const t = CT(W, 128, (g, w, h) => {
       roundRect(g, 6, 14, w - 12, h - 28, 46); g.fillStyle = "rgba(8,20,58,.88)"; g.fill();
       g.lineWidth = 5; g.strokeStyle = col || "#D4AF5A"; g.stroke();
-      g.fillStyle = col || "#F1D58A"; g.font = "800 50px 'Plus Jakarta Sans',system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillStyle = col || "#F1D58A"; g.textAlign = "center"; g.textBaseline = "middle";
+      let fs = 50; g.font = `800 ${fs}px 'Plus Jakarta Sans',system-ui,sans-serif`;
+      while (fs > 22 && g.measureText(text).width > w - 70) { fs -= 2; g.font = `800 ${fs}px 'Plus Jakarta Sans',system-ui,sans-serif`; }   // teks panjang diperkecil supaya tidak kepotong
       g.fillText(text, w / 2, h / 2 + 2);
     });
     const m = new THREE.Sprite(new THREE.SpriteMaterial({map: t, transparent: true, depthWrite: false}));
-    m.position.set(x, y, z); m.scale.set((wide ? 8 : 4) * (s || 1), 1 * (s || 1), 1); m.renderOrder = 5; CUR.add(m); return m;
+    m.position.set(x, y, z); m.scale.set((wide ? 8 : 4) * (s || 1), 1 * (s || 1), 1); m.renderOrder = 5; CUR.add(m);
+    if (text !== "Zzz") { PLAB.push(m); m.material.visible = !HIDE_TEMPAT; }
+    return m;
   }
+  function setTempat(show) { HIDE_TEMPAT = !show; PLAB.forEach(m => m.material.visible = show); }
   function plane(tex, w, h, x, y, z, ry, p) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({map: tex, toneMapped: false, transparent: true})); m.position.set(x, y, z); m.rotation.y = ry || 0; (p || CUR).add(m); return m; }
 
   /* ---------- tekstur layar ---------- */
@@ -4270,6 +4277,12 @@ const OFFICE = (() => {
     resize(); flyTo("gedung", true);
     new ResizeObserver(resize).observe(stage);
     $$("[data-view]").forEach(b => b.onclick = () => { follow = null; $("#follow").hidden = true; $$(".chip").forEach(e => e.classList.remove("on")); flyTo(b.dataset.view); });
+    const pref = k => { try { return localStorage.getItem(k) !== "0"; } catch (e) { return true; } }, simpan = (k, v) => { try { localStorage.setItem(k, v ? "1" : "0"); } catch (e) {} };
+    const tBot = v => { $("#stage").classList.toggle("hnb", !v); $("#hnBot").classList.toggle("on", v); $("#hnBot").setAttribute("aria-pressed", v); };
+    const tTmp = v => { setTempat(v); $("#hnTempat").classList.toggle("on", v); $("#hnTempat").setAttribute("aria-pressed", v); };
+    tBot(pref("mci_nama_bot")); tTmp(pref("mci_nama_tempat"));
+    $("#hnBot").onclick = () => { const v = !$("#hnBot").classList.contains("on"); tBot(v); simpan("mci_nama_bot", v); };
+    $("#hnTempat").onclick = () => { const v = !$("#hnTempat").classList.contains("on"); tTmp(v); simpan("mci_nama_tempat", v); };
     $("#pipBtn").onclick = () => { pipOn = !pipOn; $("#pipBtn").classList.toggle("on", pipOn); $("#pipBtn").setAttribute("aria-pressed", pipOn); resize(); };
     pipEl.onclick = () => { pipF = (pipF + 1) % 4; resize(); };
     $("#zIn").onclick = () => zoom(.8); $("#zOut").onclick = () => zoom(1.25);
