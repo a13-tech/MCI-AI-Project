@@ -1411,9 +1411,9 @@ function renderSx() {
     <td style="max-width:420px">${x.kunci ? '<span class="ch y">Semua izin</span>' : (x.izin.map(k => `<span class="ch">${esc(SXD.izin[k] || k)}</span>`).join(" ") || '<span class="mu">Tidak ada izin tambahan</span>')}</td><td>${x.dipakai} orang</td>
     <td class="rt" style="white-space:nowrap">${x.kunci ? "" : `<button class="bt o" data-sxe="${j}:${x.key}" style="padding:5px 10px;min-height:34px">Ubah</button>`}${x.bawaan ? "" : ` <button class="bt o" data-sxd="${j}:${x.key}" style="padding:5px 10px;min-height:34px">Hapus</button>`}</td></tr>`).join("");
   const one = v => { const [j, k] = v.split(":"); return [SXD[j].find(x => x.key === k), j]; };
-  $$("[data-sxe]").forEach(b => b.onclick = () => { const [x, j] = one(b.dataset.ste); sxForm(x, j); $("#sxForm").scrollIntoView({behavior: "smooth", block: "start"}); });
+  $$("[data-sxe]").forEach(b => b.onclick = () => { const [x, j] = one(b.dataset.sxe); sxForm(x, j); $("#sxForm").scrollIntoView({behavior: "smooth", block: "start"}); });
   $$("[data-sxd]").forEach(b => b.onclick = async () => {
-    const [x, j] = one(b.dataset.std);
+    const [x, j] = one(b.dataset.sxd);
     if (!confirm(`Hapus ${j} ${x.nama}?` + (x.dipakai ? ` ${x.dipakai} orang yang memakainya akan dilepas dari ${j} ini.` : ""))) return;
     try { await api(`/api/struktur/${j}/${encodeURIComponent(x.key)}`, {method: "DELETE"}); await sxRefresh(); sxForm(); } catch (e) { alert(e.message); }
   });
