@@ -259,6 +259,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
  <button class="nv" data-p="dokumentasi">Dokumentasi</button>
  <button class="nv" data-p="hutang">Hutang</button>
  <button class="nv" data-p="blacklist">Blacklist</button>
+ <button class="nv" data-p="sp">Surat Peringatan</button>
  <button class="nv" data-p="anggota">Anggota</button>
  <button class="nv" data-p="stok">Stok Barang</button>
  <button class="nv" data-p="produk">Produk</button>
@@ -517,6 +518,19 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="blSave">Tambahkan</button><span id="blMsg" class="mu"></span></div>
   </div>
   <div class="cd" style="padding:0"><div class="tb"><table><thead><tr><th>Nama</th><th>Alasan</th><th>Keterangan</th><th>Dicatat</th><th></th></tr></thead><tbody id="blList"></tbody></table></div></div>
+ </section>
+
+ <section id="p-sp" class="pg" hidden>
+  <h1>Surat Peringatan (SP)</h1>
+  <p class="mu">Dev menulis surat, suratnya langsung masuk ke Inbox anggota (dan Telegram kalau terhubung). Semua anggota bisa melihat siapa yang sedang kena SP; isi surat hanya bisa dibaca Dev dan penerimanya.</p>
+  <div class="cd" id="spSaya" hidden></div>
+  <div class="cd" id="spForm" hidden><b>Tulis surat peringatan</b>
+   <div class="fl" style="margin-top:12px"><label>Untuk anggota<select id="spAng"></select></label><label>Tingkat<select id="spLv"><option value="1">SP 1 · Teguran</option><option value="2">SP 2 · Peringatan tertulis</option><option value="3">SP 3 · Peringatan terakhir</option></select></label><label class="full">Judul (boleh kosong)<input type="text" id="spJudul" maxlength="120" placeholder="contoh: Tidak hadir rapat 3x"></label><label class="full">Isi surat<textarea id="spIsi" rows="6" maxlength="1800" placeholder="Tulis alasan, kejadian, dan apa yang harus diperbaiki."></textarea></label></div>
+   <div class="bar" style="margin:12px 0 0"><button class="bt g" id="spKirim">Kirim ke Inbox</button><span id="spMsg" class="mu"></span></div>
+  </div>
+  <h2 style="margin-top:22px">Anggota yang sedang SP</h2>
+  <div class="cd" style="padding:0"><div class="tb"><table><thead><tr><th>Nama</th><th>Tingkat</th><th>Jumlah SP aktif</th><th>Terakhir</th></tr></thead><tbody id="spStatus"></tbody></table></div></div>
+  <div id="spRiwayatWrap" style="margin-top:22px"><h2 id="spRiwayatJudul">Surat</h2><div id="spRiwayat"></div></div>
  </section>
 
  <section id="p-inbox" class="pg" hidden>
@@ -1056,6 +1070,7 @@ function show(p) {
   if (p === "anggota") loadAnggota();
   if (p === "catatan") loadCatatan();
   if (p === "blacklist") loadBlacklist();
+  if (p === "sp") loadSP();
   if (p === "polling") loadPolling();
   if (p === "dokumentasi") loadDok();
   clearInterval(iotTimer); if (p === "iot") { loadIot(true); iotTimer = setInterval(() => { if (!document.hidden) loadIot(); }, 3000); }
@@ -1374,7 +1389,7 @@ function agForm(m) {
 }
 function renderAnggota() {
   const tg = m => m.telegram.length ? ' <span class="ch g">Telegram</span>' : "";
-  $("#agList").innerHTML = AGD.items.map(m => `<tr style="${m.aktif ? "" : "opacity:.5"}"><td><b>${esc(m.nama)}</b>${tg(m)}${m.aktif ? "" : ' <span class="ch r">Nonaktif</span>'}</td><td>${m.divisi.map(d => `<span class="ch">${esc(AGD.divisi[d])}</span>`).join(" ") || "-"}</td><td>${m.jabatan.map(j => `<span class="ch y">${esc(AGD.jabatan[j])}</span>`).join(" ")}</td>
+  $("#agList").innerHTML = AGD.items.map(m => `<tr style="${m.aktif ? "" : "opacity:.5"}"><td><b>${esc(m.nama)}</b>${m.sp ? ` <span class="ch r">SP ${m.sp}</span>` : ""}${tg(m)}${m.aktif ? "" : ' <span class="ch r">Nonaktif</span>'}</td><td>${m.divisi.map(d => `<span class="ch">${esc(AGD.divisi[d])}</span>`).join(" ") || "-"}</td><td>${m.jabatan.map(j => `<span class="ch y">${esc(AGD.jabatan[j])}</span>`).join(" ")}</td>
     <td><code class="tk" data-tk="${m.id}">••••••••</code> <button class="bt o" data-tks="${m.id}" style="padding:4px 9px;min-height:30px;font-size:12px">Lihat</button> <button class="bt o" data-tkc="${m.id}" style="padding:4px 9px;min-height:30px;font-size:12px">Salin</button> <button class="bt o" data-tkr="${m.id}" style="padding:4px 9px;min-height:30px;font-size:12px">Buat ulang</button></td>
     <td class="rt" style="white-space:nowrap"><button class="bt o" data-age="${m.id}" style="padding:5px 10px;min-height:34px">Ubah</button> <button class="bt o" data-agd="${m.id}" style="padding:5px 10px;min-height:34px">Hapus</button></td></tr>`).join("") || '<tr><td colspan="5" class="mu">Belum ada anggota.</td></tr>';
   const one = id => AGD.items.find(m => m.id == id);
@@ -1496,6 +1511,39 @@ $("#dkSave").onclick = async () => {
       DKD = await api("/api/dokumentasi", {method: "POST", body: fd}); } catch (e) { $("#dkMsg").textContent = e.message; break; }
   }
   renderDok(); $("#dkFoto").value = ""; $("#dkSave").disabled = false; if ($("#dkMsg").textContent.startsWith("Mengunggah")) $("#dkMsg").textContent = "Selesai.";
+};
+
+/* Surat Peringatan */
+const SP_NAMA = {1: "SP 1 · Teguran", 2: "SP 2 · Peringatan tertulis", 3: "SP 3 · Peringatan terakhir"};
+async function loadSP(d) {
+  try {
+    d = d || await api("/api/sp");
+    $("#spForm").hidden = !d.edit;
+    if (d.edit) {
+      if (!AGD) { try { AGD = await api("/api/anggota"); } catch (e) {} }
+      const sel = $("#spAng"), cur = sel.value;
+      sel.innerHTML = (AGD ? AGD.items : []).filter(m => m.aktif).map(m => `<option value="${m.id}">${esc(m.nama)}${m.sp ? " (SP " + m.sp + ")" : ""}</option>`).join("");
+      if (cur) sel.value = cur;
+    }
+    const sayaLv = ME.anggota ? (d.status.find(x => x.anggota === ME.anggota.id) || {}).level : 0;
+    $("#spSaya").hidden = !sayaLv;
+    if (sayaLv) $("#spSaya").innerHTML = `<b style="color:#B3261E">Kamu sedang SP ${sayaLv}.</b> <span class="mu">Baca suratnya di bawah, lalu perbaiki dan hubungi Dev kalau ada yang mau dijelaskan.</span>`;
+    $("#spStatus").innerHTML = d.status.map(x => `<tr><td><b>${esc(x.nama)}</b></td><td><span class="ch ${x.level >= 3 ? "r" : "y"}">SP ${x.level}</span></td><td>${x.jumlah}</td><td class="mu" style="font-size:12px">${esc(x.terakhir)}</td></tr>`).join("") || '<tr><td colspan="4" class="mu">Tidak ada anggota yang sedang SP.</td></tr>';
+    $("#spRiwayatJudul").textContent = d.edit ? "Semua surat" : "Surat untuk kamu";
+    $("#spRiwayat").innerHTML = d.surat.map(x => `<div class="cd" style="${x.dicabut ? "opacity:.55" : ""}"><div class="bar" style="justify-content:space-between;margin:0"><b>${esc(x.judul)}</b><span><span class="ch ${x.level >= 3 ? "r" : "y"}">SP ${x.level}</span>${x.dicabut ? ' <span class="ch n">Dicabut</span>' : ""}</span></div>
+      <div class="mu" style="font-size:12.5px;margin:4px 0 8px">${esc(x.nomor)} · ${esc(x.tanggal)} · untuk ${esc(x.nama)} · oleh ${esc(x.oleh)}</div><div style="white-space:pre-wrap">${esc(x.isi)}</div>
+      ${d.edit ? `<div class="bar" style="margin:10px 0 0"><button class="bt o" data-spc="${x.id}:${x.dicabut ? 0 : 1}">${x.dicabut ? "Aktifkan lagi" : "Cabut SP"}</button><button class="bt o" data-spd="${x.id}">Hapus</button></div>` : ""}</div>`).join("") || '<p class="mu">Belum ada surat.</p>';
+    $$("[data-spc]").forEach(b => b.onclick = async () => { const [i, v] = b.dataset.spc.split(":"); if (v === "1" && !confirm("Cabut SP ini? Status SP orangnya berkurang, suratnya tetap tersimpan.")) return; loadSP(await api("/api/sp/" + i, {json: {dicabut: v === "1"}})); });
+    $$("[data-spd]").forEach(b => b.onclick = async () => { if (confirm("Hapus surat ini permanen? Suratnya juga hilang dari Inbox orangnya.")) loadSP(await api("/api/sp/" + b.dataset.spd, {method: "DELETE"})); });
+  } catch (e) { $("#spStatus").innerHTML = '<tr><td colspan="4" class="er">' + esc(e.message) + "</td></tr>"; }
+}
+$("#spKirim").onclick = async () => {
+  const nama = $("#spAng").selectedOptions[0] ? $("#spAng").selectedOptions[0].textContent : "";
+  if (!$("#spAng").value) { $("#spMsg").textContent = "Pilih anggota dulu."; return; }
+  if (!confirm(`Kirim SP ${$("#spLv").value} ke ${nama}? Suratnya langsung masuk ke Inbox dan Telegram dia.`)) return;
+  $("#spKirim").disabled = true;
+  try { const d = await api("/api/sp", {json: {anggota: +$("#spAng").value, level: +$("#spLv").value, judul: $("#spJudul").value, isi: $("#spIsi").value}}); $("#spJudul").value = ""; $("#spIsi").value = ""; $("#spMsg").textContent = "Terkirim ke Inbox."; AGD = null; loadSP(d); } catch (e) { $("#spMsg").textContent = e.message; }
+  $("#spKirim").disabled = false;
 };
 
 /* Blacklist (khusus Secret Service + Dev) */
@@ -1678,7 +1726,7 @@ async function inboxBadge(n) {
   const b = $("#nbInbox"); b.textContent = n > 99 ? "99+" : n; b.hidden = !n;
 }
 let IBD = {items: []};
-const IB_IKON = {bayar_kas: "💸", bayar_ok: "✅", bayar_tolak: "⛔", info: "📢", tanya_produk: "🛒", invoice_bayar: "🧾"};
+const IB_IKON = {sp: "⚠️", bayar_kas: "💸", bayar_ok: "✅", bayar_tolak: "⛔", info: "📢", tanya_produk: "🛒", invoice_bayar: "🧾"};
 async function bayarAksi(id, aksi) {
   let alasan = "";
   if (aksi === "tolak") { alasan = prompt("Alasan ditolak (opsional, dikirim ke anggota):", "Foto bukti tidak jelas"); if (alasan === null) return false; }
@@ -1694,7 +1742,7 @@ function renderInbox() {
     return `<div class="cd ib${x.dibaca ? "" : " baru"}" data-ibr="${x.id}"><div class="ibh"><span class="ibi" aria-hidden="true">${IB_IKON[x.jenis] || "🔔"}</span><div style="flex:1;min-width:0"><b>${esc(x.judul)}</b><div class="mu" style="font-size:12.5px">${relW(x.dibuat)} ${st}</div></div><button class="bt o ibx" data-ibd="${x.id}" aria-label="Hapus notifikasi">×</button></div>
       ${x.isi ? `<div style="margin-top:8px">${esc(x.isi)}</div>` : ""}
       ${x.jenis === "bayar_kas" && x.ref && x.bayar_status !== "dihapus" && kf ? `<div class="bar" style="margin:10px 0 0"><a href="/api/iuran/${x.ref}/foto" target="_blank" rel="noopener"><img class="ibf" src="/api/iuran/${x.ref}/foto" alt="Foto bukti bayar" loading="lazy"></a>${tunggu ? `<button class="bt g" data-ibt="${x.ref}">Terima</button><button class="bt o" data-ibn="${x.ref}">Tolak</button>` : ""}</div>` : ""}
-      ${x.jenis.startsWith("bayar") ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="bayarkas">Buka Bayar Kas</button></div>' : x.jenis === "tanya_produk" ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="produk">Balas di halaman Produk</button></div>' : x.jenis === "invoice_bayar" ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="invoice">Buka halaman Invoice</button></div>' : ""}</div>`;
+      ${x.jenis.startsWith("bayar") ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="bayarkas">Buka Bayar Kas</button></div>' : x.jenis === "tanya_produk" ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="produk">Balas di halaman Produk</button></div>' : x.jenis === "invoice_bayar" ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="invoice">Buka halaman Invoice</button></div>' : x.jenis === "sp" ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="sp">Buka halaman SP</button></div>' : ""}</div>`;
   }).join("") || '<p class="mu">Inbox kosong. Notifikasi baru akan muncul di sini.</p>';
   $$("[data-ibr]").forEach(e => e.onclick = async ev => { if (ev.target.closest("button,a")) return; const x = it.find(y => y.id == e.dataset.ibr); if (x && !x.dibaca) { IBD = await api("/api/inbox/baca", {json: {id: x.id}}); renderInbox(); inboxBadge(IBD.belum); } });
   $$("[data-ibd]").forEach(b => b.onclick = async () => { IBD = await api("/api/inbox/" + b.dataset.ibd, {method: "DELETE"}); renderInbox(); inboxBadge(IBD.belum); });
@@ -4318,10 +4366,10 @@ const OFFICE = (() => {
   if (!ADM()) $("#nvApex").style.display = "none";   // Tanya Apex khusus token admin
   inboxBadge(); setInterval(() => { if (!document.hidden) inboxBadge(); }, 20000);
   pasangAI();
-  const NP = ME.anggota ? ME.anggota.nama + " · " + ME.anggota.jabatan.join(", ") : (ME.nama_peran || "Viewer");
+  const NP = ME.anggota ? ME.anggota.nama + " · " + ME.anggota.jabatan.join(", ") + (ME.anggota.sp ? " · SP" + ME.anggota.sp : "") : (ME.nama_peran || "Viewer");
   $("#whoRole").innerHTML = ADM() ? `<span class="wl">Masuk sebagai</span><span class="wh">Masuk sebagai</span> <b>Admin</b>`
     : `<span class="wl">Masuk sebagai</span><span class="wh">⚡ Hemat token</span> <b>${esc(NP)}</b>`;
-  if (ME.role === "viewer") $(".nv[data-p=blacklist]").style.display = "none";   // viewer tidak boleh melihat blacklist
+  if (ME.role === "viewer") ["blacklist", "sp"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // viewer tidak boleh melihat blacklist
   if (ME.role === "viewer") $("#logout").style.display = "none";   // viewer tidak perlu tombol keluar
   if (!ADM()) { const lb = $("#lpBuat"); if (lb) lb.closest(".cd").hidden = true; }   // Manager/Sekretaris cuma lihat laporan
   if (!ADM()) { const dw = $('[data-mode="dewan"]'); if (dw) dw.remove(); }   // Sidang Dewan khusus admin/dev

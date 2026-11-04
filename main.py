@@ -248,6 +248,7 @@ def db_init():
         sql(c, f"CREATE TABLE IF NOT EXISTS perpus (id {pk}, judul TEXT NOT NULL, penulis TEXT, kategori TEXT, ringkasan TEXT, isi TEXT, link TEXT, "
                "file_nama TEXT, file_mime TEXT, file_data TEXT, sampul_mime TEXT, sampul TEXT, dibuat TEXT, diubah TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS inbox (id {pk}, untuk INTEGER NOT NULL, jenis TEXT, judul TEXT NOT NULL, isi TEXT, ref INTEGER, dibaca INTEGER NOT NULL DEFAULT 0, dibuat TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS sp (id {pk}, anggota INTEGER NOT NULL, nama TEXT, level INTEGER NOT NULL, judul TEXT NOT NULL, isi TEXT, oleh TEXT, tanggal TEXT, dicabut INTEGER NOT NULL DEFAULT 0, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS bayar_kas (id {pk}, anggota INTEGER NOT NULL, nama TEXT, periode TEXT NOT NULL, jumlah {big} NOT NULL DEFAULT 0, mime TEXT, foto TEXT, "
                "status TEXT NOT NULL DEFAULT 'menunggu', catatan TEXT, alasan TEXT, dibuat TEXT, dikonfirmasi TEXT, oleh TEXT, kas_id INTEGER)")
         sql(c, f"CREATE TABLE IF NOT EXISTS produk (id {pk}, nama TEXT NOT NULL, kategori TEXT, mitra TEXT, harga {big} NOT NULL DEFAULT 0, satuan TEXT, sedia TEXT, "
@@ -2436,7 +2437,7 @@ def api_me():
     m = member_of(r)
     return jsonify({"role": "admin" if is_admin(r) else ("anggota" if m else r), "nama_peran": nama_peran(r), "izin": sorted(perms_of(r)), "kuota": kuota_info(r),
                     "anggota": {"id": m["id"], "nama": m["nama"], "divisi": [DIVISI[x] for x in m["divisi"]], "jabatan": [JABATAN[x] for x in m["jabatan"]],
-                                "divisi_key": m["divisi"], "iuran": tingkat_of(m["id"])} if m else None, "daftar_divisi": DIVISI,
+                                "divisi_key": m["divisi"], "iuran": tingkat_of(m["id"]), "sp": sp_status().get(m["id"], 0)} if m else None, "daftar_divisi": DIVISI,
                     **{k: v for k, v in SET.items() if k not in ("kuota", "tg_users", "tg_izin", "iuran", "berita_ringkas")}, "mcp_siap": bool(MCP_SERVERS and ClientSession), "db_permanen": PG, "lantai": LANTAI,
                     "gambar": img_status()})
 
@@ -2775,7 +2776,7 @@ def api_usage():
 
 def _member_out(m, token=False):
     tg = [k for k, v in SET.get("tg_users", {}).items() if v.get("anggota") == m["id"]]
-    return {"id": m["id"], "nama": m["nama"], "divisi": m["divisi"], "jabatan": m["jabatan"], "aktif": m["aktif"], "telegram": tg,
+    return {"id": m["id"], "nama": m["nama"], "divisi": m["divisi"], "jabatan": m["jabatan"], "aktif": m["aktif"], "telegram": tg, "sp": sp_status().get(m["id"], 0),
             **({"token": m["token"]} if token else {})}
 
 
@@ -2927,6 +2928,93 @@ def api_blacklist_del(i):
     with db() as c:
         sql(c, "DELETE FROM blacklist WHERE id=?", (i,))
     return jsonify({"items": blacklist_list(), "edit": True})
+
+
+# Surat Peringatan (SP): hanya Dev yang menulis. Isi surat masuk ke Inbox orangnya; status SP aktif terlihat oleh semua anggota login.
+SP_ROMAWI = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"]
+
+
+def sp_nomor(i, level, tgl):
+    try:
+        th, bl = int(tgl[:4]), int(tgl[5:7])
+    except (ValueError, TypeError):
+        th, bl = datetime.now(WIB).year, datetime.now(WIB).month
+    return f"{int(i):03d}/SP{level}/MCI/{SP_ROMAWI[bl]}/{th}"
+
+
+def sp_semua():
+    with db() as c:
+        rows = sql(c, "SELECT id,anggota,nama,level,judul,isi,oleh,tanggal,dicabut FROM sp ORDER BY id DESC LIMIT 300").fetchall()
+    return [{"id": int(i), "anggota": int(a), "nama": n, "level": int(lv), "judul": j, "isi": isi or "", "oleh": o or "", "tanggal": t or "",
+             "dicabut": bool(dc), "nomor": sp_nomor(i, lv, t or "")} for i, a, n, lv, j, isi, o, t, dc in rows]
+
+
+def sp_status():
+    """{id anggota: level SP aktif tertinggi} (SP yang dicabut tidak dihitung)."""
+    out = {}
+    for x in sp_semua():
+        if not x["dicabut"]:
+            out[x["anggota"]] = max(out.get(x["anggota"], 0), x["level"])
+    return out
+
+
+def sp_payload(r):
+    mid = mid_of(r)
+    semua = sp_semua()
+    adm = is_admin(r)
+    st = {}
+    for x in semua:
+        if x["dicabut"]:
+            continue
+        e = st.setdefault(x["anggota"], {"anggota": x["anggota"], "nama": x["nama"], "level": 0, "jumlah": 0, "terakhir": ""})
+        e["level"] = max(e["level"], x["level"]); e["jumlah"] += 1; e["terakhir"] = max(e["terakhir"], x["tanggal"])
+    surat = semua if adm else [x for x in semua if x["anggota"] == mid]   # isi surat: hanya Dev & penerimanya
+    return {"surat": surat, "status": sorted(st.values(), key=lambda e: (-e["level"], e["nama"].lower())), "edit": adm}
+
+
+@app.route("/api/sp", methods=["GET", "POST"])
+def api_sp():
+    r = role()
+    if not r:
+        abort(401)
+    if r == "viewer":
+        abort(403)
+    if request.method == "POST":
+        need("admin")
+        d = request.get_json(silent=True) or {}
+        m = MEMBERS.get(int(d["anggota"])) if str(d.get("anggota", "")).isdigit() else None
+        if not m:
+            return jsonify({"error": "Pilih anggota penerima"}), 400
+        try:
+            lv = int(d.get("level"))
+        except (TypeError, ValueError):
+            lv = 0
+        if lv not in (1, 2, 3):
+            return jsonify({"error": "Tingkat SP harus 1, 2, atau 3"}), 400
+        isi = str(d.get("isi", "")).strip()[:1800]
+        if len(isi) < 5:
+            return jsonify({"error": "Isi surat wajib diisi"}), 400
+        judul = re.sub(r"\s+", " ", str(d.get("judul", ""))).strip()[:120] or f"Surat Peringatan {lv}"
+        tgl = today()
+        with db() as c:
+            sql(c, "INSERT INTO sp (anggota,nama,level,judul,isi,oleh,tanggal,dicabut,dibuat) VALUES (?,?,?,?,?,?,?,0,?)", (m["id"], m["nama"], lv, judul, isi, nama_peran(r), tgl, _now()))
+            sid = int(sql(c, "SELECT MAX(id) FROM sp").fetchone()[0])
+        inbox_kirim([m["id"]], "sp", f"⚠️ Surat Peringatan {lv} · {sp_nomor(sid, lv, tgl)}", f"{judul}\n\n{isi}", sid)
+    return jsonify(sp_payload(r))
+
+
+@app.route("/api/sp/<int:i>", methods=["POST", "DELETE"])
+def api_sp_one(i):
+    need("admin")
+    r = role()
+    with db() as c:
+        if request.method == "DELETE":
+            sql(c, "DELETE FROM sp WHERE id=?", (i,))
+            sql(c, "DELETE FROM inbox WHERE jenis='sp' AND ref=?", (i,))
+        else:   # POST {dicabut: true/false}
+            d = request.get_json(silent=True) or {}
+            sql(c, "UPDATE sp SET dicabut=? WHERE id=?", (1 if d.get("dicabut", True) else 0, i))
+    return jsonify(sp_payload(r))
 
 
 # Polling: 1 anggota = 1 suara, anonim. Hasil terlihat setelah ditutup / lewat batas waktu. Pemenang ditetapkan Dev manual.
