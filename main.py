@@ -102,8 +102,37 @@ try:
 except ValueError:
     MCP_SERVERS = []
 
+TANPA_LATEX = ("\n\nFORMAT: jangan pakai LaTeX atau tanda dolar untuk rumus (web dan Telegram tidak bisa menampilkannya). "
+               "Tulis rumus sebagai teks biasa, contoh: R = (V sumber - Vf) / If, dan satuan ditulis biasa: 5V, 20mA, 220 ohm atau 220Ω.")
 CAVEMAN = ("\n\nMODE CAVEMAN AKTIF: jawab sesingkat mungkin, kalimat pendek gaya telegram, tanpa basa-basi, "
            "tanpa pembuka atau penutup. Kode, angka, satuan, dan peringatan keselamatan tetap utuh dan akurat.")
+
+# Web & Telegram tidak merender LaTeX: ubah rumus ($R = \\frac{a}{b}$) jadi teks biasa agar tidak tampil simbol aneh
+_LATEX_GANTI = [(r"\\Omega", "Ω"), (r"\\times", "×"), (r"\\cdot", "·"), (r"\\approx", "≈"), (r"\\pm", "±"), (r"\\leq?", "≤"), (r"\\geq?", "≥"),
+                (r"\\neq", "≠"), (r"\\mu", "µ"), (r"\\degree|\\circ", "°"), (r"\\rightarrow|\\to", "→"), (r"\\%", "%"), (r"\\(?:,|;|:|!|quad|qquad)", " ")]
+
+
+def latex_bersih(t):
+    if not t or ("$" not in t and "\\" not in t):
+        return t
+    def rumus(m):
+        x = m.group(1)
+        x = re.sub(r"\^\{([^{}]*)\}", r"^\1", x)
+        x = re.sub(r"_\{([^{}]*)\}", r"_\1", x)
+        for _ in range(3):   # \text{..}, \mathrm{..}, \frac{a}{b} (bisa bersarang)
+            x = re.sub(r"\\(?:text|mathrm|mathbf|textbf|operatorname)\{([^{}]*)\}", r"\1", x)
+            x = re.sub(r"\\d?frac\{([^{}]*)\}\{([^{}]*)\}", lambda g: (f"({g.group(1)})" if re.search(r"[\s+\-]", g.group(1)) else g.group(1)) + "/" + (f"({g.group(2)})" if re.search(r"[\s+\-]", g.group(2)) else g.group(2)), x)
+        for p, r in _LATEX_GANTI:
+            x = re.sub(p, r, x)
+        x = re.sub(r"\\sqrt\{([^{}]*)\}", r"√(\1)", x)
+        x = re.sub(r"\\(?:left|right)", "", x)
+        x = re.sub(r"\\([a-zA-Z]+)", r"\1", x)
+        return re.sub(r"[ \t]{2,}", " ", x).strip()
+    t = re.sub(r"\$\$(.+?)\$\$", lambda m: "\n" + rumus(m) + "\n", t, flags=re.S)
+    t = re.sub(r"\\\[(.+?)\\\]", lambda m: "\n" + rumus(m) + "\n", t, flags=re.S)
+    t = re.sub(r"(?<![\w$\\])\$(?!\s)([^$\n]{1,200}?)(?<!\s)\$(?![\w$])", rumus, t)
+    return t
+
 
 # ---------- 4 LANTAI & DIVISI ----------
 LANTAI = {1: "Lobby & Santai", 2: "Divisi Teknik", 3: "Operasional & Keuangan", 4: "Eksekutif"}
@@ -575,6 +604,8 @@ async def ask(key, text, history=None, parts=None, schema=None, model=None, act=
         sysp += f"\n\n[SKILL: {skill}]\n{SKILLS[skill]['isi']}"
     if SET["caveman"] or brief:
         sysp += CAVEMAN
+    if not schema:
+        sysp += TANPA_LATEX
     contents = (history or []) + [types.Content(role="user", parts=[types.Part(text=text)] + (parts or []))]
     ck = None
     if cache and not history and not parts:
@@ -631,6 +662,8 @@ async def ask(key, text, history=None, parts=None, schema=None, model=None, act=
         s["tokens"] += total
         await asyncio.to_thread(usage_add, model, masuk, keluar, pikir)
         out = (r.text or "").strip()
+        if not schema:
+            out = latex_bersih(out)
         if ck and out:
             cache_put(ck, out)
         return out
