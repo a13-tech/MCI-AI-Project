@@ -2854,10 +2854,12 @@ def blacklist_list():
 
 @app.route("/api/blacklist", methods=["GET", "POST"])
 def api_blacklist():
-    """Lihat: semua yang sudah login (termasuk viewer). Tambah/hapus: hanya yang berizin blacklist (Dev & divisi SS)."""
+    """Lihat: semua anggota yang sudah login KECUALI viewer. Tambah/hapus: hanya yang berizin blacklist (Dev & divisi SS)."""
     r = role()
     if not r:
         abort(401)
+    if r == "viewer":
+        abort(403)
     if request.method == "POST":
         if not can("blacklist", r):
             abort(403)

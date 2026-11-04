@@ -4321,6 +4321,7 @@ const OFFICE = (() => {
   const NP = ME.anggota ? ME.anggota.nama + " · " + ME.anggota.jabatan.join(", ") : (ME.nama_peran || "Viewer");
   $("#whoRole").innerHTML = ADM() ? `<span class="wl">Masuk sebagai</span><span class="wh">Masuk sebagai</span> <b>Admin</b>`
     : `<span class="wl">Masuk sebagai</span><span class="wh">⚡ Hemat token</span> <b>${esc(NP)}</b>`;
+  if (ME.role === "viewer") $(".nv[data-p=blacklist]").style.display = "none";   // viewer tidak boleh melihat blacklist
   if (ME.role === "viewer") $("#logout").style.display = "none";   // viewer tidak perlu tombol keluar
   if (!ADM()) { const lb = $("#lpBuat"); if (lb) lb.closest(".cd").hidden = true; }   // Manager/Sekretaris cuma lihat laporan
   if (!ADM()) { const dw = $('[data-mode="dewan"]'); if (dw) dw.remove(); }   // Sidang Dewan khusus admin/dev
