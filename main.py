@@ -2931,6 +2931,7 @@ def api_blacklist_del(i):
 
 
 # Surat Peringatan (SP): hanya Dev yang menulis. Isi surat masuk ke Inbox orangnya; status SP aktif terlihat oleh semua anggota login.
+SP_MAKS = 200000   # praktis tanpa batas untuk isi surat (hanya pengaman server)
 SP_ROMAWI = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"]
 
 
@@ -2991,15 +2992,15 @@ def api_sp():
             lv = 0
         if lv not in (1, 2, 3):
             return jsonify({"error": "Tingkat SP harus 1, 2, atau 3"}), 400
-        isi = str(d.get("isi", "")).strip()[:1800]
+        isi = str(d.get("isi", "")).strip()[:SP_MAKS]
         if len(isi) < 5:
             return jsonify({"error": "Isi surat wajib diisi"}), 400
-        judul = re.sub(r"\s+", " ", str(d.get("judul", ""))).strip()[:120] or f"Surat Peringatan {lv}"
+        judul = re.sub(r"\s+", " ", str(d.get("judul", ""))).strip()[:300] or f"Surat Peringatan {lv}"
         tgl = today()
         with db() as c:
             sql(c, "INSERT INTO sp (anggota,nama,level,judul,isi,oleh,tanggal,dicabut,dibuat) VALUES (?,?,?,?,?,?,?,0,?)", (m["id"], m["nama"], lv, judul, isi, nama_peran(r), tgl, _now()))
             sid = int(sql(c, "SELECT MAX(id) FROM sp").fetchone()[0])
-        inbox_kirim([m["id"]], "sp", f"⚠️ Surat Peringatan {lv} · {sp_nomor(sid, lv, tgl)}", f"{judul}\n\n{isi}", sid)
+        inbox_kirim([m["id"]], "sp", f"⚠️ Surat Peringatan {lv} · {sp_nomor(sid, lv, tgl)}", f"{judul}\n\n{isi}", sid, maks=SP_MAKS + 400)
     return jsonify(sp_payload(r))
 
 
@@ -3283,7 +3284,8 @@ def _tg_ke_anggota(ids, teks):
     async def kirim():
         for uid in tgt:
             try:
-                await app_.bot.send_message(chat_id=uid, text=teks[:4000])
+                for i in range(0, max(len(teks), 1), 4000):   # teks panjang (mis. SP) dipecah per 4000 huruf
+                    await app_.bot.send_message(chat_id=uid, text=teks[i:i + 4000])
             except Exception:
                 log.warning("Notifikasi Inbox tidak terkirim ke Telegram %s (sudah /start bot Ledger?)", uid)
     try:
@@ -3292,14 +3294,14 @@ def _tg_ke_anggota(ids, teks):
         log.exception("kirim notif Telegram gagal")
 
 
-def inbox_kirim(untuk, jenis, judul, isi="", ref=None, tg=True):
+def inbox_kirim(untuk, jenis, judul, isi="", ref=None, tg=True, maks=2000):
     ids = sorted({int(u) for u in untuk if u is not None})
     if not ids:
         return
     now = _now()
     with db() as c:
         for u in ids:
-            sql(c, "INSERT INTO inbox (untuk,jenis,judul,isi,ref,dibaca,dibuat) VALUES (?,?,?,?,?,0,?)", (u, jenis, judul[:200], isi[:2000], ref, now))
+            sql(c, "INSERT INTO inbox (untuk,jenis,judul,isi,ref,dibaca,dibuat) VALUES (?,?,?,?,?,0,?)", (u, jenis, judul[:200], isi[:maks], ref, now))
     if tg:
         _tg_ke_anggota(ids, f"📬 {judul}" + (f"\n{isi}" if isi else "") + "\n\nBuka web MCI → Inbox.")
 
