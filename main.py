@@ -249,6 +249,7 @@ def db_init():
                "file_nama TEXT, file_mime TEXT, file_data TEXT, sampul_mime TEXT, sampul TEXT, dibuat TEXT, diubah TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS inbox (id {pk}, untuk INTEGER NOT NULL, jenis TEXT, judul TEXT NOT NULL, isi TEXT, ref INTEGER, dibaca INTEGER NOT NULL DEFAULT 0, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS sp (id {pk}, anggota INTEGER NOT NULL, nama TEXT, level INTEGER NOT NULL, judul TEXT NOT NULL, isi TEXT, oleh TEXT, tanggal TEXT, dicabut INTEGER NOT NULL DEFAULT 0, dibuat TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS uu (id {pk}, tipe TEXT NOT NULL, bab TEXT, nomor INTEGER, judul TEXT, isi TEXT, artinya TEXT, diubah TEXT, oleh TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS bayar_kas (id {pk}, anggota INTEGER NOT NULL, nama TEXT, periode TEXT NOT NULL, jumlah {big} NOT NULL DEFAULT 0, mime TEXT, foto TEXT, "
                "status TEXT NOT NULL DEFAULT 'menunggu', catatan TEXT, alasan TEXT, dibuat TEXT, dikonfirmasi TEXT, oleh TEXT, kas_id INTEGER)")
         sql(c, f"CREATE TABLE IF NOT EXISTS produk (id {pk}, nama TEXT NOT NULL, kategori TEXT, mitra TEXT, harga {big} NOT NULL DEFAULT 0, satuan TEXT, sedia TEXT, "
@@ -274,6 +275,16 @@ def db_init():
         r = sql(c, "SELECT v FROM pengaturan WHERE k=?", ("s",)).fetchone()
         if r:
             SET.update(json.loads(r[0]))
+        if not sql(c, "SELECT COUNT(*) FROM uu").fetchone()[0]:   # isi awal UU MCI (Draft Final Putusan Dewan)
+            try:
+                from uu_seed import UU_SEED
+                now = datetime.now(WIB).isoformat(timespec="seconds")
+                sql(c, "INSERT INTO uu (tipe,judul,isi,diubah,oleh) VALUES (?,?,?,?,?)", ("info", "Undang-Undang MCI", UU_SEED["info"], now, "awal"))
+                sql(c, "INSERT INTO uu (tipe,judul,isi,diubah,oleh) VALUES (?,?,?,?,?)", ("mukadimah", "Mukadimah", UU_SEED["mukadimah"], now, "awal"))
+                for p in UU_SEED["pasal"]:
+                    sql(c, "INSERT INTO uu (tipe,bab,nomor,judul,isi,artinya,diubah,oleh) VALUES (?,?,?,?,?,?,?,?)", ("pasal", p["bab"], p["nomor"], p["judul"], p["isi"], p["artinya"], now, "awal"))
+            except Exception as e:
+                log.warning("Seed UU gagal: %s", e)
         if not sql(c, "SELECT COUNT(*) FROM skills").fetchone()[0]:
             now = datetime.now(WIB).isoformat(timespec="seconds")
             for s in SKILL_SEED:
@@ -3016,6 +3027,96 @@ def api_sp_one(i):
             d = request.get_json(silent=True) or {}
             sql(c, "UPDATE sp SET dicabut=? WHERE id=?", (1 if d.get("dicabut", True) else 0, i))
     return jsonify(sp_payload(r))
+
+
+# ---- Pasal & Undang-Undang MCI: semua yang login (termasuk viewer) boleh membaca, hanya Dev yang boleh mengubah ----
+UU_COLS = "id,tipe,bab,nomor,judul,isi,artinya,diubah,oleh"
+
+
+def uu_semua():
+    with db() as c:
+        rows = sql(c, f"SELECT {UU_COLS} FROM uu").fetchall()
+    out = [{"id": int(i), "tipe": t, "bab": b or "", "nomor": int(n) if n is not None else None, "judul": j or "", "isi": isi or "", "artinya": a or "",
+            "diubah": d or "", "oleh": o or ""} for i, t, b, n, j, isi, a, d, o in rows]
+    urut = {"info": 0, "mukadimah": 1, "pasal": 2}
+    out.sort(key=lambda x: (urut.get(x["tipe"], 3), x["nomor"] if x["nomor"] is not None else 10**9, x["id"]))
+    return out
+
+
+def uu_payload(r):
+    return {"items": uu_semua(), "edit": is_admin(r)}
+
+
+def uu_baca(d, tipe, lama=None):
+    """Validasi isian pasal. Mengembalikan (data, error)."""
+    judul = re.sub(r"\s+", " ", str(d.get("judul", ""))).strip()[:200]
+    isi = str(d.get("isi", "")).replace("\r", "").strip()[:20000]
+    artinya = str(d.get("artinya", "")).strip()[:2000]
+    bab = re.sub(r"\s+", " ", str(d.get("bab", ""))).strip()[:200]
+    if tipe == "pasal":
+        if not judul:
+            return None, "Judul pasal wajib diisi"
+        if not bab:
+            return None, "Bab wajib diisi, contoh: BAB I. KETENTUAN UMUM"
+    if len(isi) < 3:
+        return None, "Isi wajib diisi"
+    nomor = None
+    if tipe == "pasal":
+        try:
+            nomor = int(d.get("nomor"))
+        except (TypeError, ValueError):
+            nomor = None
+    return {"judul": judul, "isi": isi, "artinya": artinya, "bab": bab, "nomor": nomor}, None
+
+
+@app.route("/api/uu", methods=["GET", "POST"])
+def api_uu():
+    r = role()
+    if not r:
+        abort(401)
+    if request.method == "POST":
+        need("admin")
+        v, err = uu_baca(request.get_json(silent=True) or {}, "pasal")
+        if err:
+            return jsonify({"error": err}), 400
+        with db() as c:
+            mx = sql(c, "SELECT MAX(nomor) FROM uu WHERE tipe='pasal'").fetchone()[0] or 0
+            if v["nomor"] is None:
+                v["nomor"] = int(mx) + 1
+            if v["nomor"] < 1:
+                return jsonify({"error": "Nomor pasal harus 1 atau lebih"}), 400
+            if sql(c, "SELECT id FROM uu WHERE tipe='pasal' AND nomor=?", (v["nomor"],)).fetchone():
+                return jsonify({"error": f"Pasal {v['nomor']} sudah ada"}), 400
+            sql(c, "INSERT INTO uu (tipe,bab,nomor,judul,isi,artinya,diubah,oleh) VALUES (?,?,?,?,?,?,?,?)", ("pasal", v["bab"], v["nomor"], v["judul"], v["isi"], v["artinya"], _now(), nama_peran(r)))
+    return jsonify(uu_payload(r))
+
+
+@app.route("/api/uu/<int:i>", methods=["POST", "DELETE"])
+def api_uu_one(i):
+    need("admin")
+    r = role()
+    with db() as c:
+        row = sql(c, "SELECT tipe FROM uu WHERE id=?", (i,)).fetchone()
+        if not row:
+            return jsonify({"error": "Tidak ditemukan"}), 404
+        tipe = row[0]
+        if request.method == "DELETE":
+            if tipe != "pasal":
+                return jsonify({"error": "Bagian ini tidak bisa dihapus, hanya diubah"}), 400
+            sql(c, "DELETE FROM uu WHERE id=?", (i,))
+        else:
+            v, err = uu_baca(request.get_json(silent=True) or {}, tipe)
+            if err:
+                return jsonify({"error": err}), 400
+            if tipe == "pasal":
+                if v["nomor"] is None or v["nomor"] < 1:
+                    return jsonify({"error": "Nomor pasal harus 1 atau lebih"}), 400
+                if sql(c, "SELECT id FROM uu WHERE tipe='pasal' AND nomor=? AND id<>?", (v["nomor"], i)).fetchone():
+                    return jsonify({"error": f"Pasal {v['nomor']} sudah ada"}), 400
+                sql(c, "UPDATE uu SET bab=?,nomor=?,judul=?,isi=?,artinya=?,diubah=?,oleh=? WHERE id=?", (v["bab"], v["nomor"], v["judul"], v["isi"], v["artinya"], _now(), nama_peran(r), i))
+            else:
+                sql(c, "UPDATE uu SET isi=?,diubah=?,oleh=? WHERE id=?", (v["isi"], _now(), nama_peran(r), i))
+    return jsonify(uu_payload(r))
 
 
 # Polling: 1 anggota = 1 suara, anonim. Hasil terlihat setelah ditutup / lewat batas waktu. Pemenang ditetapkan Dev manual.

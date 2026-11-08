@@ -50,6 +50,11 @@ h2{margin:22px 0 10px;font-size:17px}
 .k{font-size:12px;color:var(--mute);font-weight:600}
 .v{font-size:24px;font-weight:800;margin-top:4px}
 .ch{display:inline-block;padding:4px 11px;border-radius:99px;font-size:12px;font-weight:600;background:#DCE8FF;color:#0B3FBF}
+.uu-bab{margin:26px 0 10px;font-size:15px;font-weight:800;letter-spacing:.3px;color:#0B3FBF;border-bottom:2px solid #DCE8FF;padding-bottom:6px;scroll-margin-top:14px}
+.uu-ps{margin:10px 0;scroll-margin-top:14px}.uu-ps h3{margin:0 0 8px;font-size:16.5px}.uu-ps ol,.uu-ps ul{margin:6px 0 0;padding-left:22px}.uu-ps li{margin:5px 0;line-height:1.55}
+.uu-ar{margin-top:10px;padding:9px 13px;border-radius:10px;background:#E9F7EF;color:#0E5A33;font-size:14px;line-height:1.5}.uu-ar b{font-weight:800}
+.uu-ps mark,.uu-mk mark{background:#FFE58F;border-radius:3px;padding:0 2px}.uu-jump{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}.uu-jump button{border:0;cursor:pointer;font:inherit}
+.uu-mk{font-style:italic;line-height:1.65}
 .ch.y{background:#F6E9C3;color:#6B4E0A}.ch.n{background:#EEF1F7;color:var(--mute)}.ch.r{background:#FDE3E1;color:#B42318}.ch.g{background:#DDF5E7;color:#0E6B3A}
 .bt{border:0;border-radius:12px;padding:11px 20px;font-weight:800;font-size:14px;min-height:44px;cursor:pointer}
 .bt:disabled{opacity:.5;cursor:default}
@@ -260,6 +265,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
  <button class="nv" data-p="hutang">Hutang</button>
  <button class="nv" data-p="blacklist">Blacklist</button>
  <button class="nv" data-p="sp">Surat Peringatan</button>
+ <button class="nv" data-p="uu">Pasal & Undang</button>
  <button class="nv" data-p="anggota">Anggota</button>
  <button class="nv" data-p="stok">Stok Barang</button>
  <button class="nv" data-p="produk">Produk</button>
@@ -531,6 +537,20 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
   <h2 style="margin-top:22px">Anggota yang sedang SP</h2>
   <div class="cd" style="padding:0"><div class="tb"><table><thead><tr><th>Nama</th><th>Tingkat</th><th>Jumlah SP aktif</th><th>Terakhir</th></tr></thead><tbody id="spStatus"></tbody></table></div></div>
   <div id="spRiwayatWrap" style="margin-top:22px"><h2 id="spRiwayatJudul">Surat</h2><div id="spRiwayat"></div></div>
+ </section>
+
+ <section id="p-uu" class="pg" hidden>
+  <h1>Pasal &amp; Undang-Undang</h1>
+  <p class="mu" id="uuInfo">Memuat…</p>
+  <div class="cd" id="uuMuk" hidden><b>Mukadimah</b><div class="uu-mk" id="uuMukIsi" style="margin-top:8px"></div></div>
+  <div class="bar"><input type="search" id="uuQ" placeholder="Cari pasal atau kata kunci…" style="max-width:420px"><span class="mu" id="uuCount"></span></div>
+  <div class="uu-jump" id="uuJump"></div>
+  <div class="cd" id="uuForm" hidden><b id="uuFormJudul">Tambah pasal</b>
+   <div class="fl" style="margin-top:12px"><label id="uuLNo">Nomor pasal<input type="number" id="uuNo" min="1" placeholder="kosong = otomatis"></label><label id="uuLBab">Bab<input type="text" id="uuBab" list="uuBabs" maxlength="200" placeholder="BAB I. KETENTUAN UMUM"><datalist id="uuBabs"></datalist></label><label class="full" id="uuLJudul">Judul pasal<input type="text" id="uuJudul" maxlength="200" placeholder="contoh: Kerahasiaan Data"></label><label class="full">Isi<textarea id="uuIsi" rows="9" placeholder="Satu baris = satu ayat. Awali dengan * untuk ayat, ** untuk sub-ayat."></textarea></label><label class="full" id="uuLArt">Artinya (penjelasan singkat)<textarea id="uuArt" rows="3" placeholder="Penjelasan bahasa sehari-hari"></textarea></label></div>
+   <div class="bar" style="margin:12px 0 0"><button class="bt g" id="uuSimpan">Simpan</button><button class="bt o" id="uuBatal">Batal</button><span id="uuMsg" class="mu"></span></div>
+  </div>
+  <div class="bar" id="uuAdmBar" hidden style="margin-top:14px"><button class="bt o" id="uuTambah">+ Tambah pasal</button><button class="bt o" id="uuEditInfo">Ubah keterangan</button><button class="bt o" id="uuEditMuk">Ubah mukadimah</button></div>
+  <div id="uuList"></div>
  </section>
 
  <section id="p-inbox" class="pg" hidden>
@@ -1071,6 +1091,7 @@ function show(p) {
   if (p === "catatan") loadCatatan();
   if (p === "blacklist") loadBlacklist();
   if (p === "sp") loadSP();
+  if (p === "uu") loadUU();
   if (p === "polling") loadPolling();
   if (p === "dokumentasi") loadDok();
   clearInterval(iotTimer); if (p === "iot") { loadIot(true); iotTimer = setInterval(() => { if (!document.hidden) loadIot(); }, 3000); }
@@ -1544,6 +1565,84 @@ $("#spKirim").onclick = async () => {
   $("#spKirim").disabled = true;
   try { const d = await api("/api/sp", {json: {anggota: +$("#spAng").value, level: +$("#spLv").value, judul: $("#spJudul").value, isi: $("#spIsi").value}}); $("#spJudul").value = ""; $("#spIsi").value = ""; $("#spMsg").textContent = "Terkirim ke Inbox."; AGD = null; loadSP(d); } catch (e) { $("#spMsg").textContent = e.message; }
   $("#spKirim").disabled = false;
+};
+
+/* Pasal & Undang-Undang MCI */
+let UUD = null, UUE = null;   // data, dan entri yang sedang diedit ({id,tipe} atau null = tambah)
+function uuMark(t, q) { t = esc(t); if (!q) return t; const e = esc(q).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); return t.replace(new RegExp("(" + e + ")", "ig"), "<mark>$1</mark>"); }
+function uuIsiHtml(isi, q) {
+  let out = "", lv = 0;
+  const tutup = n => { while (lv > n) { out += "</ul>"; lv--; } };
+  String(isi).split("\n").forEach(ln => {
+    const t = ln.trim(); if (!t) return;
+    const m = t.match(/^(\*\*|\*)\s+(.*)$/);
+    if (!m) { tutup(0); out += `<p style="margin:6px 0">${uuMark(t, q)}</p>`; return; }
+    const want = m[1] === "**" ? 2 : 1;
+    while (lv < want) { out += "<ul>"; lv++; }
+    tutup(want);
+    out += `<li>${uuMark(m[2], q)}</li>`;
+  });
+  tutup(0); return out;
+}
+function renderUU() {
+  const d = UUD; if (!d) return;
+  const q = $("#uuQ").value.trim(), ql = q.toLowerCase();
+  const info = d.items.find(x => x.tipe === "info"), muk = d.items.find(x => x.tipe === "mukadimah");
+  const baris = info ? info.isi.split("\n").filter(Boolean) : [];
+  $("#uuInfo").innerHTML = baris.length ? `<b style="color:var(--ink)">${esc(baris[0])}</b><br>${baris.slice(1).map(esc).join("<br>")}` : "";
+  $("#uuMuk").hidden = !muk; if (muk) $("#uuMukIsi").innerHTML = uuMark(muk.isi, q);
+  $("#uuAdmBar").hidden = !d.edit;
+  const cocok = x => !ql || ("pasal " + x.nomor + " " + x.judul + " " + x.isi + " " + x.artinya + " " + x.bab).toLowerCase().includes(ql) || String(x.nomor) === ql;
+  const ps = d.items.filter(x => x.tipe === "pasal"), hit = ps.filter(cocok);
+  $("#uuCount").textContent = q ? `${hit.length} dari ${ps.length} pasal cocok` : `${ps.length} pasal`;
+  const babs = [...new Set(ps.map(x => x.bab))];
+  $("#uuBabs").innerHTML = babs.map(b => `<option value="${esc(b)}">`).join("");
+  $("#uuJump").innerHTML = babs.map((b, i) => `<button class="ch" data-uub="${i}" type="button">${esc(b.split(".")[0])}</button>`).join("");
+  $$("#uuJump [data-uub]").forEach(b => b.onclick = () => { const el = $("#uuBab" + b.dataset.uub); if (el) el.scrollIntoView({behavior: "smooth", block: "start"}); });
+  let html = "", last = null;
+  hit.forEach(x => {
+    if (x.bab !== last) { last = x.bab; html += `<div class="uu-bab" id="uuBab${babs.indexOf(x.bab)}">${uuMark(x.bab, q)}</div>`; }
+    html += `<div class="cd uu-ps" id="uuP${x.nomor}"><h3>Pasal ${x.nomor}. ${uuMark(x.judul, q)}</h3>${uuIsiHtml(x.isi, q)}${x.artinya ? `<div class="uu-ar"><b>Artinya:</b> ${uuMark(x.artinya, q)}</div>` : ""}
+      <div class="bar" style="margin:10px 0 0"><button class="bt o" data-uus="${x.id}" style="padding:5px 10px;min-height:34px">Salin</button>${d.edit ? `<button class="bt o" data-uue="${x.id}" style="padding:5px 10px;min-height:34px">Ubah</button><button class="bt o" data-uud="${x.id}" style="padding:5px 10px;min-height:34px">Hapus</button>` : ""}<span class="mu" style="font-size:11.5px">${x.diubah ? "diubah " + esc(x.diubah.slice(0, 10)) : ""}</span></div></div>`;
+  });
+  $("#uuList").innerHTML = html || `<p class="mu">Tidak ada pasal yang cocok dengan "${esc(q)}".</p>`;
+  $$("#uuList [data-uus]").forEach(b => b.onclick = async () => {
+    const x = d.items.find(y => y.id === +b.dataset.uus);
+    const t = `Pasal ${x.nomor}. ${x.judul}\n` + x.isi.split("\n").map(l => l.replace(/^\*\*\s+/, "    - ").replace(/^\*\s+/, "- ")).join("\n") + (x.artinya ? `\nArtinya: ${x.artinya}` : "") + "\n(UU MCI)";
+    try { await navigator.clipboard.writeText(t); b.textContent = "Tersalin ✓"; } catch (e) { b.textContent = "Gagal salin"; } setTimeout(() => b.textContent = "Salin", 1600);
+  });
+  $$("#uuList [data-uue]").forEach(b => b.onclick = () => uuBuka(d.items.find(y => y.id === +b.dataset.uue)));
+  $$("#uuList [data-uud]").forEach(b => b.onclick = async () => {
+    const x = d.items.find(y => y.id === +b.dataset.uud);
+    if (!confirm(`Hapus Pasal ${x.nomor} (${x.judul}) permanen?`)) return;
+    try { UUD = await api("/api/uu/" + x.id, {method: "DELETE"}); renderUU(); } catch (e) { alert(e.message); }
+  });
+}
+function uuBuka(x) {
+  UUE = x ? {id: x.id, tipe: x.tipe} : null;
+  const pasal = !x || x.tipe === "pasal";
+  $("#uuForm").hidden = false;
+  $("#uuFormJudul").textContent = !x ? "Tambah pasal" : x.tipe === "pasal" ? `Ubah Pasal ${x.nomor}` : x.tipe === "info" ? "Ubah keterangan (judul dan pengantar)" : "Ubah mukadimah";
+  ["#uuLNo", "#uuLBab", "#uuLJudul", "#uuLArt"].forEach(q => $(q).hidden = !pasal);
+  $("#uuNo").value = x && pasal ? x.nomor : ""; $("#uuBab").value = x && pasal ? x.bab : ($("#uuBab").value || "");
+  $("#uuJudul").value = x && pasal ? x.judul : ""; $("#uuIsi").value = x ? x.isi : ""; $("#uuArt").value = x && pasal ? x.artinya : ""; $("#uuMsg").textContent = "";
+  $("#uuForm").scrollIntoView({behavior: "smooth", block: "start"});
+}
+async function loadUU(d) {
+  try { UUD = d || await api("/api/uu"); renderUU(); }
+  catch (e) { $("#uuInfo").innerHTML = '<span class="er">' + esc(e.message) + "</span>"; }
+}
+$("#uuQ").oninput = () => renderUU();
+$("#uuTambah").onclick = () => uuBuka(null);
+$("#uuEditInfo").onclick = () => uuBuka(UUD.items.find(x => x.tipe === "info"));
+$("#uuEditMuk").onclick = () => uuBuka(UUD.items.find(x => x.tipe === "mukadimah"));
+$("#uuBatal").onclick = () => { $("#uuForm").hidden = true; UUE = null; };
+$("#uuSimpan").onclick = async () => {
+  const body = {nomor: $("#uuNo").value, bab: $("#uuBab").value, judul: $("#uuJudul").value, isi: $("#uuIsi").value, artinya: $("#uuArt").value};
+  $("#uuSimpan").disabled = true;
+  try { UUD = await api(UUE ? "/api/uu/" + UUE.id : "/api/uu", {json: body}); $("#uuForm").hidden = true; UUE = null; renderUU(); }
+  catch (e) { $("#uuMsg").textContent = e.message; }
+  $("#uuSimpan").disabled = false;
 };
 
 /* Blacklist (khusus Secret Service + Dev) */
