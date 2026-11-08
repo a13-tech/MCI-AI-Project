@@ -3,9 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>MCI Command Center</title>
+<title>MCI · Mahardika Cakrawala Indonesia</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="/aset/favicon.ico"><link rel="apple-touch-icon" href="/aset/logo-mci-192.png">
+<meta name="theme-color" content="#0F1E3A">
 <style>
 :root{--navy:#0A2A6B;--ink:#0B1F4D;--mute:#4A5A7A;--line:#D9E4FA;--bg:#F3F7FF;--gold:#D4AF5A;--gold2:#F1D58A}
 *{box-sizing:border-box}
@@ -240,37 +242,145 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 .apx .tp{align-self:flex-start;color:var(--mute);font-size:13px}
 .apxs{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 0}.apxs button{all:unset;cursor:pointer;padding:7px 13px;border-radius:99px;border:1px solid #BFD0F2;background:#fff;font-size:13px;font-weight:600;color:#0A2A6B}
 .apxs button:hover{background:#EEF3FC}.apxs button:focus-visible{outline:3px solid #D4AF5A;outline-offset:2px}
+
+/* =================== TEMA MCI: elegan, mengikuti logo (navy · perak · kuningan) =================== */
+:root{--navy:#14284B;--navy2:#0F1E3A;--ink:#1B2335;--mute:#5E6678;--line:#E4DFD3;--line2:#D6D0C2;--bg:#F6F4EF;--paper:#FFFFFF;--gold:#A88A55;--gold2:#D9C49A;--silver:#C9CED6;--serif:'Cormorant Garamond',Georgia,'Times New Roman',serif}
+body{font:14.5px/1.55 Inter,system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+#sd{background:var(--navy2);padding:22px 12px 18px;gap:1px;scrollbar-color:rgba(168,138,85,.4) transparent;border-right:1px solid #1C2E52}
+#sd::-webkit-scrollbar-thumb{background:rgba(168,138,85,.4)}
+.brand{display:flex;align-items:center;gap:12px;padding:0 10px 20px;margin-bottom:6px;border-bottom:1px solid rgba(201,206,214,.12)}
+.brand img{flex:none;width:52px;height:52px;border-radius:50%}
+.brand b{font:700 26px/1 var(--serif);letter-spacing:.14em;color:#F2EBDD}
+.brand small{display:block;margin-top:5px;font-size:9.5px;line-height:1.35;letter-spacing:.16em;text-transform:uppercase;color:#8E9AB2;white-space:normal}
+.brand i{display:none}
+.ng{margin:16px 12px 4px;font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#6F7C96}
+.ng:empty{margin:10px 12px 4px;border-top:1px solid rgba(201,206,214,.12)}
+.nv{padding:8px 12px 8px 14px;border-radius:6px;color:#B9C2D3;font-size:13.5px;font-weight:500;border-left:2px solid transparent}
+.nv:hover{background:rgba(255,255,255,.04);color:#E9E4D8}
+.nv.on{background:rgba(255,255,255,.05);color:#F2EBDD;font-weight:600;border-left-color:var(--gold);border-radius:0 6px 6px 0}
+.nv:focus-visible{outline:1px solid var(--gold2);outline-offset:-1px}
+.nb{background:var(--gold)!important;color:var(--navy2)!important}
+.cv{margin-top:18px;border-radius:8px;background:transparent;border:1px solid rgba(201,206,214,.12);color:#8E9AB2;font-size:11.5px}
+.cv b{color:#C9CED6;font-weight:600}
+.who{border-radius:8px;border-color:rgba(201,206,214,.16);color:#B9C2D3}.who b{color:#F2EBDD}
+.lo{background:transparent;color:#E9E4D8;border:1px solid rgba(201,206,214,.3);border-radius:6px;font-weight:600;font-size:12.5px}
+.lo:hover{border-color:var(--gold2)}
+main{padding:36px 44px 60px;max-width:1240px}
+h1{font:700 34px/1.12 var(--serif);letter-spacing:.005em;color:var(--navy2)}
+h2{font:700 22px/1.2 var(--serif);color:var(--navy2);margin:28px 0 12px}
+h3{font-weight:600}
+.pg>h1+p.mu,.pg>.bar+p.mu{margin:6px 0 22px;max-width:760px}
+.mu{color:var(--mute)}
+.cd{border-radius:10px;border:1px solid var(--line);padding:20px 22px;background:var(--paper);box-shadow:0 1px 0 rgba(20,40,75,.03)}
+.k{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);font-weight:600}
+.v{font:700 30px/1.1 var(--serif);color:var(--navy2);margin-top:6px}
+.ch{border-radius:4px;padding:3px 9px;font-size:11.5px;font-weight:600;letter-spacing:.02em;background:#EDEFF3;color:#2B3A55}
+.ch.y{background:#F3EADA;color:#6E5220}.ch.n{background:#EFEDE7;color:var(--mute)}.ch.r{background:#F5E1DD;color:#8E2A1E}.ch.g{background:#E2EEE5;color:#2E6243}
+.bt{border-radius:6px;padding:10px 18px;font-weight:600;font-size:13.5px;letter-spacing:.01em;min-height:42px;transition:background .15s,border-color .15s}
+.g{background:var(--navy);color:#F6F4EF}.g:hover{background:var(--navy2)}
+.o{background:var(--paper);color:var(--navy);border:1px solid var(--line2)}.o:hover{border-color:var(--navy)}
+textarea,input[type=text],input[type=number],input[type=search],input[type=url],input[type=file],input[type=date],input[type=time],input[type=password],select{border-radius:6px;border:1px solid var(--line2);background:var(--paper);padding:10px 12px}
+textarea:focus,input:focus,select:focus{outline:2px solid rgba(20,40,75,.18);border-color:var(--navy)}
+label{font-size:13px;color:var(--mute)}
+.fl label{display:grid;gap:6px;font-weight:500}
+th{background:transparent;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);border-bottom:1px solid var(--line2);font-weight:600}
+td{border-top:1px solid var(--line)}
+.boss,.hero{background:var(--navy2);border:1px solid #2A3E66;border-radius:12px}
+.boss small{color:var(--gold2);letter-spacing:.18em;font-weight:600}
+.seg{border-radius:8px}.seg button{border-radius:6px}.seg button.on{background:#E9E4D8;color:var(--navy2)}
+.hero h2{color:#F2EBDD;font-family:var(--serif)}
+.uu-bab{font:700 19px/1.3 var(--serif);letter-spacing:.04em;color:var(--navy2);border-bottom:1px solid var(--line2)}
+.uu-ps h3{font:700 20px/1.3 var(--serif);color:var(--navy2)}
+.uu-ar{background:#F3EFE5;color:#4A3D22;border-left:2px solid var(--gold);border-radius:0 6px 6px 0}
+.demo{border-radius:6px}
+.tst{background:var(--navy2);color:#F2EBDD;border-color:var(--gold);border-radius:6px}
+.adm form{background:var(--navy2);border:1px solid #2A3E66;border-radius:12px}.adm b{font-family:var(--serif);color:#F2EBDD}
+/* ---- komponen halaman baru ---- */
+.ph{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:6px}
+.ey{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);font-weight:600;margin-bottom:6px}
+.lst{display:grid;gap:12px}
+.it2{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+.it2 h3{margin:0;font:700 20px/1.25 var(--serif);color:var(--navy2)}
+.it2 .meta{font-size:12.5px;color:var(--mute);margin-top:4px;display:flex;gap:6px 14px;flex-wrap:wrap}
+.it2 .bd{margin-top:10px;white-space:pre-wrap;line-height:1.6}
+.it2 .ac{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.it2 .ac .bt{min-height:34px;padding:6px 12px;font-size:12.5px}
+.it2.pin{border-left:3px solid var(--gold)}
+.kb{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
+.kb>div{background:#EFECE4;border-radius:10px;padding:12px;min-height:120px}
+.kb>div>b{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:2px 4px 10px}
+.kb .it2{padding:14px 16px;margin-bottom:10px}.kb .it2 h3{font-size:17px}
+.fm{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}.fm .full{grid-column:1/-1}
+.fm label{display:grid;gap:6px;font-weight:500}
+.mm{display:flex;flex-wrap:wrap;gap:6px}.mm label{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);border-radius:4px;padding:5px 9px;font-size:12.5px;color:var(--ink);cursor:pointer;background:var(--paper)}
+.mm input{width:auto;margin:0}
+.seal{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.seal .cd{text-align:center;margin:0}.seal img{width:150px;height:150px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 12px}
+.seal img.sq{border-radius:10px}
+.seal h3{margin:0;font:700 21px/1.2 var(--serif);color:var(--navy2)}
+.prg{height:6px;border-radius:3px;background:#ECE8DE;overflow:hidden;margin-top:8px}.prg i{display:block;height:100%;background:var(--navy)}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}.cal div{background:var(--paper);border:1px solid var(--line);border-radius:6px;min-height:84px;padding:6px;font-size:12px}
+.cal div.hd{min-height:0;background:transparent;border:0;text-align:center;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.cal div.off{opacity:.45}.cal div.td{border-color:var(--gold)}.cal .ci{display:block;margin-top:4px;padding:3px 6px;border-radius:4px;background:#EDEFF3;color:#2B3A55;font-size:11px;line-height:1.3;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cal .ci.tayang{background:#E2EEE5;color:#2E6243}.cal .ci.siap{background:#F3EADA;color:#6E5220}
+.qa{background:var(--navy2);color:#E9E4D8;border-radius:12px;padding:22px}.qa h2{color:#F2EBDD;margin:0 0 6px}.qa .mu{color:#9AA6BD}
+.qa textarea{background:#14284B;border-color:#2E4470;color:#fff;margin-top:12px}.qa .ans{white-space:pre-wrap;background:#14284B;border-radius:8px;padding:14px;margin-top:12px;line-height:1.6}
+main .bar .seg button{color:var(--mute);font-weight:600}main .bar .seg button.on{background:var(--paper);color:var(--navy2);box-shadow:0 1px 2px rgba(15,30,58,.12)}
+.dl{display:grid;grid-template-columns:150px 1fr;gap:6px 14px;font-size:13.5px}.dl dt{color:var(--mute)}.dl dd{margin:0}
+@media(max-width:860px){
+ #sd{padding:8px 10px;border-right:0;border-bottom:1px solid #1C2E52}
+ .brand{border:0;padding:0 6px 0 0;margin:0;gap:8px}.brand img{width:34px;height:34px}.brand small{display:none}.brand b{font-size:20px}
+ .ng{display:none}
+ .nv{border-left:0;border-bottom:2px solid transparent;border-radius:0}.nv.on{border-left:0;border-bottom-color:var(--gold);border-radius:0}
+ main{padding:20px 14px 48px}h1{font-size:28px}
+ .kb{grid-template-columns:1fr}.fm{grid-template-columns:1fr}.cal{grid-template-columns:repeat(7,minmax(38px,1fr));overflow-x:auto}.cal div{min-height:60px;padding:4px}.dl{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
 <div id="app">
 <aside id="sd">
- <div class="brand"><b>MCI</b><small>AI COMMAND CENTER</small><i></i></div>
+ <div class="brand"><img src="/aset/logo-mci-64.webp" srcset="/aset/logo-mci-64.webp 1x, /aset/logo-mci-192.webp 3x" width="52" height="52" alt="Logo MCI"><div><b>MCI</b><small>Mahardika Cakrawala Indonesia</small></div></div>
  <button class="nv on" data-p="cmd">Command Center</button>
  <button class="nv" data-p="apex" id="nvApex">Tanya Apex</button>
  <button class="nv" data-p="inbox">Inbox <span class="nb" id="nbInbox" hidden>0</span></button>
+ <button class="nv" data-p="pengumuman">Pengumuman</button>
  <button class="nv" data-p="berita">Berita Hari Ini</button>
- <button class="nv" data-p="office">Virtual Office</button>
- <button class="nv" data-p="kas">Keuangan AI</button>
+ <div class="ng">Organisasi</div>
+ <button class="nv" data-p="agenda">Agenda &amp; Rapat</button>
+ <button class="nv" data-p="tugas">Tugas</button>
+ <button class="nv" data-p="proyek">Proyek</button>
+ <button class="nv" data-p="struktur">Struktur &amp; Divisi</button>
+ <button class="nv" data-p="anggota">Anggota</button>
+ <button class="nv" data-p="polling">Voting</button>
+ <button class="nv" data-p="catatan">Catatan</button>
+ <div class="ng">Hukum &amp; Disiplin</div>
+ <button class="nv" data-p="uu">Pasal &amp; Undang</button>
+ <button class="nv" data-p="sidang">Pelanggaran &amp; Sidang</button>
+ <button class="nv" data-p="putusan">Arsip Putusan</button>
+ <button class="nv" data-p="sp">Surat Peringatan</button>
+ <button class="nv" data-p="blacklist">Blacklist</button>
+ <div class="ng">Keuangan</div>
  <button class="nv" data-p="bayarkas">Bayar Kas</button>
+ <button class="nv" data-p="rekapkas">Rekap Kas</button>
+ <button class="nv" data-p="kas">Keuangan AI</button>
+ <button class="nv" data-p="hutang">Hutang</button>
+ <button class="nv" data-p="invoice">Invoice</button>
+ <button class="nv" data-p="produk">Produk</button>
+ <button class="nv" data-p="stok">Stok Barang</button>
+ <div class="ng">Konten &amp; Karya</div>
+ <button class="nv" data-p="konten">Jadwal Konten</button>
  <button class="nv" data-p="gambar">Studio Gambar</button>
- <button class="nv" data-p="memori">Memori</button>
+ <button class="nv" data-p="dokumentasi">Dokumentasi</button>
+ <button class="nv" data-p="perpus">Perpustakaan</button>
+ <div class="ng">AI &amp; Lab</div>
+ <button class="nv" data-p="office">Virtual Office</button>
  <button class="nv" data-p="iot">Lab IoT</button>
  <button class="nv" data-p="laporan">Laporan</button>
+ <button class="nv" data-p="memori">Memori</button>
  <button class="nv" data-p="skills">Skills</button>
- <button class="nv" data-p="tim">Tim & Token</button>
- <button class="nv" data-p="catatan">Catatan</button>
- <button class="nv" data-p="polling">Voting</button>
- <button class="nv" data-p="dokumentasi">Dokumentasi</button>
- <button class="nv" data-p="hutang">Hutang</button>
- <button class="nv" data-p="blacklist">Blacklist</button>
- <button class="nv" data-p="sp">Surat Peringatan</button>
- <button class="nv" data-p="uu">Pasal & Undang</button>
- <button class="nv" data-p="anggota">Anggota</button>
- <button class="nv" data-p="stok">Stok Barang</button>
- <button class="nv" data-p="produk">Produk</button>
- <button class="nv" data-p="invoice">Invoice</button>
- <button class="nv" data-p="perpus">Perpustakaan</button>
+ <button class="nv" data-p="tim">Tim &amp; Token</button>
+ <div class="ng"></div>
  <button class="nv" data-p="tentang">Tentang Kami</button>
  <div class="cv"><b>Hemat token</b><br>Router lokal, skill, model Lite, cache, dan mode Caveman.</div>
  <div class="who"><span id="whoRole">Memuat…</span><a class="lo" id="logout" href="/logout">Keluar</a></div>
@@ -543,6 +653,10 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
   <h1>Pasal &amp; Undang-Undang</h1>
   <p class="mu" id="uuInfo">Memuat…</p>
   <div class="cd" id="uuMuk" hidden><b>Mukadimah</b><div class="uu-mk" id="uuMukIsi" style="margin-top:8px"></div></div>
+  <div class="qa" style="margin-bottom:20px"><div class="ey" style="color:var(--gold2)">MCI.Scribe</div><h2>Tanya UU</h2><p class="mu" style="margin:0">Tanya apa saja soal aturan MCI. Jawaban hanya diambil dari isi UU, lengkap dengan nomor pasalnya.</p>
+   <textarea id="uuTanyaQ" rows="2" maxlength="600" placeholder="Contoh: kalau telat bayar kas dua minggu, total tagihannya berapa?"></textarea>
+   <div class="bar" style="margin:10px 0 0"><button class="bt" id="uuTanya" style="background:#E9E4D8;color:var(--navy2)">Tanya</button></div>
+   <div class="ans" id="uuJawab" hidden></div><div class="bar" id="uuRujuk" style="margin:10px 0 0"></div></div>
   <div class="bar"><input type="search" id="uuQ" placeholder="Cari pasal atau kata kunci…" style="max-width:420px"><span class="mu" id="uuCount"></span></div>
   <div class="uu-jump" id="uuJump"></div>
   <div class="cd" id="uuForm" hidden><b id="uuFormJudul">Tambah pasal</b>
@@ -551,6 +665,36 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
   </div>
   <div class="bar" id="uuAdmBar" hidden style="margin-top:14px"><button class="bt o" id="uuTambah">+ Tambah pasal</button><button class="bt o" id="uuEditInfo">Ubah keterangan</button><button class="bt o" id="uuEditMuk">Ubah mukadimah</button></div>
   <div id="uuList"></div>
+ </section>
+
+ <section id="p-pengumuman" class="pg" hidden><div id="rk-pengumuman"></div></section>
+ <section id="p-agenda" class="pg" hidden><div id="rk-agenda"></div></section>
+ <section id="p-tugas" class="pg" hidden><div id="rk-tugas"></div></section>
+ <section id="p-proyek" class="pg" hidden><div id="rk-proyek"></div></section>
+ <section id="p-konten" class="pg" hidden><div id="rk-konten"></div></section>
+ <section id="p-sidang" class="pg" hidden><div id="rk-sidang"></div></section>
+ <section id="p-putusan" class="pg" hidden><div id="rk-putusan"></div></section>
+ <section id="p-struktur" class="pg" hidden>
+  <div class="ey">Organisasi</div><h1>Struktur &amp; Divisi</h1>
+  <p class="mu" style="margin:6px 0 6px;max-width:760px">Bagan organisasi MCI. Setiap jabatan punya batas wewenang tertulis (Pasal 5); perintah di luar wewenang boleh dipertanyakan.</p>
+  <p class="mu" id="soTotal" style="font-size:12.5px;margin:0 0 20px"></p>
+  <div class="seal" id="soDiv"></div>
+  <h2>Jabatan &amp; batas wewenang</h2>
+  <div class="cd" style="padding:0"><div class="tb"><table><thead><tr><th>Jabatan</th><th>Wewenang</th><th>Dipegang oleh</th></tr></thead><tbody id="soJab"></tbody></table></div></div>
+ </section>
+ <section id="p-rekapkas" class="pg" hidden>
+  <div class="ey">Keuangan</div><h1>Rekap Kas Mingguan</h1>
+  <p class="mu" style="margin:6px 0 20px;max-width:760px">Siapa yang sudah lunas, siapa yang menunggak, dan estimasi tagihan menurut UU MCI: denda Rp25.000 tanpa izin (Pasal 15), tunggakan 2 minggu atau lebih ditinjau (Pasal 16), dan laporan Bendahara paling lambat Minggu 23.59 WIB (Pasal 9 &amp; 17).</p>
+  <div class="bar" style="flex-wrap:nowrap"><button class="bt o" id="rkkPrev" aria-label="Minggu sebelumnya">‹</button><b id="rkkLabel" style="flex:0 1 auto;text-align:center;font:700 20px var(--serif);color:var(--navy2);min-width:0">Memuat…</b><button class="bt o" id="rkkNext" aria-label="Minggu berikutnya">›</button><button class="bt o" id="rkkNow">Minggu ini</button></div>
+  <div class="gr">
+   <div class="cd"><div class="k">Lunas</div><div class="v" id="rkk1">-</div></div>
+   <div class="cd"><div class="k">Masuk minggu ini</div><div class="v" id="rkk2">-</div></div>
+   <div class="cd"><div class="k">Anggota menunggak</div><div class="v" id="rkk3">-</div></div>
+   <div class="cd"><div class="k">Total tagihan tertunggak</div><div class="v" id="rkk4">-</div></div>
+  </div>
+  <div class="cd" id="rkkLap"></div>
+  <div class="cd" style="padding:0"><div class="tb"><table><thead><tr><th>Anggota</th><th>Minggu ini</th><th>Tunggakan</th><th class="rt">Estimasi tagihan</th><th>Catatan</th></tr></thead><tbody id="rkkList"></tbody></table></div></div>
+  <p class="mu" style="font-size:12.5px">Estimasi saja. Izin resmi ke Bendahara (maksimal 2 kali) dapat membatalkan denda; skema keringanan disesuaikan Bendahara.</p>
  </section>
 
  <section id="p-inbox" class="pg" hidden>
@@ -807,8 +951,15 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
  <section id="p-tentang" class="pg" hidden>
   <div class="bar" style="justify-content:space-between;margin:0 0 4px"><h1 style="margin:0">Tentang Kami</h1><button class="bt o" id="te" hidden>Edit halaman</button></div>
   <p class="mu">Kenalan dengan anggota dan perjalanan MCI.</p>
+  <div class="cd" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap"><img src="/aset/logo-mci-192.webp" width="120" height="120" alt="Lambang MCI" style="border-radius:50%"><div style="flex:1;min-width:220px"><div class="ey">Sejak 2024</div><h2 style="margin:0">Mahardika Cakrawala Indonesia</h2><p class="mu" style="margin:6px 0 0;font:italic 600 18px var(--serif);color:var(--gold)">Trimatra Vijaya Mahe · Di tiga bidang kita berjaya</p></div></div>
   <div id="tv"></div>
   <div id="tf" hidden></div>
+  <h2>Tiga tim, satu MCI</h2>
+  <div class="seal">
+   <div class="cd"><img src="/aset/logo-creative-256.webp" width="150" height="150" alt="Lambang Creative &amp; Engineering Team" loading="lazy"><div class="ey">Creative &amp; Engineering</div><h3>Creative &amp; Engineering Team</h3><p class="mu" style="margin:8px 0 0">Innovation · Precision · Creativity</p></div>
+   <div class="cd"><img src="/aset/logo-management-256.webp" width="150" height="150" alt="Lambang Management Team" loading="lazy"><div class="ey">Management</div><h3>Management Team</h3><p class="mu" style="margin:8px 0 0">Leadership · Strategy · Vision · Execution</p></div>
+   <div class="cd"><img src="/aset/logo-ss-256.webp" width="150" height="150" class="sq" alt="Lambang Secret Service Team" loading="lazy"><div class="ey">Secret Service</div><h3>Secret Service Team</h3><p class="mu" style="margin:8px 0 0">Vigilance · Protection</p></div>
+  </div>
  </section>
 
  <section id="p-skills" class="pg" hidden>
@@ -1092,6 +1243,9 @@ function show(p) {
   if (p === "blacklist") loadBlacklist();
   if (p === "sp") loadSP();
   if (p === "uu") loadUU();
+  if (["pengumuman", "agenda", "tugas", "proyek", "konten", "sidang", "putusan"].includes(p)) loadRK(p);
+  if (p === "struktur") loadStruktur();
+  if (p === "rekapkas") loadRekapKas(RKK ? RKK.minggu : undefined);
   if (p === "polling") loadPolling();
   if (p === "dokumentasi") loadDok();
   clearInterval(iotTimer); if (p === "iot") { loadIot(true); iotTimer = setInterval(() => { if (!document.hidden) loadIot(); }, 3000); }
@@ -1645,6 +1799,239 @@ $("#uuSimpan").onclick = async () => {
   $("#uuSimpan").disabled = false;
 };
 
+/* ================= HALAMAN ORGANISASI (mesin data umum /api/r/<jenis>) ================= */
+const BLN_ID = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+const HARI_ID = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+const tglID = (s, hari) => { if (!s) return ""; const [y, m, d] = s.slice(0, 10).split("-").map(Number); if (!y) return s; const dt = new Date(y, m - 1, d); return (hari ? HARI_ID[dt.getDay()] + ", " : "") + d + " " + BLN_ID[m - 1] + " " + y; };
+const RK = {}, RKS = {};   // data per jenis, status tampilan per jenis
+const RK_INFO = {
+  pengumuman: ["Kabar resmi", "Pengumuman", "Pengumuman resmi MCI: kas, jadwal, dan keputusan. Formatnya seragam sesuai Pasal 14, dan bisa langsung dikirim ke Inbox serta Telegram semua anggota.", "Tulis pengumuman"],
+  agenda: ["Organisasi", "Agenda & Rapat", "Jadwal rapat, agenda yang dibahas, notulen, dan daftar hadir. Anggota divisi terkait mendapat undangan di Inbox.", "Jadwalkan rapat"],
+  tugas: ["Organisasi", "Tugas", "Siapa mengerjakan apa, sampai kapan. Penerima tugas mendapat notifikasi dan bisa memperbarui statusnya sendiri.", "Beri tugas"],
+  proyek: ["Organisasi", "Proyek", "Semua proyek MCI: status, tim, kebutuhan, dan pembagian hasil. Anggota yang menunggak kas 2 minggu atau lebih ditandai sesuai Pasal 16.", "Tambah proyek"],
+  konten: ["Konten & karya", "Jadwal Konten", "Kalender posting Instagram dan TikTok: dari ide, draf, siap tayang, sampai hasil tayangnya.", "Tambah konten"],
+  sidang: ["Hukum & disiplin", "Pelanggaran & Sidang", "Laporan pelanggaran UU MCI. Terlapor berhak membela diri sebelum sanksi ditetapkan (Pasal 18). Hanya Dewan, Dev, dan terlapor yang bisa melihat kasusnya.", "Laporkan pelanggaran"],
+  putusan: ["Hukum & disiplin", "Arsip Putusan", "Semua putusan resmi Dewan, hasil sidang, keputusan rapat, dan perubahan UU, tersusun dan bisa dicari.", "Catat putusan"],
+};
+const rkNama = (d, id) => { const a = (d.anggota || []).find(x => x.id === id); return a ? a.nama : "-"; };
+const rkF = (d, n) => d.fields.find(f => f.nama === n);
+const rkOp = (d, n, v) => { const f = rkF(d, n); const o = f && f.opsi.find(o => o[0] === v); return o ? o[1] : (v || ""); };
+const rkBisa = (x, n) => x._edit === "semua" || (Array.isArray(x._edit) && x._edit.includes(n));
+
+function rkInput(d, f, v) {
+  const id = `rkf-${f.nama}`, val = v == null ? "" : v;
+  let el;
+  if (f.tipe === "area") el = `<textarea id="${id}" data-rkf="${f.nama}" rows="${f.maks > 5000 ? 8 : 4}" maxlength="${f.maks}">${esc(val)}</textarea>`;
+  else if (f.tipe === "tanggal") el = `<input type="date" id="${id}" data-rkf="${f.nama}" value="${esc(val)}">`;
+  else if (f.tipe === "jam") el = `<input type="time" id="${id}" data-rkf="${f.nama}" value="${esc(val)}">`;
+  else if (f.tipe === "angka") el = `<input type="number" id="${id}" data-rkf="${f.nama}" min="0" max="${f.maks}" value="${esc(val)}">`;
+  else if (f.tipe === "bool") return `<label class="full" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="${id}" data-rkf="${f.nama}" style="width:auto" ${val ? "checked" : ""}> ${esc(f.label)}</label>`;
+  else if (f.tipe === "pilih") el = `<select id="${id}" data-rkf="${f.nama}">${f.opsi.map(o => `<option value="${esc(o[0])}" ${o[0] === val ? "selected" : ""}>${esc(o[1])}</option>`).join("")}</select>`;
+  else if (f.tipe === "divisi") el = `<select id="${id}" data-rkf="${f.nama}"><option value="">Semua divisi</option>${d.divisi.map(o => `<option value="${esc(o[0])}" ${o[0] === val ? "selected" : ""}>${esc(o[1])}</option>`).join("")}</select>`;
+  else if (f.tipe === "anggota") el = `<select id="${id}" data-rkf="${f.nama}"><option value="">Pilih anggota</option>${d.anggota.map(a => `<option value="${a.id}" ${a.id === val ? "selected" : ""}>${esc(a.nama)}</option>`).join("")}</select>`;
+  else if (f.tipe === "pasal") el = `<select id="${id}" data-rkf="${f.nama}"><option value="">Tidak spesifik</option>${(d.pasal || []).map(o => `<option value="${o[0]}" ${o[0] === val ? "selected" : ""}>${esc(o[1])}</option>`).join("")}</select>`;
+  else if (f.tipe === "anggota_banyak") { const set = new Set(val || []); return `<div class="full"><div style="font-size:13px;color:var(--mute);font-weight:500;margin-bottom:6px">${esc(f.label)}</div><div class="mm" data-rkf="${f.nama}" data-multi="1">${d.anggota.map(a => `<label><input type="checkbox" value="${a.id}" ${set.has(a.id) ? "checked" : ""}> ${esc(a.nama)}</label>`).join("") || '<span class="mu">Belum ada anggota.</span>'}</div></div>`; }
+  else el = `<input type="${f.tipe === "url" ? "url" : "text"}" id="${id}" data-rkf="${f.nama}" maxlength="${f.maks}" value="${esc(val)}">`;
+  const full = ["area", "anggota_banyak"].includes(f.tipe) || f.nama === "judul" || f.nama === "nama";
+  return `<label class="${full ? "full" : ""}" for="${id}">${esc(f.label)}${f.wajib ? " *" : ""}${el}${f.info ? `<span style="font-size:12px">${esc(f.info)}</span>` : ""}</label>`;
+}
+function rkForm(j) {
+  const d = RK[j], st = RKS[j]; if (!st.form) return "";
+  const x = st.form === "baru" ? null : d.items.find(y => y.id === st.form);
+  const fs = d.fields.filter(f => !x || rkBisa(x, f.nama));
+  const isi = fs.map(f => rkInput(d, f, x ? x[f.nama] : (f.bawaan != null ? f.bawaan : (f.tipe === "tanggal" && ["agenda", "sidang", "putusan"].includes(j) ? d.hari_ini : null)))).join("");
+  return `<div class="cd" id="rkForm-${j}"><div class="ey">${x ? "Ubah" : "Baru"}</div><b style="font:700 21px var(--serif);color:var(--navy2)">${x ? esc(x.judul || x.nama || "Entri") : esc(RK_INFO[j][3])}</b>
+    <div class="fm" style="margin-top:14px">${isi}</div>
+    <div class="bar" style="margin:14px 0 0"><button class="bt g" data-rksave="${j}">Simpan</button><button class="bt o" data-rkbatal="${j}">Batal</button><span class="mu" id="rkMsg-${j}"></span></div></div>`;
+}
+function rkKumpul(j) {
+  const o = {};
+  $$(`#rkForm-${j} [data-rkf]`).forEach(e => {
+    const n = e.dataset.rkf;
+    if (e.dataset.multi) o[n] = [...e.querySelectorAll("input:checked")].map(c => +c.value);
+    else if (e.type === "checkbox") o[n] = e.checked;
+    else o[n] = e.value;
+  });
+  return o;
+}
+async function loadRK(j, d) {
+  RKS[j] = RKS[j] || {form: null, q: "", f: ""};
+  const el = $("#rk-" + j);
+  try { RK[j] = d || await api("/api/r/" + j); renderRK(j); }
+  catch (e) { el.innerHTML = `<h1>${esc(RK_INFO[j][1])}</h1><p class="er">${esc(e.message)}</p>`; }
+}
+async function rkSimpan(j, id, body) {
+  try { RK[j] = await api(`/api/r/${j}` + (id ? "/" + id : ""), {json: body}); RKS[j].form = null; renderRK(j); return true; }
+  catch (e) { const m = $("#rkMsg-" + j); if (m) m.textContent = e.message; else alert(e.message); return false; }
+}
+function renderRK(j) {
+  const d = RK[j], st = RKS[j], [ey, jd, intro, tbl] = RK_INFO[j];
+  const q = (st.q || "").toLowerCase();
+  const cocok = x => !q || JSON.stringify(x).toLowerCase().includes(q);
+  const items = d.items.filter(cocok);
+  $("#rk-" + j).innerHTML = `<div class="ph"><div><div class="ey">${esc(ey)}</div><h1>${esc(jd)}</h1></div>${d.tulis && !st.form ? `<button class="bt g" data-rkbaru="${j}">${esc(tbl)}</button>` : ""}</div>
+    <p class="mu" style="margin:6px 0 20px;max-width:760px">${esc(intro)}</p>
+    ${rkForm(j)}
+    <div class="bar"><input type="search" data-rkq="${j}" placeholder="Cari…" value="${esc(st.q || "")}" style="max-width:300px">${(RK_ATAS[j] || (() => ""))(d, st)}<span class="mu" style="font-size:12.5px">${items.length} entri</span></div>
+    <div id="rkl-${j}">${(RK_RENDER[j] || rkDaftar)(d, items, st)}</div>`;
+  const el = $("#rk-" + j);
+  const qi = el.querySelector("[data-rkq]"); qi.oninput = () => { st.q = qi.value; const pos = qi.selectionStart; renderRK(j); const n = $(`#rk-${j} [data-rkq]`); n.focus(); n.setSelectionRange(pos, pos); };
+  el.querySelectorAll("[data-rkbaru]").forEach(b => b.onclick = () => { st.form = "baru"; renderRK(j); $("#rkForm-" + j).scrollIntoView({behavior: "smooth", block: "start"}); });
+  el.querySelectorAll("[data-rkbatal]").forEach(b => b.onclick = () => { st.form = null; renderRK(j); });
+  el.querySelectorAll("[data-rksave]").forEach(b => b.onclick = async () => { b.disabled = true; await rkSimpan(j, st.form === "baru" ? null : st.form, rkKumpul(j)); b.disabled = false; });
+  el.querySelectorAll("[data-rke]").forEach(b => b.onclick = () => { st.form = +b.dataset.rke; renderRK(j); $("#rkForm-" + j).scrollIntoView({behavior: "smooth", block: "start"}); });
+  el.querySelectorAll("[data-rkd]").forEach(b => b.onclick = async () => { if (!confirm("Hapus entri ini permanen?")) return; try { RK[j] = await api(`/api/r/${j}/${b.dataset.rkd}`, {method: "DELETE"}); renderRK(j); } catch (e) { alert(e.message); } });
+  el.querySelectorAll("[data-rkst]").forEach(s => s.onchange = () => rkSimpan(j, +s.dataset.rkst, {status: s.value}));
+  el.querySelectorAll("[data-rkfil]").forEach(b => b.onclick = () => { st.f = b.dataset.rkfil; renderRK(j); });
+  el.querySelectorAll("[data-gopasal]").forEach(b => b.onclick = () => { show("uu"); setTimeout(() => { const t = $("#uuP" + b.dataset.gopasal); if (t) t.scrollIntoView({behavior: "smooth", block: "start"}); }, 400); });
+  (RK_BIND[j] || (() => {}))(el, d, st);
+}
+const rkAksi = x => (x._edit === "semua" || (Array.isArray(x._edit) && x._edit.length) ? `<button class="bt o" data-rke="${x.id}">Ubah</button>` : "") + (x._hapus ? `<button class="bt o" data-rkd="${x.id}">Hapus</button>` : "");
+const rkMeta = x => `<span>oleh ${esc(x.oleh || "-")}</span><span>${esc(tglID(x.dibuat))}</span>`;
+const rkKosong = t => `<p class="mu">${t}</p>`;
+function rkDaftar(d, items) { return items.map(x => `<div class="it2"><h3>${esc(x.judul || x.nama || "")}</h3><div class="meta">${rkMeta(x)}</div><div class="ac">${rkAksi(x)}</div></div>`).join("") || rkKosong("Belum ada."); }
+const RK_ATAS = {
+  tugas: (d, st) => d.saya != null ? `<div class="seg" style="margin:0;background:#EFECE4"><button class="${st.f !== "saya" ? "on" : ""}" data-rkfil="">Semua</button><button class="${st.f === "saya" ? "on" : ""}" data-rkfil="saya">Tugasku</button></div>` : "",
+  proyek: (d, st) => `<div class="seg" style="margin:0;background:#EFECE4">${[["", "Semua"], ["berjalan", "Berjalan"], ["selesai", "Selesai"]].map(o => `<button class="${(st.f || "") === o[0] ? "on" : ""}" data-rkfil="${o[0]}">${o[1]}</button>`).join("")}</div>`,
+  konten: (d, st) => `<div class="seg" style="margin:0;background:#EFECE4"><button class="${st.f !== "daftar" ? "on" : ""}" data-rkfil="">Kalender</button><button class="${st.f === "daftar" ? "on" : ""}" data-rkfil="daftar">Daftar</button></div>`,
+};
+const RK_RENDER = {
+  pengumuman(d, items) {
+    const urut = [...items].sort((a, b) => (b.sematkan - a.sematkan) || (b.id - a.id));
+    return `<div class="lst">${urut.map(x => `<article class="it2${x.sematkan ? " pin" : ""}"><div class="ey">${esc(rkOp(d, "kategori", x.kategori))}${x.sematkan ? " · Disematkan" : ""}</div><h3>${esc(x.judul)}</h3>
+      <div class="meta">${rkMeta(x)}</div><div class="bd">${esc(x.isi)}</div><div class="ac">${rkAksi(x)}</div></article>`).join("") || rkKosong("Belum ada pengumuman.")}</div>`;
+  },
+  agenda(d, items) {
+    const hi = d.hari_ini, dtg = items.filter(x => x.tanggal >= hi).sort((a, b) => (a.tanggal + a.jam).localeCompare(b.tanggal + b.jam)), lalu = items.filter(x => x.tanggal < hi).sort((a, b) => (b.tanggal + b.jam).localeCompare(a.tanggal + a.jam));
+    const kartu = x => `<article class="it2"><div class="ey">${x.tanggal >= hi ? "Akan datang" : "Selesai"}${x.divisi ? " · " + esc((d.divisi.find(v => v[0] === x.divisi) || [, x.divisi])[1]) : " · Semua divisi"}</div><h3>${esc(x.judul)}</h3>
+      <div class="meta"><span>${esc(tglID(x.tanggal, true))}${x.jam ? " · " + esc(x.jam.replace(":", ".")) : ""}</span>${x.tempat ? `<span>${esc(x.tempat)}</span>` : ""}</div>
+      ${x.agenda ? `<div class="bd">${esc(x.agenda)}</div>` : ""}
+      ${x.notulen ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Notulen</summary><div class="bd">${esc(x.notulen)}</div></details>` : ""}
+      ${(x.hadir || []).length ? `<div class="meta" style="margin-top:10px"><span>Hadir (${x.hadir.length}): ${x.hadir.map(i => esc(rkNama(d, i))).join(", ")}</span></div>` : ""}
+      <div class="ac">${rkAksi(x)}</div></article>`;
+    return `${dtg.length ? `<h2>Akan datang</h2><div class="lst">${dtg.map(kartu).join("")}</div>` : ""}<h2>Riwayat rapat</h2><div class="lst">${lalu.map(kartu).join("") || rkKosong("Belum ada rapat yang lewat.")}</div>`;
+  },
+  tugas(d, items, st) {
+    const its = st.f === "saya" ? items.filter(x => x.pj === d.saya) : items;
+    const kol = [["belum", "Belum dikerjakan"], ["proses", "Sedang dikerjakan"], ["selesai", "Selesai"]];
+    const kartu = x => { const lewat = x.tenggat && x.tenggat < d.hari_ini && x.status !== "selesai";
+      return `<div class="it2"><h3>${esc(x.judul)}</h3><div class="meta"><span>${esc(rkNama(d, x.pj))}</span>${x.tenggat ? `<span>tenggat ${esc(tglID(x.tenggat))}</span>` : ""}</div>
+      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${lewat ? '<span class="ch r">Lewat tenggat</span>' : ""}${x.prioritas === "tinggi" ? '<span class="ch y">Prioritas tinggi</span>' : ""}${x.divisi ? `<span class="ch n">${esc((d.divisi.find(v => v[0] === x.divisi) || [, x.divisi])[1])}</span>` : ""}</div>
+      ${x.deskripsi ? `<div class="bd" style="font-size:13.5px">${esc(x.deskripsi)}</div>` : ""}
+      ${rkBisa(x, "status") ? `<label style="display:grid;gap:4px;margin-top:10px;font-size:12px">Status<select data-rkst="${x.id}">${kol.map(o => `<option value="${o[0]}" ${o[0] === x.status ? "selected" : ""}>${o[1]}</option>`).join("")}</select></label>` : ""}
+      <div class="ac">${x._edit === "semua" ? rkAksi(x) : ""}</div></div>`; };
+    return `<div class="kb">${kol.map(k => `<div><b>${k[1]} · ${its.filter(x => x.status === k[0]).length}</b>${its.filter(x => x.status === k[0]).sort((a, b) => (a.tenggat || "9").localeCompare(b.tenggat || "9")).map(kartu).join("")}</div>`).join("")}</div>`;
+  },
+  proyek(d, items, st) {
+    const its = st.f ? items.filter(x => x.status === st.f) : items, tg = d.tunggak || {};
+    const orang = i => `<span class="ch ${(tg[i] || 0) >= 2 ? "r" : "n"}" title="${(tg[i] || 0) >= 2 ? `Menunggak kas ${tg[i]} minggu: hak proyek ditinjau (Pasal 16)` : ""}">${esc(rkNama(d, i))}${(tg[i] || 0) >= 2 ? " · Pasal 16" : ""}</span>`;
+    return `<div class="lst">${its.map(x => `<article class="it2"><div class="ey">${esc(rkOp(d, "status", x.status))}</div><h3>${esc(x.nama)}</h3>
+      <div class="meta">${x.pj ? `<span>PJ: ${esc(rkNama(d, x.pj))}</span>` : ""}<span>Progres ${x.progres || 0}%</span>${x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">Tautan</a>` : ""}</div>
+      <div class="prg"><i style="width:${Math.min(100, x.progres || 0)}%"></i></div>
+      ${(x.tim || []).length ? `<div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">${x.tim.map(orang).join("")}</div>` : ""}
+      ${x.deskripsi ? `<div class="bd">${esc(x.deskripsi)}</div>` : ""}
+      ${x.komponen || x.hasil ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Kebutuhan & pembagian hasil</summary>${x.komponen ? `<div class="bd"><b>Komponen / kebutuhan</b>\n${esc(x.komponen)}</div>` : ""}${x.hasil ? `<div class="bd"><b>Pembagian hasil</b>\n${esc(x.hasil)}</div>` : ""}</details>` : ""}
+      <div class="ac">${rkAksi(x)}</div></article>`).join("") || rkKosong("Belum ada proyek.")}</div>`;
+  },
+  konten(d, items, st) {
+    if (st.f === "daftar") {
+      const urut = [...items].sort((a, b) => (b.tanggal || "").localeCompare(a.tanggal || ""));
+      return `<div class="lst">${urut.map(x => `<article class="it2"><div class="ey">${esc(rkOp(d, "status", x.status))} · ${esc(rkOp(d, "platform", x.platform))} · ${esc(rkOp(d, "format", x.format))}</div><h3>${esc(x.judul)}</h3>
+        <div class="meta">${x.tanggal ? `<span>${esc(tglID(x.tanggal, true))}</span>` : "<span>Belum dijadwalkan</span>"}${x.pj ? `<span>${esc(rkNama(d, x.pj))}</span>` : ""}${x.views != null ? `<span>${num(x.views)} tayang</span>` : ""}${x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">Buka postingan</a>` : ""}</div>
+        ${x.caption ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Caption & hashtag</summary><div class="bd">${esc(x.caption)}${x.hashtag ? "\n\n" + esc(x.hashtag) : ""}</div><button class="bt o" style="margin-top:8px;min-height:32px;padding:5px 10px;font-size:12px" data-salincap="${x.id}">Salin caption</button></details>` : ""}
+        <div class="ac">${rkAksi(x)}</div></article>`).join("") || rkKosong("Belum ada konten.")}</div>`;
+    }
+    const bl = st.bulan || d.hari_ini.slice(0, 7), [y, m] = bl.split("-").map(Number), awal = new Date(y, m - 1, 1), geser = (awal.getDay() + 6) % 7, jml = new Date(y, m, 0).getDate();
+    const sel = [];
+    for (let i = 0; i < geser; i++) sel.push('<div class="off"></div>');
+    for (let t = 1; t <= jml; t++) { const k = `${bl}-${String(t).padStart(2, "0")}`; const its = items.filter(x => x.tanggal === k);
+      sel.push(`<div class="${k === d.hari_ini ? "td" : ""}"><b style="font-size:12px">${t}</b>${its.map(x => `<span class="ci ${esc(x.status)}" data-kci="${x.id}" title="${esc(x.judul)}">${esc(x.judul)}</span>`).join("")}</div>`); }
+    const tanpa = items.filter(x => !x.tanggal);
+    return `<div class="bar" style="justify-content:space-between"><button class="bt o" data-kbl="-1" aria-label="Bulan sebelumnya">‹</button><b style="font:700 22px var(--serif);color:var(--navy2)">${["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"][m - 1]} ${y}</b><button class="bt o" data-kbl="1" aria-label="Bulan berikutnya">›</button></div>
+      <div class="cal">${["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"].map(h => `<div class="hd">${h}</div>`).join("")}${sel.join("")}</div>
+      <div class="bar" style="margin-top:12px;font-size:12px"><span class="ch n">Ide / draf</span><span class="ch y">Siap tayang</span><span class="ch g">Sudah tayang</span></div>
+      ${tanpa.length ? `<h2>Belum dijadwalkan</h2><div class="lst">${tanpa.map(x => `<div class="it2"><h3>${esc(x.judul)}</h3><div class="meta"><span>${esc(rkOp(d, "status", x.status))}</span></div><div class="ac">${rkAksi(x)}</div></div>`).join("")}</div>` : ""}`;
+  },
+  sidang(d, items) {
+    const warna = {dilaporkan: "n", pembelaan: "y", sidang: "y", diputus: "g", batal: "n"};
+    return `<div class="lst">${items.map(x => `<article class="it2"><div class="ey">${esc(rkOp(d, "status", x.status))}</div><h3>${esc(rkNama(d, x.terlapor))}${x.pasal ? ` · <a href="#" data-gopasal="${x.pasal}" style="color:inherit">Pasal ${x.pasal}</a>` : ""}</h3>
+      <div class="meta"><span>Kejadian ${esc(tglID(x.tanggal))}</span><span>dilaporkan oleh ${esc(x.oleh)}</span><span class="ch ${warna[x.status] || "n"}">${esc(rkOp(d, "status", x.status))}</span></div>
+      <dl class="dl" style="margin-top:12px"><dt>Kronologi</dt><dd style="white-space:pre-wrap">${esc(x.kejadian)}</dd>
+      <dt>Pembelaan</dt><dd style="white-space:pre-wrap">${x.pembelaan ? esc(x.pembelaan) : '<span class="mu">Belum ada pembelaan.</span>'}</dd>
+      ${x.sanksi || x.putusan ? `<dt>Putusan</dt><dd style="white-space:pre-wrap">${x.sanksi ? `<b>${esc(rkOp(d, "sanksi", x.sanksi))}</b>\n` : ""}${esc(x.putusan || "")}</dd>` : ""}</dl>
+      ${Array.isArray(x._edit) && x._edit.includes("pembelaan") ? `<div style="margin-top:12px"><label style="display:grid;gap:6px">Tulis pembelaanmu (Pasal 18 ayat 2)<textarea rows="4" data-bela="${x.id}" maxlength="8000">${esc(x.pembelaan || "")}</textarea></label><div class="bar" style="margin:8px 0 0"><button class="bt g" data-belasave="${x.id}">Kirim pembelaan</button></div></div>` : ""}
+      <div class="ac">${x._edit === "semua" ? rkAksi(x) : ""}${ADM() && /^sp[123]$/.test(x.sanksi || "") ? `<button class="bt o" data-buatsp="${x.id}">Buat ${esc(rkOp(d, "sanksi", x.sanksi))}</button>` : ""}</div></article>`).join("") || rkKosong(d.tulis ? "Belum ada laporan pelanggaran." : "Tidak ada kasus atas namamu.")}</div>`;
+  },
+  putusan(d, items) {
+    const urut = [...items].sort((a, b) => (b.tanggal || "").localeCompare(a.tanggal || "") || b.id - a.id);
+    return `<div class="lst">${urut.map(x => `<article class="it2"><div class="ey">${esc(rkOp(d, "jenis", x.jenis))}${x.rahasia ? " · Rahasia" : ""}</div><h3>${esc(x.judul)}</h3>
+      <div class="meta"><span>${esc(tglID(x.tanggal, true))}</span>${x.pasal ? `<a href="#" data-gopasal="${x.pasal}">Dasar: Pasal ${x.pasal}</a>` : ""}<span>dicatat ${esc(x.oleh)}</span></div>
+      <div class="bd">${esc(x.isi)}</div><div class="ac">${rkAksi(x)}</div></article>`).join("") || rkKosong("Belum ada putusan.")}</div>`;
+  },
+};
+const RK_BIND = {
+  konten(el, d, st) {
+    el.querySelectorAll("[data-kbl]").forEach(b => b.onclick = () => { const [y, m] = (st.bulan || d.hari_ini.slice(0, 7)).split("-").map(Number); const t = new Date(y, m - 1 + +b.dataset.kbl, 1); st.bulan = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}`; renderRK("konten"); });
+    el.querySelectorAll("[data-kci]").forEach(b => b.onclick = () => { const x = d.items.find(y => y.id === +b.dataset.kci); if (x && (x._edit === "semua" || (x._edit || []).length)) { st.form = x.id; renderRK("konten"); $("#rkForm-konten").scrollIntoView({behavior: "smooth"}); } else { st.f = "daftar"; st.q = x ? x.judul : ""; renderRK("konten"); } });
+    el.querySelectorAll("[data-salincap]").forEach(b => b.onclick = async () => { const x = d.items.find(y => y.id === +b.dataset.salincap); try { await navigator.clipboard.writeText(x.caption + (x.hashtag ? "\n\n" + x.hashtag : "")); b.textContent = "Tersalin ✓"; } catch (e) { b.textContent = "Gagal"; } });
+  },
+  sidang(el) {
+    el.querySelectorAll("[data-belasave]").forEach(b => b.onclick = async () => { const t = el.querySelector(`[data-bela="${b.dataset.belasave}"]`).value; if (t.trim().length < 5) { alert("Tulis pembelaan dulu."); return; } b.disabled = true; await rkSimpan("sidang", +b.dataset.belasave, {pembelaan: t}); });
+    el.querySelectorAll("[data-buatsp]").forEach(b => b.onclick = async () => {
+      const x = RK.sidang.items.find(y => y.id === +b.dataset.buatsp); show("sp"); await loadSP();
+      $("#spAng").value = x.terlapor; $("#spLv").value = x.sanksi.slice(2); $("#spJudul").value = `Pelanggaran${x.pasal ? " Pasal " + x.pasal : ""} UU MCI`;
+      $("#spIsi").value = `Berdasarkan putusan sidang tanggal ${tglID(x.diubah)}:\n\n${x.putusan || ""}\n\nKronologi:\n${x.kejadian}`; $("#spForm").scrollIntoView({behavior: "smooth"});
+    });
+  },
+};
+
+/* Struktur & Divisi (logo divisi, batas wewenang Pasal 5) */
+let SOD = null;
+async function loadStruktur(d) {
+  try { SOD = d || await api("/api/struktur-org"); } catch (e) { $("#soDiv").innerHTML = `<p class="er">${esc(e.message)}</p>`; return; }
+  const logo = k => `/aset/logo-${k}-${k === "mci" ? 192 : 256}.webp`;
+  $("#soTotal").textContent = `${SOD.total} anggota aktif · ${SOD.divisi.length} divisi · ${SOD.jabatan.length} jabatan`;
+  $("#soDiv").innerHTML = SOD.divisi.map(x => `<div class="cd"><img src="${logo(x.logo)}" class="${x.logo === "ss" ? "sq" : ""}" width="150" height="150" alt="Lambang ${esc(x.nama)}" loading="lazy">
+    <div class="ey">Divisi</div><h3>${esc(x.nama)}</h3>
+    ${x.deskripsi ? `<p style="white-space:pre-wrap;margin:10px 0 0">${esc(x.deskripsi)}</p>` : ""}
+    ${SOD.edit ? `<details style="margin-top:10px;text-align:left"><summary style="cursor:pointer;font-size:12.5px;color:var(--navy);font-weight:600">Ubah deskripsi</summary><textarea rows="3" data-sodesk="${esc(x.key)}" maxlength="2000" style="margin-top:6px">${esc(x.deskripsi)}</textarea><button class="bt o" style="margin-top:6px;min-height:34px;padding:6px 12px" data-sosave="${esc(x.key)}">Simpan</button></details>` : ""}
+    <div style="text-align:left;margin-top:14px;border-top:1px solid var(--line);padding-top:12px"><div class="k" style="margin-bottom:6px">Anggota (${x.anggota.length})</div>${x.anggota.map(a => `<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 0;font-size:13.5px"><span>${esc(a.nama)}</span><span class="mu" style="font-size:12px;text-align:right">${esc(a.jabatan.join(", "))}</span></div>`).join("") || '<span class="mu" style="font-size:13px">Belum ada anggota.</span>'}
+    ${x.wewenang.length ? `<div class="k" style="margin:12px 0 6px">Wewenang khusus divisi</div><div style="display:flex;gap:4px;flex-wrap:wrap">${x.wewenang.map(w => `<span class="ch n">${esc(w)}</span>`).join("")}</div>` : ""}</div></div>`).join("");
+  $("#soJab").innerHTML = SOD.jabatan.map(x => `<tr><td><b>${esc(x.nama)}</b></td><td>${x.wewenang.map(w => `<span class="ch n" style="margin:2px">${esc(w)}</span>`).join("") || '<span class="mu">-</span>'}</td><td>${esc(x.anggota.join(", ")) || '<span class="mu">-</span>'}</td></tr>`).join("");
+  $$("[data-sosave]").forEach(b => b.onclick = async () => { b.disabled = true; try { await loadStruktur(await api("/api/struktur-org", {json: {key: b.dataset.sosave, deskripsi: $(`[data-sodesk="${b.dataset.sosave}"]`).value}})); } catch (e) { alert(e.message); b.disabled = false; } });
+}
+
+/* Rekap Kas Mingguan (Pasal 9, 15, 16, 17) */
+let RKK = null;
+async function loadRekapKas(minggu) {
+  try { RKK = await api("/api/rekapkas" + (minggu ? "?minggu=" + encodeURIComponent(minggu) : "")); } catch (e) { $("#rkkList").innerHTML = `<tr><td colspan="5" class="er">${esc(e.message)}</td></tr>`; return; }
+  const d = RKK, lp = d.laporan;
+  $("#rkkLabel").textContent = d.label; $("#rkkPrev").disabled = !d.prev; $("#rkkNext").disabled = !d.next;
+  $("#rkk1").textContent = `${d.lunas} / ${d.wajib}`; $("#rkk2").textContent = rp(d.masuk); $("#rkk3").textContent = num(d.menunggak); $("#rkk4").textContent = rp(d.total_tagihan);
+  const stl = {belum: ["y", "Belum diterbitkan"], tepat: ["g", "Diterbitkan tepat waktu"], telat: ["r", "Terlambat (Pasal 17)"]}[lp.status];
+  $("#rkkLap").innerHTML = `<div class="ey">Laporan Bendahara · Pasal 9 & 17</div><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="ch ${stl[0]}">${stl[1]}</span><span class="mu" style="font-size:13px">Batas: ${esc(tglID(lp.batas.slice(0, 10), true))} pukul ${esc(lp.batas.slice(11))} WIB${lp.waktu ? ` · diterbitkan ${esc(tglID(lp.waktu.slice(0, 10)))} ${esc(lp.waktu.slice(11, 16))} oleh ${esc(lp.oleh)}` : ""}</span></div>
+    ${d.bisa_lapor ? `<div class="bar" style="margin:12px 0 0"><input type="text" id="rkkCat" maxlength="1000" placeholder="Catatan tambahan (opsional)" style="max-width:420px"><button class="bt g" id="rkkPub">${lp.waktu ? "Terbitkan ulang" : "Terbitkan rekap"}</button></div><p class="mu" style="font-size:12.5px;margin:6px 0 0">Rekap dikirim sebagai Pengumuman (kategori Kas) ke Inbox dan Telegram semua anggota.</p>` : ""}`;
+  $("#rkkList").innerHTML = d.anggota.map(a => { const st = a.status === "lunas" ? '<span class="ch g">Lunas</span>' : a.status === "menunggu" ? '<span class="ch y">Menunggu konfirmasi</span>' : a.status === "bebas" ? '<span class="ch n">Tidak wajib</span>' : '<span class="ch r">Belum</span>';
+    return `<tr><td><b>${esc(a.nama)}</b><div class="mu" style="font-size:12px">${esc(a.tingkat_label)}${a.nominal ? " · " + rp(a.nominal) + "/minggu" : ""}</div></td><td>${st}</td><td>${a.tunggak ? `${a.tunggak} minggu` : '<span class="mu">-</span>'}</td>
+      <td class="rt">${a.tagihan ? `<b>${rp(a.tagihan)}</b>${a.denda ? `<div class="mu" style="font-size:12px">termasuk denda ${rp(a.denda)}</div>` : ""}` : '<span class="mu">-</span>'}${a.denda_manual ? '<div class="mu" style="font-size:12px">denda disesuaikan Bendahara</div>' : ""}</td>
+      <td>${a.pasal16 ? '<span class="ch r">Ditinjau Pasal 16</span>' : ""}</td></tr>`; }).join("") || '<tr><td colspan="5" class="mu">Belum ada anggota.</td></tr>';
+  const pb = $("#rkkPub"); if (pb) pb.onclick = async () => { if (!confirm("Terbitkan rekap kas ini ke semua anggota?")) return; pb.disabled = true; try { await api("/api/rekapkas/publikasi", {json: {minggu: d.minggu, catatan: $("#rkkCat").value}}); await loadRekapKas(d.minggu); RK.pengumuman = null; } catch (e) { alert(e.message); pb.disabled = false; } };
+}
+$("#rkkPrev").onclick = () => RKK && RKK.prev && loadRekapKas(RKK.prev);
+$("#rkkNext").onclick = () => RKK && RKK.next && loadRekapKas(RKK.next);
+$("#rkkNow").onclick = () => loadRekapKas();
+
+/* Tanya UU */
+$("#uuTanya").onclick = async () => {
+  const q = $("#uuTanyaQ").value.trim(); if (q.length < 4) { $("#uuJawab").hidden = false; $("#uuJawab").textContent = "Tulis pertanyaannya dulu."; return; }
+  const b = $("#uuTanya"); b.disabled = true; $("#uuJawab").hidden = false; $("#uuJawab").textContent = "MCI.Scribe sedang membaca UU…"; $("#uuRujuk").innerHTML = "";
+  try { const d = await api("/api/uu/tanya", {json: {q}}); $("#uuJawab").textContent = d.jawab || d.pesan || "Tidak ada jawaban.";
+    $("#uuRujuk").innerHTML = (d.rujuk || []).map(x => `<button class="ch" type="button" data-uugo="${x.nomor}" style="border:0;cursor:pointer;background:#24385E;color:#E9E4D8">Pasal ${x.nomor}. ${esc(x.judul)}</button>`).join("");
+    $$("#uuRujuk [data-uugo]").forEach(c => c.onclick = () => { $("#uuQ").value = ""; renderUU(); const t = $("#uuP" + c.dataset.uugo); if (t) t.scrollIntoView({behavior: "smooth", block: "start"}); });
+  } catch (e) { $("#uuJawab").textContent = e.message; }
+  b.disabled = false;
+};
+
 /* Blacklist (khusus Secret Service + Dev) */
 async function loadBlacklist(d) {
   try { d = d || await api("/api/blacklist"); const ed = can("blacklist"); $("#blForm").hidden = !ed;
@@ -1825,7 +2212,7 @@ async function inboxBadge(n) {
   const b = $("#nbInbox"); b.textContent = n > 99 ? "99+" : n; b.hidden = !n;
 }
 let IBD = {items: []};
-const IB_IKON = {sp: "⚠️", bayar_kas: "💸", bayar_ok: "✅", bayar_tolak: "⛔", info: "📢", tanya_produk: "🛒", invoice_bayar: "🧾"};
+const IB_IKON = {tugas: "📌", pengumuman: "📣", agenda: "🗓️", sidang: "⚖️", sp: "⚠️", bayar_kas: "💸", bayar_ok: "✅", bayar_tolak: "⛔", info: "📢", tanya_produk: "🛒", invoice_bayar: "🧾"};
 async function bayarAksi(id, aksi) {
   let alasan = "";
   if (aksi === "tolak") { alasan = prompt("Alasan ditolak (opsional, dikirim ke anggota):", "Foto bukti tidak jelas"); if (alasan === null) return false; }
@@ -1841,7 +2228,7 @@ function renderInbox() {
     return `<div class="cd ib${x.dibaca ? "" : " baru"}" data-ibr="${x.id}"><div class="ibh"><span class="ibi" aria-hidden="true">${IB_IKON[x.jenis] || "🔔"}</span><div style="flex:1;min-width:0"><b>${esc(x.judul)}</b><div class="mu" style="font-size:12.5px">${relW(x.dibuat)} ${st}</div></div><button class="bt o ibx" data-ibd="${x.id}" aria-label="Hapus notifikasi">×</button></div>
       ${x.isi ? `<div style="margin-top:8px;white-space:pre-wrap">${esc(x.isi)}</div>` : ""}
       ${x.jenis === "bayar_kas" && x.ref && x.bayar_status !== "dihapus" && kf ? `<div class="bar" style="margin:10px 0 0"><a href="/api/iuran/${x.ref}/foto" target="_blank" rel="noopener"><img class="ibf" src="/api/iuran/${x.ref}/foto" alt="Foto bukti bayar" loading="lazy"></a>${tunggu ? `<button class="bt g" data-ibt="${x.ref}">Terima</button><button class="bt o" data-ibn="${x.ref}">Tolak</button>` : ""}</div>` : ""}
-      ${x.jenis.startsWith("bayar") ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="bayarkas">Buka Bayar Kas</button></div>' : x.jenis === "tanya_produk" ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="produk">Balas di halaman Produk</button></div>' : x.jenis === "invoice_bayar" ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="invoice">Buka halaman Invoice</button></div>' : x.jenis === "sp" ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="sp">Buka halaman SP</button></div>' : ""}</div>`;
+      ${x.jenis.startsWith("bayar") ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="bayarkas">Buka Bayar Kas</button></div>' : x.jenis === "tanya_produk" ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="produk">Balas di halaman Produk</button></div>' : x.jenis === "invoice_bayar" ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="invoice">Buka halaman Invoice</button></div>' : x.jenis === "sp" ? '<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="sp">Buka halaman SP</button></div>' : ["tugas", "pengumuman", "agenda", "sidang"].includes(x.jenis) ? `<div class="bar" style="margin:8px 0 0"><button class="bt o" data-ibgo="${x.jenis}">Buka ${{tugas: "Tugas", pengumuman: "Pengumuman", agenda: "Agenda", sidang: "Pelanggaran & Sidang"}[x.jenis]}</button></div>` : ""}</div>`;
   }).join("") || '<p class="mu">Inbox kosong. Notifikasi baru akan muncul di sini.</p>';
   $$("[data-ibr]").forEach(e => e.onclick = async ev => { if (ev.target.closest("button,a")) return; const x = it.find(y => y.id == e.dataset.ibr); if (x && !x.dibaca) { IBD = await api("/api/inbox/baca", {json: {id: x.id}}); renderInbox(); inboxBadge(IBD.belum); } });
   $$("[data-ibd]").forEach(b => b.onclick = async () => { IBD = await api("/api/inbox/" + b.dataset.ibd, {method: "DELETE"}); renderInbox(); inboxBadge(IBD.belum); });
@@ -4456,6 +4843,9 @@ const OFFICE = (() => {
   };
 })();
 
+function navGrup() {   // judul kelompok menu disembunyikan kalau semua menu di bawahnya tersembunyi
+  $$("#sd .ng").forEach(g => { let n = g.nextElementSibling, ada = false; while (n && n.classList.contains("nv")) { if (n.style.display !== "none") ada = true; n = n.nextElementSibling; } if (g.textContent) g.hidden = !ada; });
+}
 /* ================= MULAI ================= */
 (async () => {
   if (DEMO) { $("#demoBanner").hidden = false; $("#csv").removeAttribute("href"); $("#csv").onclick = e => { e.preventDefault(); alert("Ekspor CSV aktif di versi server."); }; }
@@ -4468,6 +4858,7 @@ const OFFICE = (() => {
   const NP = ME.anggota ? ME.anggota.nama + " · " + ME.anggota.jabatan.join(", ") + (ME.anggota.sp ? " · SP" + ME.anggota.sp : "") : (ME.nama_peran || "Viewer");
   $("#whoRole").innerHTML = ADM() ? `<span class="wl">Masuk sebagai</span><span class="wh">Masuk sebagai</span> <b>Admin</b>`
     : `<span class="wl">Masuk sebagai</span><span class="wh">⚡ Hemat token</span> <b>${esc(NP)}</b>`;
+  if (ME.role === "viewer") ["pengumuman", "agenda", "tugas", "proyek", "struktur", "sidang", "putusan", "rekapkas", "konten"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // halaman organisasi khusus anggota
   if (ME.role === "viewer") ["blacklist", "sp"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // viewer tidak boleh melihat blacklist
   if (ME.role === "viewer") $("#logout").style.display = "none";   // viewer tidak perlu tombol keluar
   if (!ADM()) { const lb = $("#lpBuat"); if (lb) lb.closest(".cd").hidden = true; }   // Manager/Sekretaris cuma lihat laporan
@@ -4475,6 +4866,7 @@ const OFFICE = (() => {
   if (!can("kas_edit")) { $("#kCatat").hidden = true; }
   if (!can("gambar_buat")) { $("#gBuat").hidden = true; }
   if (!ADM()) { $("#skForm").hidden = true; ["#mt", "#mx"].forEach(q => { const e = $(q); if (e) (e.closest("label") || e).style.display = "none"; }); }
+  navGrup();
   renderKuota();
   if (DEMO) $("#logout").onclick = e => { e.preventDefault(); alert("Tombol Keluar aktif di versi server."); };
   await poll();
