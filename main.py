@@ -2358,9 +2358,9 @@ def _try_login(token):
 
 
 LOGIN = """<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Masuk · MCI</title>
-<link rel="icon" href="/aset/favicon.ico"><link rel="apple-touch-icon" href="/aset/logo-mci-192.png">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0F1E3A;font-family:Inter,system-ui,sans-serif;color:#E9E4D8;padding:24px}
+<link rel="icon" href="/aset/favicon.ico"><link rel="apple-touch-icon" href="/aset/app-apple-180.png"><link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#0F1E3A"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="MCI"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0F1E3A;font-family:'Instrument Sans',Inter,system-ui,sans-serif;color:#E9E4D8;padding:24px}
 form{width:min(380px,100%%);display:grid;gap:14px;justify-items:center;text-align:center}
 img{width:132px;height:132px}h1{margin:6px 0 0;font:700 34px/1 'Cormorant Garamond',serif;letter-spacing:.12em;color:#F2EBDD}
 small{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#8E9AB2}hr{width:56px;border:0;border-top:1px solid #A88A55;margin:6px 0 10px}
@@ -2369,7 +2369,7 @@ input{border:1px solid #2E4470;background:#14284B;color:#fff}input:focus{outline
 button{border:0;background:#E9E4D8;color:#0F1E3A;font-weight:600;letter-spacing:.04em;cursor:pointer}button:hover{background:#fff}
 p{margin:0;color:#F2B8B0;font-size:14px}.mt{font:italic 600 15px 'Cormorant Garamond',serif;color:#A88A55;letter-spacing:.06em;margin-top:8px}</style></head>
 <body><form method="post" action="/login"><img src="/aset/logo-mci-192.webp" alt="Logo MCI"><h1>MCI</h1><small>Mahardika Cakrawala Indonesia</small><hr>
-<label for="t">Token akses</label><input id="t" name="t" type="password" autocomplete="current-password" required>%s<button>Masuk</button><div class="mt">Trimatra Vijaya Mahe</div></form></body></html>"""
+<label for="t">Token akses</label><input id="t" name="t" type="password" autocomplete="current-password" required>%s<button>Masuk</button><div class="mt">Trimatra Vijaya Mahe</div></form><script>if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{})</script></body></html>"""
 
 
 @app.before_request
@@ -2429,6 +2429,56 @@ def aset(f):
     r = send_from_directory(ASET_DIR, f)
     r.headers["Cache-Control"] = "public, max-age=604800"
     return r
+
+
+# ---------- PWA: website bisa dipasang sebagai aplikasi (Android, iPhone, laptop) ----------
+MANIFEST = {
+    "name": "MCI · Mahardika Cakrawala Indonesia", "short_name": "MCI", "id": "/", "start_url": "/", "scope": "/",
+    "display": "standalone", "orientation": "any", "background_color": "#0F1E3A", "theme_color": "#0F1E3A", "lang": "id",
+    "description": "Pusat kerja MCI: pengumuman, tugas, rapat, kas, UU, dan bot AI.",
+    "icons": [{"src": "/aset/app-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+              {"src": "/aset/app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+              {"src": "/aset/app-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+              {"src": "/aset/app-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}],
+    "shortcuts": [{"name": "Inbox", "url": "/#inbox", "icons": [{"src": "/aset/app-192.png", "sizes": "192x192"}]},
+                  {"name": "Tugas", "url": "/#tugas", "icons": [{"src": "/aset/app-192.png", "sizes": "192x192"}]},
+                  {"name": "Bayar Kas", "url": "/#bayarkas", "icons": [{"src": "/aset/app-192.png", "sizes": "192x192"}]}],
+}
+PWA_VER = "mci-v1"
+SW_JS = """// Service worker MCI: hanya menyimpan logo/ikon dan halaman offline. Data & API TIDAK PERNAH disimpan di perangkat.
+const V = "%s", ASET = ["/offline", "/aset/logo-mci-192.webp", "/aset/app-192.png", "/aset/favicon.ico"];
+self.addEventListener("install", e => { e.waitUntil(caches.open(V).then(c => c.addAll(ASET)).then(() => self.skipWaiting())); });
+self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== V).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
+self.addEventListener("fetch", e => {
+  const r = e.request, u = new URL(r.url);
+  if (r.method !== "GET" || u.origin !== location.origin) return;
+  if (r.mode === "navigate") { e.respondWith(fetch(r).catch(() => caches.match("/offline"))); return; }
+  if (u.pathname.startsWith("/aset/")) e.respondWith(caches.match(r).then(c => c || fetch(r).then(res => { if (res.ok) { const k = res.clone(); caches.open(V).then(x => x.put(r, k)); } return res; })));
+});
+""" % PWA_VER
+OFFLINE = """<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MCI · Offline</title><meta name="theme-color" content="#0F1E3A">
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0F1E3A;color:#E9E4D8;font-family:'Instrument Sans',system-ui,sans-serif;text-align:center;padding:24px}
+img{width:110px;height:110px}h1{font:700 30px Georgia,serif;letter-spacing:.1em;margin:14px 0 6px;color:#F2EBDD}p{color:#9AA6BD;margin:0 0 20px}button{font:inherit;font-weight:600;background:#E9E4D8;color:#0F1E3A;border:0;border-radius:8px;padding:12px 20px;cursor:pointer}</style></head>
+<body><div><img src="/aset/logo-mci-192.webp" alt="Logo MCI"><h1>MCI</h1><p>Tidak ada koneksi internet. Sambungkan lagi, lalu coba muat ulang.</p><button onclick="location.reload()">Muat ulang</button></div></body></html>"""
+
+
+@app.route("/manifest.webmanifest")
+def manifest():
+    r = Response(json.dumps(MANIFEST, ensure_ascii=False), mimetype="application/manifest+json")
+    r.headers["Cache-Control"] = "public, max-age=3600"
+    return r
+
+
+@app.route("/sw.js")
+def service_worker():
+    r = Response(SW_JS, mimetype="application/javascript")
+    r.headers["Cache-Control"] = "no-cache"
+    return r
+
+
+@app.route("/offline")
+def offline_page():
+    return Response(OFFLINE, mimetype="text/html")
 
 
 @app.route("/favicon.ico")

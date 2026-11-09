@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>MCI · Mahardika Cakrawala Indonesia</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="icon" href="/aset/favicon.ico"><link rel="apple-touch-icon" href="/aset/logo-mci-192.png">
-<meta name="theme-color" content="#0F1E3A">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="/aset/favicon.ico"><link rel="apple-touch-icon" href="/aset/app-apple-180.png"><link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0F1E3A"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="MCI"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>
 :root{--navy:#0A2A6B;--ink:#0B1F4D;--mute:#4A5A7A;--line:#D9E4FA;--bg:#F3F7FF;--gold:#D4AF5A;--gold2:#F1D58A}
 *{box-sizing:border-box}
@@ -245,7 +245,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 
 /* =================== TEMA MCI: elegan, mengikuti logo (navy · perak · kuningan) =================== */
 :root{--navy:#14284B;--navy2:#0F1E3A;--ink:#1B2335;--mute:#5E6678;--line:#E4DFD3;--line2:#D6D0C2;--bg:#F6F4EF;--paper:#FFFFFF;--gold:#A88A55;--gold2:#D9C49A;--silver:#C9CED6;--serif:'Cormorant Garamond',Georgia,'Times New Roman',serif}
-body{font:14.5px/1.55 Inter,system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+body{font:14.5px/1.55 'Instrument Sans',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
 #sd{background:var(--navy2);padding:22px 12px 18px;gap:1px;scrollbar-color:rgba(168,138,85,.4) transparent;border-right:1px solid #1C2E52}
 #sd::-webkit-scrollbar-thumb{background:rgba(168,138,85,.4)}
 .brand{display:flex;align-items:center;gap:12px;padding:0 10px 20px;margin-bottom:6px;border-bottom:1px solid rgba(201,206,214,.12)}
@@ -253,6 +253,7 @@ body{font:14.5px/1.55 Inter,system-ui,-apple-system,'Segoe UI',sans-serif;backgr
 .brand b{font:700 26px/1 var(--serif);letter-spacing:.14em;color:#F2EBDD}
 .brand small{display:block;margin-top:5px;font-size:9.5px;line-height:1.35;letter-spacing:.16em;text-transform:uppercase;color:#8E9AB2;white-space:normal}
 .brand i{display:none}
+.nv.inst{margin-top:14px;border:1px solid rgba(168,138,85,.55);border-radius:6px;color:var(--gold2);text-align:center;font-weight:600}.nv.inst:hover{background:rgba(168,138,85,.12);color:#F2EBDD}
 .ng{margin:16px 12px 4px;font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#6F7C96}
 .ng:empty{margin:10px 12px 4px;border-top:1px solid rgba(201,206,214,.12)}
 .nv{padding:8px 12px 8px 14px;border-radius:6px;color:#B9C2D3;font-size:13.5px;font-weight:500;border-left:2px solid transparent}
@@ -324,7 +325,7 @@ td{border-top:1px solid var(--line)}
 .hcl b{display:block;color:#F2EBDD}.hcl span{font-size:12px;color:var(--gold2)}
 .hc summary{color:var(--gold2)!important}.hc .mm label{background:#14284B;border-color:#2E4470;color:#E9E4D8}
 .pg{position:relative}.exw{position:absolute;top:0;right:0;z-index:5}
-.exb{font:600 12px Inter,system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--navy);background:var(--paper);border:1px solid var(--line2);border-radius:6px;padding:7px 12px;cursor:pointer}
+.exb{font:600 12px 'Instrument Sans',Inter,system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--navy);background:var(--paper);border:1px solid var(--line2);border-radius:6px;padding:7px 12px;cursor:pointer}
 .exb::after{content:"";display:inline-block;margin-left:7px;border:4px solid transparent;border-top-color:currentColor;transform:translateY(2px)}
 .exb:hover,.exb[aria-expanded=true]{border-color:var(--navy)}
 .exm{position:absolute;right:0;top:calc(100% + 6px);min-width:150px;background:var(--paper);border:1px solid var(--line2);border-radius:8px;box-shadow:0 10px 30px rgba(15,30,58,.14);padding:5px;display:grid}
@@ -394,6 +395,7 @@ main .bar .seg button{color:var(--mute);font-weight:600}main .bar .seg button.on
  <button class="nv" data-p="tim">Tim &amp; Token</button>
  <div class="ng"></div>
  <button class="nv" data-p="tentang">Tentang Kami</button>
+ <button class="nv inst" id="pasangApp" hidden>Pasang aplikasi</button>
  <div class="cv"><b>Hemat token</b><br>Router lokal, skill, model Lite, cache, dan mode Caveman.</div>
  <div class="who"><span id="whoRole">Memuat…</span><a class="lo" id="logout" href="/logout">Keluar</a></div>
 </aside>
@@ -2180,8 +2182,8 @@ function exXLSX(ts) {
 function exPDF(p, ts) {
   const e = s => esc(String(s ?? "")), lebar = Math.max(...ts.map(t => t.kolom.length));
   const html = `<!doctype html><html lang="id"><head><meta charset="utf-8"><title>${e(exNamaFile(p, "pdf").replace(/\.pdf$/, ""))}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
-  <style>@page{size:A4 ${lebar > 5 ? "landscape" : "portrait"};margin:14mm 12mm}*{box-sizing:border-box}body{margin:0;font:10.5px/1.45 Inter,Arial,sans-serif;color:#1B2335}
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&family=Instrument+Sans:wght@400;600&display=swap" rel="stylesheet">
+  <style>@page{size:A4 ${lebar > 5 ? "landscape" : "portrait"};margin:14mm 12mm}*{box-sizing:border-box}body{margin:0;font:10.5px/1.45 'Instrument Sans',Inter,Arial,sans-serif;color:#1B2335}
   header{display:flex;align-items:center;gap:14px;border-bottom:1.5px solid #A88A55;padding-bottom:10px;margin-bottom:14px}header img{width:54px;height:54px}
   h1{margin:0;font:700 22px 'Cormorant Garamond',Georgia,serif;color:#0F1E3A}header small{display:block;color:#5E6678;font-size:10px;letter-spacing:.06em}
   h2{font:700 15px 'Cormorant Garamond',Georgia,serif;color:#0F1E3A;margin:16px 0 6px}table{width:100%;border-collapse:collapse;page-break-inside:auto}
@@ -5037,6 +5039,19 @@ const OFFICE = (() => {
 function navGrup() {   // judul kelompok menu disembunyikan kalau semua menu di bawahnya tersembunyi
   $$("#sd .ng").forEach(g => { let n = g.nextElementSibling, ada = false; while (n && n.classList.contains("nv")) { if (n.style.display !== "none") ada = true; n = n.nextElementSibling; } if (g.textContent) g.hidden = !ada; });
 }
+/* ================= APLIKASI (PWA) ================= */
+let PASANG = null;
+const APP_MODE = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+if ("serviceWorker" in navigator && !DEMO) navigator.serviceWorker.register("/sw.js").catch(() => {});
+addEventListener("beforeinstallprompt", e => { e.preventDefault(); PASANG = e; if (!APP_MODE()) $("#pasangApp").hidden = false; });
+addEventListener("appinstalled", () => { PASANG = null; $("#pasangApp").hidden = true; });
+if (!APP_MODE() && /iPhone|iPad|iPod/i.test(navigator.userAgent)) $("#pasangApp").hidden = false;   // iPhone tidak punya prompt otomatis
+$("#pasangApp").onclick = async () => {
+  if (PASANG) { PASANG.prompt(); const r = await PASANG.userChoice; if (r.outcome === "accepted") $("#pasangApp").hidden = true; PASANG = null; return; }
+  alert("Pasang MCI di iPhone/iPad:\n1. Buka web ini di Safari\n2. Ketuk tombol Bagikan (kotak dengan panah ke atas)\n3. Pilih 'Tambahkan ke Layar Utama'\n4. Ketuk 'Tambah'");
+};
+function bukaHash() { const p = (location.hash || "").slice(1); const b = p && document.querySelector(`.nv[data-p="${p}"]`); if (b && b.style.display !== "none") show(p); }   // pintasan aplikasi (#inbox, #tugas, …)
+
 /* ================= MULAI ================= */
 (async () => {
   if (DEMO) { $("#demoBanner").hidden = false; $("#csv").removeAttribute("href"); $("#csv").onclick = e => { e.preventDefault(); alert("Ekspor CSV aktif di versi server."); }; }
@@ -5063,6 +5078,7 @@ function navGrup() {   // judul kelompok menu disembunyikan kalau semua menu di 
   await poll();
   loadKas(true); loadUsage();
   show(DEMO || !can("boss") ? "office" : "cmd");
+  bukaHash();   // pintasan aplikasi: /#tugas, /#inbox, /#bayarkas
   OFFICE.ensure(DATA); OFFICE.sync(DATA);
   // admin 1 detik, viewer 3 detik; berhenti saat tab tidak dilihat (hemat server & kuota bandwidth)
   setInterval(() => { if (!document.hidden) poll(); }, ME.role === "admin" ? 1000 : 3000);
