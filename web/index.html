@@ -1861,7 +1861,7 @@ const RK_INFO = {
   pengumuman: ["Kabar resmi", "Pengumuman", "Pengumuman resmi MCI: kas, jadwal, dan keputusan. Formatnya seragam sesuai Pasal 14, dan bisa langsung dikirim ke Inbox serta Telegram semua anggota.", "Tulis pengumuman"],
   agenda: ["Organisasi", "Agenda & Rapat", "Jadwal rapat, agenda yang dibahas, notulen, dan daftar hadir. Anggota divisi terkait mendapat undangan di Inbox.", "Jadwalkan rapat"],
   tugas: ["Organisasi", "Tugas", "Siapa mengerjakan apa, sampai kapan. Penerima tugas mendapat notifikasi dan bisa memperbarui statusnya sendiri.", "Beri tugas"],
-  proyek: ["Organisasi", "Proyek", "Semua proyek MCI: status, tim, kebutuhan, dan pembagian hasil. Anggota yang menunggak kas 2 minggu atau lebih tanpa izin ditandai: hak proyeknya dicabut sampai lunas (Peraturan Kas Pasal 4).", "Tambah proyek"],
+  proyek: ["Organisasi", "Proyek", "Semua anggota boleh mengusulkan proyek. Proyek sah jika disetujui minimal 3 anggota, dan dana kasnya paling banyak Rp75.000 kecuali ada tambahan dari Bendahara atau Pemilik MCI (Peraturan Kas Pasal 7). Anggota yang menunggak 2 minggu tanpa izin dicabut hak proyeknya, dan pemilik proyek boleh langsung mengeluarkannya (Pasal 4 & 6).", "Usulkan proyek"],
   konten: ["Konten & karya", "Jadwal Konten", "Kalender posting Instagram dan TikTok: dari ide, draf, siap tayang, sampai hasil tayangnya.", "Tambah konten"],
   sidang: ["Hukum & disiplin", "Pelanggaran & Sidang", "Laporan pelanggaran UU MCI. Terlapor berhak membela diri sebelum sanksi ditetapkan (Pasal 18). Hanya Dewan, Dev, dan terlapor yang bisa melihat kasusnya.", "Laporkan pelanggaran"],
   putusan: ["Hukum & disiplin", "Arsip Putusan", "Semua putusan resmi Dewan, hasil sidang, keputusan rapat, dan perubahan UU, tersusun dan bisa dicari.", "Catat putusan"],
@@ -1891,7 +1891,7 @@ function rkInput(d, f, v) {
 function rkForm(j) {
   const d = RK[j], st = RKS[j]; if (!st.form) return "";
   const x = st.form === "baru" ? null : d.items.find(y => y.id === st.form);
-  const fs = d.fields.filter(f => !x || rkBisa(x, f.nama));
+  const fs = d.fields.filter(f => !f.sistem && (!x || rkBisa(x, f.nama)) && !(j === "proyek" && !x && !d.tulis && f.nama === "pj") && !(f.nama === "dana_tambahan" && !d.bendahara));
   const isi = fs.map(f => rkInput(d, f, x ? x[f.nama] : (f.bawaan != null ? f.bawaan : (f.tipe === "tanggal" && ["agenda", "sidang", "putusan"].includes(j) ? d.hari_ini : null)))).join("");
   return `<div class="cd" id="rkForm-${j}"><div class="ey">${x ? "Ubah" : "Baru"}</div><b style="font:700 21px var(--serif);color:var(--navy2)">${x ? esc(x.judul || x.nama || "Entri") : esc(RK_INFO[j][3])}</b>
     <div class="fm" style="margin-top:14px">${isi}</div>
@@ -1922,7 +1922,7 @@ function renderRK(j) {
   const q = (st.q || "").toLowerCase();
   const cocok = x => !q || JSON.stringify(x).toLowerCase().includes(q);
   const items = d.items.filter(cocok);
-  $("#rk-" + j).innerHTML = `<div class="ph"><div><div class="ey">${esc(ey)}</div><h1>${esc(jd)}</h1></div>${d.tulis && !st.form ? `<button class="bt g" data-rkbaru="${j}">${esc(tbl)}</button>` : ""}</div>
+  $("#rk-" + j).innerHTML = `<div class="ph"><div><div class="ey">${esc(ey)}</div><h1>${esc(jd)}</h1></div>${(d.tulis || d.buat) && !st.form ? `<button class="bt g" data-rkbaru="${j}">${esc(tbl)}</button>` : ""}</div>
     <p class="mu" style="margin:6px 0 20px;max-width:760px">${esc(intro)}</p>
     ${rkForm(j)}
     <div class="bar"><input type="search" data-rkq="${j}" placeholder="Cari…" value="${esc(st.q || "")}" style="max-width:300px">${(RK_ATAS[j] || (() => ""))(d, st)}<span class="mu" style="font-size:12.5px">${items.length} entri</span></div>
@@ -1976,15 +1976,21 @@ const RK_RENDER = {
     return `<div class="kb">${kol.map(k => `<div><b>${k[1]} · ${its.filter(x => x.status === k[0]).length}</b>${its.filter(x => x.status === k[0]).sort((a, b) => (a.tenggat || "9").localeCompare(b.tenggat || "9")).map(kartu).join("")}</div>`).join("")}</div>`;
   },
   proyek(d, items, st) {
-    const its = st.f ? items.filter(x => x.status === st.f) : items, tg = d.tunggak || {};
-    const orang = i => `<span class="ch ${(tg[i] || 0) >= 2 ? "r" : "n"}" title="${(tg[i] || 0) >= 2 ? `Menunggak kas ${tg[i]} minggu tanpa izin: hak proyek dicabut sampai lunas (Peraturan Kas Pasal 4)` : ""}">${esc(rkNama(d, i))}${(tg[i] || 0) >= 2 ? " · hak dicabut" : ""}</span>`;
-    return `<div class="lst">${its.map(x => `<article class="it2"><div class="ey">${esc(rkOp(d, "status", x.status))}</div><h3>${esc(x.nama)}</h3>
-      <div class="meta">${x.pj ? `<span>PJ: ${esc(rkNama(d, x.pj))}</span>` : ""}<span>Progres ${x.progres || 0}%</span>${x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">Tautan</a>` : ""}</div>
+    const its = st.f ? items.filter(x => x.status === st.f) : items, tg = d.tunggak || {}, maks = d.dana_maks || 75000;
+    const orang = (x, i) => { const cabut = (tg[i] || 0) >= 2;
+      return `<span class="ch ${cabut ? "r" : "n"}" title="${cabut ? `Menunggak kas ${tg[i]} minggu tanpa izin: hak proyek dicabut sampai lunas (Peraturan Kas Pasal 4)` : ""}">${esc(rkNama(d, i))}${i === x.pj ? " · pemilik" : ""}${cabut ? " · hak dicabut" : ""}</span>${cabut && rkBisa(x, "tim") && i !== x.pj ? `<button class="bt o" data-pkel="${x.id}:${i}" style="min-height:28px;padding:3px 9px;font-size:12px">Keluarkan</button>` : ""}`; };
+    return `<div class="lst">${its.map(x => { const batas = maks + (x.dana_tambahan || 0), dana = x.dana || 0;
+      return `<article class="it2"><div class="ey">${esc(rkOp(d, "status", x.status))}</div><h3>${esc(x.nama)}</h3>
+      <div class="meta">${x.pj ? `<span>Pemilik: ${esc(rkNama(d, x.pj))}</span>` : ""}<span>Progres ${x.progres || 0}%</span>${x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">Tautan</a>` : ""}</div>
       <div class="prg"><i style="width:${Math.min(100, x.progres || 0)}%"></i></div>
-      ${(x.tim || []).length ? `<div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">${x.tim.map(orang).join("")}</div>` : ""}
+      ${(x.setuju || []).length ? `<div class="meta" style="margin-top:10px"><span>Disetujui ${x.setuju.length} anggota: ${x.setuju.map(i => esc(rkNama(d, i))).join(", ")}</span></div>` : ""}
+      <div class="meta" style="margin-top:6px"><span>Dana kas ${rp(dana)} dari batas ${rp(batas)}${x.dana_tambahan ? ` (termasuk tambahan ${rp(x.dana_tambahan)})` : ""}</span></div>
+      <div class="prg"><i style="width:${Math.min(100, batas ? dana / batas * 100 : 0)}%;background:${dana > batas * 0.85 ? "#B4532A" : "var(--gold)"}"></i></div>
+      ${(x.tim || []).length ? `<div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">${x.tim.map(i => orang(x, i)).join("")}</div>` : ""}
       ${x.deskripsi ? `<div class="bd">${esc(x.deskripsi)}</div>` : ""}
       ${x.komponen || x.hasil ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Kebutuhan & pembagian hasil</summary>${x.komponen ? `<div class="bd"><b>Komponen / kebutuhan</b>\n${esc(x.komponen)}</div>` : ""}${x.hasil ? `<div class="bd"><b>Pembagian hasil</b>\n${esc(x.hasil)}</div>` : ""}</details>` : ""}
-      <div class="ac">${rkAksi(x)}</div></article>`).join("") || rkKosong("Belum ada proyek.")}</div>`;
+      ${x.riwayat ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Riwayat tim</summary><div class="bd" style="font-size:13px">${esc(x.riwayat)}</div></details>` : ""}
+      <div class="ac">${rkAksi(x)}</div></article>`; }).join("") || rkKosong("Belum ada proyek.")}</div>`;
   },
   konten(d, items, st) {
     if (st.f === "daftar") {
@@ -2023,6 +2029,13 @@ const RK_RENDER = {
   },
 };
 const RK_BIND = {
+  proyek(el, d) {
+    el.querySelectorAll("[data-pkel]").forEach(b => b.onclick = async () => {
+      const [pid, mid] = b.dataset.pkel.split(":").map(Number), x = d.items.find(y => y.id === pid);
+      if (!confirm(`Keluarkan ${rkNama(d, mid)} dari proyek "${x.nama}"? Hak proyeknya sedang dicabut karena tunggakan kas (Peraturan Kas Pasal 6). Ia akan diberi tahu lewat Inbox.`)) return;
+      b.disabled = true; await rkSimpan("proyek", pid, {tim: x.tim.filter(i => i !== mid)});
+    });
+  },
   konten(el, d, st) {
     el.querySelectorAll("[data-kbl]").forEach(b => b.onclick = () => { const [y, m] = (st.bulan || d.hari_ini.slice(0, 7)).split("-").map(Number); const t = new Date(y, m - 1 + +b.dataset.kbl, 1); st.bulan = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}`; renderRK("konten"); });
     el.querySelectorAll("[data-kci]").forEach(b => b.onclick = () => { const x = d.items.find(y => y.id === +b.dataset.kci); if (x && (x._edit === "semua" || (x._edit || []).length)) { st.form = x.id; renderRK("konten"); $("#rkForm-konten").scrollIntoView({behavior: "smooth"}); } else { st.f = "daftar"; st.q = x ? x.judul : ""; renderRK("konten"); } });
@@ -2451,7 +2464,7 @@ async function inboxBadge(n) {
   const b = $("#nbInbox"); b.textContent = n > 99 ? "99+" : n; b.hidden = !n;
 }
 let IBD = {items: []};
-const IB_IKON = {tugas: "📌", pengumuman: "📣", agenda: "🗓️", sidang: "⚖️", sp: "⚠️", bayar_kas: "💸", bayar_ok: "✅", bayar_tolak: "⛔", info: "📢", tanya_produk: "🛒", invoice_bayar: "🧾"};
+const IB_IKON = {proyek: "🧩", tugas: "📌", pengumuman: "📣", agenda: "🗓️", sidang: "⚖️", sp: "⚠️", bayar_kas: "💸", bayar_ok: "✅", bayar_tolak: "⛔", info: "📢", tanya_produk: "🛒", invoice_bayar: "🧾"};
 async function bayarAksi(id, aksi) {
   let alasan = "";
   if (aksi === "tolak") { alasan = prompt("Alasan ditolak (opsional, dikirim ke anggota):", "Foto bukti tidak jelas"); if (alasan === null) return false; }

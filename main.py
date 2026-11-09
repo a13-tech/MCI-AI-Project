@@ -304,6 +304,33 @@ def db_init():
                     sql(c, "INSERT INTO uu (tipe,bab,nomor,judul,isi,artinya,diubah,oleh) VALUES (?,?,?,?,?,?,?,?)", ("kas_pasal", "", p["nomor"], p["judul"], p["isi"], "", now, "awal"))
             except Exception as e:
                 log.warning("Seed Peraturan Kas gagal: %s", e)
+        try:   # perbarui teks UU & Peraturan Kas ke versi terbaru, sekali saja; baris yang sudah diedit Dev di web tidak ditimpa
+            from uu_seed import UU_SEED, KAS_SEED, UU_VERSI
+            vr = sql(c, "SELECT id, isi FROM uu WHERE tipe='meta_versi'").fetchone()
+            if not vr or int(vr[1] or 1) < UU_VERSI:
+                now, lewat = datetime.now(WIB).isoformat(timespec="seconds"), []
+                def _uu_set(tipe, nomor, judul, isi, artinya="", bab=""):
+                    row = sql(c, "SELECT id, oleh FROM uu WHERE tipe=?" + (" AND nomor=?" if nomor is not None else ""), (tipe, nomor) if nomor is not None else (tipe,)).fetchone()
+                    if not row:
+                        sql(c, "INSERT INTO uu (tipe,bab,nomor,judul,isi,artinya,diubah,oleh) VALUES (?,?,?,?,?,?,?,?)", (tipe, bab, nomor, judul, isi, artinya, now, "awal"))
+                    elif row[1] == "awal":
+                        sql(c, "UPDATE uu SET bab=?,judul=?,isi=?,artinya=?,diubah=? WHERE id=?", (bab, judul, isi, artinya, now, row[0]))
+                    else:
+                        lewat.append(f"{tipe} {nomor or ''}".strip())
+                _uu_set("info", None, "Undang-Undang MCI", UU_SEED["info"])
+                _uu_set("mukadimah", None, "Mukadimah", UU_SEED["mukadimah"])
+                for p in UU_SEED["pasal"]:
+                    _uu_set("pasal", p["nomor"], p["judul"], p["isi"], p["artinya"], p["bab"])
+                _uu_set("kas_info", None, "Peraturan Kas", KAS_SEED["info"])
+                for p in KAS_SEED["pasal"]:
+                    _uu_set("kas_pasal", p["nomor"], p["judul"], p["isi"])
+                if vr:
+                    sql(c, "UPDATE uu SET isi=? WHERE id=?", (str(UU_VERSI), vr[0]))
+                else:
+                    sql(c, "INSERT INTO uu (tipe,isi,diubah,oleh) VALUES (?,?,?,?)", ("meta_versi", str(UU_VERSI), now, "sistem"))
+                log.info("Teks UU & Peraturan Kas diperbarui ke versi %s%s", UU_VERSI, f" (tidak ditimpa karena sudah diedit: {', '.join(lewat)})" if lewat else "")
+        except Exception as e:
+            log.warning("Pembaruan teks UU gagal: %s", e)
         if not sql(c, "SELECT COUNT(*) FROM skills").fetchone()[0]:
             now = datetime.now(WIB).isoformat(timespec="seconds")
             for s in SKILL_SEED:
@@ -3132,7 +3159,7 @@ UU_COLS = "id,tipe,bab,nomor,judul,isi,artinya,diubah,oleh"
 
 def uu_semua():
     with db() as c:
-        rows = sql(c, f"SELECT {UU_COLS} FROM uu").fetchall()
+        rows = sql(c, f"SELECT {UU_COLS} FROM uu WHERE tipe<>'meta_versi'").fetchall()
     out = [{"id": int(i), "tipe": t, "bab": b or "", "nomor": int(n) if n is not None else None, "judul": j or "", "isi": isi or "", "artinya": a or "",
             "diubah": d or "", "oleh": o or ""} for i, t, b, n, j, isi, a, d, o in rows]
     urut = {"info": 0, "mukadimah": 1, "pasal": 2, "kas_info": 3, "kas_pasal": 4}
@@ -3200,6 +3227,8 @@ def api_uu_one(i):
         if not row:
             return jsonify({"error": "Tidak ditemukan"}), 404
         tipe = row[0]
+        if tipe == "meta_versi":
+            return jsonify({"error": "Tidak ditemukan"}), 404
         if request.method == "DELETE":
             if tipe not in ("pasal", "kas_pasal"):
                 return jsonify({"error": "Bagian ini tidak bisa dihapus, hanya diubah"}), 400
@@ -3266,11 +3295,16 @@ JENIS = {
         F("kategori", "Kategori", "pilih", opsi=[["umum", "Umum"], ["kas", "Kas"], ["jadwal", "Jadwal"], ["keputusan", "Keputusan"]], bawaan="umum"),
         F("judul", "Judul", wajib=True), F("isi", "Isi pengumuman", "area", wajib=True, maks=8000),
         F("sematkan", "Sematkan di atas", "bool"), F("kirim", "Kirim ke Inbox & Telegram semua anggota", "bool", bawaan=True)]},
-    "proyek": {"judul": "Proyek", "tulis": "proyek_kelola", "lihat": "anggota", "fields": [
+    "proyek": {"judul": "Proyek", "tulis": "proyek_kelola", "buat": "anggota", "lihat": "anggota", "fields": [   # Peraturan Kas Pasal 6 & 7
         F("nama", "Nama proyek", wajib=True), F("status", "Status", "pilih", opsi=[["ide", "Ide"], ["berjalan", "Berjalan"], ["ditunda", "Ditunda"], ["selesai", "Selesai"]], bawaan="berjalan"),
-        F("pj", "Penanggung jawab", "anggota"), F("tim", "Tim", "anggota_banyak"), F("progres", "Progres (%)", "angka", maks=100, bawaan=0),
+        F("pj", "Pemilik proyek", "anggota", info="Pengusul proyek. Boleh langsung mengeluarkan anggota tim yang hak proyeknya dicabut (Peraturan Kas Pasal 6)."),
+        F("setuju", "Anggota yang menyetujui", "anggota_banyak", info="Minimal 3 anggota aktif yang haknya tidak dicabut, termasuk pemilik proyek (Peraturan Kas Pasal 7)."),
+        F("tim", "Tim", "anggota_banyak"), F("progres", "Progres (%)", "angka", maks=100, bawaan=0),
+        F("dana", "Dana kas terpakai (Rp)", "angka", maks=10**9, bawaan=0, info="Paling banyak Rp75.000 per proyek. Lebih dari itu perlu persetujuan Bendahara atau Pemilik MCI (Peraturan Kas Pasal 7)."),
+        F("dana_tambahan", "Tambahan dana disetujui (Rp)", "angka", maks=10**9, bawaan=0, info="Diisi Bendahara atau Pemilik MCI."),
         F("deskripsi", "Deskripsi", "area", maks=4000), F("komponen", "Komponen / kebutuhan", "area", maks=4000),
-        F("hasil", "Pembagian hasil", "area", maks=2000, info="Peraturan Kas Pasal 4: anggota yang menunggak kas melewati toleransi tidak berhak atas bagian hasil sampai lunas."), F("link", "Tautan (repo, dokumen)", "url", maks=400)]},
+        F("hasil", "Pembagian hasil", "area", maks=2000, info="Peraturan Kas Pasal 4: anggota yang hak proyeknya dicabut tidak menerima bagian hasil, dan bagian itu tidak diberikan kemudian."),
+        F("link", "Tautan (repo, dokumen)", "url", maks=400), {**F("riwayat", "Riwayat tim", "area", maks=8000), "sistem": True}]},
     "konten": {"judul": "Jadwal Konten", "tulis": "konten_kelola", "lihat": "anggota", "fields": [
         F("judul", "Judul / topik", wajib=True), F("tanggal", "Tanggal tayang", "tanggal"),
         F("platform", "Platform", "pilih", opsi=[["ig_tt", "Instagram + TikTok"], ["ig", "Instagram"], ["tt", "TikTok"]], bawaan="ig_tt"),
@@ -3305,6 +3339,10 @@ def rk_bersih(jenis, d, lama=None, hanya=None):
     ids = rk_anggota_ids() | {m["id"] for m in MEMBERS.values()}
     for f in JENIS[jenis]["fields"]:
         n, t = f["nama"], f["tipe"]
+        if f.get("sistem"):   # diisi sistem (mis. riwayat tim), bukan dari formulir
+            if lama is None:
+                out[n] = ""
+            continue
         if hanya is not None and n not in hanya:
             continue
         if n not in d:
@@ -3389,8 +3427,13 @@ def rk_edit_fields(jenis, x, r):
         return []
     if jenis == "tugas" and x.get("pj") == me:
         return ["status"]
-    if jenis == "proyek" and x.get("pj") == me:
-        return ["status", "progres", "deskripsi", "komponen", "link", "tim"]
+    if jenis == "proyek":
+        f = []
+        if x.get("pj") == me:   # pemilik proyek: semua kecuali persetujuan dana tambahan
+            f = [k["nama"] for k in JENIS["proyek"]["fields"] if k["nama"] not in ("dana_tambahan", "riwayat")]
+        if can("kas_edit", r):   # Bendahara menyetujui dana tambahan
+            f.append("dana_tambahan")
+        return f
     if jenis == "konten" and x.get("pj") == me:
         return ["status", "caption", "hashtag", "link", "views", "tanggal"]
     if jenis == "sidang" and x.get("terlapor") == me and x.get("status") in ("dilaporkan", "pembelaan", "sidang"):
@@ -3419,6 +3462,7 @@ def rk_payload(jenis, r):
         x["_edit"] = e
         x["_hapus"] = e == "semua"
     out = {"jenis": jenis, "judul": JENIS[jenis]["judul"], "fields": JENIS[jenis]["fields"], "items": items, "tulis": boleh(r, JENIS[jenis]["tulis"]),
+           "buat": boleh(r, JENIS[jenis]["tulis"]) or (JENIS[jenis].get("buat") == "anggota" and me is not None), "dana_maks": DANA_PROYEK_MAKS if jenis == "proyek" else None, "bendahara": is_admin(r) or can("kas_edit", r),
            "saya": me, "anggota": [{"id": m["id"], "nama": m["nama"]} for m in sorted(MEMBERS.values(), key=lambda m: m["nama"].lower()) if m["aktif"]],
            "divisi": [[k, v] for k, v in DIVISI.items()], "hari_ini": today()}
     if jenis == "proyek":
@@ -3440,6 +3484,14 @@ def rk_setelah(jenis, x, lama, r):
         inbox_kirim([x["pj"]], "tugas", f"📌 Tugas baru: {x['judul']}", (f"Tenggat: {x['tenggat']}\n" if x.get("tenggat") else "") + (x.get("deskripsi") or ""), sid)
     if jenis == "tugas" and lama is not None and lama.get("status") != x.get("status") and x.get("status") == "selesai" and x.get("oleh_id") and x["oleh_id"] != mid_of(r):
         inbox_kirim([x["oleh_id"]], "tugas", f"✅ Tugas selesai: {x['judul']}", f"Dikerjakan oleh {_nm(x.get('pj'))}.", sid)
+    if jenis == "proyek" and lama is not None:
+        keluar = sorted(set(lama.get("tim") or []) - set(x.get("tim") or []))
+        if keluar:
+            tg = rk_tunggak()
+            for i in keluar:
+                inbox_kirim([i], "proyek", f"Kamu dikeluarkan dari proyek {x.get('nama', '')}",
+                            ("Hak proyekmu sedang dicabut karena tunggakan kas, jadi pemilik proyek mengeluarkanmu dari tim (Peraturan Kas Pasal 6). "
+                             "Setelah tunggakan dan denda lunas, kamu boleh bergabung lagi jika pemilik proyek setuju.") if tg.get(i, 0) >= 2 else f"Diubah oleh {nama_peran(r)}.", sid)
     if jenis == "pengumuman" and lama is None and x.get("kirim"):
         inbox_kirim(sorted(rk_anggota_ids()), "pengumuman", f"📣 {x['judul']}", x.get("isi", ""), sid, maks=8200)
     if jenis == "agenda" and lama is None:
@@ -3453,6 +3505,44 @@ def rk_setelah(jenis, x, lama, r):
         sk = dict(JENIS["sidang"]["fields"][6]["opsi"]).get(x.get("sanksi") or "", "")
         rk_simpan_raw("putusan", {"judul": f"Putusan pelanggaran {_nm(x.get('terlapor'))}" + (f" · {sk}" if sk else ""), "tanggal": today(), "jenis": "sidang",
                                   "pasal": x.get("pasal"), "isi": (x.get("putusan") or "") + (f"\n\nSanksi: {sk}" if sk else ""), "rahasia": False, "ref_sidang": sid}, r)
+
+
+DANA_PROYEK_MAKS = 75000   # Peraturan Kas Pasal 7
+
+
+def rk_cek(jenis, data, lama, r):
+    """Aturan khusus sebelum disimpan. Kembalikan pesan error atau None (data boleh diubah di sini)."""
+    if jenis != "proyek":
+        return None
+    me = mid_of(r)
+    if lama is None and not boleh(r, "proyek_kelola"):
+        data["pj"] = me   # anggota biasa yang mengusulkan otomatis jadi pemilik proyek
+    if lama is None and not data.get("pj"):
+        data["pj"] = me
+    if not data.get("pj"):
+        return "Pemilik proyek wajib diisi"
+    data["setuju"] = sorted(set(data.get("setuju") or []) | {data["pj"]})
+    if lama is None or set(data["setuju"]) != set(lama.get("setuju") or []):
+        tg = rk_tunggak()
+        dicabut = [_nm(i) for i in data["setuju"] if tg.get(i, 0) >= 2]
+        if dicabut:
+            return f"{', '.join(dicabut)} sedang dicabut hak proyeknya, jadi belum bisa ikut menyetujui (Peraturan Kas Pasal 4 & 7)."
+        if len(data["setuju"]) < 3:
+            return f"Proyek perlu disetujui minimal 3 anggota termasuk pemilik proyek (Peraturan Kas Pasal 7). Baru {len(data['setuju'])}."
+    if not (is_admin(r) or can("kas_edit", r)):
+        data["dana_tambahan"] = (lama or {}).get("dana_tambahan") or 0
+    batas = DANA_PROYEK_MAKS + int(data.get("dana_tambahan") or 0)
+    if int(data.get("dana") or 0) > batas:
+        return f"Dana kas proyek paling banyak Rp{batas:,}".replace(",", ".") + ". Untuk tambahan, ajukan ke Bendahara atau Pemilik MCI (Peraturan Kas Pasal 7)."
+    if lama is not None:   # catat perubahan tim
+        keluar = set(lama.get("tim") or []) - set(data.get("tim") or [])
+        masuk = set(data.get("tim") or []) - set(lama.get("tim") or [])
+        tg = rk_tunggak() if keluar else {}
+        baris = [f"{today()}: {_nm(i)} dikeluarkan oleh {nama_peran(r)}" + (" (hak proyek dicabut, Peraturan Kas Pasal 6)" if tg.get(i, 0) >= 2 else "") for i in sorted(keluar)]
+        baris += [f"{today()}: {_nm(i)} masuk tim" for i in sorted(masuk)]
+        if baris:
+            data["riwayat"] = ((lama.get("riwayat") or "") + "\n" + "\n".join(baris)).strip()[-8000:]
+    return None
 
 
 def rk_simpan_raw(jenis, data, r):
@@ -3472,11 +3562,13 @@ def api_rekord(jenis):
     if not rk_bisa_lihat(jenis, r):
         abort(403)
     if request.method == "POST":
-        if not boleh(r, JENIS[jenis]["tulis"]):
+        if not (boleh(r, JENIS[jenis]["tulis"]) or (JENIS[jenis].get("buat") == "anggota" and mid_of(r) is not None)):
             abort(403)
         if len(rk_rows(jenis)) >= 2000:
             return jsonify({"error": "Batas 2000 entri tercapai, hapus yang lama dulu"}), 400
         data, err = rk_bersih(jenis, request.get_json(silent=True) or {})
+        if not err:
+            err = rk_cek(jenis, data, None, r)
         if err:
             return jsonify({"error": err}), 400
         sid = rk_simpan_raw(jenis, data, r)
@@ -3508,6 +3600,8 @@ def api_rekord_one(jenis, i):
     d = request.get_json(silent=True) or {}
     simpan = {k: v for k, v in lama.items() if not k.startswith("_") and k not in ("id", "oleh_id", "oleh", "dibuat", "diubah")}
     data, err = rk_bersih(jenis, d, lama=simpan, hanya=None if e == "semua" else set(e))
+    if not err:
+        err = rk_cek(jenis, data, simpan, r)
     if err:
         return jsonify({"error": err}), 400
     with db() as c:
