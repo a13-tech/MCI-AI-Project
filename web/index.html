@@ -318,6 +318,11 @@ td{border-top:1px solid var(--line)}
 .seal .cd{text-align:center;margin:0}.seal img{width:150px;height:150px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 12px}
 .seal img.sq{border-radius:10px}
 .seal h3{margin:0;font:700 21px/1.2 var(--serif);color:var(--navy2)}
+.hc{display:flex;gap:26px;align-items:center;flex-wrap:wrap;background:var(--navy2);border-color:#2A3E66;color:#E9E4D8;padding:26px}
+.hc img{width:170px;height:170px;border-radius:50%;flex:none}.hc h2{color:#F2EBDD}.hc .mu{color:#9AA6BD}.hc .ey{color:var(--gold2)}
+.hcl{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}.hcl div{border:1px solid #2E4470;border-radius:8px;padding:9px 12px}
+.hcl b{display:block;color:#F2EBDD}.hcl span{font-size:12px;color:var(--gold2)}
+.hc summary{color:var(--gold2)!important}.hc .mm label{background:#14284B;border-color:#2E4470;color:#E9E4D8}
 .prg{height:6px;border-radius:3px;background:#ECE8DE;overflow:hidden;margin-top:8px}.prg i{display:block;height:100%;background:var(--navy)}
 .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}.cal div{background:var(--paper);border:1px solid var(--line);border-radius:6px;min-height:84px;padding:6px;font-size:12px}
 .cal div.hd{min-height:0;background:transparent;border:0;text-align:center;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
@@ -678,6 +683,8 @@ main .bar .seg button{color:var(--mute);font-weight:600}main .bar .seg button.on
   <div class="ey">Organisasi</div><h1>Struktur &amp; Divisi</h1>
   <p class="mu" style="margin:6px 0 6px;max-width:760px">Bagan organisasi MCI. Setiap jabatan punya batas wewenang tertulis (Pasal 5); perintah di luar wewenang boleh dipertanyakan.</p>
   <p class="mu" id="soTotal" style="font-size:12.5px;margin:0 0 20px"></p>
+  <div class="cd hc" id="soMp"></div>
+  <h2>Divisi</h2>
   <div class="seal" id="soDiv"></div>
   <h2>Jabatan &amp; batas wewenang</h2>
   <div class="cd" style="padding:0"><div class="tb"><table><thead><tr><th>Jabatan</th><th>Wewenang</th><th>Dipegang oleh</th></tr></thead><tbody id="soJab"></tbody></table></div></div>
@@ -954,11 +961,12 @@ main .bar .seg button{color:var(--mute);font-weight:600}main .bar .seg button.on
   <div class="cd" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap"><img src="/aset/logo-mci-192.webp" width="120" height="120" alt="Lambang MCI" style="border-radius:50%"><div style="flex:1;min-width:220px"><div class="ey">Sejak 2024</div><h2 style="margin:0">Mahardika Cakrawala Indonesia</h2><p class="mu" style="margin:6px 0 0;font:italic 600 18px var(--serif);color:var(--gold)">Trimatra Vijaya Mahe · Di tiga bidang kita berjaya</p></div></div>
   <div id="tv"></div>
   <div id="tf" hidden></div>
-  <h2>Tiga tim, satu MCI</h2>
+  <h2>Lambang MCI</h2>
   <div class="seal">
+   <div class="cd"><img src="/aset/logo-mahapatih-256.webp" width="150" height="150" alt="Lambang Mahapatih" loading="lazy"><div class="ey">High Command</div><h3>Mahapatih</h3><p class="mu" style="margin:8px 0 0">Kelompok khusus pejabat MCI</p></div>
    <div class="cd"><img src="/aset/logo-creative-256.webp" width="150" height="150" alt="Lambang Creative &amp; Engineering Team" loading="lazy"><div class="ey">Creative &amp; Engineering</div><h3>Creative &amp; Engineering Team</h3><p class="mu" style="margin:8px 0 0">Innovation · Precision · Creativity</p></div>
    <div class="cd"><img src="/aset/logo-management-256.webp" width="150" height="150" alt="Lambang Management Team" loading="lazy"><div class="ey">Management</div><h3>Management Team</h3><p class="mu" style="margin:8px 0 0">Leadership · Strategy · Vision · Execution</p></div>
-   <div class="cd"><img src="/aset/logo-ss-256.webp" width="150" height="150" class="sq" alt="Lambang Secret Service Team" loading="lazy"><div class="ey">Secret Service</div><h3>Secret Service Team</h3><p class="mu" style="margin:8px 0 0">Vigilance · Protection</p></div>
+   <div class="cd"><img src="/aset/logo-ss-256.webp" width="150" height="150" alt="Lambang Secret Service Team" loading="lazy"><div class="ey">Secret Service</div><h3>Secret Service Team</h3><p class="mu" style="margin:8px 0 0">Vigilance · Protection</p></div>
   </div>
  </section>
 
@@ -1991,7 +1999,14 @@ async function loadStruktur(d) {
   try { SOD = d || await api("/api/struktur-org"); } catch (e) { $("#soDiv").innerHTML = `<p class="er">${esc(e.message)}</p>`; return; }
   const logo = k => `/aset/logo-${k}-${k === "mci" ? 192 : 256}.webp`;
   $("#soTotal").textContent = `${SOD.total} anggota aktif · ${SOD.divisi.length} divisi · ${SOD.jabatan.length} jabatan`;
-  $("#soDiv").innerHTML = SOD.divisi.map(x => `<div class="cd"><img src="${logo(x.logo)}" class="${x.logo === "ss" ? "sq" : ""}" width="150" height="150" alt="Lambang ${esc(x.nama)}" loading="lazy">
+  const mp = SOD.mahapatih;
+  $("#soMp").innerHTML = `<img src="/aset/logo-mahapatih-256.webp" srcset="/aset/logo-mahapatih-256.webp 1x, /aset/logo-mahapatih-512.webp 2x" width="170" height="170" alt="Lambang Mahapatih">
+    <div style="flex:1;min-width:240px"><div class="ey">High Command MCI</div><h2 style="margin:0">Mahapatih</h2>
+    <p class="mu" style="margin:6px 0 14px">Kelompok khusus pejabat MCI: ${esc(mp.jabatan.map(k => (mp.pilihan.find(p => p[0] === k) || [, k])[1]).join(", ") || "belum ditentukan")}.</p>
+    <div class="hcl">${mp.anggota.map(a => `<div><b>${esc(a.nama)}</b><span>${esc(a.jabatan.join(", "))}</span></div>`).join("") || '<span class="mu">Belum ada anggota yang memegang jabatan pejabat.</span>'}</div>
+    ${SOD.edit ? `<details style="margin-top:14px"><summary style="cursor:pointer;font-size:12.5px;color:var(--navy);font-weight:600">Atur jabatan yang termasuk Mahapatih</summary><div class="mm" style="margin-top:8px">${mp.pilihan.map(p => `<label><input type="checkbox" value="${esc(p[0])}" ${mp.jabatan.includes(p[0]) ? "checked" : ""}> ${esc(p[1])}</label>`).join("")}</div><button class="bt o" id="soMpSave" style="margin-top:8px;min-height:34px;padding:6px 12px">Simpan</button></details>` : ""}</div>`;
+  const ms = $("#soMpSave"); if (ms) ms.onclick = async () => { ms.disabled = true; try { await loadStruktur(await api("/api/struktur-org", {json: {mahapatih: [...$$("#soMp .mm input:checked")].map(c => c.value)}})); } catch (e) { alert(e.message); ms.disabled = false; } };
+  $("#soDiv").innerHTML = SOD.divisi.map(x => `<div class="cd"><img src="${logo(x.logo)}" width="150" height="150" alt="Lambang ${esc(x.nama)}" loading="lazy">
     <div class="ey">Divisi</div><h3>${esc(x.nama)}</h3>
     ${x.deskripsi ? `<p style="white-space:pre-wrap;margin:10px 0 0">${esc(x.deskripsi)}</p>` : ""}
     ${SOD.edit ? `<details style="margin-top:10px;text-align:left"><summary style="cursor:pointer;font-size:12.5px;color:var(--navy);font-weight:600">Ubah deskripsi</summary><textarea rows="3" data-sodesk="${esc(x.key)}" maxlength="2000" style="margin-top:6px">${esc(x.deskripsi)}</textarea><button class="bt o" style="margin-top:6px;min-height:34px;padding:6px 12px" data-sosave="${esc(x.key)}">Simpan</button></details>` : ""}
@@ -2661,15 +2676,16 @@ function renderPerpus() {
   const vis = it.filter(x => (!kf || x.kategori === kf) && (!q || [x.judul, x.penulis, x.kategori, x.ringkasan].join(" ").toLowerCase().includes(q)));
   $("#ppJml").textContent = `Koleksi (${num(it.length)})`;
   $("#ppList").innerHTML = vis.map(x => `<div class="it"><div class="cv2" style="background:${ppWarna(x.kategori)}"><i></i>${x.sampul ? `<img src="/api/perpus/${x.id}/sampul?v=${x.v}" alt="" loading="lazy">` : esc(x.judul)}</div>
-    <div class="bd"><b>${esc(x.judul)}</b>${x.penulis ? `<span class="mu" style="font-size:12.5px">${esc(x.penulis)}</span>` : ""}<span><span class="ch">${esc(x.kategori)}</span> <span class="mu" style="font-size:12px">oleh ${esc(x.oleh)}</span></span>${x.ringkasan ? `<span style="font-size:13px">${esc(x.ringkasan)}</span>` : ""}
+    <div class="bd"><b>${esc(x.judul)}</b>${x.penulis ? `<span class="mu" style="font-size:12.5px">${esc(x.penulis)}</span>` : ""}<span><span class="ch">${esc(x.kategori)}</span> <span class="mu" style="font-size:12px">oleh ${esc(x.oleh)}</span>${ME.role !== "viewer" ? (x.publik ? ' <span class="ch g">Publik</span>' : ' <span class="ch n">Khusus anggota</span>') : ""}</span>${x.ringkasan ? `<span style="font-size:13px">${esc(x.ringkasan)}</span>` : ""}
     <div class="bar">${x.ada_isi ? `<button class="bt g" data-ppb="${x.id}">Baca</button>` : ""}${x.file_nama ? `<a class="bt o" href="/api/perpus/${x.id}/file" target="_blank" rel="noopener">Buka file</a><a class="bt o" href="/api/perpus/${x.id}/file?unduh=1">Unduh${x.file_kb ? ` (${x.file_kb > 1024 ? (x.file_kb / 1024).toFixed(1) + " MB" : x.file_kb + " KB"})` : ""}</a>` : ""}${x.link ? `<a class="bt o" href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">Buka link</a>` : ""}
-    ${PPD.edit ? `<button class="bt o" data-ppe="${x.id}">Ubah</button>` : ""}${PPD.edit || x.milikku ? `<button class="bt o" data-ppd="${x.id}">Hapus</button>` : ""}</div></div></div>`).join("")
+    ${PPD.edit ? `<button class="bt o" data-ppe="${x.id}">Ubah</button>` : ""}${PPD.edit || x.milikku ? `<button class="bt o" data-ppd="${x.id}">Hapus</button><button class="bt o" data-ppp="${x.id}">${x.publik ? "Jadikan khusus anggota" : "Tampilkan ke publik"}</button>` : ""}</div></div></div>`).join("")
     || `<p class="mu">${it.length ? "Tidak ada yang cocok." : "Rak masih kosong." + (PUNYA_INBOX() ? " Jadi yang pertama: unggah lewat formulir di atas." : "")}</p>`;
   const one = id => it.find(x => x.id == id);
   $$("[data-ppb]").forEach(b => b.onclick = async () => {
     const x = one(b.dataset.ppb); $("#ppBK").textContent = x.kategori; $("#ppBJ").textContent = x.judul; $("#ppBP").textContent = x.penulis; $("#ppBT").textContent = "Memuat…"; $("#ppBaca").hidden = false;
     try { $("#ppBT").textContent = (await api("/api/perpus/" + x.id)).isi; } catch (e) { $("#ppBT").textContent = e.message; }
   });
+  $$("[data-ppp]").forEach(b => b.onclick = async () => { const x = one(b.dataset.ppp); if (!x.publik && !confirm(`Tampilkan "${x.judul}" ke viewer (orang luar)?`)) return; try { PPD = await api(`/api/perpus/${x.id}/publik`, {json: {publik: !x.publik}}); renderPerpus(); } catch (e) { alert(e.message); } });
   $$("[data-ppd]").forEach(b => b.onclick = async () => { const x = one(b.dataset.ppd); if (!confirm(`Hapus "${x.judul}" dari perpustakaan?`)) return; try { PPD = await api("/api/perpus/" + x.id, {method: "DELETE"}); renderPerpus(); } catch (e) { alert(e.message); } });
   $$("[data-ppe]").forEach(b => b.onclick = async () => {
     const x = one(b.dataset.ppe); let isi = "";
@@ -4858,7 +4874,7 @@ function navGrup() {   // judul kelompok menu disembunyikan kalau semua menu di 
   const NP = ME.anggota ? ME.anggota.nama + " · " + ME.anggota.jabatan.join(", ") + (ME.anggota.sp ? " · SP" + ME.anggota.sp : "") : (ME.nama_peran || "Viewer");
   $("#whoRole").innerHTML = ADM() ? `<span class="wl">Masuk sebagai</span><span class="wh">Masuk sebagai</span> <b>Admin</b>`
     : `<span class="wl">Masuk sebagai</span><span class="wh">⚡ Hemat token</span> <b>${esc(NP)}</b>`;
-  if (ME.role === "viewer") ["pengumuman", "agenda", "tugas", "proyek", "struktur", "sidang", "putusan", "rekapkas", "konten"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // halaman organisasi khusus anggota
+  if (ME.role === "viewer") ["pengumuman", "agenda", "tugas", "proyek", "struktur", "uu", "sidang", "putusan", "rekapkas", "konten"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // halaman organisasi & UU khusus anggota
   if (ME.role === "viewer") ["blacklist", "sp"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // viewer tidak boleh melihat blacklist
   if (ME.role === "viewer") $("#logout").style.display = "none";   // viewer tidak perlu tombol keluar
   if (!ADM()) { const lb = $("#lpBuat"); if (lb) lb.closest(".cd").hidden = true; }   // Manager/Sekretaris cuma lihat laporan

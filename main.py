@@ -2485,7 +2485,8 @@ def api_office():
     need("viewer")
     r_ = role()
     adm = is_admin(r_)
-    ck = adm
+    luar = r_ == "viewer"   # viewer = orang luar: tanpa data stok & sensor
+    ck = "adm" if adm else ("luar" if luar else "agt")
     c = _OFFICE_CACHE.get(ck)
     if c and time.time() - c[0] < 0.8:   # banyak viewer = satu hitungan per 0,8 detik
         return Response(c[1], mimetype="application/json")
@@ -2497,8 +2498,8 @@ def api_office():
     ags.append({"key": "canvas", "name": CANVAS["nama"], "peran": CANVAS["peran"], "boss": False, "lantai": 1, "divisi": CANVAS["divisi"],
                 "status": o[0], "activity": o[1], "mode": o[2], "model": "cloudflare-flux", "gemini": bool(CF_TOKEN),
                 "telegram": bool(os.getenv("TOKEN_GAMBAR")), **({"calls": img_today(), "tokens": 0} if adm else {})})
-    body = json.dumps({"agents": ags, "log": list(TASKLOG) if adm else [], "lantai": LANTAI, "iot": iot_public(adm), **({"galeri": GAL_IDS[:4]} if adm else {}),
-                       "stok": [[x["id"], x["nama"], x["jumlah"], x["satuan"], x["minimum"], x["foto"], x["v"]] for x in STOK[:18]]})   # kardus 3D terlihat semua peran
+    body = json.dumps({"agents": ags, "log": list(TASKLOG) if adm else [], "lantai": LANTAI, "iot": [] if luar else iot_public(adm), **({"galeri": GAL_IDS[:4]} if adm else {}),
+                       "stok": [] if luar else [[x["id"], x["nama"], x["jumlah"], x["satuan"], x["minimum"], x["foto"], x["v"]] for x in STOK[:18]]})   # kardus 3D: anggota saja
     _OFFICE_CACHE[ck] = (time.time(), body)
     return Response(body, mimetype="application/json")
 
@@ -2743,6 +2744,8 @@ def api_iot():
         iot_rules_check(pr, data)
         return jsonify({"ok": True})
     need("viewer")
+    if role() == "viewer":   # data sensor khusus anggota
+        abort(403)
     adm = is_admin(role())
     out = {"devices": iot_public(adm, full=True), "aktif": bool(IOT_KEY)}
     if adm:
@@ -3056,7 +3059,7 @@ def api_sp_one(i):
     return jsonify(sp_payload(r))
 
 
-# ---- Pasal & Undang-Undang MCI: semua yang login (termasuk viewer) boleh membaca, hanya Dev yang boleh mengubah ----
+# ---- Pasal & Undang-Undang MCI: hanya anggota MCI & Dev yang boleh membaca (viewer/orang luar ditolak), hanya Dev yang boleh mengubah ----
 UU_COLS = "id,tipe,bab,nomor,judul,isi,artinya,diubah,oleh"
 
 
@@ -3101,6 +3104,8 @@ def api_uu():
     r = role()
     if not r:
         abort(401)
+    if mid_of(r) is None and not is_admin(r):
+        abort(403)
     if request.method == "POST":
         need("admin")
         v, err = uu_baca(request.get_json(silent=True) or {}, "pasal")
@@ -3446,6 +3451,7 @@ def api_rekord_one(jenis, i):
 
 # ---------- STRUKTUR & DIVISI: bagan organisasi + logo divisi + batas wewenang (Pasal 5). Deskripsi divisi diubah Dev. ----------
 DIVISI_LOGO = {"creative": "creative", "management": "management", "ss": "ss"}
+MAHAPATIH_DEFAULT = ["admin", "manager", "pj", "sekretaris", "bendahara"]   # Mahapatih = High Command: pemegang jabatan pejabat
 
 
 def struktur_org():
@@ -3463,7 +3469,10 @@ def struktur_org():
         org = sorted(m["nama"] for m in aktif if k in m["jabatan"])
         w = ["Semua wewenang"] if k == "admin" else izin_label(JABATAN_PERM.get(k, set()) | IZIN_BARU_DEFAULT.get(k, set()))
         jab.append({"key": k, "nama": nama, "wewenang": w, "anggota": org})
-    return {"divisi": div, "jabatan": jab, "total": len(aktif)}
+    mp_keys = [k for k in (SET.get("mahapatih_jabatan") or MAHAPATIH_DEFAULT) if k in JABATAN]
+    mp = sorted(({"nama": m["nama"], "jabatan": [JABATAN[j] for j in m["jabatan"] if j in mp_keys]} for m in aktif if any(j in mp_keys for j in m["jabatan"])), key=lambda x: x["nama"].lower())
+    return {"divisi": div, "jabatan": jab, "total": len(aktif),
+            "mahapatih": {"jabatan": mp_keys, "anggota": mp, "pilihan": [[k, v] for k, v in JABATAN.items() if k != "anggota"]}}
 
 
 @app.route("/api/struktur-org", methods=["GET", "POST"])
@@ -3476,6 +3485,12 @@ def api_struktur_org():
     if request.method == "POST":
         need("admin")
         d = request.get_json(silent=True) or {}
+        if "mahapatih" in d:   # Dev memilih jabatan mana saja yang termasuk Mahapatih (High Command)
+            SET["mahapatih_jabatan"] = [k for k in JABATAN if k != "anggota" and k in set(map(str, d.get("mahapatih") or []))]
+            set_save()
+            out = struktur_org()
+            out["edit"] = True
+            return jsonify(out)
         k = str(d.get("key", ""))
         if k not in DIVISI:
             return jsonify({"error": "Divisi tidak dikenal"}), 400
@@ -5761,8 +5776,23 @@ def perpus_list(r=None):
         rows = sql(c, f"SELECT {_PERPUS_KOLOM} FROM perpus ORDER BY LOWER(kategori), LOWER(judul)").fetchall()
     return [{"id": int(i), "judul": j, "penulis": pn or "", "kategori": k or "Umum", "ringkasan": r_ or "", "link": ln or "", "file_nama": fn or "",
              "file_mime": fm or "", "dibuat": d or "", "diubah": u or "", "sampul": bool(sp), "ada_isi": bool(li), "file_kb": round((lf or 0) * 3 / 4 / 1024),
-             "oleh": ol or "Dev", "milikku": bool(r and r != "viewer" and orl == r),
-             "v": abs(hash(u or "")) % 100000} for i, j, pn, k, r_, ln, fn, fm, d, u, sp, li, lf, ol, orl in rows]
+             "oleh": ol or "Dev", "milikku": bool(r and r != "viewer" and orl == r), "publik": perpus_publik(i, orl),
+             "v": abs(hash(u or "")) % 100000} for i, j, pn, k, r_, ln, fn, fm, d, u, sp, li, lf, ol, orl in rows if r != "viewer" or perpus_publik(i, orl)]
+
+
+def perpus_publik(i, oleh_role):
+    """Koleksi boleh dilihat viewer (orang luar) hanya kalau ditandai Publik, atau memang diunggah viewer."""
+    return oleh_role == "viewer" or int(i) in set(SET.get("perpus_publik") or [])
+
+
+def perpus_cek_viewer(i):
+    """Tolak viewer untuk koleksi khusus anggota."""
+    if role() != "viewer":
+        return
+    with db() as c:
+        row = sql(c, "SELECT oleh_role FROM perpus WHERE id=?", (i,)).fetchone()
+    if not row or not perpus_publik(i, row[0]):
+        abort(404)
 
 
 def _url_aman(u):
@@ -5978,6 +6008,7 @@ def api_perpus_one(i):
             sql(c, "DELETE FROM perpus WHERE id=?", (i,))
         return jsonify({"items": perpus_list(r), "edit": is_admin(r)})
     need("viewer")
+    perpus_cek_viewer(i)
     with db() as c:
         row = sql(c, "SELECT judul, isi FROM perpus WHERE id=?", (i,)).fetchone()
     if not row:
@@ -5985,9 +6016,32 @@ def api_perpus_one(i):
     return jsonify({"id": i, "judul": row[0], "isi": row[1] or ""})
 
 
+@app.route("/api/perpus/<int:i>/publik", methods=["POST"])
+def api_perpus_publik(i):
+    """Tandai koleksi Publik (tampil ke viewer) atau Khusus anggota. Dev, atau anggota untuk unggahannya sendiri."""
+    r = role()
+    if not r or r == "viewer":
+        abort(403)
+    with db() as c:
+        row = sql(c, "SELECT oleh_role FROM perpus WHERE id=?", (i,)).fetchone()
+    if not row:
+        abort(404)
+    if not is_admin(r) and row[0] != r:
+        abort(403)
+    ids = set(SET.get("perpus_publik") or [])
+    if (request.get_json(silent=True) or {}).get("publik"):
+        ids.add(i)
+    else:
+        ids.discard(i)
+    SET["perpus_publik"] = sorted(ids)
+    set_save()
+    return jsonify({"items": perpus_list(r), "edit": is_admin(r)})
+
+
 @app.route("/api/perpus/<int:i>/file")
 def api_perpus_file(i):
     need("viewer")
+    perpus_cek_viewer(i)
     with db() as c:
         row = sql(c, "SELECT file_nama, file_mime, file_data FROM perpus WHERE id=?", (i,)).fetchone()
     if not row or not row[2]:
@@ -6006,6 +6060,7 @@ def api_perpus_file(i):
 @app.route("/api/perpus/<int:i>/sampul")
 def api_perpus_sampul(i):
     need("viewer")
+    perpus_cek_viewer(i)
     with db() as c:
         row = sql(c, "SELECT sampul_mime, sampul FROM perpus WHERE id=?", (i,)).fetchone()
     if not row or not row[1]:
@@ -6017,7 +6072,9 @@ def api_perpus_sampul(i):
 
 @app.route("/api/stok/<int:i>/gambar")
 def api_stok_img(i):
-    need("viewer")   # foto ditempel di kardus 3D, viewer juga melihatnya (halaman Stok tetap tertutup)
+    need("viewer")   # foto ditempel di kardus 3D (khusus anggota; viewer tidak menerima data stok)
+    if role() == "viewer":
+        abort(403)
     g = stok_img(i)
     if not g:
         abort(404)
