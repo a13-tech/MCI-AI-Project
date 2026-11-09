@@ -295,6 +295,15 @@ def db_init():
                     sql(c, "INSERT INTO uu (tipe,bab,nomor,judul,isi,artinya,diubah,oleh) VALUES (?,?,?,?,?,?,?,?)", ("pasal", p["bab"], p["nomor"], p["judul"], p["isi"], p["artinya"], now, "awal"))
             except Exception as e:
                 log.warning("Seed UU gagal: %s", e)
+        if not sql(c, "SELECT COUNT(*) FROM uu WHERE tipe IN ('kas_info','kas_pasal')").fetchone()[0]:   # Peraturan Kas (ketentuan khusus kas)
+            try:
+                from uu_seed import KAS_SEED
+                now = datetime.now(WIB).isoformat(timespec="seconds")
+                sql(c, "INSERT INTO uu (tipe,judul,isi,diubah,oleh) VALUES (?,?,?,?,?)", ("kas_info", "Peraturan Kas", KAS_SEED["info"], now, "awal"))
+                for p in KAS_SEED["pasal"]:
+                    sql(c, "INSERT INTO uu (tipe,bab,nomor,judul,isi,artinya,diubah,oleh) VALUES (?,?,?,?,?,?,?,?)", ("kas_pasal", "", p["nomor"], p["judul"], p["isi"], "", now, "awal"))
+            except Exception as e:
+                log.warning("Seed Peraturan Kas gagal: %s", e)
         if not sql(c, "SELECT COUNT(*) FROM skills").fetchone()[0]:
             now = datetime.now(WIB).isoformat(timespec="seconds")
             for s in SKILL_SEED:
@@ -3126,7 +3135,7 @@ def uu_semua():
         rows = sql(c, f"SELECT {UU_COLS} FROM uu").fetchall()
     out = [{"id": int(i), "tipe": t, "bab": b or "", "nomor": int(n) if n is not None else None, "judul": j or "", "isi": isi or "", "artinya": a or "",
             "diubah": d or "", "oleh": o or ""} for i, t, b, n, j, isi, a, d, o in rows]
-    urut = {"info": 0, "mukadimah": 1, "pasal": 2}
+    urut = {"info": 0, "mukadimah": 1, "pasal": 2, "kas_info": 3, "kas_pasal": 4}
     out.sort(key=lambda x: (urut.get(x["tipe"], 3), x["nomor"] if x["nomor"] is not None else 10**9, x["id"]))
     return out
 
@@ -3141,15 +3150,14 @@ def uu_baca(d, tipe, lama=None):
     isi = str(d.get("isi", "")).replace("\r", "").strip()[:20000]
     artinya = str(d.get("artinya", "")).strip()[:2000]
     bab = re.sub(r"\s+", " ", str(d.get("bab", ""))).strip()[:200]
-    if tipe == "pasal":
-        if not judul:
-            return None, "Judul pasal wajib diisi"
-        if not bab:
-            return None, "Bab wajib diisi, contoh: BAB I. KETENTUAN UMUM"
+    if tipe in ("pasal", "kas_pasal") and not judul:
+        return None, "Judul pasal wajib diisi"
+    if tipe == "pasal" and not bab:
+        return None, "Bab wajib diisi, contoh: BAB I. KETENTUAN UMUM"
     if len(isi) < 3:
         return None, "Isi wajib diisi"
     nomor = None
-    if tipe == "pasal":
+    if tipe in ("pasal", "kas_pasal"):
         try:
             nomor = int(d.get("nomor"))
         except (TypeError, ValueError):
@@ -3166,18 +3174,20 @@ def api_uu():
         abort(403)
     if request.method == "POST":
         need("admin")
-        v, err = uu_baca(request.get_json(silent=True) or {}, "pasal")
+        d_ = request.get_json(silent=True) or {}
+        tp = "kas_pasal" if d_.get("dok") == "kas" else "pasal"   # dok: "uu" (UU MCI) atau "kas" (Peraturan Kas)
+        v, err = uu_baca(d_, tp)
         if err:
             return jsonify({"error": err}), 400
         with db() as c:
-            mx = sql(c, "SELECT MAX(nomor) FROM uu WHERE tipe='pasal'").fetchone()[0] or 0
+            mx = sql(c, "SELECT MAX(nomor) FROM uu WHERE tipe=?", (tp,)).fetchone()[0] or 0
             if v["nomor"] is None:
                 v["nomor"] = int(mx) + 1
             if v["nomor"] < 1:
                 return jsonify({"error": "Nomor pasal harus 1 atau lebih"}), 400
-            if sql(c, "SELECT id FROM uu WHERE tipe='pasal' AND nomor=?", (v["nomor"],)).fetchone():
+            if sql(c, "SELECT id FROM uu WHERE tipe=? AND nomor=?", (tp, v["nomor"])).fetchone():
                 return jsonify({"error": f"Pasal {v['nomor']} sudah ada"}), 400
-            sql(c, "INSERT INTO uu (tipe,bab,nomor,judul,isi,artinya,diubah,oleh) VALUES (?,?,?,?,?,?,?,?)", ("pasal", v["bab"], v["nomor"], v["judul"], v["isi"], v["artinya"], _now(), nama_peran(r)))
+            sql(c, "INSERT INTO uu (tipe,bab,nomor,judul,isi,artinya,diubah,oleh) VALUES (?,?,?,?,?,?,?,?)", (tp, v["bab"] if tp == "pasal" else "", v["nomor"], v["judul"], v["isi"], v["artinya"], _now(), nama_peran(r)))
     return jsonify(uu_payload(r))
 
 
@@ -3191,19 +3201,19 @@ def api_uu_one(i):
             return jsonify({"error": "Tidak ditemukan"}), 404
         tipe = row[0]
         if request.method == "DELETE":
-            if tipe != "pasal":
+            if tipe not in ("pasal", "kas_pasal"):
                 return jsonify({"error": "Bagian ini tidak bisa dihapus, hanya diubah"}), 400
             sql(c, "DELETE FROM uu WHERE id=?", (i,))
         else:
             v, err = uu_baca(request.get_json(silent=True) or {}, tipe)
             if err:
                 return jsonify({"error": err}), 400
-            if tipe == "pasal":
+            if tipe in ("pasal", "kas_pasal"):
                 if v["nomor"] is None or v["nomor"] < 1:
                     return jsonify({"error": "Nomor pasal harus 1 atau lebih"}), 400
-                if sql(c, "SELECT id FROM uu WHERE tipe='pasal' AND nomor=? AND id<>?", (v["nomor"], i)).fetchone():
+                if sql(c, "SELECT id FROM uu WHERE tipe=? AND nomor=? AND id<>?", (tipe, v["nomor"], i)).fetchone():
                     return jsonify({"error": f"Pasal {v['nomor']} sudah ada"}), 400
-                sql(c, "UPDATE uu SET bab=?,nomor=?,judul=?,isi=?,artinya=?,diubah=?,oleh=? WHERE id=?", (v["bab"], v["nomor"], v["judul"], v["isi"], v["artinya"], _now(), nama_peran(r), i))
+                sql(c, "UPDATE uu SET bab=?,nomor=?,judul=?,isi=?,artinya=?,diubah=?,oleh=? WHERE id=?", (v["bab"] if tipe == "pasal" else "", v["nomor"], v["judul"], v["isi"], v["artinya"], _now(), nama_peran(r), i))
             else:
                 sql(c, "UPDATE uu SET isi=?,diubah=?,oleh=? WHERE id=?", (v["isi"], _now(), nama_peran(r), i))
     return jsonify(uu_payload(r))
@@ -3260,7 +3270,7 @@ JENIS = {
         F("nama", "Nama proyek", wajib=True), F("status", "Status", "pilih", opsi=[["ide", "Ide"], ["berjalan", "Berjalan"], ["ditunda", "Ditunda"], ["selesai", "Selesai"]], bawaan="berjalan"),
         F("pj", "Penanggung jawab", "anggota"), F("tim", "Tim", "anggota_banyak"), F("progres", "Progres (%)", "angka", maks=100, bawaan=0),
         F("deskripsi", "Deskripsi", "area", maks=4000), F("komponen", "Komponen / kebutuhan", "area", maks=4000),
-        F("hasil", "Pembagian hasil", "area", maks=2000, info="Pasal 16: anggota yang menunggak kas tidak berhak atas bagian hasil."), F("link", "Tautan (repo, dokumen)", "url", maks=400)]},
+        F("hasil", "Pembagian hasil", "area", maks=2000, info="Peraturan Kas Pasal 4: anggota yang menunggak kas melewati toleransi tidak berhak atas bagian hasil sampai lunas."), F("link", "Tautan (repo, dokumen)", "url", maks=400)]},
     "konten": {"judul": "Jadwal Konten", "tulis": "konten_kelola", "lihat": "anggota", "fields": [
         F("judul", "Judul / topik", wajib=True), F("tanggal", "Tanggal tayang", "tanggal"),
         F("platform", "Platform", "pilih", opsi=[["ig_tt", "Instagram + TikTok"], ["ig", "Instagram"], ["tt", "TikTok"]], bawaan="ig_tt"),
@@ -3389,9 +3399,9 @@ def rk_edit_fields(jenis, x, r):
 
 
 def rk_tunggak():
-    """{id anggota: jumlah minggu kas yang belum dibayar} untuk tanda Pasal 16."""
+    """{id anggota: jumlah minggu menunggak tanpa izin}; >= 2 berarti hak proyek dicabut (Peraturan Kas Pasal 4)."""
     try:
-        return {a["id"]: a["tunggak"] for a in iuran_data("admin")["anggota"] if a["tunggak"]}
+        return {a["id"]: a["tanpa_izin"] for a in rekap_kas("admin")["anggota"] if a["tanpa_izin"]}
     except Exception:
         return {}
 
@@ -3569,13 +3579,29 @@ def lapkas_tenggat(minggu):
     return WIB.localize(t) if hasattr(WIB, "localize") else t.replace(tzinfo=WIB)
 
 
+IZIN_MAKS = 2   # Peraturan Kas Pasal 3: toleransi izin maksimal 2 kali per anggota
+
+
+def kas_izin(mid):
+    return list((SET.get("kas_izin") or {}).get(str(mid), []))
+
+
 def rekap_kas(r, minggu=None):
+    """Rekap kas menurut Peraturan Kas MCI:
+    Pasal 3: izin resmi ke Bendahara (maks 2x) membebaskan denda minggu itu; tanpa izin langsung denda Rp25.000
+             (menunggak 2 minggu = Kas W1 + Kas W2 + 1 denda).
+    Pasal 4: menunggak melewati toleransi (>= 2 minggu tanpa izin) -> hak proyek dicabut sampai lunas.
+    Pasal 2: laporan Bendahara paling lambat Minggu 23.59 WIB; terlambat -> denda 2x iuran pribadinya."""
     d = iuran_data(r if mid_of(r) is not None or is_admin(r) else "admin", minggu)
     baris = []
     for a in d["anggota"]:
+        iz = kas_izin(a["id"])
+        tanpa = [k for k in a.get("tunggak_semua", a["tunggak_minggu"]) if k not in iz]
         tg = a["tunggak"]
-        denda = DENDA_KAS if (tg and a["tingkat"] == "biasa") else 0
-        baris.append({**a, "tagihan": tg * a["nominal"] + denda, "denda": denda, "denda_manual": bool(tg and a["tingkat"] == "ringan"), "pasal16": tg >= 2})
+        denda = DENDA_KAS if (tanpa and a["tingkat"] == "biasa") else 0
+        b = {k: v for k, v in a.items() if k != "tunggak_semua"}
+        baris.append({**b, "tagihan": tg * a["nominal"] + denda, "denda": denda, "denda_manual": bool(tanpa and a["tingkat"] == "ringan"),
+                      "izin_pakai": len(iz), "izin_minggu_ini": d["minggu"] in iz, "tanpa_izin": len(tanpa), "hak_dicabut": len(tanpa) >= 2})
     lk = (SET.get("lapkas") or {}).get(d["minggu"])
     batas = lapkas_tenggat(d["minggu"])
     now = datetime.now(WIB)
@@ -3583,10 +3609,13 @@ def rekap_kas(r, minggu=None):
         st = "tepat" if datetime.fromisoformat(lk["t"]) <= batas else "telat"
     else:
         st = "telat" if now > batas else "belum"
+    bendahara = [m for m in MEMBERS.values() if m["aktif"] and "bendahara" in m["jabatan"]]
+    denda_b = [{"nama": m["nama"], "denda": 2 * (nominal_of(m["id"]) or d["tarif"]["biasa"])} for m in bendahara] if st == "telat" else []
     return {"minggu": d["minggu"], "label": d["label"], "prev": d["prev"], "next": d["next"], "sekarang": d["sekarang"], "tarif": d["tarif"],
-            "anggota": baris, "lunas": d["lunas"], "wajib": d["wajib"], "masuk": d["masuk"], "denda": DENDA_KAS,
+            "anggota": baris, "lunas": d["lunas"], "wajib": d["wajib"], "masuk": d["masuk"], "denda": DENDA_KAS, "izin_maks": IZIN_MAKS,
             "total_tagihan": sum(b["tagihan"] for b in baris), "menunggak": sum(1 for b in baris if b["tunggak"]),
-            "laporan": {"status": st, "batas": batas.strftime("%Y-%m-%d %H:%M"), "waktu": (lk or {}).get("t", ""), "oleh": (lk or {}).get("oleh", "")},
+            "hak_dicabut": sum(1 for b in baris if b["hak_dicabut"]), "tarif_aturan": 25000, "tarif_beda": d["tarif"]["biasa"] != 25000,
+            "laporan": {"status": st, "batas": batas.strftime("%Y-%m-%d %H:%M"), "waktu": (lk or {}).get("t", ""), "oleh": (lk or {}).get("oleh", ""), "denda_bendahara": denda_b},
             "bisa_lapor": can("kas_edit", r)}
 
 
@@ -3604,6 +3633,37 @@ def _rp(n):
     return "Rp" + f"{int(n):,}".replace(",", ".")
 
 
+@app.route("/api/rekapkas/izin", methods=["POST"])
+def api_rekapkas_izin():
+    """Bendahara mencatat / membatalkan izin resmi anggota untuk satu minggu (Peraturan Kas Pasal 3, maks 2 kali per anggota)."""
+    r = need_perm("kas_edit")
+    d = request.get_json(silent=True) or {}
+    try:
+        mid = int(d.get("anggota"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Anggota tidak dikenal"}), 400
+    m = MEMBERS.get(mid)
+    mg = str(d.get("minggu") or "")
+    if not m or not m["aktif"]:
+        return jsonify({"error": "Anggota tidak dikenal"}), 400
+    if not minggu_valid(mg):
+        return jsonify({"error": "Minggu tidak valid"}), 400
+    semua = SET.setdefault("kas_izin", {})
+    iz = list(semua.get(str(mid), []))
+    if d.get("izin"):
+        if mg not in iz:
+            if len(iz) >= IZIN_MAKS:
+                return jsonify({"error": f"Izin {m['nama']} sudah dipakai {IZIN_MAKS} kali (batas Peraturan Kas Pasal 3)."}), 400
+            iz.append(mg)
+            inbox_kirim([mid], "pengumuman", "📝 Izin kas dicatat Bendahara", f"Izin bayar kas untuk {minggu_label(mg)} sudah dicatat, jadi tidak kena denda minggu itu. "
+                        f"Sisa jatah izin: {IZIN_MAKS - len(iz)} dari {IZIN_MAKS} (Peraturan Kas Pasal 3). Kas tetap wajib dilunasi.", None)
+    else:
+        iz = [k for k in iz if k != mg]
+    semua[str(mid)] = sorted(iz)
+    set_save()
+    return jsonify(rekap_kas(r, mg))
+
+
 @app.route("/api/rekapkas/publikasi", methods=["POST"])
 def api_rekapkas_publikasi():
     """Bendahara menerbitkan rekap minggu ini: jadi Pengumuman (kategori Kas) + Inbox/Telegram semua anggota, dan tercatat waktu laporannya (Pasal 9 & 17)."""
@@ -3611,10 +3671,12 @@ def api_rekapkas_publikasi():
     d = request.get_json(silent=True) or {}
     rk = rekap_kas(r, d.get("minggu"))
     lunas = [b["nama"] for b in rk["anggota"] if b["status"] == "lunas"]
-    belum = [f"{b['nama']} ({b['tunggak']} minggu, {_rp(b['tagihan'])})" for b in rk["anggota"] if b["tunggak"]]
+    belum = [f"{b['nama']} ({b['tunggak']} minggu, {_rp(b['tagihan'])}" + (", hak proyek dicabut" if b["hak_dicabut"] else "") + ")" for b in rk["anggota"] if b["tunggak"]]
+    izin = [b["nama"] for b in rk["anggota"] if b["izin_minggu_ini"]]
     isi = (f"Rekap kas {rk['label']}\nLunas {rk['lunas']} dari {rk['wajib']} anggota · masuk {_rp(rk['masuk'])}\n\n"
            f"Sudah lunas: {', '.join(lunas) or '-'}\n\nMenunggak: " + ("\n- " + "\n- ".join(belum) if belum else "tidak ada") +
-           f"\n\nDenda tanpa izin {_rp(DENDA_KAS)} (Pasal 15). Tunggakan 2 minggu atau lebih ditinjau sesuai Pasal 16.\n" + (str(d.get("catatan", "")).strip()[:1000]))
+           (f"\n\nIzin resmi minggu ini: {', '.join(izin)}" if izin else "") +
+           f"\n\nSesuai Peraturan Kas: tidak bayar tanpa izin didenda {_rp(DENDA_KAS)} (Pasal 3); menunggak 2 minggu atau lebih tanpa izin, hak proyek dicabut sampai lunas (Pasal 4).\n" + (str(d.get("catatan", "")).strip()[:1000]))
     SET.setdefault("lapkas", {})[rk["minggu"]] = {"t": datetime.now(WIB).isoformat(timespec="seconds"), "oleh": nama_peran(r)}
     set_save()
     sid = rk_simpan_raw("pengumuman", {"kategori": "kas", "judul": f"Rekap Kas {rk['label']}", "isi": isi, "sematkan": False, "kirim": True}, r)
@@ -3627,20 +3689,22 @@ TANYA_UU = {}
 
 
 def uu_teks():
-    out = []
+    uu, kas = [], []
     for x in uu_semua():
         if x["tipe"] == "pasal":
-            out.append(f"{x['bab']}\nPasal {x['nomor']}. {x['judul']}\n{x['isi']}\nArtinya: {x['artinya']}")
+            uu.append(f"{x['bab']}\nUU Pasal {x['nomor']}. {x['judul']}\n{x['isi']}" + (f"\nArtinya: {x['artinya']}" if x["artinya"] else ""))
         elif x["tipe"] == "mukadimah":
-            out.append("MUKADIMAH\n" + x["isi"])
-    return "\n\n".join(out)
+            uu.append("MUKADIMAH\n" + x["isi"])
+        elif x["tipe"] == "kas_pasal":
+            kas.append(f"Peraturan Kas Pasal {x['nomor']}. {x['judul']}\n{x['isi']}")
+    return "=== UU MCI ===\n" + "\n\n".join(uu) + "\n\n=== PERATURAN KAS (ketentuan khusus soal kas, iuran, denda, izin, Bendahara) ===\n" + "\n\n".join(kas)
 
 
 def uu_cari(q, n=3):
     kata = [k for k in re.findall(r"[a-z0-9]+", q.lower()) if len(k) > 2]
     skor = []
     for x in uu_semua():
-        if x["tipe"] != "pasal":
+        if x["tipe"] not in ("pasal", "kas_pasal"):
             continue
         t = f"{x['judul']} {x['isi']} {x['artinya']}".lower()
         s = sum(t.count(k) for k in kata)
@@ -3663,11 +3727,12 @@ def api_uu_tanya():
     if not is_admin(r) and TANYA_UU.get(kunci, 0) >= 15:
         return jsonify({"error": "Batas 15 pertanyaan per hari tercapai"}), 429
     TANYA_UU[kunci] = TANYA_UU.get(kunci, 0) + 1
-    rujuk = [{"nomor": x["nomor"], "judul": x["judul"]} for x in uu_cari(q)]
-    prompt = ("Kamu menjawab pertanyaan anggota MCI tentang Undang-Undang MCI. Jawab HANYA berdasarkan teks UU di bawah. "
-              "Sebutkan nomor pasal yang jadi dasar (contoh: 'Menurut Pasal 15 ...'). Kalau ada hitungan uang, hitung langkah demi langkah dengan angka dari pasal. "
+    rujuk = [{"nomor": x["nomor"], "judul": x["judul"], "dok": "kas" if x["tipe"] == "kas_pasal" else "uu"} for x in uu_cari(q)]
+    prompt = ("Kamu menjawab pertanyaan anggota MCI tentang Undang-Undang MCI dan Peraturan Kas MCI. Jawab HANYA berdasarkan teks di bawah. "
+              "Untuk urusan kas, iuran, izin bayar, denda, dan Bendahara, Peraturan Kas adalah aturan khusus yang diutamakan. "
+              "Sebutkan dasar aturannya (contoh: 'Menurut Peraturan Kas Pasal 3 ...' atau 'Menurut UU Pasal 6 ...'). Kalau ada hitungan uang, hitung langkah demi langkah dengan angka dari aturan. "
               "Kalau UU tidak mengaturnya, katakan terus terang bahwa UU belum mengatur hal itu dan sarankan bertanya ke Dewan Pengawas. "
-              "Bahasa Indonesia sehari-hari, kalimat pendek, maksimal 6 kalimat, tanpa markdown tebal. Kalau ada hitungan, tulis per langkah singkat.\n\n=== UU MCI ===\n" + uu_teks() + "\n=== AKHIR UU ===\n\nPertanyaan: " + q)
+              "Bahasa Indonesia sehari-hari, kalimat pendek, maksimal 6 kalimat, tanpa markdown tebal. Kalau ada hitungan, tulis per langkah singkat.\n\n" + uu_teks() + "\n=== AKHIR ATURAN ===\n\nPertanyaan: " + q)
     try:
         teks = asyncio.run_coroutine_threadsafe(ask("scribe", prompt, use_mcp=False, cache=True, act="Menjawab pertanyaan UU MCI"), LOOP).result(90) if LOOP else ""
     except Exception as e:
@@ -4153,7 +4218,7 @@ def iuran_data(r, minggu=None):
         t = tingkat_of(m["id"])
         tg = [] if t == "bebas" else [k for k in lalu if _st_minggu(rows, m["id"], k) == "belum"]
         anggota.append({"id": m["id"], "nama": m["nama"], "tingkat": t, "tingkat_label": TINGKAT[t], "nominal": nominal_of(m["id"]),
-                        "status": "bebas" if t == "bebas" else _st_minggu(rows, m["id"], minggu), "tunggak": len(tg), "tunggak_minggu": tg[-8:]})
+                        "status": "bebas" if t == "bebas" else _st_minggu(rows, m["id"], minggu), "tunggak": len(tg), "tunggak_minggu": tg[-8:], "tunggak_semua": tg})
     masuk = sum(x["jumlah"] // max(1, len(x["minggu"])) for x in rows if x["status"] == "lunas" and minggu in x["minggu"])
     wajib = [a for a in anggota if a["tingkat"] != "bebas"]
     out = {"minggu": minggu, "label": minggu_label(minggu), "sekarang": cur, "mulai": d["mulai"], "mulai_tgl": _senin(d["mulai"]).isoformat(), "no_sekarang": minggu_no(cur), "no": minggu_no(minggu), "prev": minggu_geser(minggu, -1) if minggu > d["mulai"] else None,

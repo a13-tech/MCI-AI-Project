@@ -140,3 +140,37 @@ UU_SEED = {'info': 'UNDANG-UNDANG MAHARDIKA CAKRAWALA INDONESIA (UU MCI)\n'
                    '* Perubahan Undang-Undang ini sah bila disetujui lebih dari separuh anggota.\n'
                    '* Undang-Undang ini berlaku sejak disahkan oleh anggota.',
             'artinya': 'pelanggaran umum diproses bertahap dan ada hak bela diri; aturan diubah jika mayoritas setuju.'}]}
+
+# Peraturan Pengelolaan & Pembayaran Kas MCI (ketentuan khusus kas). Dipakai main.py hanya kalau belum ada di tabel uu.
+KAS_SEED = {
+    "info": "Peraturan Pengelolaan & Pembayaran Kas\nMahardika Cakrawala Indonesia (MCI)\nAturan ini berlaku efektif sejak ditetapkan demi kedisiplinan, keadilan, dan keberlanjutan proyek Mahardika Cakrawala Indonesia.",
+    "pasal": [
+        {"nomor": 1, "judul": "Ketentuan Umum & Besaran Kas", "isi": "\n".join([
+            "* Besaran iuran kas ditetapkan sebesar Rp5.000 per hari kerja, sehingga total tagihan mingguan adalah Rp25.000 per minggu (Senin – Jumat).",
+            "* Dana kas digunakan sepenuhnya untuk mendukung operasional, kebutuhan logistik, dan keberlangsungan proyek MCI.",
+            "* Penagihan dan pembayaran kas dilakukan secara rutin setiap hari Jumat pada minggu berjalan."])},
+        {"nomor": 2, "judul": "Kewajiban & Sanksi Bendahara", "isi": "\n".join([
+            "* Kewajiban Laporan:",
+            "** Bendahara diwajibkan untuk menyampaikan laporan rekapitulasi pembayaran dan saldo kas bulanan/mingguan paling lambat hari Minggu pukul 23.59 WIB setelah penagihan hari Jumat.",
+            "* Sanksi Keterlambatan Bendahara:",
+            "** Apabila Bendahara lalai dan tidak memberikan laporan hingga batas waktu hari Minggu, maka Bendahara dikenakan sanksi berupa membayar denda 2x lipat dari total kewajiban iuran kas pribadinya atau menanggung penalti sesuai kesepakatan internal tim."])},
+        {"nomor": 3, "judul": "Izin, Toleransi, & Sanksi Anggota", "isi": "\n".join([
+            "* Ketentuan Izin (Urusan Tertentu):",
+            "** Anggota yang memiliki urusan tertentu/mendesak sehingga belum bisa membayar kas tepat waktu wajib mengajukan izin secara resmi kepada Bendahara sebelum/pada hari Jumat penagihan.",
+            "** Toleransi izin diberikan maksimal 2 (dua) kali per anggota.",
+            "* Sanksi Tanpa Izin (Tanpa Keterangan):",
+            "** Anggota yang tidak membayar pada hari Jumat tanpa konfirmasi/izin yang jelas langsung dikenakan sanksi denda sebesar Rp25.000.",
+            "* Skema Denda & Tagihan Berlipat (Lewat Batas Toleransi):",
+            "** Jika sampai hari Jumat minggu berikutnya anggota belum melunasi kewajibannya (menunggak 2 minggu + sanksi), maka total tagihan yang wajib dibayar pada Jumat depan adalah Rp75.000 (Kas W1 Rp25.000 + Kas W2 Rp25.000 + Denda Rp25.000)."])},
+        {"nomor": 4, "judul": "Penangguhan Hak & Keanggotaan Proyek", "isi": "\n".join([
+            "* Pencabutan Hak Proyek:",
+            "** Anggota yang tidak membayar kas secara konsisten (menunggak melewati masa toleransi atau tidak beritikad baik) secara otomatis kehilangan seluruh hak terkait proyek MCI.",
+            "* Cakupan Pembatasan Hak Meliputi:",
+            "** Tidak memiliki hak suara atau keterlibatan dalam pengambilan keputusan proyek.",
+            "** Tidak berhak atas akses atau pemanfaatan inventaris, dokumen, dan fasilitas proyek.",
+            "** Tidak berhak menerima bagian hasil, rekognisi, atau klaim kepemilikan atas output proyek MCI.",
+            "* Hak dalam proyek baru dapat dipulihkan secara penuh setelah anggota melunasi seluruh tunggakan kas beserta akumulasi dendanya."])},
+        {"nomor": 5, "judul": "Akuntabilitas & Transparansi", "isi": "\n".join([
+            "* Laporan rekapitulasi pembayaran dan saldo kas wajib dipublikasikan oleh Bendahara setiap minggu sesuai jadwal yang telah ditentukan agar transparan bagi seluruh anggota."])},
+    ],
+}

@@ -356,7 +356,7 @@ body.nofs{overflow:hidden}
 .cal .ci.tayang{background:#E2EEE5;color:#2E6243}.cal .ci.siap{background:#F3EADA;color:#6E5220}
 .qa{background:var(--navy2);color:#E9E4D8;border-radius:12px;padding:22px}.qa h2{color:#F2EBDD;margin:0 0 6px}.qa .mu{color:#9AA6BD}
 .qa textarea{background:#14284B;border-color:#2E4470;color:#fff;margin-top:12px}.qa .ans{white-space:pre-wrap;background:#14284B;border-radius:8px;padding:14px;margin-top:12px;line-height:1.6}
-main .bar .seg button{color:var(--mute);font-weight:600}main .bar .seg button.on{background:var(--paper);color:var(--navy2);box-shadow:0 1px 2px rgba(15,30,58,.12)}
+main .bar .seg button,#uuDok button{color:var(--mute);font-weight:600}main .bar .seg button.on,#uuDok button.on{background:var(--paper);color:var(--navy2);box-shadow:0 1px 2px rgba(15,30,58,.12)}
 .dl{display:grid;grid-template-columns:150px 1fr;gap:6px 14px;font-size:13.5px}.dl dt{color:var(--mute)}.dl dd{margin:0}
 @media(max-width:860px){
  #sd{padding:8px 10px;border-right:0;border-bottom:1px solid #1C2E52}
@@ -686,9 +686,10 @@ main .bar .seg button{color:var(--mute);font-weight:600}main .bar .seg button.on
 
  <section id="p-uu" class="pg" hidden>
   <h1>Pasal &amp; Undang-Undang</h1>
+  <div class="seg" id="uuDok" style="background:#EFECE4;margin:10px 0 14px;max-width:360px"><button class="on" data-dok="uu" type="button">UU MCI</button><button data-dok="kas" type="button">Peraturan Kas</button></div>
   <p class="mu" id="uuInfo">Memuat…</p>
   <div class="cd" id="uuMuk" hidden><b>Mukadimah</b><div class="uu-mk" id="uuMukIsi" style="margin-top:8px"></div></div>
-  <div class="qa" style="margin-bottom:20px"><div class="ey" style="color:var(--gold2)">MCI.Scribe</div><h2>Tanya UU</h2><p class="mu" style="margin:0">Tanya apa saja soal aturan MCI. Jawaban hanya diambil dari isi UU, lengkap dengan nomor pasalnya.</p>
+  <div class="qa" style="margin-bottom:20px"><div class="ey" style="color:var(--gold2)">MCI.Scribe</div><h2>Tanya UU</h2><p class="mu" style="margin:0">Tanya apa saja soal aturan MCI. Jawaban hanya diambil dari UU MCI dan Peraturan Kas, lengkap dengan nomor pasalnya.</p>
    <textarea id="uuTanyaQ" rows="2" maxlength="600" placeholder="Contoh: kalau telat bayar kas dua minggu, total tagihannya berapa?"></textarea>
    <div class="bar" style="margin:10px 0 0"><button class="bt" id="uuTanya" style="background:#E9E4D8;color:var(--navy2)">Tanya</button></div>
    <div class="ans" id="uuJawab" hidden></div><div class="bar" id="uuRujuk" style="margin:10px 0 0"></div></div>
@@ -721,7 +722,7 @@ main .bar .seg button{color:var(--mute);font-weight:600}main .bar .seg button.on
  </section>
  <section id="p-rekapkas" class="pg" hidden>
   <div class="ey">Keuangan</div><h1>Rekap Kas Mingguan</h1>
-  <p class="mu" style="margin:6px 0 20px;max-width:760px">Siapa yang sudah lunas, siapa yang menunggak, dan estimasi tagihan menurut UU MCI: denda Rp25.000 tanpa izin (Pasal 15), tunggakan 2 minggu atau lebih ditinjau (Pasal 16), dan laporan Bendahara paling lambat Minggu 23.59 WIB (Pasal 9 &amp; 17).</p>
+  <p class="mu" style="margin:6px 0 20px;max-width:760px">Siapa yang sudah lunas, siapa yang menunggak, dan tagihannya menurut <a href="#" id="rkkAturan">Peraturan Kas MCI</a>: kas Rp25.000 per minggu dibayar tiap Jumat (Pasal 1), izin resmi maksimal 2 kali dan tanpa izin didenda Rp25.000 (Pasal 3), menunggak 2 minggu tanpa izin berarti hak proyek dicabut sampai lunas (Pasal 4), dan laporan Bendahara paling lambat Minggu 23.59 WIB (Pasal 2 &amp; 5).</p>
   <div class="bar" style="flex-wrap:nowrap"><button class="bt o" id="rkkPrev" aria-label="Minggu sebelumnya">‹</button><b id="rkkLabel" style="flex:0 1 auto;text-align:center;font:700 20px var(--serif);color:var(--navy2);min-width:0">Memuat…</b><button class="bt o" id="rkkNext" aria-label="Minggu berikutnya">›</button><button class="bt o" id="rkkNow">Minggu ini</button></div>
   <div class="gr">
    <div class="cd"><div class="k">Lunas</div><div class="v" id="rkk1">-</div></div>
@@ -730,8 +731,8 @@ main .bar .seg button{color:var(--mute);font-weight:600}main .bar .seg button.on
    <div class="cd"><div class="k">Total tagihan tertunggak</div><div class="v" id="rkk4">-</div></div>
   </div>
   <div class="cd" id="rkkLap"></div>
-  <div class="cd" style="padding:0"><div class="tb"><table><thead><tr><th>Anggota</th><th>Minggu ini</th><th>Tunggakan</th><th class="rt">Estimasi tagihan</th><th>Catatan</th></tr></thead><tbody id="rkkList"></tbody></table></div></div>
-  <p class="mu" style="font-size:12.5px">Estimasi saja. Izin resmi ke Bendahara (maksimal 2 kali) dapat membatalkan denda; skema keringanan disesuaikan Bendahara.</p>
+  <div class="cd" style="padding:0"><div class="tb"><table><thead><tr><th>Anggota</th><th>Minggu ini</th><th>Izin</th><th>Tunggakan</th><th class="rt">Tagihan</th><th>Hak proyek</th></tr></thead><tbody id="rkkList"></tbody></table></div></div>
+  <p class="mu" style="font-size:12.5px">Izin dicatat Bendahara per minggu, paling banyak 2 kali per anggota; minggu yang diizinkan tidak kena denda, tapi kasnya tetap wajib dilunasi. Denda untuk skema keringanan disesuaikan Bendahara.</p>
  </section>
 
  <section id="p-inbox" class="pg" hidden>
@@ -1780,46 +1781,51 @@ function uuIsiHtml(isi, q) {
   });
   tutup(0); return out;
 }
+let UUDOK = "uu";   // dokumen yang dibuka: "uu" (UU MCI) atau "kas" (Peraturan Kas)
+const UUT = () => UUDOK === "kas" ? {info: "kas_info", pasal: "kas_pasal", nama: "Peraturan Kas MCI", id: "uuK"} : {info: "info", pasal: "pasal", nama: "UU MCI", id: "uuP"};
 function renderUU() {
   const d = UUD; if (!d) return;
-  const q = $("#uuQ").value.trim(), ql = q.toLowerCase();
-  const info = d.items.find(x => x.tipe === "info"), muk = d.items.find(x => x.tipe === "mukadimah");
+  const T = UUT(), q = $("#uuQ").value.trim(), ql = q.toLowerCase();
+  $$("#uuDok [data-dok]").forEach(b => b.classList.toggle("on", b.dataset.dok === UUDOK));
+  const info = d.items.find(x => x.tipe === T.info), muk = UUDOK === "uu" ? d.items.find(x => x.tipe === "mukadimah") : null;
   const baris = info ? info.isi.split("\n").filter(Boolean) : [];
   $("#uuInfo").innerHTML = baris.length ? `<b style="color:var(--ink)">${esc(baris[0])}</b><br>${baris.slice(1).map(esc).join("<br>")}` : "";
   $("#uuMuk").hidden = !muk; if (muk) $("#uuMukIsi").innerHTML = uuMark(muk.isi, q);
-  $("#uuAdmBar").hidden = !d.edit;
+  $("#uuAdmBar").hidden = !d.edit; $("#uuEditMuk").hidden = UUDOK !== "uu";
   const cocok = x => !ql || ("pasal " + x.nomor + " " + x.judul + " " + x.isi + " " + x.artinya + " " + x.bab).toLowerCase().includes(ql) || String(x.nomor) === ql;
-  const ps = d.items.filter(x => x.tipe === "pasal"), hit = ps.filter(cocok);
+  const ps = d.items.filter(x => x.tipe === T.pasal), hit = ps.filter(cocok);
   $("#uuCount").textContent = q ? `${hit.length} dari ${ps.length} pasal cocok` : `${ps.length} pasal`;
-  const babs = [...new Set(ps.map(x => x.bab))];
+  const babs = [...new Set(ps.map(x => x.bab).filter(Boolean))];
   $("#uuBabs").innerHTML = babs.map(b => `<option value="${esc(b)}">`).join("");
-  $("#uuJump").innerHTML = babs.map((b, i) => `<button class="ch" data-uub="${i}" type="button">${esc(b.split(".")[0])}</button>`).join("");
+  $("#uuJump").innerHTML = babs.length ? babs.map((b, i) => `<button class="ch" data-uub="${i}" type="button">${esc(b.split(".")[0])}</button>`).join("")
+    : ps.map(x => `<button class="ch" data-uup="${x.nomor}" type="button">Pasal ${x.nomor}</button>`).join("");
   $$("#uuJump [data-uub]").forEach(b => b.onclick = () => { const el = $("#uuBab" + b.dataset.uub); if (el) el.scrollIntoView({behavior: "smooth", block: "start"}); });
+  $$("#uuJump [data-uup]").forEach(b => b.onclick = () => { const el = $("#" + T.id + b.dataset.uup); if (el) el.scrollIntoView({behavior: "smooth", block: "start"}); });
   let html = "", last = null;
   hit.forEach(x => {
-    if (x.bab !== last) { last = x.bab; html += `<div class="uu-bab" id="uuBab${babs.indexOf(x.bab)}">${uuMark(x.bab, q)}</div>`; }
-    html += `<div class="cd uu-ps" id="uuP${x.nomor}"><h3>Pasal ${x.nomor}. ${uuMark(x.judul, q)}</h3>${uuIsiHtml(x.isi, q)}${x.artinya ? `<div class="uu-ar"><b>Artinya:</b> ${uuMark(x.artinya, q)}</div>` : ""}
+    if (x.bab && x.bab !== last) { last = x.bab; html += `<div class="uu-bab" id="uuBab${babs.indexOf(x.bab)}">${uuMark(x.bab, q)}</div>`; }
+    html += `<div class="cd uu-ps" id="${T.id}${x.nomor}"><h3>Pasal ${x.nomor}. ${uuMark(x.judul, q)}</h3>${uuIsiHtml(x.isi, q)}${x.artinya ? `<div class="uu-ar"><b>Artinya:</b> ${uuMark(x.artinya, q)}</div>` : ""}
       <div class="bar" style="margin:10px 0 0"><button class="bt o" data-uus="${x.id}" style="padding:5px 10px;min-height:34px">Salin</button>${d.edit ? `<button class="bt o" data-uue="${x.id}" style="padding:5px 10px;min-height:34px">Ubah</button><button class="bt o" data-uud="${x.id}" style="padding:5px 10px;min-height:34px">Hapus</button>` : ""}<span class="mu" style="font-size:11.5px">${x.diubah ? "diubah " + esc(x.diubah.slice(0, 10)) : ""}</span></div></div>`;
   });
-  $("#uuList").innerHTML = html || `<p class="mu">Tidak ada pasal yang cocok dengan "${esc(q)}".</p>`;
+  $("#uuList").innerHTML = html || `<p class="mu">${ps.length ? `Tidak ada pasal yang cocok dengan "${esc(q)}".` : "Belum ada pasal."}</p>`;
   $$("#uuList [data-uus]").forEach(b => b.onclick = async () => {
     const x = d.items.find(y => y.id === +b.dataset.uus);
-    const t = `Pasal ${x.nomor}. ${x.judul}\n` + x.isi.split("\n").map(l => l.replace(/^\*\*\s+/, "    - ").replace(/^\*\s+/, "- ")).join("\n") + (x.artinya ? `\nArtinya: ${x.artinya}` : "") + "\n(UU MCI)";
+    const t = `Pasal ${x.nomor}. ${x.judul}\n` + x.isi.split("\n").map(l => l.replace(/^\*\*\s+/, "    - ").replace(/^\*\s+/, "- ")).join("\n") + (x.artinya ? `\nArtinya: ${x.artinya}` : "") + `\n(${T.nama})`;
     try { await navigator.clipboard.writeText(t); b.textContent = "Tersalin ✓"; } catch (e) { b.textContent = "Gagal salin"; } setTimeout(() => b.textContent = "Salin", 1600);
   });
   $$("#uuList [data-uue]").forEach(b => b.onclick = () => uuBuka(d.items.find(y => y.id === +b.dataset.uue)));
   $$("#uuList [data-uud]").forEach(b => b.onclick = async () => {
     const x = d.items.find(y => y.id === +b.dataset.uud);
-    if (!confirm(`Hapus Pasal ${x.nomor} (${x.judul}) permanen?`)) return;
+    if (!confirm(`Hapus Pasal ${x.nomor} (${x.judul}) dari ${T.nama} permanen?`)) return;
     try { UUD = await api("/api/uu/" + x.id, {method: "DELETE"}); renderUU(); } catch (e) { alert(e.message); }
   });
 }
 function uuBuka(x) {
   UUE = x ? {id: x.id, tipe: x.tipe} : null;
-  const pasal = !x || x.tipe === "pasal";
+  const pasal = !x || x.tipe === "pasal" || x.tipe === "kas_pasal", kas = x ? x.tipe.startsWith("kas_") : UUDOK === "kas";
   $("#uuForm").hidden = false;
-  $("#uuFormJudul").textContent = !x ? "Tambah pasal" : x.tipe === "pasal" ? `Ubah Pasal ${x.nomor}` : x.tipe === "info" ? "Ubah keterangan (judul dan pengantar)" : "Ubah mukadimah";
-  ["#uuLNo", "#uuLBab", "#uuLJudul", "#uuLArt"].forEach(q => $(q).hidden = !pasal);
+  $("#uuFormJudul").textContent = !x ? `Tambah pasal ${kas ? "Peraturan Kas" : "UU MCI"}` : pasal ? `Ubah Pasal ${x.nomor} ${kas ? "Peraturan Kas" : "UU MCI"}` : x.tipe.endsWith("info") ? `Ubah keterangan ${kas ? "Peraturan Kas" : "UU MCI"}` : "Ubah mukadimah";
+  ["#uuLNo", "#uuLJudul", "#uuLArt"].forEach(q => $(q).hidden = !pasal); $("#uuLBab").hidden = !pasal || kas;
   $("#uuNo").value = x && pasal ? x.nomor : ""; $("#uuBab").value = x && pasal ? x.bab : ($("#uuBab").value || "");
   $("#uuJudul").value = x && pasal ? x.judul : ""; $("#uuIsi").value = x ? x.isi : ""; $("#uuArt").value = x && pasal ? x.artinya : ""; $("#uuMsg").textContent = "";
   $("#uuForm").scrollIntoView({behavior: "smooth", block: "start"});
@@ -1828,13 +1834,18 @@ async function loadUU(d) {
   try { UUD = d || await api("/api/uu"); renderUU(); }
   catch (e) { $("#uuInfo").innerHTML = '<span class="er">' + esc(e.message) + "</span>"; }
 }
+function uuKe(dok, nomor) {   // buka dokumen & loncat ke pasal
+  UUDOK = dok === "kas" ? "kas" : "uu"; $("#uuQ").value = ""; $("#uuForm").hidden = true; UUE = null; renderUU();
+  if (nomor) setTimeout(() => { const t = $("#" + UUT().id + nomor); if (t) t.scrollIntoView({behavior: "smooth", block: "start"}); }, 80);
+}
+$$("#uuDok [data-dok]").forEach(b => b.onclick = () => uuKe(b.dataset.dok));
 $("#uuQ").oninput = () => renderUU();
 $("#uuTambah").onclick = () => uuBuka(null);
-$("#uuEditInfo").onclick = () => uuBuka(UUD.items.find(x => x.tipe === "info"));
+$("#uuEditInfo").onclick = () => uuBuka(UUD.items.find(x => x.tipe === UUT().info));
 $("#uuEditMuk").onclick = () => uuBuka(UUD.items.find(x => x.tipe === "mukadimah"));
 $("#uuBatal").onclick = () => { $("#uuForm").hidden = true; UUE = null; };
 $("#uuSimpan").onclick = async () => {
-  const body = {nomor: $("#uuNo").value, bab: $("#uuBab").value, judul: $("#uuJudul").value, isi: $("#uuIsi").value, artinya: $("#uuArt").value};
+  const body = {nomor: $("#uuNo").value, bab: $("#uuBab").value, judul: $("#uuJudul").value, isi: $("#uuIsi").value, artinya: $("#uuArt").value, dok: UUDOK};
   $("#uuSimpan").disabled = true;
   try { UUD = await api(UUE ? "/api/uu/" + UUE.id : "/api/uu", {json: body}); $("#uuForm").hidden = true; UUE = null; renderUU(); }
   catch (e) { $("#uuMsg").textContent = e.message; }
@@ -1850,7 +1861,7 @@ const RK_INFO = {
   pengumuman: ["Kabar resmi", "Pengumuman", "Pengumuman resmi MCI: kas, jadwal, dan keputusan. Formatnya seragam sesuai Pasal 14, dan bisa langsung dikirim ke Inbox serta Telegram semua anggota.", "Tulis pengumuman"],
   agenda: ["Organisasi", "Agenda & Rapat", "Jadwal rapat, agenda yang dibahas, notulen, dan daftar hadir. Anggota divisi terkait mendapat undangan di Inbox.", "Jadwalkan rapat"],
   tugas: ["Organisasi", "Tugas", "Siapa mengerjakan apa, sampai kapan. Penerima tugas mendapat notifikasi dan bisa memperbarui statusnya sendiri.", "Beri tugas"],
-  proyek: ["Organisasi", "Proyek", "Semua proyek MCI: status, tim, kebutuhan, dan pembagian hasil. Anggota yang menunggak kas 2 minggu atau lebih ditandai sesuai Pasal 16.", "Tambah proyek"],
+  proyek: ["Organisasi", "Proyek", "Semua proyek MCI: status, tim, kebutuhan, dan pembagian hasil. Anggota yang menunggak kas 2 minggu atau lebih tanpa izin ditandai: hak proyeknya dicabut sampai lunas (Peraturan Kas Pasal 4).", "Tambah proyek"],
   konten: ["Konten & karya", "Jadwal Konten", "Kalender posting Instagram dan TikTok: dari ide, draf, siap tayang, sampai hasil tayangnya.", "Tambah konten"],
   sidang: ["Hukum & disiplin", "Pelanggaran & Sidang", "Laporan pelanggaran UU MCI. Terlapor berhak membela diri sebelum sanksi ditetapkan (Pasal 18). Hanya Dewan, Dev, dan terlapor yang bisa melihat kasusnya.", "Laporkan pelanggaran"],
   putusan: ["Hukum & disiplin", "Arsip Putusan", "Semua putusan resmi Dewan, hasil sidang, keputusan rapat, dan perubahan UU, tersusun dan bisa dicari.", "Catat putusan"],
@@ -1925,7 +1936,7 @@ function renderRK(j) {
   el.querySelectorAll("[data-rkd]").forEach(b => b.onclick = async () => { if (!confirm("Hapus entri ini permanen?")) return; try { RK[j] = await api(`/api/r/${j}/${b.dataset.rkd}`, {method: "DELETE"}); renderRK(j); } catch (e) { alert(e.message); } });
   el.querySelectorAll("[data-rkst]").forEach(s => s.onchange = () => rkSimpan(j, +s.dataset.rkst, {status: s.value}));
   el.querySelectorAll("[data-rkfil]").forEach(b => b.onclick = () => { st.f = b.dataset.rkfil; renderRK(j); });
-  el.querySelectorAll("[data-gopasal]").forEach(b => b.onclick = () => { show("uu"); setTimeout(() => { const t = $("#uuP" + b.dataset.gopasal); if (t) t.scrollIntoView({behavior: "smooth", block: "start"}); }, 400); });
+  el.querySelectorAll("[data-gopasal]").forEach(b => b.onclick = e => { e.preventDefault(); show("uu"); setTimeout(() => uuKe("uu", b.dataset.gopasal), 400); });
   (RK_BIND[j] || (() => {}))(el, d, st);
 }
 const rkAksi = x => (x._edit === "semua" || (Array.isArray(x._edit) && x._edit.length) ? `<button class="bt o" data-rke="${x.id}">Ubah</button>` : "") + (x._hapus ? `<button class="bt o" data-rkd="${x.id}">Hapus</button>` : "");
@@ -1966,7 +1977,7 @@ const RK_RENDER = {
   },
   proyek(d, items, st) {
     const its = st.f ? items.filter(x => x.status === st.f) : items, tg = d.tunggak || {};
-    const orang = i => `<span class="ch ${(tg[i] || 0) >= 2 ? "r" : "n"}" title="${(tg[i] || 0) >= 2 ? `Menunggak kas ${tg[i]} minggu: hak proyek ditinjau (Pasal 16)` : ""}">${esc(rkNama(d, i))}${(tg[i] || 0) >= 2 ? " · Pasal 16" : ""}</span>`;
+    const orang = i => `<span class="ch ${(tg[i] || 0) >= 2 ? "r" : "n"}" title="${(tg[i] || 0) >= 2 ? `Menunggak kas ${tg[i]} minggu tanpa izin: hak proyek dicabut sampai lunas (Peraturan Kas Pasal 4)` : ""}">${esc(rkNama(d, i))}${(tg[i] || 0) >= 2 ? " · hak dicabut" : ""}</span>`;
     return `<div class="lst">${its.map(x => `<article class="it2"><div class="ey">${esc(rkOp(d, "status", x.status))}</div><h3>${esc(x.nama)}</h3>
       <div class="meta">${x.pj ? `<span>PJ: ${esc(rkNama(d, x.pj))}</span>` : ""}<span>Progres ${x.progres || 0}%</span>${x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">Tautan</a>` : ""}</div>
       <div class="prg"><i style="width:${Math.min(100, x.progres || 0)}%"></i></div>
@@ -2056,27 +2067,40 @@ async function loadRekapKas(minggu) {
   try { RKK = await api("/api/rekapkas" + (minggu ? "?minggu=" + encodeURIComponent(minggu) : "")); } catch (e) { $("#rkkList").innerHTML = `<tr><td colspan="5" class="er">${esc(e.message)}</td></tr>`; return; }
   const d = RKK, lp = d.laporan;
   $("#rkkLabel").textContent = d.label; $("#rkkPrev").disabled = !d.prev; $("#rkkNext").disabled = !d.next;
-  $("#rkk1").textContent = `${d.lunas} / ${d.wajib}`; $("#rkk2").textContent = rp(d.masuk); $("#rkk3").textContent = num(d.menunggak); $("#rkk4").textContent = rp(d.total_tagihan);
-  const stl = {belum: ["y", "Belum diterbitkan"], tepat: ["g", "Diterbitkan tepat waktu"], telat: ["r", "Terlambat (Pasal 17)"]}[lp.status];
-  $("#rkkLap").innerHTML = `<div class="ey">Laporan Bendahara · Pasal 9 & 17</div><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="ch ${stl[0]}">${stl[1]}</span><span class="mu" style="font-size:13px">Batas: ${esc(tglID(lp.batas.slice(0, 10), true))} pukul ${esc(lp.batas.slice(11))} WIB${lp.waktu ? ` · diterbitkan ${esc(tglID(lp.waktu.slice(0, 10)))} ${esc(lp.waktu.slice(11, 16))} oleh ${esc(lp.oleh)}` : ""}</span></div>
+  $("#rkk1").textContent = `${d.lunas} / ${d.wajib}`; $("#rkk2").textContent = rp(d.masuk); $("#rkk3").innerHTML = num(d.menunggak) + (d.hak_dicabut ? `<div class="mu" style="font:600 12.5px 'Instrument Sans',sans-serif;margin-top:6px">${d.hak_dicabut} orang hak proyeknya dicabut</div>` : ""); $("#rkk4").textContent = rp(d.total_tagihan);
+  const stl = {belum: ["y", "Belum diterbitkan"], tepat: ["g", "Diterbitkan tepat waktu"], telat: ["r", "Terlambat (Peraturan Kas Pasal 2)"]}[lp.status];
+  $("#rkkLap").innerHTML = `<div class="ey">Laporan Bendahara · Peraturan Kas Pasal 2 & 5</div><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="ch ${stl[0]}">${stl[1]}</span><span class="mu" style="font-size:13px">Batas: ${esc(tglID(lp.batas.slice(0, 10), true))} pukul ${esc(lp.batas.slice(11))} WIB${lp.waktu ? ` · diterbitkan ${esc(tglID(lp.waktu.slice(0, 10)))} ${esc(lp.waktu.slice(11, 16))} oleh ${esc(lp.oleh)}` : ""}</span></div>
+    ${lp.denda_bendahara && lp.denda_bendahara.length ? `<div class="ch r" style="display:block;margin-top:10px;padding:8px 12px;line-height:1.5">Sanksi Bendahara (Peraturan Kas Pasal 2): ${lp.denda_bendahara.map(b => `${esc(b.nama)} denda ${rp(b.denda)}`).join(", ")} (2× iuran pribadi), atau penalti sesuai kesepakatan internal tim.</div>` : ""}
+    ${d.bisa_lapor && d.tarif_beda ? `<div class="ch y" style="display:block;margin-top:10px;padding:8px 12px;line-height:1.5">Tarif kas biasa di sistem ${rp(d.tarif.biasa)}/minggu, sedangkan Peraturan Kas Pasal 1 menetapkan ${rp(d.tarif_aturan)}/minggu. Ubah di halaman Bayar Kas → Atur tarif.</div>` : ""}
     ${d.bisa_lapor ? `<div class="bar" style="margin:12px 0 0"><input type="text" id="rkkCat" maxlength="1000" placeholder="Catatan tambahan (opsional)" style="max-width:420px"><button class="bt g" id="rkkPub">${lp.waktu ? "Terbitkan ulang" : "Terbitkan rekap"}</button></div><p class="mu" style="font-size:12.5px;margin:6px 0 0">Rekap dikirim sebagai Pengumuman (kategori Kas) ke Inbox dan Telegram semua anggota.</p>` : ""}`;
   $("#rkkList").innerHTML = d.anggota.map(a => { const st = a.status === "lunas" ? '<span class="ch g">Lunas</span>' : a.status === "menunggu" ? '<span class="ch y">Menunggu konfirmasi</span>' : a.status === "bebas" ? '<span class="ch n">Tidak wajib</span>' : '<span class="ch r">Belum</span>';
-    return `<tr><td><b>${esc(a.nama)}</b><div class="mu" style="font-size:12px">${esc(a.tingkat_label)}${a.nominal ? " · " + rp(a.nominal) + "/minggu" : ""}</div></td><td>${st}</td><td>${a.tunggak ? `${a.tunggak} minggu` : '<span class="mu">-</span>'}</td>
+    const izinBtn = d.bisa_lapor && a.status !== "bebas" ? (a.izin_minggu_ini ? `<button class="bt o" data-rkiz="${a.id}" data-on="0" style="min-height:30px;padding:4px 9px;font-size:12px;margin-top:4px">Batalkan izin</button>`
+      : a.izin_pakai < d.izin_maks ? `<button class="bt o" data-rkiz="${a.id}" data-on="1" style="min-height:30px;padding:4px 9px;font-size:12px;margin-top:4px">Catat izin</button>` : "") : "";
+    return `<tr><td><b>${esc(a.nama)}</b><div class="mu" style="font-size:12px">${esc(a.tingkat_label)}${a.nominal ? " · " + rp(a.nominal) + "/minggu" : ""}</div></td>
+      <td>${a.izin_minggu_ini && a.status === "belum" ? '<span class="ch y">Izin</span>' : st}</td>
+      <td><span class="${a.izin_pakai >= d.izin_maks ? "ch r" : "mu"}" style="font-size:12.5px">${a.izin_pakai}/${d.izin_maks} dipakai</span><br>${izinBtn}</td>
+      <td>${a.tunggak ? `${a.tunggak} minggu${a.tanpa_izin < a.tunggak ? `<div class="mu" style="font-size:12px">${a.tunggak - a.tanpa_izin} dengan izin</div>` : ""}` : '<span class="mu">-</span>'}</td>
       <td class="rt">${a.tagihan ? `<b>${rp(a.tagihan)}</b>${a.denda ? `<div class="mu" style="font-size:12px">termasuk denda ${rp(a.denda)}</div>` : ""}` : '<span class="mu">-</span>'}${a.denda_manual ? '<div class="mu" style="font-size:12px">denda disesuaikan Bendahara</div>' : ""}</td>
-      <td>${a.pasal16 ? '<span class="ch r">Ditinjau Pasal 16</span>' : ""}</td></tr>`; }).join("") || '<tr><td colspan="5" class="mu">Belum ada anggota.</td></tr>';
+      <td>${a.hak_dicabut ? '<span class="ch r" title="Peraturan Kas Pasal 4: pulih setelah semua tunggakan dan denda lunas">Dicabut sampai lunas</span>' : a.status === "bebas" ? '<span class="mu">-</span>' : '<span class="ch g">Aktif</span>'}</td></tr>`; }).join("") || '<tr><td colspan="6" class="mu">Belum ada anggota.</td></tr>';
+  $$("#rkkList [data-rkiz]").forEach(b => b.onclick = async () => {
+    const a = d.anggota.find(x => x.id === +b.dataset.rkiz), on = b.dataset.on === "1";
+    if (on && !confirm(`Catat izin resmi ${a.nama} untuk ${d.label}? Sisa jatah izinnya jadi ${d.izin_maks - a.izin_pakai - 1} dari ${d.izin_maks}.`)) return;
+    b.disabled = true; try { await api("/api/rekapkas/izin", {json: {anggota: a.id, minggu: d.minggu, izin: on}}); await loadRekapKas(d.minggu); } catch (e) { alert(e.message); b.disabled = false; }
+  });
   const pb = $("#rkkPub"); if (pb) pb.onclick = async () => { if (!confirm("Terbitkan rekap kas ini ke semua anggota?")) return; pb.disabled = true; try { await api("/api/rekapkas/publikasi", {json: {minggu: d.minggu, catatan: $("#rkkCat").value}}); await loadRekapKas(d.minggu); RK.pengumuman = null; } catch (e) { alert(e.message); pb.disabled = false; } };
 }
 $("#rkkPrev").onclick = () => RKK && RKK.prev && loadRekapKas(RKK.prev);
 $("#rkkNext").onclick = () => RKK && RKK.next && loadRekapKas(RKK.next);
 $("#rkkNow").onclick = () => loadRekapKas();
+$("#rkkAturan").onclick = e => { e.preventDefault(); show("uu"); setTimeout(() => uuKe("kas"), 400); };
 
 /* Tanya UU */
 $("#uuTanya").onclick = async () => {
   const q = $("#uuTanyaQ").value.trim(); if (q.length < 4) { $("#uuJawab").hidden = false; $("#uuJawab").textContent = "Tulis pertanyaannya dulu."; return; }
   const b = $("#uuTanya"); b.disabled = true; $("#uuJawab").hidden = false; $("#uuJawab").textContent = "MCI.Scribe sedang membaca UU…"; $("#uuRujuk").innerHTML = "";
   try { const d = await api("/api/uu/tanya", {json: {q}}); $("#uuJawab").textContent = d.jawab || d.pesan || "Tidak ada jawaban.";
-    $("#uuRujuk").innerHTML = (d.rujuk || []).map(x => `<button class="ch" type="button" data-uugo="${x.nomor}" style="border:0;cursor:pointer;background:#24385E;color:#E9E4D8">Pasal ${x.nomor}. ${esc(x.judul)}</button>`).join("");
-    $$("#uuRujuk [data-uugo]").forEach(c => c.onclick = () => { $("#uuQ").value = ""; renderUU(); const t = $("#uuP" + c.dataset.uugo); if (t) t.scrollIntoView({behavior: "smooth", block: "start"}); });
+    $("#uuRujuk").innerHTML = (d.rujuk || []).map(x => `<button class="ch" type="button" data-uugo="${x.nomor}" data-uudok="${x.dok || "uu"}" style="border:0;cursor:pointer;background:#24385E;color:#E9E4D8">${x.dok === "kas" ? "Peraturan Kas " : "UU "}Pasal ${x.nomor}. ${esc(x.judul)}</button>`).join("");
+    $$("#uuRujuk [data-uugo]").forEach(c => c.onclick = () => uuKe(c.dataset.uudok, c.dataset.uugo));
   } catch (e) { $("#uuJawab").textContent = e.message; }
   b.disabled = false;
 };
@@ -2129,17 +2153,18 @@ const EKSPOR = {
   dokumentasi: () => [exTabel("Dokumentasi", DKD && DKD.items)],
   blacklist: () => [exTabel("Blacklist", (APIC["/api/blacklist"] || {}).items)],
   sp: () => { const d = APIC["/api/sp"] || {}; return [exTabel("Status SP anggota", d.status), exTabel("Surat Peringatan", d.surat, ["nomor", "nama", "level", "judul", "isi", "tanggal", "oleh"])]; },
-  uu: () => { const d = UUD || {items: []}; const bersih = t => String(t || "").split("\n").map(l => l.replace(/^\*\*\s+/, "    - ").replace(/^\*\s+/, "- ")).join("\n");
-    return [{nama: "UU MCI", kolom: ["Bab", "Pasal", "Judul", "Isi", "Artinya"], baris: d.items.map(x => x.tipe === "pasal" ? [x.bab, x.nomor, x.judul, bersih(x.isi), x.artinya] : ["", "", x.tipe === "info" ? "Keterangan" : "Mukadimah", x.isi, ""])}]; },
+  uu: () => { const d = UUD || {items: []}, T = UUT(); const bersih = t => String(t || "").split("\n").map(l => l.replace(/^\*\*\s+/, "    - ").replace(/^\*\s+/, "- ")).join("\n");
+    const its = d.items.filter(x => UUDOK === "kas" ? x.tipe.startsWith("kas_") : !x.tipe.startsWith("kas_"));
+    return [{nama: T.nama, kolom: ["Bab", "Pasal", "Judul", "Isi", "Artinya"], baris: its.map(x => x.tipe === T.pasal ? [x.bab, x.nomor, x.judul, bersih(x.isi), x.artinya] : ["", "", x.tipe === T.info ? "Keterangan" : "Mukadimah", x.isi, ""])}]; },
   pengumuman: () => exRK("pengumuman"), agenda: () => exRK("agenda"), tugas: () => exRK("tugas"), proyek: () => exRK("proyek"), konten: () => exRK("konten"), sidang: () => exRK("sidang"), putusan: () => exRK("putusan"),
   struktur: () => { const d = SOD; if (!d) return [];
     return [{nama: "Mahapatih (High Command)", kolom: ["Nama", "Jabatan"], baris: d.mahapatih.anggota.map(a => [a.nama, a.jabatan.join(", ")])},
       {nama: "Divisi", kolom: ["Divisi", "Nama", "Jabatan"], baris: d.divisi.flatMap(x => x.anggota.length ? x.anggota.map(a => [x.nama, a.nama, a.jabatan.join(", ")]) : [[x.nama, "", ""]])},
       {nama: "Jabatan & wewenang", kolom: ["Jabatan", "Wewenang", "Dipegang oleh"], baris: d.jabatan.map(x => [x.nama, x.wewenang.join(", "), x.anggota.join(", ")])}]; },
   rekapkas: () => { const d = RKK; if (!d) return [];
-    return [{nama: "Rekap kas " + d.label, kolom: ["Anggota", "Skema", "Nominal/minggu", "Minggu ini", "Tunggakan (minggu)", "Estimasi tagihan", "Denda", "Catatan"],
-      baris: d.anggota.map(a => [a.nama, a.tingkat_label, a.nominal, {lunas: "Lunas", menunggu: "Menunggu konfirmasi", bebas: "Tidak wajib"}[a.status] || "Belum", a.tunggak, a.tagihan, a.denda, a.pasal16 ? "Ditinjau Pasal 16" : (a.denda_manual ? "Denda disesuaikan Bendahara" : "")])},
-      {nama: "Ringkasan", kolom: ["Keterangan", "Nilai"], baris: [["Minggu", d.label], ["Lunas", `${d.lunas} dari ${d.wajib}`], ["Masuk", d.masuk], ["Anggota menunggak", d.menunggak], ["Total tagihan", d.total_tagihan], ["Laporan Bendahara", {belum: "Belum diterbitkan", tepat: "Tepat waktu", telat: "Terlambat"}[d.laporan.status]], ["Batas laporan", d.laporan.batas + " WIB"]]}]; },
+    return [{nama: "Rekap kas " + d.label, kolom: ["Anggota", "Skema", "Nominal/minggu", "Minggu ini", "Izin dipakai", "Tunggakan (minggu)", "Tanpa izin (minggu)", "Tagihan", "Denda", "Hak proyek"],
+      baris: d.anggota.map(a => [a.nama, a.tingkat_label, a.nominal, a.izin_minggu_ini && a.status === "belum" ? "Izin" : ({lunas: "Lunas", menunggu: "Menunggu konfirmasi", bebas: "Tidak wajib"}[a.status] || "Belum"), `${a.izin_pakai}/${d.izin_maks}`, a.tunggak, a.tanpa_izin, a.tagihan, a.denda, a.hak_dicabut ? "Dicabut sampai lunas" : (a.status === "bebas" ? "-" : "Aktif")])},
+      {nama: "Ringkasan", kolom: ["Keterangan", "Nilai"], baris: [["Minggu", d.label], ["Lunas", `${d.lunas} dari ${d.wajib}`], ["Masuk", d.masuk], ["Anggota menunggak", d.menunggak], ["Total tagihan", d.total_tagihan], ["Hak proyek dicabut", d.hak_dicabut], ["Laporan Bendahara", {belum: "Belum diterbitkan", tepat: "Tepat waktu", telat: "Terlambat"}[d.laporan.status]], ["Batas laporan", d.laporan.batas + " WIB"], ...(d.laporan.denda_bendahara || []).map(b => ["Denda Bendahara " + b.nama, b.denda])]}]; },
   inbox: () => [exTabel("Inbox", IBD && IBD.items, ["judul", "isi", "waktu", "jenis"])],
   berita: () => [exTabel("Berita " + (BRK || ""), BRD && BRD.items, ["judul", "sumber", "waktu", "url"])],
   bayarkas: () => { const d = BKD; if (!d) return []; return [exTabel("Bayar kas " + (d.label || ""), d.anggota, ["nama", "tingkat_label", "nominal", "status", "tunggak"]), exTabel("Riwayat pembayaran", d.riwayat)]; },
