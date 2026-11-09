@@ -6337,6 +6337,7 @@ def run_flask():
 
 # ---------- TELEGRAM ----------
 HIST = {}
+ALBUM = {}   # (bot, media_group_id) -> foto-foto satu album Telegram yang sedang dikumpulkan
 CANVAS_APP = {}
 
 
@@ -6492,7 +6493,7 @@ def _addressed(u, c):
     if m.chat.type == "private":
         return True
     un = (c.bot.username or "").lower()
-    if un and f"@{un}" in (m.text or "").lower():
+    if un and f"@{un}" in (m.text or m.caption or "").lower():
         return True
     r = m.reply_to_message
     return bool(r and r.from_user and r.from_user.id == c.bot.id)
@@ -6714,6 +6715,61 @@ def make_handlers(key):
         if await _gate(u.message, u.effective_user, "gambar_buat", "gambar"):
             await tg_gambar(u.message, c, q)
 
+    async def foto_tanya(u, c):
+        """Telegram mengirim album sebagai beberapa pesan terpisah (caption hanya di salah satunya).
+        Foto-foto dengan media_group_id yang sama dikumpulkan ~2 detik, lalu dijawab sekali."""
+        m = u.message
+        gid = m.media_group_id
+        if not gid:
+            await _foto_jawab(u, c, [m.photo[-1]], m.caption or "")
+            return
+        k = (key, gid)
+        if k in ALBUM:
+            a = ALBUM[k]
+            a["foto"].append(m.photo[-1])
+            if m.caption and not a["cap"]:
+                a["cap"], a["u"] = m.caption, u
+            return
+        ALBUM[k] = {"foto": [m.photo[-1]], "cap": m.caption or "", "u": u}
+        await asyncio.sleep(2)
+        a = ALBUM.pop(k, None)
+        if a:
+            await _foto_jawab(a["u"], c, a["foto"], a["cap"])
+
+    async def _foto_jawab(u, c, fotos, cap):
+        m = u.message
+        if not _addressed(u, c):
+            return
+        if not _ok(u.effective_user):
+            await m.reply_text(f"Akses ditolak. Kirim !izin untuk minta akses ke admin.\nID kamu: {u.effective_user.id}")
+            return
+        if not await _gate(m, u.effective_user, "boss", "boss"):
+            return
+        q = (cap.replace(f"@{c.bot.username}", "") if c.bot.username else cap).strip() or "Jelaskan apa yang ada di foto ini."
+        t0 = time.time()
+        _begin(key, "Melihat foto")
+        try:
+            await c.bot.send_chat_action(chat_id=m.chat_id, action="typing")
+            parts = []
+            for p in fotos[:4]:   # maksimal 4 foto per pertanyaan supaya hemat token
+                f = await p.get_file()
+                parts.append(types.Part.from_bytes(data=bytes(await f.download_as_bytearray()), mime_type="image/jpeg"))
+            h = HIST.setdefault((key, m.chat_id), [])
+            ans = await ask(key, f"[Pengguna mengirim {len(parts)} foto]\n{q}", history=h, parts=parts, act="Melihat foto")
+            h += [types.Content(role="user", parts=[types.Part(text=f"[mengirim {len(parts)} foto] {q}")]),
+                  types.Content(role="model", parts=[types.Part(text=ans)])]
+            del h[:-6]
+            ok = True
+        except Exception as e:
+            log.exception("[%s] foto gagal", cfg["nama"])
+            ans = str(e) if isinstance(e, RuntimeError) else "⚠️ Ada gangguan saat membaca foto. Coba kirim lagi sebentar."
+            ok = False
+        finally:
+            _end(key)
+        await asyncio.to_thread(_log, key, f"[foto] {q}", "Selesai" if ok else "Gagal", "telegram")
+        await asyncio.sleep(max(0.0, 1.5 - (time.time() - t0)))
+        await _send(m, ans)
+
     async def photo(u, c):
         m = u.message
         cap = (m.caption or "").strip()
@@ -6729,7 +6785,10 @@ def make_handlers(key):
             if await _gate(m, u.effective_user, "gambar_buat", "gambar"):
                 await tg_gambar(m, c, q, m)
             return
-        if key != "ledger" or m.chat.type != "private" or not ALLOWED or not can("kas_edit", tg_role(u.effective_user)):
+        if key != "ledger":
+            await foto_tanya(u, c)   # foto + pertanyaan biasa: Gemini ikut melihat fotonya
+            return
+        if m.chat.type != "private" or not ALLOWED or not can("kas_edit", tg_role(u.effective_user)):
             return
         try:
             f = await m.photo[-1].get_file()
