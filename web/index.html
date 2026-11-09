@@ -323,6 +323,13 @@ td{border-top:1px solid var(--line)}
 .hcl{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}.hcl div{border:1px solid #2E4470;border-radius:8px;padding:9px 12px}
 .hcl b{display:block;color:#F2EBDD}.hcl span{font-size:12px;color:var(--gold2)}
 .hc summary{color:var(--gold2)!important}.hc .mm label{background:#14284B;border-color:#2E4470;color:#E9E4D8}
+.pg{position:relative}.exw{position:absolute;top:0;right:0;z-index:5}
+.exb{font:600 12px Inter,system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--navy);background:var(--paper);border:1px solid var(--line2);border-radius:6px;padding:7px 12px;cursor:pointer}
+.exb::after{content:"";display:inline-block;margin-left:7px;border:4px solid transparent;border-top-color:currentColor;transform:translateY(2px)}
+.exb:hover,.exb[aria-expanded=true]{border-color:var(--navy)}
+.exm{position:absolute;right:0;top:calc(100% + 6px);min-width:150px;background:var(--paper);border:1px solid var(--line2);border-radius:8px;box-shadow:0 10px 30px rgba(15,30,58,.14);padding:5px;display:grid}
+.exm[hidden]{display:none}.exm button{all:unset;cursor:pointer;padding:8px 12px;border-radius:5px;font-size:13.5px;color:var(--ink)}.exm button:hover,.exm button:focus-visible{background:#F1EEE6}
+.pg>h1:first-of-type,.pg>.ey:first-of-type,.pg .ph{padding-right:110px}
 .prg{height:6px;border-radius:3px;background:#ECE8DE;overflow:hidden;margin-top:8px}.prg i{display:block;height:100%;background:var(--navy)}
 .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}.cal div{background:var(--paper);border:1px solid var(--line);border-radius:6px;min-height:84px;padding:6px;font-size:12px}
 .cal div.hd{min-height:0;background:transparent;border:0;text-align:center;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
@@ -1201,6 +1208,7 @@ const MOCK = (() => {
   };
 })();
 
+const APIC = {};   // respons API terakhir per path, dipakai fitur Ekspor
 async function api(u, o = {}) {
   if (DEMO) { if (o.json) { o.method = "POST"; o.body = JSON.stringify(o.json); } return MOCK(u, o); }
   o.headers = Object.assign({"X-MCI": "1"}, o.headers || {});
@@ -1209,6 +1217,8 @@ async function api(u, o = {}) {
   if (r.status === 401) { location = "/"; throw new Error("login"); }
   let d = {}; try { d = await r.json(); } catch (e) {}
   if (!r.ok) { const er = new Error(d.error || "Error " + r.status); if (d.kurang) er.kurang = d.kurang; throw er; }
+  { const p = u.split("?")[0], lama = APIC[p];   // untuk fitur Ekspor: GET disimpan; POST/DELETE ke path yang sama ikut memperbarui bila bentuknya sama
+    if (d && typeof d === "object" && !Array.isArray(d) && ((!o.method || o.method === "GET") || (lama && Object.keys(lama).every(k => k in d)))) APIC[p] = d; }
   return d;
 }
 
@@ -2046,6 +2056,171 @@ $("#uuTanya").onclick = async () => {
   } catch (e) { $("#uuJawab").textContent = e.message; }
   b.disabled = false;
 };
+
+/* ================= EKSPOR DATA (Salin, TXT, CSV, PDF, Excel) =================
+   Setiap halaman hanya mengekspor data yang sudah dimuat untuk user itu, jadi hak akses tetap sama dengan yang terlihat di layar. */
+const EX_LABEL = {nama: "Nama", judul: "Judul", tanggal: "Tanggal", jumlah: "Jumlah", kategori: "Kategori", catatan: "Catatan", status: "Status", dibuat: "Dibuat", diubah: "Diubah",
+  oleh: "Oleh", isi: "Isi", keterangan: "Keterangan", masuk: "Masuk", keluar: "Keluar", saldo: "Saldo", harga: "Harga", stok: "Stok", satuan: "Satuan", minimum: "Minimum",
+  penulis: "Penulis", ringkasan: "Ringkasan", link: "Tautan", divisi: "Divisi", jabatan: "Jabatan", aktif: "Aktif", telegram: "Telegram", sp: "SP", level: "Level", nomor: "Nomor",
+  anggota: "Anggota", alasan: "Alasan", waktu: "Waktu", jenis: "Jenis", pesan: "Pesan", nominal: "Nominal", tunggak: "Tunggakan (minggu)", tingkat_label: "Skema", total: "Total",
+  deskripsi: "Deskripsi", tenggat: "Tenggat", minggu: "Minggu", periode: "Periode", sumber: "Sumber", url: "URL", teks: "Teks", pemicu: "Pemicu", bot: "Bot", file_nama: "File"};
+const EX_SKIP = /^(_|id$|v$|token$|foto|sampul$|file_data|file_mime|file_kb|blob|b64|milikku|oleh_id|ada_isi|bukti|thumb|img$|gambar_b|kunci$|bawaan$|dipakai$|tingkat$|ref$)/;
+const exLabel = k => EX_LABEL[k] || (k.charAt(0).toUpperCase() + k.slice(1)).replace(/_/g, " ");
+function exNilai(v) {
+  if (v == null) return "";
+  if (typeof v === "boolean") return v ? "Ya" : "Tidak";
+  if (typeof v === "number") return v;
+  if (Array.isArray(v)) return v.map(x => x && typeof x === "object" ? Object.values(x).filter(y => y != null && typeof y !== "object").join(" ") : exNilai(x)).join("; ");
+  if (typeof v === "object") return Object.entries(v).filter(([k, y]) => y != null && typeof y !== "object" && !EX_SKIP.test(k)).map(([k, y]) => `${exLabel(k)}: ${exNilai(y)}`).join("; ");
+  const t = String(v), m = t.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(:\d{2}(\.\d+)?)?([+-]\d{2}:?\d{2}|Z)?$/);
+  return m ? `${m[1]} ${m[2]}` : t;
+}
+/* daftar objek -> tabel {nama, kolom, baris}; kolom otomatis dari kunci yang ada */
+function exTabel(nama, arr, urut) {
+  arr = (arr || []).filter(x => x && typeof x === "object");
+  if (!arr.length) return {nama, kolom: [], baris: []};
+  const keys = []; arr.forEach(o => Object.keys(o).forEach(k => { if (!EX_SKIP.test(k) && !keys.includes(k)) keys.push(k); }));
+  const pakai = (urut || []).filter(k => keys.includes(k)).concat(keys.filter(k => !(urut || []).includes(k)));
+  return {nama, kolom: pakai.map(exLabel), baris: arr.map(o => pakai.map(k => exNilai(o[k])))};
+}
+const exKV = (nama, obj) => ({nama, kolom: ["Keterangan", "Nilai"], baris: Object.entries(obj || {}).filter(([k, v]) => !EX_SKIP.test(k) && v != null && typeof v !== "object").map(([k, v]) => [exLabel(k), exNilai(v)])});
+function exRK(j) {
+  const d = RK[j]; if (!d) return [];
+  const fs = d.fields.filter(f => f.nama !== "kirim");
+  const nilai = (f, v) => f.tipe === "anggota" ? (v != null ? rkNama(d, v) : "") : f.tipe === "anggota_banyak" ? (v || []).map(i => rkNama(d, i)).join(", ")
+    : f.tipe === "pilih" ? rkOp(d, f.nama, v) : f.tipe === "divisi" ? (v ? (d.divisi.find(x => x[0] === v) || [, v])[1] : "") : f.tipe === "pasal" ? (v ? "Pasal " + v : "") : exNilai(v);
+  return [{nama: d.judul, kolom: fs.map(f => f.label).concat(["Dibuat", "Oleh"]), baris: d.items.map(x => fs.map(f => nilai(f, x[f.nama])).concat([exNilai(x.dibuat), x.oleh]))}];
+}
+const EKSPOR = {
+  cmd: () => [exTabel("Log aktivitas bot", LOG.map(l => Array.isArray(l) ? {waktu: l[0], bot: l[1], kegiatan: l[2]} : l))],
+  kas: () => [exTabel("Kas", KAS && KAS.rows, ["tanggal", "keterangan", "kategori", "masuk", "keluar"]), exKV("Ringkasan kas", KAS && KAS.ringkas)],
+  gambar: () => [exTabel("Galeri gambar", (APIC["/api/gambar"] || {}).items)],
+  memori: () => [exTabel("Memori", (APIC["/api/memori"] || {}).items)],
+  iot: () => { const d = APIC["/api/iot"] || IOTA || {}; return [{nama: "Perangkat IoT", kolom: ["Perangkat", "Online", "Terakhir", "Data"], baris: (d.devices || []).map(x => [x.perangkat, x.online ? "Ya" : "Tidak", x.ts ? new Date(x.ts * 1000).toLocaleString("id-ID") : "", exNilai(x.data)])}, exTabel("Aturan otomatis", d.rules)]; },
+  laporan: () => [exTabel("Laporan", (APIC["/api/laporan"] || {}).items)],
+  anggota: () => { const d = AGD || {}; const peta = v => Array.isArray(v) ? Object.fromEntries(v.map(x => Array.isArray(x) ? x : [x.key, x.nama])) : Object.fromEntries(Object.entries(v || {}).map(([k, x]) => [k, typeof x === "object" && x ? (x.nama || k) : x])), dv = peta(d.divisi), jb = peta(d.jabatan);
+    return [{nama: "Anggota", kolom: ["Nama", "Divisi", "Jabatan", "Aktif", "Telegram", "SP"], baris: (d.items || []).map(a => [a.nama, (a.divisi || []).map(k => dv[k] || k).join(", "), (a.jabatan || []).map(k => jb[k] || k).join(", "), a.aktif ? "Ya" : "Tidak", a.telegram ? "Terhubung" : "-", a.sp || ""])}]; },
+  catatan: () => [exTabel("Catatan", CTD && CTD.items, ["judul", "isi"])],
+  polling: () => [{nama: "Voting", kolom: ["Pertanyaan", "Untuk", "Pilihan (hasil bila sudah ditutup)", "Jumlah pemilih", "Status", "Batas", "Pembuat"], baris: ((PLD && PLD.items) || []).map(p => [p.judul, p.divisi_nama, (p.opsi || []).map((o, i) => o + (p.hasil ? ` (${p.hasil[i]})` : "")).join("; "), p.pemilih, p.tutup ? "Ditutup" : "Dibuka", p.batas || "", p.pembuat])}],
+  dokumentasi: () => [exTabel("Dokumentasi", DKD && DKD.items)],
+  blacklist: () => [exTabel("Blacklist", (APIC["/api/blacklist"] || {}).items)],
+  sp: () => { const d = APIC["/api/sp"] || {}; return [exTabel("Status SP anggota", d.status), exTabel("Surat Peringatan", d.surat, ["nomor", "nama", "level", "judul", "isi", "tanggal", "oleh"])]; },
+  uu: () => { const d = UUD || {items: []}; const bersih = t => String(t || "").split("\n").map(l => l.replace(/^\*\*\s+/, "    - ").replace(/^\*\s+/, "- ")).join("\n");
+    return [{nama: "UU MCI", kolom: ["Bab", "Pasal", "Judul", "Isi", "Artinya"], baris: d.items.map(x => x.tipe === "pasal" ? [x.bab, x.nomor, x.judul, bersih(x.isi), x.artinya] : ["", "", x.tipe === "info" ? "Keterangan" : "Mukadimah", x.isi, ""])}]; },
+  pengumuman: () => exRK("pengumuman"), agenda: () => exRK("agenda"), tugas: () => exRK("tugas"), proyek: () => exRK("proyek"), konten: () => exRK("konten"), sidang: () => exRK("sidang"), putusan: () => exRK("putusan"),
+  struktur: () => { const d = SOD; if (!d) return [];
+    return [{nama: "Mahapatih (High Command)", kolom: ["Nama", "Jabatan"], baris: d.mahapatih.anggota.map(a => [a.nama, a.jabatan.join(", ")])},
+      {nama: "Divisi", kolom: ["Divisi", "Nama", "Jabatan"], baris: d.divisi.flatMap(x => x.anggota.length ? x.anggota.map(a => [x.nama, a.nama, a.jabatan.join(", ")]) : [[x.nama, "", ""]])},
+      {nama: "Jabatan & wewenang", kolom: ["Jabatan", "Wewenang", "Dipegang oleh"], baris: d.jabatan.map(x => [x.nama, x.wewenang.join(", "), x.anggota.join(", ")])}]; },
+  rekapkas: () => { const d = RKK; if (!d) return [];
+    return [{nama: "Rekap kas " + d.label, kolom: ["Anggota", "Skema", "Nominal/minggu", "Minggu ini", "Tunggakan (minggu)", "Estimasi tagihan", "Denda", "Catatan"],
+      baris: d.anggota.map(a => [a.nama, a.tingkat_label, a.nominal, {lunas: "Lunas", menunggu: "Menunggu konfirmasi", bebas: "Tidak wajib"}[a.status] || "Belum", a.tunggak, a.tagihan, a.denda, a.pasal16 ? "Ditinjau Pasal 16" : (a.denda_manual ? "Denda disesuaikan Bendahara" : "")])},
+      {nama: "Ringkasan", kolom: ["Keterangan", "Nilai"], baris: [["Minggu", d.label], ["Lunas", `${d.lunas} dari ${d.wajib}`], ["Masuk", d.masuk], ["Anggota menunggak", d.menunggak], ["Total tagihan", d.total_tagihan], ["Laporan Bendahara", {belum: "Belum diterbitkan", tepat: "Tepat waktu", telat: "Terlambat"}[d.laporan.status]], ["Batas laporan", d.laporan.batas + " WIB"]]}]; },
+  inbox: () => [exTabel("Inbox", IBD && IBD.items, ["judul", "isi", "waktu", "jenis"])],
+  berita: () => [exTabel("Berita " + (BRK || ""), BRD && BRD.items, ["judul", "sumber", "waktu", "url"])],
+  bayarkas: () => { const d = BKD; if (!d) return []; return [exTabel("Bayar kas " + (d.label || ""), d.anggota, ["nama", "tingkat_label", "nominal", "status", "tunggak"]), exTabel("Riwayat pembayaran", d.riwayat)]; },
+  produk: () => [exTabel("Produk", PRD && PRD.items, ["nama", "harga", "stok", "kategori", "deskripsi"])],
+  apex: () => [{nama: "Percakapan Tanya Apex", kolom: ["Dari", "Pesan"], baris: (APX || []).map(m => [m.role === "user" ? "Kamu" : "Apex", m.text || ""])}],
+  invoice: () => [exTabel("Invoice", IVD && IVD.items), exKV("Ringkasan", IVD && IVD.ringkas)],
+  hutang: () => [exTabel("Hutang", HB && HB.items, ["nama", "jumlah", "status", "tanggal", "catatan"]), exTabel("Sudah dikeluarkan", HB && HB.dikeluarkan)],
+  stok: () => [exTabel("Stok barang", STK && STK.items, ["nama", "jumlah", "satuan", "minimum", "kategori", "lokasi"])],
+  perpus: () => [exTabel("Perpustakaan", PPD && PPD.items, ["judul", "penulis", "kategori", "ringkasan", "link", "file_nama", "oleh", "publik"])],
+  skills: () => [exTabel("Skills", SKL && SKL.skills, ["nama", "bot", "pemicu", "deskripsi", "isi"])],
+  tim: () => [exKV("Pemakaian token", USE), exTabel("Bot", DATA, ["name", "peran", "status", "activity", "model", "calls", "tokens"])],
+};
+const exJudul = p => { const s = $("#p-" + p); const h = s && s.querySelector("h1"); return (h ? h.textContent : p).trim(); };
+const exNamaFile = (p, ext) => `MCI-${exJudul(p).replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${new Date().toISOString().slice(0, 10)}.${ext}`;
+function exAmbil(p) { let t = []; try { t = (EKSPOR[p] ? EKSPOR[p]() : []).filter(x => x && x.baris && x.baris.length); } catch (e) { console.warn("ekspor", e); } return t; }
+function exUnduh(nama, isi, mime) { const a = document.createElement("a"); a.href = URL.createObjectURL(isi instanceof Blob ? isi : new Blob([isi], {type: mime})); a.download = nama; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); }
+const exWaktu = () => new Date().toLocaleString("id-ID", {dateStyle: "long", timeStyle: "short"});
+function exTSV(ts) { const c = v => String(v ?? "").replace(/\t/g, " ").replace(/\r?\n/g, " / "); return ts.map(t => [t.nama, t.kolom.join("\t"), ...t.baris.map(r => r.map(c).join("\t"))].join("\n")).join("\n\n"); }
+function exTXT(p, ts) {
+  const out = [`${exJudul(p).toUpperCase()} · MCI`, `Diekspor ${exWaktu()} oleh ${ME.nama || ME.role || ""}`, ""];
+  ts.forEach(t => { out.push(`== ${t.nama} (${t.baris.length}) ==`, ""); t.baris.forEach((r, i) => { out.push(`${i + 1}.`); t.kolom.forEach((k, j) => { const v = String(r[j] ?? ""); if (v !== "") out.push(`   ${k}: ${v.replace(/\n/g, "\n      ")}`); }); out.push(""); }); });
+  return out.join("\n");
+}
+function exCSV(ts) { const c = v => { const s = String(v ?? ""); return /[",\n\r;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }; return "﻿" + ts.map(t => (ts.length > 1 ? `# ${c(t.nama)}\n` : "") + [t.kolom, ...t.baris].map(r => r.map(c).join(",")).join("\r\n")).join("\r\n\r\n"); }
+/* ---- XLSX tanpa library: ZIP (stored) + CRC32 ---- */
+const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(b) { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC_T[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function zipStored(files) {
+  const enc = new TextEncoder(), parts = [], central = []; let off = 0;
+  const u16 = n => [n & 255, (n >>> 8) & 255], u32 = n => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
+  files.forEach(([name, txt]) => {
+    const nm = enc.encode(name), data = enc.encode(txt), crc = crc32(data);
+    const head = [0x50, 0x4b, 3, 4, ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nm.length), ...u16(0)];
+    parts.push(new Uint8Array(head), nm, data);
+    central.push([0x50, 0x4b, 1, 2, ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nm.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(off)], nm);
+    off += head.length + nm.length + data.length;
+  });
+  let csz = 0; const cparts = []; for (let i = 0; i < central.length; i += 2) { const h = new Uint8Array(central[i]); cparts.push(h, central[i + 1]); csz += h.length + central[i + 1].length; }
+  const end = new Uint8Array([0x50, 0x4b, 5, 6, ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length), ...u32(csz), ...u32(off), ...u16(0)]);
+  return new Blob([...parts, ...cparts, end], {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+function exXLSX(ts) {
+  const x = s => String(s ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const col = i => { let s = ""; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
+  const pakai = new Set(); const nama = ts.map((t, i) => { let n = t.nama.replace(/[\[\]:*?\/\\]/g, " ").slice(0, 31).trim() || "Sheet" + (i + 1); while (pakai.has(n.toLowerCase())) n = n.slice(0, 28) + " " + (i + 1); pakai.add(n.toLowerCase()); return n; });
+  const sheets = ts.map(t => {
+    const lebar = t.kolom.map((k, j) => Math.min(60, Math.max(10, String(k).length + 2, ...t.baris.slice(0, 200).map(r => Math.min(60, String(r[j] ?? "").split("\n")[0].length + 2)))));
+    const sel = (v, r, c, s) => typeof v === "number" && isFinite(v) ? `<c r="${col(c)}${r}"${s ? ` s="${s}"` : ""}><v>${v}</v></c>` : `<c r="${col(c)}${r}" t="inlineStr"${s ? ` s="${s}"` : ""}><is><t xml:space="preserve">${x(v)}</t></is></c>`;
+    const rows = [`<row r="1">${t.kolom.map((k, c) => sel(k, 1, c, 1)).join("")}</row>`, ...t.baris.map((r, i) => `<row r="${i + 2}">${r.map((v, c) => sel(v, i + 2, c, 2)).join("")}</row>`)];
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${lebar.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join("")}</cols><sheetData>${rows.join("")}</sheetData>${t.baris.length ? `<autoFilter ref="A1:${col(t.kolom.length - 1)}${t.baris.length + 1}"/>` : ""}</worksheet>`;
+  });
+  const files = [
+    ["[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((s, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}</Types>`],
+    ["_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ["xl/workbook.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${nama.map((n, i) => `<sheet name="${x(n)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join("")}</sheets></workbook>`],
+    ["xl/_rels/workbook.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((s, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join("")}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ["xl/styles.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF14284B"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`],
+    ...sheets.map((s, i) => [`xl/worksheets/sheet${i + 1}.xml`, s]),
+  ];
+  return zipStored(files);
+}
+function exPDF(p, ts) {
+  const e = s => esc(String(s ?? "")), lebar = Math.max(...ts.map(t => t.kolom.length));
+  const html = `<!doctype html><html lang="id"><head><meta charset="utf-8"><title>${e(exNamaFile(p, "pdf").replace(/\.pdf$/, ""))}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>@page{size:A4 ${lebar > 5 ? "landscape" : "portrait"};margin:14mm 12mm}*{box-sizing:border-box}body{margin:0;font:10.5px/1.45 Inter,Arial,sans-serif;color:#1B2335}
+  header{display:flex;align-items:center;gap:14px;border-bottom:1.5px solid #A88A55;padding-bottom:10px;margin-bottom:14px}header img{width:54px;height:54px}
+  h1{margin:0;font:700 22px 'Cormorant Garamond',Georgia,serif;color:#0F1E3A}header small{display:block;color:#5E6678;font-size:10px;letter-spacing:.06em}
+  h2{font:700 15px 'Cormorant Garamond',Georgia,serif;color:#0F1E3A;margin:16px 0 6px}table{width:100%;border-collapse:collapse;page-break-inside:auto}
+  th{background:#14284B;color:#fff;text-align:left;font-weight:600;padding:5px 6px;font-size:9.5px}td{padding:5px 6px;border-bottom:1px solid #E4DFD3;vertical-align:top;white-space:pre-wrap;word-break:break-word}
+  tr:nth-child(even) td{background:#F6F4EF}tr{page-break-inside:avoid}footer{margin-top:14px;color:#8a8f9c;font-size:9px;text-align:right}</style></head><body>
+  <header><img src="${location.origin}/aset/logo-mci-192.webp" alt=""><div><h1>${e(exJudul(p))}</h1><small>MAHARDIKA CAKRAWALA INDONESIA · Diekspor ${e(exWaktu())}${ME.nama ? " oleh " + e(ME.nama) : ""}</small></div></header>
+  ${ts.map(t => `<h2>${e(t.nama)} (${t.baris.length})</h2><table><thead><tr>${t.kolom.map(k => `<th>${e(k)}</th>`).join("")}</tr></thead><tbody>${t.baris.map(r => `<tr>${r.map(v => `<td>${e(v)}</td>`).join("")}</tr>`).join("")}</tbody></table>`).join("")}
+  <footer>Trimatra Vijaya Mahe · Dokumen internal MCI</footer></body></html>`;
+  if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {   // HP: buka di tab baru, lalu Bagikan/Cetak -> Simpan PDF
+    const u = URL.createObjectURL(new Blob([html.replace("</body>", "<script>onload=()=>setTimeout(()=>print(),600)<\/script></body>")], {type: "text/html"}));
+    const w = window.open(u, "_blank"); if (!w) location.href = u; setTimeout(() => URL.revokeObjectURL(u), 120000); return;
+  }
+  const f = document.createElement("iframe"); f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
+  document.body.appendChild(f); f.srcdoc = html;
+  f.onload = () => setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (er) { alert("Browser menolak mencetak: " + er.message); } setTimeout(() => f.remove(), 60000); }, 700);
+}
+async function exJalan(p, fmt) {
+  const ts = exAmbil(p);
+  if (!ts.length) { alert("Belum ada data untuk diekspor di halaman ini."); return; }
+  if (fmt === "salin") { const t = exTSV(ts); try { await navigator.clipboard.writeText(t); } catch (e) { const a = document.createElement("textarea"); a.value = t; document.body.appendChild(a); a.select(); document.execCommand("copy"); a.remove(); } exToast(`Tersalin: ${ts.reduce((s, t) => s + t.baris.length, 0)} baris`); }
+  else if (fmt === "txt") exUnduh(exNamaFile(p, "txt"), exTXT(p, ts), "text/plain;charset=utf-8");
+  else if (fmt === "csv") exUnduh(exNamaFile(p, "csv"), exCSV(ts), "text/csv;charset=utf-8");
+  else if (fmt === "xlsx") exUnduh(exNamaFile(p, "xlsx"), exXLSX(ts));
+  else if (fmt === "pdf") exPDF(p, ts);
+}
+function exToast(m) { const e = $("#tst"); if (!e) return; e.textContent = m; e.hidden = false; clearTimeout(exToast.t); exToast.t = setTimeout(() => e.hidden = true, 1600); }
+function exPasang() {   // tombol "Ekspor" di setiap halaman yang punya data
+  Object.keys(EKSPOR).forEach(p => {
+    const s = $("#p-" + p); if (!s || s.querySelector(":scope > .exw")) return;
+    const w = document.createElement("div"); w.className = "exw";
+    w.innerHTML = `<button class="exb" type="button" aria-haspopup="true" aria-expanded="false">Ekspor</button><div class="exm" role="menu" hidden>${[["salin", "Salin"], ["txt", "TXT"], ["csv", "CSV"], ["pdf", "PDF"], ["xlsx", "Excel"]].map(f => `<button type="button" role="menuitem" data-exf="${f[0]}">${f[1]}</button>`).join("")}</div>`;
+    s.prepend(w);
+    const b = w.querySelector(".exb"), m = w.querySelector(".exm");
+    b.onclick = ev => { ev.stopPropagation(); const buka = m.hidden; $$(".exm").forEach(x => x.hidden = true); $$(".exb").forEach(x => x.setAttribute("aria-expanded", "false")); m.hidden = !buka; b.setAttribute("aria-expanded", String(buka)); };
+    m.querySelectorAll("[data-exf]").forEach(x => x.onclick = () => { m.hidden = true; b.setAttribute("aria-expanded", "false"); exJalan(p, x.dataset.exf); });
+  });
+  document.addEventListener("click", () => $$(".exm").forEach(x => x.hidden = true));
+}
+exPasang();
 
 /* Blacklist (khusus Secret Service + Dev) */
 async function loadBlacklist(d) {
