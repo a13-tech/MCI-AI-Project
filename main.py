@@ -104,8 +104,16 @@ except ValueError:
 
 TANPA_LATEX = ("\n\nFORMAT: jangan pakai LaTeX atau tanda dolar untuk rumus (web dan Telegram tidak bisa menampilkannya). "
                "Tulis rumus sebagai teks biasa, contoh: R = (V sumber - Vf) / If, dan satuan ditulis biasa: 5V, 20mA, 220 ohm atau 220Ω.")
-CAVEMAN = ("\n\nMODE CAVEMAN AKTIF: jawab sesingkat mungkin, kalimat pendek gaya telegram, tanpa basa-basi, "
-           "tanpa pembuka atau penutup. Kode, angka, satuan, dan peringatan keselamatan tetap utuh dan akurat.")
+CAVEMAN = ("\n\nMODE HEMAT AKTIF: jawab singkat tanpa basa-basi, tanpa pembuka atau penutup, tapi tetap pakai kalimat utuh yang sederhana "
+           "dan mudah dipahami (bukan gaya telegram yang terpotong-potong). Kode, angka, satuan, dan peringatan keselamatan tetap utuh dan akurat.")
+GAYA_JAWAB = ("\n\nGAYA JAWABAN (wajib, pembaca banyak yang pemula):\n"
+              "- Kalimat pertama langsung menjawab inti pertanyaan dengan bahasa sehari-hari.\n"
+              "- Kalimat pendek (paling banyak sekitar 20 kata), satu ide per kalimat. Hindari paragraf panjang.\n"
+              "- Setiap istilah teknis dijelaskan singkat dengan kata biasa, kalau membantu beri perumpamaan sehari-hari.\n"
+              "- Kalau ada langkah, pakai daftar bernomor, paling banyak 5 poin.\n"
+              "- Jangan menumpuk angka, data, atau pilihan yang tidak ditanya. Kalau ada rincian tambahan, tawarkan di akhir dalam satu kalimat.\n"
+              "- Panjang ideal di bawah 150 kata, kecuali pengguna meminta penjelasan lengkap atau dokumen.\n"
+              "- Jangan pakai tabel besar dan jangan menebalkan banyak kata.")
 
 # Web & Telegram tidak merender LaTeX: ubah rumus ($R = \\frac{a}{b}$) jadi teks biasa agar tidak tampil simbol aneh
 _LATEX_GANTI = [(r"\\Omega", "Ω"), (r"\\times", "×"), (r"\\cdot", "·"), (r"\\approx", "≈"), (r"\\pm", "±"), (r"\\leq?", "≤"), (r"\\geq?", "≥"),
@@ -619,7 +627,7 @@ async def ask(key, text, history=None, parts=None, schema=None, model=None, act=
     if SET["caveman"] or brief:
         sysp += CAVEMAN
     if not schema:
-        sysp += TANPA_LATEX
+        sysp += GAYA_JAWAB + TANPA_LATEX
     contents = (history or []) + [types.Content(role="user", parts=[types.Part(text=text)] + (parts or []))]
     ck = None
     if cache and not history and not parts:
@@ -3659,7 +3667,7 @@ def api_uu_tanya():
     prompt = ("Kamu menjawab pertanyaan anggota MCI tentang Undang-Undang MCI. Jawab HANYA berdasarkan teks UU di bawah. "
               "Sebutkan nomor pasal yang jadi dasar (contoh: 'Menurut Pasal 15 ...'). Kalau ada hitungan uang, hitung langkah demi langkah dengan angka dari pasal. "
               "Kalau UU tidak mengaturnya, katakan terus terang bahwa UU belum mengatur hal itu dan sarankan bertanya ke Dewan Pengawas. "
-              "Bahasa Indonesia santai tapi jelas, maksimal 8 kalimat, tanpa markdown tebal.\n\n=== UU MCI ===\n" + uu_teks() + "\n=== AKHIR UU ===\n\nPertanyaan: " + q)
+              "Bahasa Indonesia sehari-hari, kalimat pendek, maksimal 6 kalimat, tanpa markdown tebal. Kalau ada hitungan, tulis per langkah singkat.\n\n=== UU MCI ===\n" + uu_teks() + "\n=== AKHIR UU ===\n\nPertanyaan: " + q)
     try:
         teks = asyncio.run_coroutine_threadsafe(ask("scribe", prompt, use_mcp=False, cache=True, act="Menjawab pertanyaan UU MCI"), LOOP).result(90) if LOOP else ""
     except Exception as e:

@@ -324,6 +324,24 @@ td{border-top:1px solid var(--line)}
 .hcl{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}.hcl div{border:1px solid #2E4470;border-radius:8px;padding:9px 12px}
 .hcl b{display:block;color:#F2EBDD}.hcl span{font-size:12px;color:var(--gold2)}
 .hc summary{color:var(--gold2)!important}.hc .mm label{background:#14284B;border-color:#2E4470;color:#E9E4D8}
+#voWrap.fs{position:fixed;inset:0;z-index:9000;background:#0a1638;display:flex;flex-direction:column;padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
+#voWrap:fullscreen{background:#0a1638;display:flex;flex-direction:column;padding:10px}
+#voWrap.fs #stage,#voWrap:fullscreen #stage{flex:1;height:auto;min-height:0;margin:0;border-radius:12px}
+#voWrap.fs #views,#voWrap:fullscreen #views{padding:0 0 10px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}#voWrap.fs #views::-webkit-scrollbar,#voWrap:fullscreen #views::-webkit-scrollbar{display:none}#voWrap.fs #views .grp,#voWrap:fullscreen #views .grp{flex-wrap:nowrap;flex:none}
+#voWrap.fs #views .lbl,#voWrap:fullscreen #views .lbl{color:#9AA6BD}
+#voWrap.fs .vb,#voWrap:fullscreen .vb{background:rgba(255,255,255,.06);color:#E2EAFB;border-color:rgba(255,255,255,.18)}
+#voWrap.fs .vb.on,#voWrap:fullscreen .vb.on{background:var(--gold);color:var(--navy2);border-color:var(--gold)}
+body.nofs{overflow:hidden}
+/* penampil foto / file di dalam aplikasi */
+#viewer{position:fixed;inset:0;z-index:9500;background:rgba(6,12,26,.94);display:flex;flex-direction:column}
+#viewer[hidden]{display:none}
+#viewer .vh{display:flex;align-items:center;gap:8px;padding:max(10px,env(safe-area-inset-top)) 12px 10px;color:#E9E4D8}
+#viewer .vh b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+#viewer .vh button,#viewer .vh a{font:600 13.5px 'Instrument Sans',system-ui,sans-serif;background:#E9E4D8;color:#0F1E3A;border:0;border-radius:6px;padding:9px 14px;min-height:40px;text-decoration:none;display:inline-flex;align-items:center;cursor:pointer}
+#viewer .vh a{background:transparent;color:#E9E4D8;border:1px solid rgba(233,228,216,.35)}
+#viewer .vb2{flex:1;min-height:0;display:grid;place-items:center;padding:0 10px max(10px,env(safe-area-inset-bottom));overflow:auto}
+#viewer img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px;background:#fff}
+#viewer iframe{width:100%;height:100%;border:0;border-radius:6px;background:#fff}
 .pg{position:relative}.exw{position:absolute;top:0;right:0;z-index:5}
 .exb{font:600 12px 'Instrument Sans',Inter,system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--navy);background:var(--paper);border:1px solid var(--line2);border-radius:6px;padding:7px 12px;cursor:pointer}
 .exb::after{content:"";display:inline-block;margin-left:7px;border:4px solid transparent;border-top-color:currentColor;transform:translateY(2px)}
@@ -402,6 +420,7 @@ main .bar .seg button{color:var(--mute);font-weight:600}main .bar .seg button.on
 <div class="adm" id="adm" hidden><form id="admF"><b>MASUK</b><p>Masukkan token pribadi kamu (diawali nama depan) atau token admin.</p>
  <input type="password" id="admT" autocomplete="current-password" aria-label="Token akses" placeholder="Token akses">
  <div class="er" id="admE" role="alert"></div><div class="bar"><button type="button" class="bt o" id="admX">Batal</button><button class="bt g">Masuk</button></div></form></div>
+<div id="viewer" hidden role="dialog" aria-modal="true" aria-label="Penampil"><div class="vh"><button type="button" id="vwTutup">← Kembali</button><b id="vwJudul"></b><a id="vwUnduh" href="#" download>Unduh</a></div><div class="vb2" id="vwIsi"></div></div>
 <div class="tst" id="tst" hidden></div>
 <main>
  <div class="demo" id="demoBanner" hidden>DEMO: semua data contoh. Tanpa server dan tanpa AI sungguhan.</div>
@@ -432,6 +451,7 @@ main .bar .seg button{color:var(--mute);font-weight:600}main .bar .seg button.on
  <section id="p-office" class="pg" hidden>
   <h1>Virtual Office · Gedung MCI</h1>
   <p class="mu">Pilih tampilan gedung, lantai, atau ruangan. Seret untuk memutar, cubit atau scroll untuk zoom, klik nama bot untuk mengikutinya.</p>
+  <div id="voWrap">
   <div id="views">
    <div class="grp"><button class="vb on" data-view="gedung">Gedung</button></div>
    <div class="grp"><span class="lbl">LANTAI</span><button class="vb" data-view="f0">LT 1</button><button class="vb" data-view="f1">LT 2</button><button class="vb" data-view="f2">LT 3</button><button class="vb" data-view="f3">LT 4</button></div>
@@ -440,10 +460,11 @@ main .bar .seg button{color:var(--mute);font-weight:600}main .bar .seg button.on
   <div id="stage">
    <div id="chips"></div>
    <button id="pip" type="button" aria-label="Peta atas, ketuk untuk ganti lantai"><b id="pipTxt">PETA LT 1</b></button>
-   <div class="ovl" id="tools"><button class="ob on" id="hnBot" aria-pressed="true" title="Tampilkan atau sembunyikan nama bot">Nama bot</button><button class="ob on" id="hnTempat" aria-pressed="true" title="Tampilkan atau sembunyikan nama tempat">Nama tempat</button><button class="ob" id="pipBtn" aria-pressed="false">Peta atas</button><button class="ob" id="zIn" aria-label="Zoom masuk">+</button><button class="ob" id="zOut" aria-label="Zoom keluar">−</button></div>
+   <div class="ovl" id="tools"><button class="ob on" id="hnBot" aria-pressed="true" title="Tampilkan atau sembunyikan nama bot">Nama bot</button><button class="ob on" id="hnTempat" aria-pressed="true" title="Tampilkan atau sembunyikan nama tempat">Nama tempat</button><button class="ob" id="pipBtn" aria-pressed="false">Peta atas</button><button class="ob" id="zIn" aria-label="Zoom masuk">+</button><button class="ob" id="zOut" aria-label="Zoom keluar">−</button><button class="ob" id="voFull" type="button" aria-pressed="false" title="Layar penuh">⛶ Layar penuh</button></div>
    <div class="ovl" id="follow" hidden><span id="followTxt"></span><button id="unfollow">Lepas</button></div>
    <div class="ovl" id="where">Gedung MCI</div>
    <div class="ovl" id="legend"><span><i style="background:#ef4444"></i>Bekerja</span><span><i style="background:#f59e0b"></i>Berpikir</span><span><i style="background:#a78bfa"></i>Sidang</span><span><i style="background:#38bdf8"></i>Istirahat</span><span><i style="background:#22c55e"></i>Siaga</span></div>
+  </div>
   </div>
   <div class="fls" id="sl"></div>
  </section>
@@ -1238,6 +1259,7 @@ function renderKuota() {
 }
 let ME = {}, DATA = [], LOG = [], KAS = null, PV = [], USE = null, MODE = "boss", SKL = {skills: [], bots: []};
 function show(p) {
+  if (p !== "office" && typeof voKeluar === "function") voKeluar(false);
   $$(".pg").forEach(e => e.hidden = e.id !== "p-" + p);
   $$(".nv").forEach(b => b.classList.toggle("on", b.dataset.p === p));
   OFFICE.setVisible(p === "office");
@@ -5039,6 +5061,48 @@ const OFFICE = (() => {
 function navGrup() {   // judul kelompok menu disembunyikan kalau semua menu di bawahnya tersembunyi
   $$("#sd .ng").forEach(g => { let n = g.nextElementSibling, ada = false; while (n && n.classList.contains("nv")) { if (n.style.display !== "none") ada = true; n = n.nextElementSibling; } if (g.textContent) g.hidden = !ada; });
 }
+/* ================= PENAMPIL FOTO/FILE DI DALAM APLIKASI (ada tombol Kembali; tombol back HP juga menutup) ================= */
+const VW_POLA = /^\/api\/(iuran\/\d+\/foto|invoice\/\d+\/bukti|stok\/\d+\/gambar|produk\/\d+\/foto|perpus\/\d+\/(file|sampul)|gambar\/\d+|dokumentasi\/\d+)(\?.*)?$/;
+function vwBuka(url, judul) {
+  const u = new URL(url, location.href), gbr = !/\/perpus\/\d+\/file|\/dokumentasi\/\d+/.test(u.pathname);
+  $("#vwJudul").textContent = judul || (gbr ? "Foto" : "Dokumen");
+  $("#vwUnduh").href = u.pathname + (u.pathname.includes("/perpus/") && u.pathname.endsWith("/file") ? "?unduh=1" : "");
+  $("#vwIsi").innerHTML = gbr ? `<img src="${esc(u.pathname + u.search)}" alt="${esc(judul || "Foto")}">` : `<iframe src="${esc(u.pathname + u.search)}" title="${esc(judul || "Dokumen")}"></iframe>`;
+  $("#viewer").hidden = false; document.body.classList.add("nofs");
+  history.pushState({viewer: 1}, ""); $("#vwTutup").focus();
+}
+function vwTutup(dariBack) {
+  if ($("#viewer").hidden) return;
+  $("#viewer").hidden = true; $("#vwIsi").innerHTML = ""; if (!$("#voWrap").classList.contains("fs")) document.body.classList.remove("nofs");
+  if (!dariBack && history.state && history.state.viewer) history.back();
+}
+$("#vwTutup").onclick = () => vwTutup(false);
+document.addEventListener("click", e => {
+  const a = e.target.closest && e.target.closest("a[href]"); if (!a || e.ctrlKey || e.metaKey || a.hasAttribute("download") || a.closest("#viewer")) return;
+  const u = new URL(a.getAttribute("href"), location.href); if (u.origin !== location.origin || !VW_POLA.test(u.pathname) || u.searchParams.get("unduh") === "1") return;
+  e.preventDefault();
+  const img = a.querySelector("img"); vwBuka(u.href, (img && img.alt) || a.textContent.trim() || "");
+});
+addEventListener("popstate", () => { vwTutup(true); voKeluar(true); });
+addEventListener("keydown", e => { if (e.key === "Escape") { vwTutup(false); voKeluar(false); } });
+
+/* ================= VIRTUAL OFFICE: LAYAR PENUH ================= */
+function voAktif() { return $("#voWrap").classList.contains("fs"); }
+function voUpdate() { const on = voAktif(); $("#voFull").textContent = on ? "✕ Keluar layar penuh" : "⛶ Layar penuh"; $("#voFull").setAttribute("aria-pressed", String(on)); }
+function voMasuk() {   // layar penuh selalu jalan (CSS), lalu minta browser menyembunyikan address bar bila didukung
+  $("#voWrap").classList.add("fs"); document.body.classList.add("nofs"); voUpdate();
+  const el = document.documentElement, riwayat = () => history.pushState({vofs: 1}, "");   // supaya tombol back HP menutup layar penuh versi CSS
+  if (el.requestFullscreen && !/iPhone|iPod/i.test(navigator.userAgent)) el.requestFullscreen({navigationUI: "hide"}).then(() => { try { screen.orientation.lock("landscape").catch(() => {}); } catch (e) {} }).catch(riwayat);
+  else riwayat();
+}
+function voKeluar(dariBack) {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  if (voAktif()) { $("#voWrap").classList.remove("fs"); if ($("#viewer").hidden) document.body.classList.remove("nofs"); if (!dariBack && history.state && history.state.vofs) history.back(); }
+  voUpdate();
+}
+$("#voFull").onclick = () => voAktif() ? voKeluar(false) : voMasuk();
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && voAktif()) voKeluar(false); else if (document.fullscreenElement && !voAktif()) document.exitFullscreen().catch(() => {}); });   // keluar lewat Esc/tombol browser
+
 /* ================= APLIKASI (PWA) ================= */
 let PASANG = null;
 const APP_MODE = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
