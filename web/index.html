@@ -377,6 +377,7 @@ main .bar .seg button,#uuDok button{color:var(--mute);font-weight:600}main .bar 
  <button class="nv" data-p="inbox">Inbox <span class="nb" id="nbInbox" hidden>0</span></button>
  <button class="nv" data-p="pengumuman">Pengumuman</button>
  <button class="nv" data-p="berita">Berita Hari Ini</button>
+ <button class="nv" data-p="info">Pusat Info</button>
  <div class="ng">Organisasi</div>
  <button class="nv" data-p="agenda">Agenda &amp; Rapat</button>
  <button class="nv" data-p="tugas">Tugas</button>
@@ -843,6 +844,18 @@ main .bar .seg button,#uuDok button{color:var(--mute);font-weight:600}main .bar 
   </div>
  </section>
 
+ <section id="p-info" class="pg" hidden>
+  <h1>Pusat Info</h1>
+  <p class="mu">Tanya apa saja tentang MCI: siapa kami, divisi, produk, jam admin, atau buku di Perpustakaan. AI di sini hanya membaca <b>informasi publik</b>, jadi data internal anggota (kas, aturan internal, data pribadi) memang tidak bisa dijawab.</p>
+  <div class="cd">
+   <div class="apx" id="piLog" aria-live="polite"></div>
+   <div class="apxs" id="piSaran"></div>
+   <div class="bar" style="margin:12px 0 0;align-items:flex-end"><textarea id="piIn" rows="2" maxlength="500" placeholder="Contoh: MCI itu organisasi apa?" style="flex:1 1 60%;min-width:220px" aria-label="Pertanyaan untuk Pusat Info"></textarea>
+    <button class="bt g" type="button" id="piKirim">Kirim</button><button class="bt o" type="button" id="piHapus">Obrolan baru</button></div>
+   <div class="mu" id="piMsg" style="font-size:12.5px;margin-top:6px">Enter = kirim · Shift+Enter = baris baru.</div>
+  </div>
+ </section>
+
  <section id="p-invoice" class="pg" hidden>
   <h1>Invoice</h1>
   <p class="mu">Tagihan digital untuk pembeli. Item bisa diambil dari <b>produk jualan</b>, <b>stok gudang</b>, atau diketik manual; harga dibekukan di invoice. Stok gudang <b>dibooking saat dikirim</b>, <b>dikurangi saat lunas</b>, dan <b>kembali kalau dibatalkan</b>. Pembeli membuka link acak (tanpa login) dan bisa mengunggah bukti bayar. Membuat invoice: Dev, Manager, Bendahara. Menandai <b>lunas</b> (barang dikurangi diskon masuk Kas · Penjualan; ongkir masuk tabel Dana Ongkir): <b>Bendahara dan Dev</b>.</p>
@@ -1279,6 +1292,7 @@ function show(p) {
   if (p === "bayarkas") loadBayarKas();
   if (p === "produk") loadProduk();
   if (p === "invoice") loadInvoice();
+  if (p === "info") piBuka();
   if (p === "apex") { apxRender(); setTimeout(() => $("#apxIn").focus(), 50); }
   if (p === "hutang") loadHutang();
   if (p === "anggota") loadAnggota();
@@ -2182,6 +2196,7 @@ const EKSPOR = {
   berita: () => [exTabel("Berita " + (BRK || ""), BRD && BRD.items, ["judul", "sumber", "waktu", "url"])],
   bayarkas: () => { const d = BKD; if (!d) return []; return [exTabel("Bayar kas " + (d.label || ""), d.anggota, ["nama", "tingkat_label", "nominal", "status", "tunggak"]), exTabel("Riwayat pembayaran", d.riwayat)]; },
   produk: () => [exTabel("Produk", PRD && PRD.items, ["nama", "harga", "stok", "kategori", "deskripsi"])],
+  info: () => [{nama: "Percakapan Pusat Info", kolom: ["Dari", "Pesan"], baris: PI.filter(m => !m.galat).map(m => [m.role === "user" ? "Kamu" : "Pusat Info", m.text || ""])}],
   apex: () => [{nama: "Percakapan Tanya Apex", kolom: ["Dari", "Pesan"], baris: (APX || []).map(m => [m.role === "user" ? "Kamu" : "Apex", m.text || ""])}],
   invoice: () => [exTabel("Invoice", IVD && IVD.items), exKV("Ringkasan", IVD && IVD.ringkas)],
   hutang: () => [exTabel("Hutang", HB && HB.items, ["nama", "jumlah", "status", "tanggal", "catatan"]), exTabel("Sudah dikeluarkan", HB && HB.dikeluarkan)],
@@ -2752,6 +2767,43 @@ $("#apxKirim").onclick = () => apxTanya();
 $("#apxIn").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); apxTanya(); } };
 $("#apxHapus").onclick = () => { if (APX_BUSY) return; APX = []; apxRender(); };
 apxRender();
+
+/* ===== Pusat Info: pengunjung tanya AI tentang MCI (server hanya memberi AI data publik) ===== */
+let PI = [], PI_BUSY = false, PI_SISA = null, PI_AKTIF = true;
+const PI_SARAN = ["MCI itu organisasi apa?", "Divisi di MCI apa saja?", "Produk apa yang dijual MCI?", "Kapan jam kerja admin?"];
+function piRender() {
+  const lg = $("#piLog");
+  lg.innerHTML = (PI.length ? "" : '<div class="m a">Halo! Aku Pusat Info MCI. Mau tahu apa tentang MCI? Tanya saja, atau pilih contoh pertanyaan di bawah.</div>')
+    + PI.map(x => x.role === "user" ? `<div class="m u">${esc(x.text)}</div>` : `<div class="m a${x.galat ? " g" : ""}">${apxMd(x.text)}</div>`).join("")
+    + (PI_BUSY ? '<div class="tp">Pusat Info sedang mengetik…</div>' : "");
+  lg.scrollTop = lg.scrollHeight;
+  $("#piKirim").disabled = PI_BUSY || !PI_AKTIF || PI_SISA === 0; $("#piSaran").hidden = PI.length > 0 || !PI_AKTIF;
+  $("#piMsg").textContent = !PI_AKTIF ? "Pusat Info belum aktif. Admin perlu memasang key AI dulu."
+    : "Enter = kirim · Shift+Enter = baris baru" + (PI_SISA != null ? ` · sisa ${PI_SISA} pertanyaan jam ini` : "");
+}
+async function piBuka() {
+  piRender(); setTimeout(() => $("#piIn").focus(), 50);
+  try { const d = await fetch("/api/pusat-info", {headers: {"X-MCI": "1"}}).then(r => r.json()); PI_AKTIF = !!d.aktif; PI_SISA = d.sisa; } catch (e) {}
+  piRender();
+}
+async function piTanya(teks) {
+  teks = String(teks == null ? $("#piIn").value : teks).trim(); if (!teks || PI_BUSY || !PI_AKTIF) return;
+  const riwayat = PI.filter(x => !x.galat).slice(-6).map(x => ({role: x.role, text: x.text}));
+  PI.push({role: "user", text: teks}); $("#piIn").value = ""; PI_BUSY = true; piRender();
+  try {
+    const r = await fetch("/api/pusat-info", {method: "POST", headers: {"X-MCI": "1", "Content-Type": "application/json"}, body: JSON.stringify({pesan: teks, riwayat})});
+    const d = await r.json().catch(() => ({}));
+    if (d.sisa != null) PI_SISA = d.sisa;
+    if (!r.ok) throw new Error(d.error || "Gagal menghubungi Pusat Info");
+    PI.push({role: "model", text: d.jawaban});
+  } catch (e) { PI.push({role: "model", text: "⚠️ " + e.message, galat: true}); }
+  PI_BUSY = false; piRender(); $("#piIn").focus();
+}
+$("#piSaran").innerHTML = PI_SARAN.map(q => `<button type="button">${esc(q)}</button>`).join("");
+$$("#piSaran button").forEach(b => b.onclick = () => piTanya(b.textContent));
+$("#piKirim").onclick = () => piTanya();
+$("#piIn").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); piTanya(); } };
+$("#piHapus").onclick = () => { if (PI_BUSY) return; PI = []; piRender(); };
 
 /* ===== Invoice digital: item dari produk / stok gudang / manual; stok dibooking saat dikirim, dikurangi saat lunas ===== */
 let IVD = null, IVI = [], IVEDIT = "";
