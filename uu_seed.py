@@ -5,7 +5,7 @@ baris yang belum pernah diubah lewat web. Baris yang sudah diedit Dev di web tid
 Format isi: satu baris = satu ayat. Awali "* " untuk ayat, "** " untuk rincian di bawah ayat.
 """
 
-UU_VERSI = 3
+UU_VERSI = 4
 
 UU_SEED = {
     "info": "UNDANG-UNDANG MAHARDIKA CAKRAWALA INDONESIA (UU MCI)\n"
@@ -96,6 +96,15 @@ UU_SEED = {
                 "* Perubahan Undang-Undang ini sah jika disetujui lebih dari separuh anggota.\n"
                 "* Undang-Undang ini berlaku sejak disahkan oleh anggota.",
          "artinya": "pelanggaran umum ditangani bertahap dan anggota boleh membela diri. Undang-Undang dapat diubah jika lebih dari separuh anggota setuju."},
+        {"bab": "BAB VI. TATA TERTIB DAN SANKSI", "nomor": 19, "judul": "Absen Harian",
+         "isi": "* Setiap anggota wajib mengisi absen harian di web MCI setiap hari Senin sampai Sabtu, paling lambat pukul 23.59 WIB. Hari Minggu libur.\n"
+                "* Sebelum absen, anggota wajib menjawab satu soal kuis dengan benar. Jika jawabannya salah, anggota mendapat soal lain sampai benar.\n"
+                "* Anggota yang berhalangan wajib mengajukan izin melalui web. Izin disetujui atau ditolak oleh pengurus yang berwenang. Hari yang diizinkan tidak dihitung bolos.\n"
+                "* Hari tanpa absen dan tanpa izin yang disetujui dihitung sebagai bolos. Jumlah bolos dihitung keseluruhan sejak absen harian berlaku.\n"
+                "* Anggota diberi peringatan saat bolos mencapai 4 kali dan 5 kali.\n"
+                "* Anggota yang bolos lebih dari 5 kali otomatis dikeluarkan dari MCI. Ketentuan ini adalah pengecualian dari sanksi bertahap pada Pasal 18.\n"
+                "* Anggota yang dikeluarkan karena absen dapat mengajukan keberatan kepada Pemilik MCI. Jika Pemilik MCI memulihkannya, hitungan bolos dimulai lagi dari nol.",
+         "artinya": "isi absen setiap hari kecuali Minggu dan jawab kuisnya. Kalau berhalangan, minta izin. Bolos lebih dari 5 kali berarti otomatis keluar."},
     ],
 }
 

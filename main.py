@@ -10,9 +10,9 @@ Prinsip hemat token (Gemini Tier 1):
 
 Studio Gambar: Cloudflare Workers AI (FLUX schnell + img2img), gratis 10.000 neuron/hari.
 """
-import os, io, csv, json, re, time, gzip, base64, asyncio, secrets, logging, sqlite3, threading, contextlib, hashlib, zipfile
+import os, io, csv, json, re, time, gzip, random, base64, asyncio, secrets, logging, sqlite3, threading, contextlib, hashlib, zipfile
 from collections import deque, OrderedDict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, date, timedelta, timezone
 from html import unescape as _unesc
 from email.utils import parsedate_to_datetime
 import xml.etree.ElementTree as ET
@@ -281,6 +281,10 @@ def db_init():
                "jawaban_ai TEXT, balasan TEXT, dibalas_oleh TEXT, status TEXT, dibuat TEXT, dibalas TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS proyek_kas (id {pk}, proyek_id INTEGER NOT NULL, tanggal TEXT NOT NULL, jenis TEXT NOT NULL, keterangan TEXT, "
                f"masuk {big} NOT NULL DEFAULT 0, keluar {big} NOT NULL DEFAULT 0, mitra TEXT, jatuh_tempo TEXT, ref INTEGER, status TEXT, bukti TEXT, oleh TEXT, dibuat TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS absen (id {pk}, anggota INTEGER NOT NULL, tanggal TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'kuis', "
+               f"idx INTEGER NOT NULL DEFAULT 0, salah INTEGER NOT NULL DEFAULT 0, jam TEXT, dibuat TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS absen_izin (id {pk}, anggota INTEGER NOT NULL, tanggal TEXT NOT NULL, alasan TEXT, status TEXT NOT NULL DEFAULT 'menunggu', oleh TEXT, dibuat TEXT)")
+        sql(c, "CREATE TABLE IF NOT EXISTS kuis (tanggal TEXT PRIMARY KEY, data TEXT NOT NULL, sumber TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS pusat_info (id {pk}, ip TEXT NOT NULL, tanya TEXT NOT NULL, jawab TEXT, token {big} NOT NULL DEFAULT 0, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS stok (id {pk}, nama TEXT NOT NULL, jumlah {big} NOT NULL DEFAULT 0, satuan TEXT, kategori TEXT, minimum {big} NOT NULL DEFAULT 0, catatan TEXT, mime TEXT, gambar TEXT, diubah TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS laporan (id {pk}, minggu TEXT, dibuat TEXT, dari TEXT, sampai TEXT, sumber TEXT, isi TEXT, data TEXT)")
@@ -2126,6 +2130,11 @@ async def laporan_jadwal():
         except Exception:
             log.exception("Cek hutang telat gagal")
         try:
+            for nama in await asyncio.to_thread(absen_cek):
+                log.info("Anggota dikeluarkan (absen): %s", nama)
+        except Exception:
+            log.exception("Cek absen gagal")
+        try:
             await asyncio.to_thread(pk_cek_pinjaman)
         except Exception:
             log.exception("Cek pinjaman mitra proyek gagal")
@@ -3287,10 +3296,11 @@ IZIN_PILIHAN.update({
     "rapat_kelola": "Kelola Agenda & Rapat", "tugas_kelola": "Bagi & kelola Tugas", "umum_kelola": "Terbitkan Pengumuman",
     "proyek_kelola": "Kelola Proyek", "konten_kelola": "Kelola Jadwal Konten", "sidang": "Dewan: Pelanggaran, Sidang & Putusan",
 })
+IZIN_PILIHAN["absen_kelola"] = "Kelola absen harian & setujui izin"
 IZIN_BARU_DEFAULT = {   # berlaku walau struktur sudah pernah disimpan Dev (izin ini baru ada)
-    "manager": {"rapat_kelola", "tugas_kelola", "umum_kelola", "proyek_kelola", "konten_kelola"},
+    "manager": {"rapat_kelola", "tugas_kelola", "umum_kelola", "proyek_kelola", "konten_kelola", "absen_kelola"},
     "pj": {"rapat_kelola", "tugas_kelola", "proyek_kelola"},
-    "sekretaris": {"rapat_kelola", "umum_kelola"},
+    "sekretaris": {"rapat_kelola", "umum_kelola", "absen_kelola"},
     "bendahara": {"umum_kelola"},
     "designer": {"konten_kelola"},
     "dokumentasi": {"konten_kelola"},   # divisi
@@ -3937,6 +3947,366 @@ def pk_cek_pinjaman():
     if kirim:
         set_save()
     return kirim
+
+
+# ---------- ABSEN HARIAN + KUIS (UU MCI Pasal 19) ----------
+# Senin–Sabtu wajib absen di web; Minggu libur. Sebelum absen, jawab 1 kuis sampai benar (salah = soal lain).
+# Hari tanpa absen & tanpa izin yang disetujui = bolos. Bolos dihitung total sejak absen berlaku; > 5 kali = otomatis dikeluarkan.
+ABSEN_MAKS_BOLOS = 5
+ABSEN_SOAL_PER_HARI = 6
+ABSEN_INGAT_JAM = 19   # pengingat untuk yang belum absen (WIB)
+KUIS_CADANGAN = [   # dipakai kalau AI gagal membuat soal
+    {"soal": "Berapa iuran kas biasa MCI per minggu?", "opsi": ["Rp10.000", "Rp25.000", "Rp50.000", "Rp5.000"], "benar": 1, "penjelasan": "Rp5.000 per hari kerja = Rp25.000 per minggu (Peraturan Kas Pasal 1).", "topik": "Aturan MCI"},
+    {"soal": "Proyek MCI sah jika disetujui paling sedikit berapa anggota?", "opsi": ["2", "3", "5", "Semua anggota"], "benar": 1, "penjelasan": "Minimal 3 anggota termasuk pengusul (Peraturan Kas Pasal 7).", "topik": "Aturan MCI"},
+    {"soal": "Batas dana kas MCI untuk satu proyek tanpa tambahan adalah…", "opsi": ["Rp50.000", "Rp75.000", "Rp100.000", "Tidak ada batas"], "benar": 1, "penjelasan": "Paling banyak Rp75.000 per proyek (Peraturan Kas Pasal 7).", "topik": "Aturan MCI"},
+    {"soal": "Saat tutup buku proyek, berapa persen keuntungan yang masuk kas MCI?", "opsi": ["10%", "20%", "50%", "80%"], "benar": 1, "penjelasan": "20% ke kas MCI, 80% dibagi rata ke tim yang bekerja (Peraturan Kas Pasal 11).", "topik": "Aturan MCI"},
+    {"soal": "Hari apa absen harian MCI libur?", "opsi": ["Sabtu", "Jumat", "Minggu", "Senin"], "benar": 2, "penjelasan": "Absen wajib Senin–Sabtu, Minggu libur (UU MCI Pasal 19).", "topik": "Aturan MCI"},
+    {"soal": "Fungsi resistor pada rangkaian LED adalah…", "opsi": ["Menambah tegangan", "Membatasi arus", "Menyimpan muatan", "Mengubah AC ke DC"], "benar": 1, "penjelasan": "Resistor membatasi arus supaya LED tidak terbakar.", "topik": "Elektronika"},
+    {"soal": "Fungsi pinMode(13, OUTPUT) di Arduino adalah…", "opsi": ["Membaca pin 13", "Menjadikan pin 13 keluaran", "Menyalakan Wi-Fi", "Mengatur baud rate"], "benar": 1, "penjelasan": "pinMode mengatur arah pin; OUTPUT berarti pin dipakai untuk mengeluarkan sinyal.", "topik": "Arduino"},
+    {"soal": "Sensor HC-SR04 mengukur jarak memakai…", "opsi": ["Cahaya inframerah", "Gelombang ultrasonik", "Medan magnet", "Suhu"], "benar": 1, "penjelasan": "HC-SR04 memancarkan gelombang ultrasonik dan menghitung waktu pantulnya.", "topik": "Elektronika"},
+    {"soal": "Satuan hambatan listrik adalah…", "opsi": ["Volt", "Ampere", "Ohm", "Watt"], "benar": 2, "penjelasan": "Hambatan diukur dalam ohm (Ω). Hukum Ohm: V = I × R.", "topik": "Elektronika"},
+    {"soal": "Di Python, perintah untuk menampilkan teks ke layar adalah…", "opsi": ["echo()", "print()", "show()", "write()"], "benar": 1, "penjelasan": "print() menampilkan teks ke layar.", "topik": "Pemrograman"},
+    {"soal": "ESP32 berbeda dari Arduino Uno terutama karena ESP32 punya…", "opsi": ["Wi-Fi dan Bluetooth bawaan", "Lebih sedikit pin", "Tegangan 12V", "Tidak bisa diprogram"], "benar": 0, "penjelasan": "ESP32 sudah membawa Wi-Fi dan Bluetooth.", "topik": "Elektronika"},
+    {"soal": "Fungsi loop() di sketch Arduino adalah…", "opsi": ["Jalan sekali saat menyala", "Jalan berulang terus", "Menghapus program", "Mengatur pin"], "benar": 1, "penjelasan": "setup() jalan sekali; loop() diulang terus selama board menyala.", "topik": "Arduino"},
+]
+
+
+class SoalKuis(BaseModel):
+    soal: str
+    opsi: list[str]
+    benar: int
+    penjelasan: str
+    topik: str
+
+
+class SetKuis(BaseModel):
+    soal: list[SoalKuis]
+
+
+def _kuis_valid(x):
+    try:
+        opsi = [str(o).strip()[:160] for o in x["opsi"]]
+        b = int(x["benar"])
+        if len(opsi) != 4 or not all(opsi) or len(set(o.lower() for o in opsi)) != 4 or not 0 <= b <= 3 or len(str(x["soal"]).strip()) < 8:
+            return None
+        return {"soal": str(x["soal"]).strip()[:400], "opsi": opsi, "benar": b, "penjelasan": str(x.get("penjelasan") or "").strip()[:400], "topik": str(x.get("topik") or "").strip()[:40]}
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+async def kuis_buat_ai(tanggal):
+    aturan = [x for x in uu_semua() if x["tipe"] in ("pasal", "kas_pasal")]
+    rnd = random.Random(tanggal)
+    contoh = "\n\n".join(f"{'UU MCI' if x['tipe'] == 'pasal' else 'Peraturan Kas'} Pasal {x['nomor']} ({x['judul']}):\n{x['isi'][:900]}" for x in rnd.sample(aturan, min(3, len(aturan))))
+    prompt = (f"Buat {ABSEN_SOAL_PER_HARI} soal kuis pilihan ganda singkat untuk absen harian anggota MCI (komunitas teknologi pelajar), tanggal {tanggal}. "
+              "Campuran topik: 2 soal elektronika/Arduino/ESP32, 2 soal pemrograman atau teknologi umum, 2 soal tentang aturan MCI di bawah. "
+              "Tiap soal punya tepat 4 opsi berbeda, hanya 1 benar, field benar = indeks 0-3. Tingkat mudah-sedang, bisa dijawab dalam 30 detik. "
+              "Bahasa Indonesia. Penjelasan 1 kalimat. Jangan membuat soal yang jawabannya bisa diperdebatkan.\n\nATURAN MCI:\n" + contoh)
+    r = await ask("apex", prompt, schema=SetKuis, use_mcp=False, cache=False, act="Membuat kuis absen", model=MODEL_LITE)
+    return [v for v in (_kuis_valid(x) for x in json.loads(r).get("soal", [])) if v]
+
+
+def kuis_hari(tanggal):
+    with db() as c:
+        row = sql(c, "SELECT data FROM kuis WHERE tanggal=?", (tanggal,)).fetchone()
+    if row:
+        try:
+            return json.loads(row[0])
+        except ValueError:
+            pass
+    soal, sumber = [], "cadangan"
+    try:
+        soal = asyncio.run_coroutine_threadsafe(kuis_buat_ai(tanggal), LOOP).result(60) if LOOP else []
+        sumber = "ai"
+    except Exception:
+        log.exception("Kuis AI gagal, pakai soal cadangan")
+    if len(soal) < 3:
+        rnd = random.Random(tanggal)
+        soal, sumber = rnd.sample(KUIS_CADANGAN, ABSEN_SOAL_PER_HARI), "cadangan"
+    with db() as c:   # kalau permintaan lain sudah menyimpan duluan, pakai milik mereka supaya urutan soal sama untuk semua
+        sql(c, "INSERT INTO kuis (tanggal,data,sumber) VALUES (?,?,?) ON CONFLICT (tanggal) DO NOTHING", (tanggal, json.dumps(soal, ensure_ascii=False), sumber))
+        row = sql(c, "SELECT data FROM kuis WHERE tanggal=?", (tanggal,)).fetchone()
+    return json.loads(row[0]) if row else soal
+
+
+def _soal_publik(soal, i):
+    x = soal[i % len(soal)]
+    return {"no": i + 1, "soal": x["soal"], "opsi": x["opsi"], "topik": x.get("topik", "")}   # kunci jawaban TIDAK dikirim
+
+
+def absen_mulai():
+    if not SET.get("absen_mulai"):
+        SET["absen_mulai"] = (datetime.now(WIB) + timedelta(days=1)).date().isoformat()   # berlaku mulai besok
+        set_save()
+    return SET["absen_mulai"]
+
+
+def _hari_wajib(a, b):
+    """Tanggal Senin–Sabtu dari a sampai b (inklusif), format ISO."""
+    out, d, akhir = [], date.fromisoformat(a), date.fromisoformat(b)
+    while d <= akhir:
+        if d.weekday() != 6:
+            out.append(d.isoformat())
+        d += timedelta(days=1)
+    return out
+
+
+def absen_rekap(mid, c=None):
+    """Hitung kehadiran 1 anggota sejak absen berlaku (atau sejak dipulihkan / bergabung)."""
+    if c is None:
+        with db() as c2:
+            return absen_rekap(mid, c2)
+    gab = sql(c, "SELECT dibuat FROM anggota WHERE id=?", (mid,)).fetchone()
+    hadir = {r[0] for r in sql(c, "SELECT tanggal FROM absen WHERE anggota=? AND status='hadir'", (mid,)).fetchall()}
+    izin = sql(c, "SELECT tanggal,status FROM absen_izin WHERE anggota=?", (mid,)).fetchall()
+    mulai = max(absen_mulai(), (SET.get("absen_dari") or {}).get(str(mid), ""), ((gab[0] or "")[:10] if gab else ""))
+    if gab and gab[0] and gab[0][:10] >= absen_mulai():   # anggota baru: mulai hari berikutnya setelah bergabung
+        mulai = max(mulai, (date.fromisoformat(gab[0][:10]) + timedelta(days=1)).isoformat())
+    kemarin = (datetime.now(WIB) - timedelta(days=1)).date().isoformat()
+    ok_izin = {t for t, s in izin if s == "disetujui"}
+    tunggu = {t for t, s in izin if s == "menunggu"}
+    wajib = _hari_wajib(mulai, kemarin) if mulai <= kemarin else []
+    bolos = [t for t in wajib if t not in hadir and t not in ok_izin and t not in tunggu]
+    return {"mulai": mulai, "wajib": len(wajib), "hadir": sum(1 for t in wajib if t in hadir), "izin": sum(1 for t in wajib if t in ok_izin),
+            "bolos": len(bolos), "bolos_tanggal": bolos[-20:], "sisa": max(0, ABSEN_MAKS_BOLOS - len(bolos)), "maks": ABSEN_MAKS_BOLOS}
+
+
+def _absen_kebal(mid):
+    return is_admin(f"m:{mid}")   # pemegang akses penuh (Dev/Pemilik) tidak dikeluarkan otomatis
+
+
+def absen_cek():
+    """Dijalankan berkala: peringatan bolos ke-4 & ke-5, keluarkan otomatis jika bolos > 5 (Pasal 19)."""
+    hari = today()
+    warn = SET.setdefault("absen_warn", {})
+    keluar, ubah = [], False
+    for m in [m for m in MEMBERS.values() if m["aktif"]]:
+        rk = absen_rekap(m["id"])
+        n, k = rk["bolos"], str(m["id"])
+        if n > ABSEN_MAKS_BOLOS and not _absen_kebal(m["id"]):
+            with db() as c:
+                sql(c, "UPDATE anggota SET aktif=0 WHERE id=?", (m["id"],))
+                sql(c, "DELETE FROM dikeluarkan WHERE nama=?", (m["nama"],))
+                sql(c, "INSERT INTO dikeluarkan (nama,tanggal,alasan) VALUES (?,?,?)", (m["nama"], hari, f"Absen: bolos {n} kali (UU MCI Pasal 19)"))
+            inbox_kirim([m["id"]], "absen", "Kamu dikeluarkan dari MCI", f"Kamu tidak absen {n} kali tanpa izin (batas {ABSEN_MAKS_BOLOS}). Ajukan keberatan ke Pemilik MCI jika ada alasan (UU MCI Pasal 19).")
+            inbox_kirim([0] + [x["id"] for x in MEMBERS.values() if x["aktif"] and x["id"] != m["id"] and boleh(f"m:{x['id']}", "absen_kelola")],
+                        "absen", f"🚪 {m['nama']} otomatis dikeluarkan (absen)", f"Bolos {n} kali tanpa izin. Pemilik MCI bisa memulihkan di halaman Absen.")
+            keluar.append(m["nama"])
+            warn.pop(k, None)
+            ubah = True
+        elif n >= ABSEN_MAKS_BOLOS - 1 and warn.get(k, 0) < n:
+            warn[k] = n
+            ubah = True
+            inbox_kirim([m["id"]], "absen", f"⚠️ Peringatan absen: sudah bolos {n} kali",
+                        f"Batasnya {ABSEN_MAKS_BOLOS} kali. Bolos {'1 kali lagi' if n == ABSEN_MAKS_BOLOS else '2 kali lagi'} berarti otomatis dikeluarkan dari MCI (UU MCI Pasal 19). Kalau berhalangan, ajukan izin di halaman Absen.")
+    if keluar:
+        members_load()
+    # pengingat malam untuk yang belum absen (sekali sehari)
+    now = datetime.now(WIB)
+    if now.weekday() != 6 and now.hour >= ABSEN_INGAT_JAM and SET.get("absen_ingat") != hari and hari >= absen_mulai():
+        SET["absen_ingat"] = hari
+        ubah = True
+        with db() as c:
+            sudah = {r[0] for r in sql(c, "SELECT anggota FROM absen WHERE tanggal=? AND status='hadir'", (hari,)).fetchall()}
+            sudah |= {r[0] for r in sql(c, "SELECT anggota FROM absen_izin WHERE tanggal=? AND status<>'ditolak'", (hari,)).fetchall()}
+        belum = [m["id"] for m in MEMBERS.values() if m["aktif"] and m["id"] not in sudah]
+        if belum:
+            inbox_kirim(belum, "absen", "⏰ Jangan lupa absen hari ini", "Absen di web MCI paling lambat pukul 23.59 WIB. Jawab 1 kuis dulu ya (UU MCI Pasal 19).")
+    if now.weekday() != 6 and hari >= absen_mulai():   # siapkan kuis hari ini lebih awal supaya halaman absen cepat
+        kuis_hari(hari)
+    if not SET.get("absen_umum"):   # pengumuman pertama kali fitur aktif
+        SET["absen_umum"] = hari
+        ubah = True
+        inbox_kirim([m["id"] for m in MEMBERS.values() if m["aktif"]], "absen", "📋 Absen harian mulai berlaku",
+                    f"Mulai {tglid(absen_mulai())}, absen di web MCI wajib Senin–Sabtu (Minggu libur), didahului 1 kuis. Bolos lebih dari {ABSEN_MAKS_BOLOS} kali tanpa izin = otomatis dikeluarkan (UU MCI Pasal 19).")
+    if ubah:
+        set_save()
+    return keluar
+
+
+def tglid(t):
+    try:
+        d = date.fromisoformat(t[:10])
+    except ValueError:
+        return t
+    return f"{['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'][d.weekday()]}, {d.day} {['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'][d.month - 1]} {d.year}"
+
+
+def _absen_baris(c, mid, hari):
+    return sql(c, "SELECT id,status,idx,salah,jam FROM absen WHERE anggota=? AND tanggal=?", (mid, hari)).fetchone()
+
+
+def absen_payload(r):
+    me = mid_of(r) if member_of(r) else None
+    hari = today()
+    minggu = datetime.now(WIB).weekday() == 6
+    out = {"hari_ini": hari, "hari_label": tglid(hari), "minggu": minggu, "mulai": absen_mulai(), "maks": ABSEN_MAKS_BOLOS, "kelola": boleh(r, "absen_kelola"),
+           "pemilik": is_admin(r), "saya": me}
+    if me is not None:
+        with db() as c:
+            b = _absen_baris(c, me, hari)
+            iz = sql(c, "SELECT id,tanggal,alasan,status,oleh FROM absen_izin WHERE anggota=? ORDER BY tanggal DESC LIMIT 30", (me,)).fetchall()
+        izin_hari = next((x for x in iz if x[1] == hari and x[3] != "ditolak"), None)
+        if minggu:
+            st = "libur"
+        elif b and b[1] == "hadir":
+            st = "hadir"
+        elif izin_hari:
+            st = "izin_" + izin_hari[3]
+        elif hari < absen_mulai():
+            st = "belum_berlaku"
+        else:
+            st = "belum"
+        out.update({"status": st, "jam": b[4] if b else None, "salah": b[3] if b else 0, "rekap": absen_rekap(me),
+                    "izin": [{"id": i, "tanggal": t, "label": tglid(t), "alasan": a or "", "status": s, "oleh": o or ""} for i, t, a, s, o in iz]})
+        if st in ("belum", "belum_berlaku") and not minggu:
+            soal = kuis_hari(hari)
+            out["soal"] = _soal_publik(soal, b[2] if b else 0)
+    if out["kelola"]:
+        with db() as c:
+            hadir = {r_[0]: r_[1] for r_ in sql(c, "SELECT anggota,jam FROM absen WHERE tanggal=? AND status='hadir'", (hari,)).fetchall()}
+            iz_hari = {r_[0]: r_[1] for r_ in sql(c, "SELECT anggota,status FROM absen_izin WHERE tanggal=? AND status<>'ditolak'", (hari,)).fetchall()}
+            tunggu = sql(c, "SELECT id,anggota,tanggal,alasan,dibuat FROM absen_izin WHERE status='menunggu' ORDER BY tanggal").fetchall()
+            keluar = sql(c, "SELECT nama,tanggal,alasan FROM dikeluarkan WHERE alasan LIKE 'Absen:%' ORDER BY tanggal DESC").fetchall()
+            rekap_all = {m["id"]: absen_rekap(m["id"], c) for m in MEMBERS.values() if m["aktif"]}
+        out["daftar"] = [{"id": m["id"], "nama": m["nama"], "jam": hadir.get(m["id"]), "izin": iz_hari.get(m["id"]), "bolos": rekap_all[m["id"]]["bolos"],
+                          "hadir_total": rekap_all[m["id"]]["hadir"], "kebal": _absen_kebal(m["id"])}
+                         for m in sorted(MEMBERS.values(), key=lambda m: m["nama"].lower()) if m["aktif"]]
+        out["izin_menunggu"] = [{"id": i, "anggota": a, "nama": _nm(a), "tanggal": t, "label": tglid(t), "alasan": al or "", "dibuat": d or ""} for i, a, t, al, d in tunggu]
+        nama_id = {m["nama"]: m["id"] for m in MEMBERS.values()}
+        out["dikeluarkan"] = [{"nama": n, "tanggal": t, "alasan": a, "id": nama_id.get(n)} for n, t, a in keluar]
+    return out
+
+
+def _absen_need(r):
+    if not r:
+        abort(401)
+    if mid_of(r) is None:
+        abort(403)   # viewer tidak punya absen
+
+
+@app.route("/api/absen")
+def api_absen():
+    r = role()
+    _absen_need(r)
+    return jsonify(absen_payload(r))
+
+
+@app.route("/api/absen/jawab", methods=["POST"])
+def api_absen_jawab():
+    r = role()
+    _absen_need(r)
+    me = mid_of(r) if member_of(r) else None
+    if me is None:
+        return jsonify({"error": "Absen hanya untuk akun anggota"}), 400
+    hari = today()
+    if datetime.now(WIB).weekday() == 6:
+        return jsonify({"error": "Hari Minggu libur, tidak perlu absen."}), 400
+    try:
+        jawab = int((request.get_json(silent=True) or {}).get("jawab"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Pilih salah satu jawaban"}), 400
+    soal = kuis_hari(hari)
+    with _KLOCK:
+        with db() as c:
+            b = _absen_baris(c, me, hari)
+            if b and b[1] == "hadir":
+                return jsonify({**absen_payload(r), "hasil": "sudah"})
+            if not b:
+                q = "INSERT INTO absen (anggota,tanggal,status,idx,salah,dibuat) VALUES (?,?,'kuis',0,0,?)"
+                sql(c, q, (me, hari, _now()))
+                b = _absen_baris(c, me, hari)
+            x = soal[b[2] % len(soal)]
+            if jawab == x["benar"]:
+                sql(c, "UPDATE absen SET status='hadir', jam=? WHERE id=?", (datetime.now(WIB).strftime("%H:%M"), b[0]))
+                hasil = {"hasil": "benar", "penjelasan": x.get("penjelasan", "")}
+            else:
+                sql(c, "UPDATE absen SET idx=idx+1, salah=salah+1 WHERE id=?", (b[0],))
+                hasil = {"hasil": "salah"}   # kunci tidak dibuka; lanjut ke soal lain
+    return jsonify({**absen_payload(r), **hasil})
+
+
+@app.route("/api/absen/izin", methods=["POST"])
+def api_absen_izin():
+    """Anggota mengajukan izin (menunggu persetujuan). Pengurus (absen_kelola) bisa langsung mencatat izin untuk anggota lain."""
+    r = role()
+    _absen_need(r)
+    d = request.get_json(silent=True) or {}
+    tgl = str(d.get("tanggal") or today())[:10]
+    alasan = str(d.get("alasan") or "").strip()[:300]
+    kelola = boleh(r, "absen_kelola")
+    try:
+        t = date.fromisoformat(tgl)
+    except ValueError:
+        return jsonify({"error": "Tanggal tidak valid"}), 400
+    siapa = int(d.get("anggota") or 0) if kelola and d.get("anggota") else (mid_of(r) if member_of(r) else None)
+    if siapa is None or siapa not in MEMBERS:
+        return jsonify({"error": "Pilih anggota"}), 400
+    hari = datetime.now(WIB).date()
+    if not kelola and not (hari <= t <= hari + timedelta(days=30)):
+        return jsonify({"error": "Izin diajukan untuk hari ini atau sampai 30 hari ke depan"}), 400
+    if t.weekday() == 6:
+        return jsonify({"error": "Hari Minggu memang libur"}), 400
+    if len(alasan) < 3:
+        return jsonify({"error": "Tulis alasan izin"}), 400
+    status = "disetujui" if kelola and siapa != mid_of(r) else "menunggu"   # pengurus tidak menyetujui izinnya sendiri
+    with db() as c:
+        if sql(c, "SELECT 1 FROM absen_izin WHERE anggota=? AND tanggal=? AND status<>'ditolak'", (siapa, tgl)).fetchone():
+            return jsonify({"error": "Sudah ada izin untuk tanggal itu"}), 400
+        sql(c, "INSERT INTO absen_izin (anggota,tanggal,alasan,status,oleh,dibuat) VALUES (?,?,?,?,?,?)", (siapa, tgl, alasan, status, nama_peran(r), _now()))
+    if status == "menunggu":
+        pengurus = [0] + [m["id"] for m in MEMBERS.values() if m["aktif"] and m["id"] != siapa and boleh(f"m:{m['id']}", "absen_kelola")]
+        inbox_kirim(pengurus, "absen", f"📝 Izin absen: {_nm(siapa)}", f"{tglid(tgl)}: {alasan}\nSetujui atau tolak di halaman Absen.")
+    else:
+        inbox_kirim([siapa], "absen", f"✅ Izin absen dicatat: {tglid(tgl)}", f"Dicatat oleh {nama_peran(r)}. Alasan: {alasan}")
+    return jsonify(absen_payload(r))
+
+
+@app.route("/api/absen/izin/<int:i>", methods=["POST", "DELETE"])
+def api_absen_izin_one(i):
+    r = role()
+    _absen_need(r)
+    with db() as c:
+        row = sql(c, "SELECT anggota,tanggal,status FROM absen_izin WHERE id=?", (i,)).fetchone()
+    if not row:
+        return jsonify({"error": "Izin tidak ditemukan"}), 404
+    a, tgl, st = row
+    if request.method == "DELETE":   # pemohon membatalkan izin yang belum diputus
+        if a != mid_of(r) or st != "menunggu":
+            abort(403)
+        with db() as c:
+            sql(c, "DELETE FROM absen_izin WHERE id=?", (i,))
+        return jsonify(absen_payload(r))
+    if not boleh(r, "absen_kelola") or a == mid_of(r):
+        abort(403)
+    baru = str((request.get_json(silent=True) or {}).get("status") or "")
+    if baru not in ("disetujui", "ditolak"):
+        return jsonify({"error": "Status tidak valid"}), 400
+    with db() as c:
+        sql(c, "UPDATE absen_izin SET status=?, oleh=? WHERE id=?", (baru, nama_peran(r), i))
+    inbox_kirim([a], "absen", f"{'✅ Izin disetujui' if baru == 'disetujui' else '⛔ Izin ditolak'}: {tglid(tgl)}",
+                f"Oleh {nama_peran(r)}." + ("" if baru == "disetujui" else " Hari itu dihitung bolos jika kamu tidak absen."))
+    return jsonify(absen_payload(r))
+
+
+@app.route("/api/absen/pulihkan/<int:mid>", methods=["POST"])
+def api_absen_pulihkan(mid):
+    """Pemilik MCI memulihkan anggota yang dikeluarkan karena absen. Hitungan bolos mulai lagi dari nol (Pasal 19)."""
+    r = role()
+    if not is_admin(r):
+        abort(403)
+    with db() as c:
+        row = sql(c, "SELECT nama FROM anggota WHERE id=?", (mid,)).fetchone()
+        if not row:
+            return jsonify({"error": "Anggota tidak ditemukan"}), 404
+        sql(c, "UPDATE anggota SET aktif=1 WHERE id=?", (mid,))
+        sql(c, "DELETE FROM dikeluarkan WHERE nama=? AND alasan LIKE 'Absen:%'", (row[0],))
+    SET.setdefault("absen_dari", {})[str(mid)] = today()
+    (SET.get("absen_warn") or {}).pop(str(mid), None)
+    set_save()
+    members_load()
+    inbox_kirim([mid], "absen", "Kamu dipulihkan sebagai anggota MCI", "Hitungan bolos absen dimulai lagi dari nol. Jangan lupa absen setiap hari ya.")
+    return jsonify(absen_payload(r))
 
 
 # ---------- STRUKTUR & DIVISI: bagan organisasi + logo divisi + batas wewenang (Pasal 5). Deskripsi divisi diubah Dev. ----------

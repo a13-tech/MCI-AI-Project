@@ -368,6 +368,7 @@ main .bar .seg button,#uuDok button{color:var(--mute);font-weight:600}main .bar 
 }
 a.ch{text-decoration:none;color:inherit;padding:7px 13px;font-size:13px;font-weight:600}a.ch:hover{filter:brightness(.95)}[data-goinfo]{color:var(--navy);font-weight:600}
 .lst>*,.pkd,.pkb{min-width:0;max-width:100%}.pkb .fl{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))}
+p.mu a[data-gopasal]{color:var(--navy);font-weight:600}
 </style>
 </head>
 <body>
@@ -377,6 +378,7 @@ a.ch{text-decoration:none;color:inherit;padding:7px 13px;font-size:13px;font-wei
  <button class="nv on" data-p="cmd">Command Center</button>
  <button class="nv" data-p="apex" id="nvApex">Tanya Apex</button>
  <button class="nv" data-p="inbox">Inbox <span class="nb" id="nbInbox" hidden>0</span></button>
+ <button class="nv" data-p="absen">Absen Harian <span class="nb" id="nbAbsen" hidden>!</span></button>
  <button class="nv" data-p="pengumuman">Pengumuman</button>
  <button class="nv" data-p="berita">Berita Hari Ini</button>
  <button class="nv" data-p="info">Pusat Info</button>
@@ -846,6 +848,12 @@ a.ch{text-decoration:none;color:inherit;padding:7px 13px;font-size:13px;font-wei
   </div>
  </section>
 
+ <section id="p-absen" class="pg" hidden>
+  <h1>Absen Harian</h1>
+  <p class="mu">Wajib Senin–Sabtu sampai pukul 23.59 WIB, Minggu libur. Jawab 1 kuis dengan benar untuk absen. Berhalangan? Ajukan izin. Bolos lebih dari 5 kali tanpa izin = otomatis dikeluarkan (<a href="#" data-gopasal="19">UU MCI Pasal 19</a>).</p>
+  <div id="abBox"><p class="mu">Memuat…</p></div>
+ </section>
+
  <section id="p-info" class="pg" hidden>
   <h1>Pusat Info</h1>
   <p class="mu">Tanya apa saja tentang MCI: siapa kami, divisi, produk, jam admin, atau buku di Perpustakaan. AI di sini hanya membaca <b>informasi publik</b>, jadi data internal anggota (kas, aturan internal, data pribadi) memang tidak bisa dijawab.</p>
@@ -1295,6 +1303,7 @@ function show(p) {
   if (p === "produk") loadProduk();
   if (p === "invoice") loadInvoice();
   if (p === "info") piBuka();
+  if (p === "absen") abMuat();
   if (p === "apex") { apxRender(); setTimeout(() => $("#apxIn").focus(), 50); }
   if (p === "hutang") loadHutang();
   if (p === "anggota") loadAnggota();
@@ -2275,6 +2284,11 @@ const EKSPOR = {
   berita: () => [exTabel("Berita " + (BRK || ""), BRD && BRD.items, ["judul", "sumber", "waktu", "url"])],
   bayarkas: () => { const d = BKD; if (!d) return []; return [exTabel("Bayar kas " + (d.label || ""), d.anggota, ["nama", "tingkat_label", "nominal", "status", "tunggak"]), exTabel("Riwayat pembayaran", d.riwayat)]; },
   produk: () => [exTabel("Produk", PRD && PRD.items, ["nama", "harga", "stok", "kategori", "deskripsi"])],
+  absen: () => { const d = AB; if (!d) return []; const t = [];
+    if (d.rekap) t.push({nama: "Kehadiran saya", kolom: ["Mulai", "Hari wajib", "Hadir", "Izin", "Bolos", "Sisa jatah bolos"], baris: [[d.rekap.mulai, d.rekap.wajib, d.rekap.hadir, d.rekap.izin, d.rekap.bolos, d.rekap.sisa]]});
+    if (d.izin && d.izin.length) t.push({nama: "Izin saya", kolom: ["Tanggal", "Alasan", "Status", "Oleh"], baris: d.izin.map(x => [x.tanggal, x.alasan, x.status, x.oleh])});
+    if (d.daftar) t.push({nama: "Absen anggota " + d.hari_ini, kolom: ["Anggota", "Hari ini", "Total hadir", "Bolos"], baris: d.daftar.map(x => [x.nama, x.jam ? "Hadir " + x.jam : x.izin ? "Izin (" + x.izin + ")" : "Belum", x.hadir_total, x.bolos])});
+    return t; },
   info: () => [{nama: "Percakapan Pusat Info", kolom: ["Dari", "Pesan"], baris: PI.filter(m => !m.galat).map(m => [m.role === "user" ? "Kamu" : "Pusat Info", m.text || ""])}],
   apex: () => [{nama: "Percakapan Tanya Apex", kolom: ["Dari", "Pesan"], baris: (APX || []).map(m => [m.role === "user" ? "Kamu" : "Apex", m.text || ""])}],
   invoice: () => [exTabel("Invoice", IVD && IVD.items), exKV("Ringkasan", IVD && IVD.ringkas)],
@@ -2558,7 +2572,7 @@ async function inboxBadge(n) {
   const b = $("#nbInbox"); b.textContent = n > 99 ? "99+" : n; b.hidden = !n;
 }
 let IBD = {items: []};
-const IB_IKON = {proyek: "🧩", tugas: "📌", pengumuman: "📣", agenda: "🗓️", sidang: "⚖️", sp: "⚠️", bayar_kas: "💸", bayar_ok: "✅", bayar_tolak: "⛔", info: "📢", tanya_produk: "🛒", invoice_bayar: "🧾"};
+const IB_IKON = {absen: "📋", proyek: "🧩", tugas: "📌", pengumuman: "📣", agenda: "🗓️", sidang: "⚖️", sp: "⚠️", bayar_kas: "💸", bayar_ok: "✅", bayar_tolak: "⛔", info: "📢", tanya_produk: "🛒", invoice_bayar: "🧾"};
 async function bayarAksi(id, aksi) {
   let alasan = "";
   if (aksi === "tolak") { alasan = prompt("Alasan ditolak (opsional, dikirim ke anggota):", "Foto bukti tidak jelas"); if (alasan === null) return false; }
@@ -2846,6 +2860,62 @@ $("#apxKirim").onclick = () => apxTanya();
 $("#apxIn").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); apxTanya(); } };
 $("#apxHapus").onclick = () => { if (APX_BUSY) return; APX = []; apxRender(); };
 apxRender();
+
+
+/* ===== Absen harian + kuis (UU MCI Pasal 19) ===== */
+let AB = null, AB_PESAN = "";
+function abRender() {
+  const d = AB, el = $("#abBox"); if (!d) return;
+  let h = "";
+  if (d.saya != null) {
+    const st = d.status;
+    if (st === "libur") h += `<div class="cd"><b>Hari Minggu libur</b><p class="mu" style="margin:6px 0 0">Tidak perlu absen hari ini.</p></div>`;
+    else if (st === "hadir") h += `<div class="cd" style="border-color:#9CC5A1;background:#F1F8F2"><b style="font-size:17px">✅ Kamu sudah absen hari ini</b><p class="mu" style="margin:6px 0 0">${esc(d.hari_label)} pukul ${esc(d.jam || "")} WIB${d.salah ? ` · ${d.salah} kali salah sebelum benar` : ""}.</p>${AB_PESAN ? `<p style="margin:8px 0 0">${esc(AB_PESAN)}</p>` : ""}</div>`;
+    else if (st === "izin_menunggu") h += `<div class="cd"><b>Izin hari ini menunggu persetujuan</b><p class="mu" style="margin:6px 0 0">Selama belum diputus, hari ini tidak dihitung bolos. Kamu tetap boleh absen di bawah.</p></div>`;
+    else if (st === "izin_disetujui") h += `<div class="cd"><b>Kamu izin hari ini</b><p class="mu" style="margin:6px 0 0">Izin sudah disetujui, hari ini tidak dihitung bolos.</p></div>`;
+    if (d.soal) { const q = d.soal;
+      h += `<div class="cd" id="abKuis">${st === "belum_berlaku" ? `<p class="mu" style="margin:0 0 8px">Absen wajib mulai ${esc(tglID(d.mulai, true))}. Hari ini boleh dicoba dulu.</p>` : ""}
+        <div class="ey">Kuis absen · ${esc(d.hari_label)}${q.topik ? " · " + esc(q.topik) : ""}${q.no > 1 ? ` · soal ke-${q.no}` : ""}</div>
+        <h2 style="margin:6px 0 12px;font-size:20px">${esc(q.soal)}</h2>
+        <div style="display:grid;gap:8px">${q.opsi.map((o, i) => `<button class="bt o" data-abj="${i}" style="justify-content:flex-start;text-align:left;min-height:46px;white-space:normal"><b style="margin-right:8px">${"ABCD"[i]}.</b>${esc(o)}</button>`).join("")}</div>
+        ${AB_PESAN ? `<p class="er" style="margin:10px 0 0">${esc(AB_PESAN)}</p>` : ""}</div>`; }
+    const r = d.rekap;
+    if (r) h += `<div class="cd"><b>Kehadiranku</b><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
+      ${[["Hadir", r.hadir, ""], ["Izin", r.izin, ""], ["Bolos", `${r.bolos} / ${r.maks}`, r.bolos >= r.maks - 1 ? "#B4532A" : ""], ["Sisa jatah bolos", r.sisa, r.sisa <= 1 ? "#B4532A" : ""]].map(([l, v, w]) => `<div style="padding:8px 12px;border:1px solid var(--line,#E5E0D5);border-radius:10px;min-width:110px"><div class="mu" style="font-size:11.5px">${l}</div><b style="font-size:18px;${w ? "color:" + w : ""}">${v}</b></div>`).join("")}</div>
+      ${r.bolos_tanggal.length ? `<p class="mu" style="font-size:12.5px;margin:10px 0 0">Tanggal bolos: ${r.bolos_tanggal.map(t => esc(tglID(t))).join(", ")}</p>` : ""}
+      <p class="mu" style="font-size:12px;margin:6px 0 0">Dihitung sejak ${esc(tglID(r.mulai, true))}.</p></div>`;
+    h += `<div class="cd fl"><b class="full">Ajukan izin</b><label>Tanggal<input type="date" id="abIzT" value="${d.hari_ini}" min="${d.hari_ini}"></label><label class="full">Alasan<input type="text" id="abIzA" maxlength="300" placeholder="Contoh: sakit, acara keluarga, ujian"></label>
+      <div class="bar full" style="margin:0"><button class="bt g" id="abIzK">Kirim izin</button><span class="mu" id="abIzM"></span></div>
+      ${d.izin.length ? `<div class="full" style="margin-top:4px">${d.izin.map(x => `<div class="meta"><span>${esc(x.label)}: ${esc(x.alasan)}</span><span class="ch ${x.status === "disetujui" ? "g" : x.status === "ditolak" ? "r" : "y"}">${x.status === "menunggu" ? "Menunggu" : x.status === "disetujui" ? "Disetujui" : "Ditolak"}</span>${x.status === "menunggu" ? `<button class="bt o" data-abbatal="${x.id}" style="min-height:26px;padding:2px 8px;font-size:11.5px">Batalkan</button>` : ""}</div>`).join("")}</div>` : ""}</div>`;
+  }
+  if (d.kelola) {
+    if (d.izin_menunggu.length) h += `<h2>Izin menunggu persetujuan</h2><div class="lst">${d.izin_menunggu.map(x => `<div class="it2"><h3>${esc(x.nama)} · ${esc(x.label)}</h3><div class="bd" style="font-size:13.5px">${esc(x.alasan)}</div>${x.anggota === d.saya ? '<p class="mu" style="font-size:12px">Izinmu sendiri diputus pengurus lain.</p>' : `<div class="ac"><button class="bt g" data-abput="${x.id}:disetujui">Setujui</button><button class="bt o" data-abput="${x.id}:ditolak">Tolak</button></div>`}</div>`).join("")}</div>`;
+    const sudah = d.daftar.filter(x => x.jam).length;
+    h += `<h2>Absen anggota hari ini · ${sudah}/${d.daftar.length}</h2><div class="cd" style="overflow-x:auto"><table class="tb" style="font-size:13px"><thead><tr><th>Anggota</th><th>Hari ini</th><th style="text-align:right">Total hadir</th><th style="text-align:right">Bolos</th></tr></thead><tbody>
+      ${d.daftar.map(x => `<tr><td>${esc(x.nama)}</td><td>${x.jam ? `<span class="ch g">Hadir ${esc(x.jam)}</span>` : x.izin ? `<span class="ch y">Izin${x.izin === "menunggu" ? " (menunggu)" : ""}</span>` : d.minggu ? '<span class="ch n">Libur</span>' : '<span class="ch n">Belum</span>'}</td><td style="text-align:right">${x.hadir_total}</td><td style="text-align:right;${x.bolos >= d.maks - 1 ? "color:#B4532A;font-weight:700" : ""}">${x.bolos}${x.kebal ? ' <span class="mu" title="Akses penuh: tidak dikeluarkan otomatis">·</span>' : ""}</td></tr>`).join("")}</tbody></table></div>
+      <div class="cd fl"><b class="full">Catat izin untuk anggota</b><label>Anggota<select id="abCA">${d.daftar.filter(x => x.id !== d.saya).map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join("")}</select></label><label>Tanggal<input type="date" id="abCT" value="${d.hari_ini}"></label><label class="full">Alasan<input type="text" id="abCAl" maxlength="300"></label><div class="bar full" style="margin:0"><button class="bt g" id="abCK">Catat izin</button><span class="mu" id="abCM"></span></div></div>`;
+    if (d.dikeluarkan.length) h += `<h2>Dikeluarkan karena absen</h2><div class="lst">${d.dikeluarkan.map(x => `<div class="it2"><h3>${esc(x.nama)}</h3><div class="meta"><span>${esc(tglID(x.tanggal))}</span><span>${esc(x.alasan)}</span></div>${d.pemilik && x.id ? `<div class="ac"><button class="bt g" data-abpul="${x.id}">Pulihkan</button></div>` : ""}</div>`).join("")}</div>`;
+  }
+  el.innerHTML = h || '<p class="mu">Tidak ada data absen.</p>';
+  const nb = $("#nbAbsen"); if (nb) nb.hidden = !(d.status === "belum" && !d.minggu);
+}
+async function abMuat(url, opt) {
+  try { AB = await api(url || "/api/absen", opt); abRender(); return true; }
+  catch (e) { if (!AB) $("#abBox").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; else alert(e.message); return false; }
+}
+$("#abBox").addEventListener("click", async e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.abj != null) { $$("#abKuis [data-abj]").forEach(x => x.disabled = true);
+    try { const d = await api("/api/absen/jawab", {json: {jawab: +b.dataset.abj}}); AB = d;
+      AB_PESAN = d.hasil === "benar" ? (d.penjelasan ? "Benar! " + d.penjelasan : "Benar!") : d.hasil === "salah" ? "Jawaban salah. Coba soal berikut ini." : ""; abRender(); }
+    catch (er) { AB_PESAN = er.message; abRender(); } }
+  if (b.id === "abIzK") { b.disabled = true; const ok = await abMuat("/api/absen/izin", {json: {tanggal: $("#abIzT").value, alasan: $("#abIzA").value}}); if (!ok) b.disabled = false; }
+  if (b.dataset.abbatal && confirm("Batalkan pengajuan izin ini?")) await abMuat("/api/absen/izin/" + b.dataset.abbatal, {method: "DELETE"});
+  if (b.dataset.abput) { const [i, st] = b.dataset.abput.split(":"); b.disabled = true; await abMuat("/api/absen/izin/" + i, {json: {status: st}}); }
+  if (b.id === "abCK") { b.disabled = true; const ok = await abMuat("/api/absen/izin", {json: {anggota: +$("#abCA").value, tanggal: $("#abCT").value, alasan: $("#abCAl").value}}); if (!ok) b.disabled = false; }
+  if (b.dataset.abpul && confirm("Pulihkan anggota ini? Hitungan bolosnya dimulai lagi dari nol.")) await abMuat("/api/absen/pulihkan/" + b.dataset.abpul, {method: "POST", json: {}});
+});
+$("#p-absen [data-gopasal]").onclick = e => { e.preventDefault(); show("uu"); setTimeout(() => uuKe("uu", 19), 400); };
 
 /* ===== Pusat Info: pengunjung tanya AI tentang MCI (server hanya memberi AI data publik) ===== */
 let PI = [], PI_BUSY = false, PI_SISA = null, PI_AKTIF = true;
@@ -5291,13 +5361,14 @@ function bukaHash() { const p = (location.hash || "").slice(1); const b = p && d
   try { ME = await api("/api/me"); if (ME.lantai) LANTAI = ME.lantai; } catch (e) { return; }
   $$(".nv").forEach(b => { const p = PAGE_PERM[b.dataset.p]; if (p && !can(p)) b.style.display = "none"; });
   if (!PUNYA_INBOX()) ["inbox", "bayarkas"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // viewer tidak punya inbox & iuran
+  if (ME.role !== "viewer") api("/api/absen").then(d => { AB = d; const nb = $("#nbAbsen"); if (nb) nb.hidden = !(d.status === "belum"); }).catch(() => {});   // tanda "!" kalau belum absen
   if (!ADM()) $("#nvApex").style.display = "none";   // Tanya Apex khusus token admin
   inboxBadge(); setInterval(() => { if (!document.hidden) inboxBadge(); }, 20000);
   pasangAI();
   const NP = ME.anggota ? ME.anggota.nama + " · " + ME.anggota.jabatan.join(", ") + (ME.anggota.sp ? " · SP" + ME.anggota.sp : "") : (ME.nama_peran || "Viewer");
   $("#whoRole").innerHTML = ADM() ? `<span class="wl">Masuk sebagai</span><span class="wh">Masuk sebagai</span> <b>Admin</b>`
     : `<span class="wl">Masuk sebagai</span><span class="wh">⚡ Hemat token</span> <b>${esc(NP)}</b>`;
-  if (ME.role === "viewer") ["pengumuman", "agenda", "tugas", "proyek", "struktur", "uu", "sidang", "putusan", "rekapkas", "konten"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // halaman organisasi & UU khusus anggota
+  if (ME.role === "viewer") ["absen", "pengumuman", "agenda", "tugas", "proyek", "struktur", "uu", "sidang", "putusan", "rekapkas", "konten"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // halaman organisasi & UU khusus anggota
   if (ME.role === "viewer") ["blacklist", "sp"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // viewer tidak boleh melihat blacklist
   if (ME.role === "viewer") $("#logout").style.display = "none";   // viewer tidak perlu tombol keluar
   if (!ADM()) { const lb = $("#lpBuat"); if (lb) lb.closest(".cd").hidden = true; }   // Manager/Sekretaris cuma lihat laporan
