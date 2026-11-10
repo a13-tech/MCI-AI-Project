@@ -18,7 +18,7 @@ from email.utils import parsedate_to_datetime
 import xml.etree.ElementTree as ET
 
 import httpx, pytz, psutil
-from flask import Flask, jsonify, abort, request, send_from_directory, make_response, redirect, Response
+from flask import Flask, jsonify, abort, request, has_request_context, send_from_directory, make_response, redirect, Response
 from pydantic import BaseModel
 from google import genai
 from google.genai import types
@@ -281,6 +281,7 @@ def db_init():
                "jawaban_ai TEXT, balasan TEXT, dibalas_oleh TEXT, status TEXT, dibuat TEXT, dibalas TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS proyek_kas (id {pk}, proyek_id INTEGER NOT NULL, tanggal TEXT NOT NULL, jenis TEXT NOT NULL, keterangan TEXT, "
                f"masuk {big} NOT NULL DEFAULT 0, keluar {big} NOT NULL DEFAULT 0, mitra TEXT, jatuh_tempo TEXT, ref INTEGER, status TEXT, bukti TEXT, oleh TEXT, dibuat TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS audit (id {pk}, waktu TEXT NOT NULL, oleh TEXT, area TEXT NOT NULL, aksi TEXT NOT NULL, detail TEXT, jumlah {big} NOT NULL DEFAULT 0)")
         sql(c, f"CREATE TABLE IF NOT EXISTS absen (id {pk}, anggota INTEGER NOT NULL, tanggal TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'kuis', "
                f"idx INTEGER NOT NULL DEFAULT 0, salah INTEGER NOT NULL DEFAULT 0, jam TEXT, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS absen_izin (id {pk}, anggota INTEGER NOT NULL, tanggal TEXT NOT NULL, alasan TEXT, status TEXT NOT NULL DEFAULT 'menunggu', oleh TEXT, dibuat TEXT)")
@@ -364,6 +365,22 @@ def set_save():
         sql(c, "INSERT INTO pengaturan (k,v) VALUES (?,?) ON CONFLICT (k) DO UPDATE SET v=excluded.v", ("s", json.dumps(SET)))
 
 
+def audit(area, aksi, detail="", jumlah=0, oleh=None, c=None):
+    """Riwayat perubahan keuangan (Peraturan Kas Pasal 5: keterbukaan). c = koneksi yang sedang dipakai (satu transaksi)."""
+    if oleh is None:
+        oleh = nama_peran(role()) if has_request_context() else "Sistem"
+    p = (datetime.now(WIB).isoformat(timespec="seconds"), str(oleh)[:80], area[:40], aksi[:60], str(detail)[:600], int(jumlah or 0))
+    q = "INSERT INTO audit (waktu,oleh,area,aksi,detail,jumlah) VALUES (?,?,?,?,?,?)"
+    if c is not None:
+        sql(c, q, p)
+        return
+    try:
+        with db() as c2:
+            sql(c2, q, p)
+    except Exception:
+        log.exception("Gagal mencatat riwayat keuangan")
+
+
 def kas_add(rows, sumber):
     ids, now = [], datetime.now(WIB).isoformat(timespec="seconds")
     q = "INSERT INTO kas (tanggal,keterangan,kategori,masuk,keluar,sumber,dibuat) VALUES (?,?,?,?,?,?,?)"
@@ -371,12 +388,18 @@ def kas_add(rows, sumber):
         for r in rows:
             p = (r["tanggal"], r["keterangan"], r["kategori"], r["masuk"], r["keluar"], sumber, now)
             ids.append(sql(c, q + " RETURNING id", p).fetchone()[0] if PG else sql(c, q, p).lastrowid)
+    for r in rows:
+        audit("Kas MCI", "Uang masuk" if r["masuk"] else "Uang keluar", f"{r['keterangan']} [{r['kategori']}] · sumber: {sumber}", r["masuk"] or -r["keluar"])
     return ids
 
 
 def kas_del(i):
     with db() as c:
-        return sql(c, "DELETE FROM kas WHERE id=?", (i,)).rowcount
+        row = sql(c, "SELECT tanggal,keterangan,masuk,keluar FROM kas WHERE id=?", (i,)).fetchone()
+        n = sql(c, "DELETE FROM kas WHERE id=?", (i,)).rowcount
+    if n and row:
+        audit("Kas MCI", "Hapus catatan", f"{row[0]} · {row[1]}", row[2] or -row[3])
+    return n
 
 
 def kas_all():
@@ -1381,6 +1404,7 @@ def hutang_tambah(nama, jumlah, catatan="", catat_kas=True):
             raise ValueError(f"Melebihi batas {rp(HUTANG_MAX)} per bulan. {nama} sudah pinjam {rp(dipakai)} bulan ini, sisa {rp(max(0, HUTANG_MAX - dipakai))}.")
         tgl = today()
         jt = (datetime.now(WIB) + timedelta(days=HUTANG_HARI)).strftime("%Y-%m-%d")
+        audit("Hutang", "Pinjaman baru", f"{nama}" + (f" · {catatan}" if catatan else ""), -int(jumlah), c=c)
         sql(c, "INSERT INTO hutang (nama,jumlah,tanggal,jatuh_tempo,status,catatan,dibuat) VALUES (?,?,?,?,?,?,?)",
             (nama, jumlah, tgl, jt, "belum", str(catatan or "")[:200], _now()))
     if catat_kas:
@@ -1398,6 +1422,7 @@ def hutang_aksi(i, aksi, catat_kas=True):
             if status == "lunas":
                 raise ValueError("Sudah lunas")
             sql(c, "UPDATE hutang SET status='lunas', lunas=? WHERE id=?", (today(), i))
+            audit("Hutang", "Lunas", f"hutang #{i}", c=c)
         elif aksi == "konfirmasi":
             if status == "lunas":
                 raise ValueError("Sudah lunas")
@@ -1405,6 +1430,7 @@ def hutang_aksi(i, aksi, catat_kas=True):
                 raise ValueError("Konfirmasi tambahan hanya bisa sekali")
             baru = (datetime.strptime(max(jt, today()), "%Y-%m-%d") + timedelta(days=HUTANG_HARI)).strftime("%Y-%m-%d")
             sql(c, "UPDATE hutang SET konfirmasi=1, jatuh_tempo=? WHERE id=?", (baru, i))
+            audit("Hutang", "Perpanjangan", f"hutang #{i} jatuh tempo baru {baru}", c=c)
         elif aksi == "hapus":
             sql(c, "DELETE FROM hutang WHERE id=?", (i,))
         else:
@@ -2134,6 +2160,11 @@ async def laporan_jadwal():
                 log.info("Anggota dikeluarkan (absen): %s", nama)
         except Exception:
             log.exception("Cek absen gagal")
+        try:
+            await asyncio.to_thread(alat_cek_telat)
+            await backup_jadwal_cek()
+        except Exception:
+            log.exception("Cek alat / backup gagal")
         try:
             await asyncio.to_thread(pk_cek_pinjaman)
         except Exception:
@@ -3297,11 +3328,13 @@ IZIN_PILIHAN.update({
     "proyek_kelola": "Kelola Proyek", "konten_kelola": "Kelola Jadwal Konten", "sidang": "Dewan: Pelanggaran, Sidang & Putusan",
 })
 IZIN_PILIHAN["absen_kelola"] = "Kelola absen harian & setujui izin"
+IZIN_PILIHAN["mitra_kelola"] = "Kelola Database Mitra"
+IZIN_PILIHAN["alat_kelola"] = "Kelola Peminjaman Alat"
 IZIN_BARU_DEFAULT = {   # berlaku walau struktur sudah pernah disimpan Dev (izin ini baru ada)
-    "manager": {"rapat_kelola", "tugas_kelola", "umum_kelola", "proyek_kelola", "konten_kelola", "absen_kelola"},
-    "pj": {"rapat_kelola", "tugas_kelola", "proyek_kelola"},
-    "sekretaris": {"rapat_kelola", "umum_kelola", "absen_kelola"},
-    "bendahara": {"umum_kelola"},
+    "manager": {"rapat_kelola", "tugas_kelola", "umum_kelola", "proyek_kelola", "konten_kelola", "absen_kelola", "mitra_kelola", "alat_kelola"},
+    "pj": {"rapat_kelola", "tugas_kelola", "proyek_kelola", "alat_kelola"},
+    "sekretaris": {"rapat_kelola", "umum_kelola", "absen_kelola", "alat_kelola"},
+    "bendahara": {"umum_kelola", "mitra_kelola"},
     "designer": {"konten_kelola"},
     "dokumentasi": {"konten_kelola"},   # divisi
 }
@@ -3345,7 +3378,24 @@ JENIS = {
         F("deskripsi", "Deskripsi", "area", maks=4000), F("komponen", "Komponen / kebutuhan", "area", maks=4000),
         F("tidak_kerja", "Tidak ikut bagi hasil (tidak bekerja)", "anggota_banyak", info="Diisi pemilik proyek. Anggota tim yang dipilih di sini tidak mendapat bagian keuntungan saat tutup buku (Peraturan Kas Pasal 11)."),
         F("hasil", "Catatan hasil proyek", "area", maks=2000, info="Keuntungan dibagi otomatis saat tutup buku: 20% ke kas MCI, 80% dibagi rata ke tim yang bekerja. Anggota yang hak proyeknya dicabut tidak menerima bagian (Peraturan Kas Pasal 4 & 11)."),
-        F("link", "Tautan (repo, dokumen)", "url", maks=400), {**F("riwayat", "Riwayat tim", "area", maks=8000), "sistem": True}]},
+        F("link", "Tautan (repo, dokumen)", "url", maks=400),
+        F("publik", "Tampilkan di Portofolio publik", "bool", info="Hanya untuk proyek berstatus Selesai. Pengunjung (viewer) dan Pusat Info bisa melihat nama, ringkasan, dan foto proyek ini."),
+        F("ringkasan_publik", "Ringkasan untuk Portofolio", "area", maks=1500, info="Tulis untuk orang luar: apa yang dibuat dan hasilnya. Jangan tulis data internal (dana, nama mitra, masalah tim)."),
+        F("foto", "Link foto proyek (Portofolio)", "url", maks=400),
+        {**F("riwayat", "Riwayat tim", "area", maks=8000), "sistem": True}]},
+    "mitra": {"judul": "Database Mitra", "tulis": "mitra_kelola", "lihat": "anggota", "fields": [
+        F("nama", "Nama mitra", wajib=True, maks=80, info="Tulis sama persis dengan nama mitra di Kas proyek supaya total subsidi & pinjamannya terhitung."),
+        F("jenis", "Jenis", "pilih", opsi=[["pemasok", "Pemasok / toko"], ["sponsor", "Sponsor / pemberi subsidi"], ["pemodal", "Pemberi pinjaman"], ["pelanggan", "Pelanggan"], ["kolaborator", "Kolaborator"], ["lainnya", "Lainnya"]], bawaan="pemasok"),
+        F("kontak", "Kontak (nama, WA, email)", maks=200), F("alamat", "Alamat / link", maks=300),
+        F("status", "Status kerja sama", "pilih", opsi=[["aktif", "Aktif"], ["selesai", "Selesai"], ["calon", "Calon mitra"]], bawaan="aktif"),
+        F("catatan", "Catatan", "area", maks=4000)]},
+    "alat": {"judul": "Peminjaman Alat", "tulis": "alat_kelola", "lihat": "anggota", "fields": [
+        F("nama", "Nama alat", wajib=True, maks=120), F("kode", "Kode / nomor inventaris", maks=40),
+        F("kategori", "Kategori", "pilih", opsi=[["perkakas", "Perkakas (solder, tang, obeng)"], ["ukur", "Alat ukur (multimeter, osiloskop)"], ["board", "Board & modul"], ["komputer", "Komputer & kamera"], ["lainnya", "Lainnya"]], bawaan="perkakas"),
+        F("kondisi", "Kondisi", "pilih", opsi=[["baik", "Baik"], ["rusak_ringan", "Rusak ringan"], ["rusak", "Rusak / perlu servis"]], bawaan="baik"),
+        F("lokasi", "Disimpan di", maks=120),
+        F("peminjam", "Sedang dipinjam oleh", "anggota"), F("tgl_pinjam", "Tanggal pinjam", "tanggal"), F("tenggat", "Harus kembali", "tanggal"),
+        F("catatan", "Catatan", "area", maks=2000), {**F("riwayat", "Riwayat peminjaman", "area", maks=8000), "sistem": True}]},
     "konten": {"judul": "Jadwal Konten", "tulis": "konten_kelola", "lihat": "anggota", "fields": [
         F("judul", "Judul / topik", wajib=True), F("tanggal", "Tanggal tayang", "tanggal"),
         F("platform", "Platform", "pilih", opsi=[["ig_tt", "Instagram + TikTok"], ["ig", "Instagram"], ["tt", "TikTok"]], bawaan="ig_tt"),
@@ -3508,6 +3558,12 @@ def rk_payload(jenis, r):
            "divisi": [[k, v] for k, v in DIVISI.items()], "hari_ini": today()}
     if jenis == "proyek":
         out["tunggak"] = {str(k): v for k, v in rk_tunggak().items()}
+    if jenis == "mitra":
+        out["statistik"] = mitra_statistik()
+    if jenis == "alat":
+        out["pinjam_maks_hari"] = ALAT_MAKS_HARI
+    if jenis == "agenda":
+        out["kode_aktif"] = {str(k): v for k, v in (SET.get("agenda_kode") or {}).items() if v.get("sampai", "") >= today()} if boleh(r, "rapat_kelola") else {}
     if jenis in ("sidang", "putusan"):
         out["pasal"] = [[x["nomor"], f"Pasal {x['nomor']}. {x['judul']}"] for x in uu_semua() if x["tipe"] == "pasal"]
     return out
@@ -3555,6 +3611,12 @@ DANA_PROYEK_MAKS = 75000   # Peraturan Kas Pasal 7
 
 def rk_cek(jenis, data, lama, r):
     """Aturan khusus sebelum disimpan. Kembalikan pesan error atau None (data boleh diubah di sini)."""
+    if jenis == "alat":
+        if not data.get("peminjam"):
+            data["tgl_pinjam"], data["tenggat"] = "", ""
+        return None
+    if jenis == "proyek" and data.get("publik") and data.get("status") != "selesai":
+        return "Portofolio hanya untuk proyek yang sudah Selesai."
     if jenis != "proyek":
         return None
     me = mid_of(r)
@@ -3677,6 +3739,8 @@ def pk_rows(pid):
 
 
 def pk_ins(c, pid, jenis, masuk=0, keluar=0, ket="", mitra="", jt="", ref=None, status="", bukti="", oleh="", tanggal=None):
+    if status != "menunggu":
+        audit("Kas proyek", PK_LABEL.get(jenis, jenis), f"proyek #{pid} · {ket}" + (f" · {mitra}" if mitra else ""), int(masuk) - int(keluar), oleh or None, c=c)
     q = "INSERT INTO proyek_kas (proyek_id,tanggal,jenis,keterangan,masuk,keluar,mitra,jatuh_tempo,ref,status,bukti,oleh,dibuat) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
     p = (pid, tanggal or today(), jenis, ket[:300], int(masuk), int(keluar), mitra[:80], jt, ref, status, bukti[:400], oleh[:80], _now())
     return int(sql(c, q + " RETURNING id", p).fetchone()[0] if PG else sql(c, q, p).lastrowid)
@@ -3849,6 +3913,7 @@ def api_proyek_kas_hapus(pid, i):
         return jsonify({"error": "Tidak bisa dihapus: uang ini sudah terpakai (saldo jadi minus)."}), 400
     with db() as c:
         sql(c, "DELETE FROM proyek_kas WHERE id=? AND proyek_id=?", (i, pid))
+    audit("Kas proyek", "Hapus transaksi", f"{x.get('nama', '')} · {t['label']} · {t['keterangan']}", t["keluar"] - t["masuk"])
     return jsonify(pk_payload(x, r))
 
 
@@ -3866,6 +3931,7 @@ def api_proyek_kas_cair(pid, i):
     if t["masuk"] > saldo_mci:
         return jsonify({"error": f"Saldo kas MCI tidak cukup ({rp(saldo_mci)})."}), 400
     kas_add([{"tanggal": today(), "keterangan": f"Alokasi dana proyek {x.get('nama', '')}"[:200], "kategori": "Proyek", "masuk": 0, "keluar": t["masuk"]}], "proyek")
+    audit("Kas proyek", "Pencairan dana", f"{x.get('nama', '')}: dari kas MCI ke kas proyek", t["masuk"])
     with db() as c:
         sql(c, "UPDATE proyek_kas SET status='cair', tanggal=?, keterangan=?, oleh=? WHERE id=?",
             (today(), f"Dicairkan dari kas MCI oleh {nama_peran(r)}", nama_peran(r), i))
@@ -4167,7 +4233,7 @@ def absen_payload(r):
             hadir = {r_[0]: r_[1] for r_ in sql(c, "SELECT anggota,jam FROM absen WHERE tanggal=? AND status='hadir'", (hari,)).fetchall()}
             iz_hari = {r_[0]: r_[1] for r_ in sql(c, "SELECT anggota,status FROM absen_izin WHERE tanggal=? AND status<>'ditolak'", (hari,)).fetchall()}
             tunggu = sql(c, "SELECT id,anggota,tanggal,alasan,dibuat FROM absen_izin WHERE status='menunggu' ORDER BY tanggal").fetchall()
-            keluar = sql(c, "SELECT nama,tanggal,alasan FROM dikeluarkan WHERE alasan LIKE 'Absen:%' ORDER BY tanggal DESC").fetchall()
+            keluar = sql(c, "SELECT nama,tanggal,alasan FROM dikeluarkan WHERE alasan LIKE ? ORDER BY tanggal DESC", ("Absen:%",)).fetchall()
             rekap_all = {m["id"]: absen_rekap(m["id"], c) for m in MEMBERS.values() if m["aktif"]}
         out["daftar"] = [{"id": m["id"], "nama": m["nama"], "jam": hadir.get(m["id"]), "izin": iz_hari.get(m["id"]), "bolos": rekap_all[m["id"]]["bolos"],
                           "hadir_total": rekap_all[m["id"]]["hadir"], "kebal": _absen_kebal(m["id"])}
@@ -4300,13 +4366,358 @@ def api_absen_pulihkan(mid):
         if not row:
             return jsonify({"error": "Anggota tidak ditemukan"}), 404
         sql(c, "UPDATE anggota SET aktif=1 WHERE id=?", (mid,))
-        sql(c, "DELETE FROM dikeluarkan WHERE nama=? AND alasan LIKE 'Absen:%'", (row[0],))
+        sql(c, "DELETE FROM dikeluarkan WHERE nama=? AND alasan LIKE ?", (row[0], "Absen:%"))
     SET.setdefault("absen_dari", {})[str(mid)] = today()
     (SET.get("absen_warn") or {}).pop(str(mid), None)
     set_save()
     members_load()
     inbox_kirim([mid], "absen", "Kamu dipulihkan sebagai anggota MCI", "Hitungan bolos absen dimulai lagi dari nol. Jangan lupa absen setiap hari ya.")
     return jsonify(absen_payload(r))
+
+
+# ---------- DATABASE MITRA: total subsidi/pinjaman dihitung otomatis dari Kas proyek ----------
+def mitra_statistik():
+    with db() as c:
+        rows = sql(c, "SELECT proyek_id,jenis,masuk,keluar,mitra,id,ref FROM proyek_kas WHERE COALESCE(mitra,'')<>'' AND COALESCE(status,'')<>'menunggu'").fetchall()
+    nama_p = {x["id"]: x.get("nama", "") for x in rk_rows("proyek")}
+    out = {}
+    for pid, j, m, k, mt, i, ref in rows:
+        o = out.setdefault(mt.strip().casefold(), {"nama": mt.strip(), "subsidi": 0, "pinjaman": 0, "dibayar": 0, "proyek": set()})
+        if j == "subsidi":
+            o["subsidi"] += m
+        elif j == "pinjaman":
+            o["pinjaman"] += m
+        elif j == "bayar_pinjaman":
+            o["dibayar"] += k
+        if nama_p.get(pid):
+            o["proyek"].add(nama_p[pid])
+    for x in produk_list(True) if "produk_list" in globals() else []:
+        if x.get("mitra") and x["mitra"].casefold() != "mci":
+            o = out.setdefault(x["mitra"].strip().casefold(), {"nama": x["mitra"].strip(), "subsidi": 0, "pinjaman": 0, "dibayar": 0, "proyek": set()})
+            o["produk"] = o.get("produk", 0) + 1
+    terdaftar = {str(x.get("nama", "")).strip().casefold() for x in rk_rows("mitra")}
+    return {k: {**v, "proyek": sorted(v["proyek"]), "sisa_utang": max(0, v["pinjaman"] - v["dibayar"]), "terdaftar": k in terdaftar, "produk": v.get("produk", 0)} for k, v in out.items()}
+
+
+# ---------- PEMINJAMAN ALAT ----------
+ALAT_MAKS_HARI = 14
+
+
+def _rk_tulis(jenis, i, data):
+    with db() as c:
+        sql(c, "UPDATE rekord SET data=?,diubah=? WHERE id=? AND jenis=?", (json.dumps(data, ensure_ascii=False), _now(), i, jenis))
+
+
+def _rk_data(x):
+    return {k: v for k, v in x.items() if not k.startswith("_") and k not in ("id", "oleh_id", "oleh", "dibuat", "diubah")}
+
+
+@app.route("/api/alat/<int:i>/<aksi>", methods=["POST"])
+def api_alat_aksi(i, aksi):
+    """pinjam {tenggat} oleh anggota sendiri; kembali oleh peminjam atau pengelola alat."""
+    r = role()
+    if not r:
+        abort(401)
+    me = mid_of(r) if member_of(r) else None
+    x = rk_get("alat", i)
+    if not x:
+        return jsonify({"error": "Alat tidak ditemukan"}), 404
+    data = _rk_data(x)
+    kelola = boleh(r, "alat_kelola")
+    if aksi == "pinjam":
+        if me is None:
+            return jsonify({"error": "Peminjaman hanya untuk akun anggota"}), 400
+        if data.get("peminjam"):
+            return jsonify({"error": f"Sedang dipinjam {_nm(data['peminjam'])}"}), 400
+        if data.get("kondisi") == "rusak":
+            return jsonify({"error": "Alat ini sedang rusak / perlu servis"}), 400
+        tg = str((request.get_json(silent=True) or {}).get("tenggat") or "")[:10]
+        try:
+            t = date.fromisoformat(tg)
+        except ValueError:
+            return jsonify({"error": "Isi tanggal pengembalian"}), 400
+        hari = datetime.now(WIB).date()
+        if not hari <= t <= hari + timedelta(days=ALAT_MAKS_HARI):
+            return jsonify({"error": f"Paling lama {ALAT_MAKS_HARI} hari"}), 400
+        data.update(peminjam=me, tgl_pinjam=today(), tenggat=tg)
+        data["riwayat"] = ((data.get("riwayat") or "") + f"\n{today()}: dipinjam {_nm(me)} sampai {tg}").strip()[-8000:]
+    elif aksi == "kembali":
+        if not data.get("peminjam"):
+            return jsonify({"error": "Alat ini tidak sedang dipinjam"}), 400
+        if not (kelola or data["peminjam"] == me):
+            abort(403)
+        kond = str((request.get_json(silent=True) or {}).get("kondisi") or data.get("kondisi") or "baik")
+        if kond not in ("baik", "rusak_ringan", "rusak"):
+            kond = "baik"
+        telat = data.get("tenggat") and data["tenggat"] < today()
+        data["riwayat"] = ((data.get("riwayat") or "") + f"\n{today()}: dikembalikan {_nm(data['peminjam'])}" + (" (TERLAMBAT)" if telat else "")
+                           + (f", kondisi {kond.replace('_', ' ')}" if kond != "baik" else "") + (f", dicatat {nama_peran(r)}" if data["peminjam"] != me else "")).strip()[-8000:]
+        data.update(peminjam=None, tgl_pinjam="", tenggat="", kondisi=kond)
+    else:
+        abort(404)
+    _rk_tulis("alat", i, data)
+    return jsonify(rk_payload("alat", r))
+
+
+def alat_cek_telat():
+    """Sekali sehari: ingatkan peminjam alat yang lewat tenggat (dan pengelola alat)."""
+    hari = today()
+    if SET.get("alat_ingat") == hari or datetime.now(WIB).hour < 8:
+        return 0
+    SET["alat_ingat"] = hari
+    n = 0
+    for x in rk_rows("alat"):
+        if x.get("peminjam") and x.get("tenggat") and x["tenggat"] < hari:
+            pengelola = [m["id"] for m in MEMBERS.values() if m["aktif"] and boleh(f"m:{m['id']}", "alat_kelola") and m["id"] != x["peminjam"]]
+            inbox_kirim([x["peminjam"]] + pengelola, "alat", f"🔧 Alat terlambat dikembalikan: {x.get('nama', '')}",
+                        f"Dipinjam {_nm(x['peminjam'])} sejak {x.get('tgl_pinjam', '')}, harusnya kembali {x['tenggat']}.", x["id"])
+            n += 1
+    set_save()
+    return n
+
+
+# ---------- KODE HADIR RAPAT (QR) ----------
+@app.route("/api/agenda/<int:i>/kode", methods=["POST", "DELETE"])
+def api_agenda_kode(i):
+    r = role()
+    if not boleh(r, "rapat_kelola"):
+        abort(403)
+    x = rk_get("agenda", i)
+    if not x:
+        return jsonify({"error": "Rapat tidak ditemukan"}), 404
+    kode = SET.setdefault("agenda_kode", {})
+    if request.method == "DELETE":
+        kode.pop(str(i), None)
+    else:
+        kode[str(i)] = {"kode": "".join(secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789") for _ in range(6)), "sampai": today()}
+    for k in [k for k, v in kode.items() if v.get("sampai", "") < today()]:
+        kode.pop(k, None)   # kode kedaluwarsa dibersihkan
+    set_save()
+    return jsonify(rk_payload("agenda", r))
+
+
+@app.route("/api/agenda/<int:i>/hadir", methods=["POST"])
+def api_agenda_hadir(i):
+    """Anggota memasukkan / memindai kode rapat → namanya masuk daftar hadir. Kode berlaku sampai akhir hari dibuat."""
+    r = role()
+    me = mid_of(r) if member_of(r) else None
+    if me is None:
+        return jsonify({"error": "Masuk dengan akun anggota untuk absen rapat"}), 403
+    x = rk_get("agenda", i)
+    k = (SET.get("agenda_kode") or {}).get(str(i))
+    kode = str((request.get_json(silent=True) or {}).get("kode") or "").strip().upper()
+    if not x or not k or k.get("sampai", "") < today():
+        return jsonify({"error": "Absensi rapat ini belum dibuka atau sudah ditutup"}), 400
+    if not secrets.compare_digest(kode, k["kode"]):
+        return jsonify({"error": "Kode salah"}), 400
+    data = _rk_data(x)
+    if me not in (data.get("hadir") or []):
+        data["hadir"] = sorted(set(data.get("hadir") or []) | {me})
+        _rk_tulis("agenda", i, data)
+    return jsonify({"ok": True, "judul": x.get("judul", ""), **rk_payload("agenda", r)})
+
+
+# ---------- SKOR KEAKTIFAN (30 hari terakhir) ----------
+SKOR_BOBOT = {"absen": 35, "tugas": 20, "iuran": 20, "rapat": 15, "proyek": 10}
+
+
+def skor_semua():
+    hari = datetime.now(WIB).date()
+    awal = (hari - timedelta(days=30)).isoformat()
+    kemarin = (hari - timedelta(days=1)).isoformat()
+    tg = rk_tunggak()
+    tugas, agenda, proyek = rk_rows("tugas"), rk_rows("agenda"), rk_rows("proyek")
+    with db() as c:
+        hadir = sql(c, "SELECT anggota,tanggal FROM absen WHERE status='hadir' AND tanggal>=?", (awal,)).fetchall()
+        izin = sql(c, "SELECT anggota,tanggal FROM absen_izin WHERE status='disetujui' AND tanggal>=?", (awal,)).fetchall()
+        gab = {int(a): (d or "")[:10] for a, d in sql(c, "SELECT id,dibuat FROM anggota").fetchall()}
+    H, I = {}, {}
+    for a, t in hadir:
+        H.setdefault(a, set()).add(t)
+    for a, t in izin:
+        I.setdefault(a, set()).add(t)
+    out = []
+    for m in [m for m in MEMBERS.values() if m["aktif"]]:
+        i = m["id"]
+        mulai = max(awal, absen_mulai(), (SET.get("absen_dari") or {}).get(str(i), ""), gab.get(i, ""))
+        wajib = [t for t in (_hari_wajib(mulai, kemarin) if mulai <= kemarin else []) if t not in I.get(i, set())]
+        komp = {}
+        if wajib:
+            komp["absen"] = sum(1 for t in wajib if t in H.get(i, set())) / len(wajib)
+        selesai = sum(1 for x in tugas if x.get("pj") == i and x.get("status") == "selesai" and (x.get("diubah") or "")[:10] >= awal)
+        punya_tugas = any(x.get("pj") == i and ((x.get("diubah") or "")[:10] >= awal or x.get("status") != "selesai") for x in tugas)
+        if punya_tugas or selesai:
+            komp["tugas"] = min(1.0, selesai / 3)
+        komp["iuran"] = {0: 1.0, 1: 0.5}.get(tg.get(i, 0), 0.0)
+        rapat = [x for x in agenda if awal <= (x.get("tanggal") or "") <= kemarin and (not x.get("divisi") or x["divisi"] in m["divisi"])]
+        if rapat:
+            komp["rapat"] = sum(1 for x in rapat if i in (x.get("hadir") or [])) / len(rapat)
+        komp["proyek"] = 1.0 if any(i in (x.get("tim") or []) and x.get("status") in ("berjalan", "selesai") for x in proyek) else 0.0
+        bobot = sum(SKOR_BOBOT[k] for k in komp)
+        skor = round(sum(SKOR_BOBOT[k] * v for k, v in komp.items()) * 100 / bobot) if bobot else 0
+        out.append({"id": i, "nama": m["nama"], "skor": skor, "komponen": {k: round(v * 100) for k, v in komp.items()}, "tugas_selesai": selesai})
+    out.sort(key=lambda x: (-x["skor"], x["nama"].lower()))
+    return out
+
+
+@app.route("/api/skor")
+def api_skor():
+    r = role()
+    if not r:
+        abort(401)
+    if mid_of(r) is None:
+        abort(403)
+    return jsonify({"items": skor_semua(), "bobot": SKOR_BOBOT, "saya": mid_of(r), "periode": "30 hari terakhir"})
+
+
+# ---------- PROYEKSI KAS 8 MINGGU ----------
+KAS_BATAS_AMAN = 50000
+
+
+def kas_proyeksi():
+    rows = kas_all()
+    saldo = kas_summary(rows)["saldo"]
+    hari = datetime.now(WIB).date()
+    a28 = (hari - timedelta(days=28)).isoformat()
+    iuran_pekan = sum(nominal_of(m["id"]) for m in MEMBERS.values() if m["aktif"])
+    masuk_iuran = sum(x["masuk"] for x in rows if x["kategori"] == "Iuran" and x["tanggal"] >= a28)
+    pertama = rows[0]["tanggal"] if rows else hari.isoformat()
+    pekan_data = max(1, min(4, (hari - date.fromisoformat(pertama[:10])).days // 7))
+    rate = min(1.0, masuk_iuran / (iuran_pekan * pekan_data)) if iuran_pekan and pekan_data >= 2 else 1.0
+    rutin = sum(x["keluar"] for x in rows if x["tanggal"] >= a28 and x["kategori"] != "Proyek") / 4
+    with db() as c:
+        tunggu = int(sql(c, "SELECT COALESCE(SUM(masuk),0) FROM proyek_kas WHERE status='menunggu'").fetchone()[0])
+        pids = [int(a[0]) for a in sql(c, "SELECT DISTINCT proyek_id FROM proyek_kas WHERE jenis='pinjaman'").fetchall()]
+    risiko = []   # pinjaman mitra yang mungkin ditalangi kas MCI (sisa utang > saldo kas proyek)
+    for pid in pids:
+        if pk_ditutup(pid):
+            continue
+        rk = pk_ringkas(pid)
+        kurang = max(0, rk["utang_mitra"] - rk["saldo"])
+        if kurang:
+            jt = min((p["jatuh_tempo"] for p in rk["pinjaman"] if p["sisa"]), default=hari.isoformat())
+            risiko.append({"proyek": _nm_proyek(pid), "jumlah": kurang, "jatuh_tempo": jt})
+    titik, s_ = [], saldo - tunggu
+    masuk_pekan = round(iuran_pekan * rate)
+    for w in range(0, 9):
+        akhir = hari + timedelta(days=7 * w)
+        if w:
+            s_ += masuk_pekan - rutin
+        tal = sum(x["jumlah"] for x in risiko if x["jatuh_tempo"] <= akhir.isoformat())
+        titik.append({"minggu": w, "tanggal": akhir.isoformat(), "saldo": round(s_ - tal)})
+    rendah = min(titik, key=lambda t: t["saldo"])
+    return {"saldo": saldo, "titik": titik, "iuran_pekan": iuran_pekan, "rate": round(rate * 100), "masuk_pekan": masuk_pekan, "rutin_pekan": round(rutin),
+            "menunggu_proyek": tunggu, "risiko_pinjaman": risiko, "batas_aman": KAS_BATAS_AMAN, "terendah": rendah,
+            "peringatan": rendah["saldo"] < KAS_BATAS_AMAN}
+
+
+def _nm_proyek(pid):
+    x = rk_get("proyek", pid)
+    return x.get("nama", "") if x else f"#{pid}"
+
+
+@app.route("/api/kas/proyeksi")
+def api_kas_proyeksi():
+    r = role()
+    if not r:
+        abort(401)
+    if mid_of(r) is None:
+        abort(403)
+    return jsonify(kas_proyeksi())
+
+
+# ---------- PORTOFOLIO PUBLIK (proyek Selesai yang ditandai publik) ----------
+def portofolio():
+    return [{"id": x["id"], "nama": x.get("nama", ""), "ringkasan": x.get("ringkasan_publik") or "", "foto": x.get("foto") or "",
+             "tahun": (x.get("diubah") or x.get("dibuat") or "")[:4], "tim": len(x.get("tim") or [])}
+            for x in rk_rows("proyek") if x.get("publik") and x.get("status") == "selesai"]
+
+
+@app.route("/api/portofolio")
+def api_portofolio():
+    if not role():
+        abort(401)
+    return jsonify({"items": portofolio()})
+
+
+# ---------- RIWAYAT PERUBAHAN KEUANGAN (Peraturan Kas Pasal 5) ----------
+@app.route("/api/riwayat-keuangan")
+def api_riwayat_keuangan():
+    r = role()
+    if not r:
+        abort(401)
+    if mid_of(r) is None:
+        abort(403)
+    area = request.args.get("area") or ""
+    with db() as c:
+        q = "SELECT id,waktu,oleh,area,aksi,detail,jumlah FROM audit" + (" WHERE area=?" if area else "") + " ORDER BY id DESC LIMIT 500"
+        rows = sql(c, q, (area,) if area else ()).fetchall()
+    nama_p = {x["id"]: x.get("nama", "") for x in rk_rows("proyek")}
+    ganti = lambda t: re.sub(r"proyek #(\d+)", lambda m: "proyek " + (nama_p.get(int(m.group(1))) or "#" + m.group(1)), t or "")
+    return jsonify({"items": [{"id": i, "waktu": w, "oleh": o or "", "area": a, "aksi": k, "detail": ganti(d), "jumlah": int(j or 0)} for i, w, o, a, k, d, j in rows],
+                    "area": ["Kas MCI", "Iuran", "Kas proyek", "Hutang"]})
+
+
+# ---------- BACKUP OTOMATIS (zip JSON semua tabel) ----------
+BACKUP_LEWATI = {"gambar"}   # galeri gambar AI bisa dibuat ulang & ukurannya besar
+
+
+def backup_zip():
+    with db() as c:
+        if PG:
+            tabel = [a[0] for a in sql(c, "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'").fetchall()]
+        else:
+            tabel = [a[0] for a in sql(c, "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall()]
+        buf = io.BytesIO()
+        info = {"dibuat": _now(), "tabel": {}}
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            for t in sorted(tabel):
+                if t in BACKUP_LEWATI or not re.fullmatch(r"[a-z_]+", t):
+                    continue
+                cur = sql(c, f"SELECT * FROM {t}")
+                kol = [d[0] for d in cur.description]
+                rows = [dict(zip(kol, [v.isoformat() if hasattr(v, "isoformat") else v for v in row])) for row in cur.fetchall()]
+                info["tabel"][t] = len(rows)
+                z.writestr(f"{t}.json", json.dumps(rows, ensure_ascii=False, default=str))
+            z.writestr("_info.json", json.dumps(info, ensure_ascii=False, indent=1))
+    return buf.getvalue(), info
+
+
+@app.route("/api/backup.zip")
+def api_backup():
+    if not is_admin(role()):
+        abort(403)
+    data, _ = backup_zip()
+    SET["backup_unduh"] = _now()
+    set_save()
+    return Response(data, mimetype="application/zip", headers={"Content-Disposition": f'attachment; filename="MCI-backup-{today()}.zip"', "Cache-Control": "no-store"})
+
+
+@app.route("/api/backup/info")
+def api_backup_info():
+    if not is_admin(role()):
+        abort(403)
+    return jsonify({"terakhir_kirim": SET.get("backup_terakhir_waktu"), "terakhir_unduh": SET.get("backup_unduh"), "jadwal": "Setiap Minggu pukul 22.00 WIB, dikirim ke Telegram admin"})
+
+
+async def backup_jadwal_cek():
+    now = datetime.now(WIB)
+    kunci = _minggu_key(now)
+    if now.weekday() != 6 or now.hour < 22 or SET.get("backup_terakhir") == kunci:
+        return
+    app_ = TG_APPS.get("apex")
+    if not app_ or not ALLOWED:
+        return
+    SET["backup_terakhir"] = kunci
+    data, info = await asyncio.to_thread(backup_zip)
+    for aid in ALLOWED:
+        try:
+            await app_.bot.send_document(aid, document=io.BytesIO(data), filename=f"MCI-backup-{today()}.zip",
+                                         caption=f"🗄️ Backup mingguan MCI · {sum(info['tabel'].values())} baris dari {len(info['tabel'])} tabel. Simpan file ini di tempat aman.")
+        except Exception:
+            log.exception("Kirim backup ke %s gagal", aid)
+    SET["backup_terakhir_waktu"] = _now()
+    await asyncio.to_thread(set_save)
 
 
 # ---------- STRUKTUR & DIVISI: bagan organisasi + logo divisi + batas wewenang (Pasal 5). Deskripsi divisi diubah Dev. ----------
@@ -5128,6 +5539,7 @@ def api_iuran_aksi(i):
             sql(c, "UPDATE inbox SET dibaca=1 WHERE jenis='bayar_kas' AND ref=?", (i,))
         if not n:
             return jsonify({"error": f"Pembayaran ini sudah diproses{' oleh ' + oleh0 if oleh0 else ''}"}), 409
+        audit("Iuran", "Diterima" if aksi == "terima" else "Ditolak", f"{nama} · {lbl}" + (f" · alasan: {alasan}" if alasan else ""), int(jumlah) if aksi == "terima" else 0)
         if aksi == "terima":
             kid = _kas_iuran(nama, mg, jumlah)
             with db() as c:
@@ -5141,6 +5553,7 @@ def api_iuran_aksi(i):
         with db() as c:
             sql(c, "DELETE FROM bayar_kas WHERE id=?", (i,))
             sql(c, "UPDATE inbox SET dibaca=1 WHERE jenis='bayar_kas' AND ref=?", (i,))
+        audit("Iuran", "Hapus pembayaran", f"{nama} · {lbl} (status {status})", -int(jumlah) if status == "lunas" else 0)
         if kid:
             kas_del(int(kid))
     else:
@@ -5782,6 +6195,9 @@ def pi_konteks():
     sos = [f"Instagram {k['ig']} (instagram.com/{k['ig'][1:]})" if k.get("ig") else "", f"TikTok {k['tt']} (tiktok.com/{k['tt']})" if k.get("tt") else ""]
     out.append(f"Media sosial resmi MCI: {', '.join(x for x in sos if x) or 'belum ada'}. "
                f"Nomor WhatsApp admin: tidak ditulis di sini; pakai penanda {PI_TANDA_WA} sesuai aturan 7.")
+    pf = portofolio()
+    if pf:
+        out.append("Portofolio proyek MCI yang sudah selesai:\n" + "\n".join(f"- {x['nama']} ({x['tahun']}): {x['ringkasan'][:300]}" for x in pf[:30]))
     bk = perpus_list("viewer")
     if bk:
         out.append("Buku publik di Perpustakaan MCI:\n" + "\n".join(
