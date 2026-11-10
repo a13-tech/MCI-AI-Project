@@ -366,6 +366,7 @@ main .bar .seg button,#uuDok button{color:var(--mute);font-weight:600}main .bar 
  main{padding:20px 14px 48px}h1{font-size:28px}
  .kb{grid-template-columns:1fr}.fm{grid-template-columns:1fr}.cal{grid-template-columns:repeat(7,minmax(38px,1fr));overflow-x:auto}.cal div{min-height:60px;padding:4px}.dl{grid-template-columns:1fr}
 }
+a.ch{text-decoration:none;color:inherit;padding:7px 13px;font-size:13px;font-weight:600}a.ch:hover{filter:brightness(.95)}[data-goinfo]{color:var(--navy);font-weight:600}
 </style>
 </head>
 <body>
@@ -1573,8 +1574,18 @@ function renderTentang() {
   const t = TK;
   $("#tv").innerHTML = `<div class="hero"><h2>${esc(t.judul)}</h2>${t.semboyan ? `<div class="moto">“${esc(t.semboyan)}”</div>` : ""}<p>${esc(t.deskripsi)}</p></div>
    <div class="cd"><b>Sejarah MCI</b>${t.sejarah.length ? `<div class="tl">${[...t.sejarah].sort((x, y) => (parseInt(x.tahun) || 0) - (parseInt(y.tahun) || 0)).map(x => `<div class="it"><span class="y">${esc(x.tahun)}</span><b>${esc(x.judul)}</b>${x.isi ? `<p>${esc(x.isi)}</p>` : ""}</div>`).join("")}</div>` : '<p class="mu">Sejarah belum diisi.</p>'}</div>
+   ${tkKontak(t.kontak || {})}
    <div class="cd"><b>Anggota</b>${t.anggota.length ? `<div class="ag">${t.anggota.map(a => `<div class="cd"><div class="av">${ini(a.nama)}</div><b>${esc(a.nama)}</b><div class="pr">${esc(a.peran)}</div>${a.bio ? `<p>${esc(a.bio)}</p>` : ""}</div>`).join("")}</div>` : '<p class="mu">Daftar anggota belum diisi.</p>'}</div>`;
 }
+function tkKontak(k) {
+  const wa = String(k.wa || "").replace(/\D/g, "").replace(/^0/, "62");
+  const it = [k.ig && `<a class="ch" href="https://instagram.com/${encodeURIComponent(k.ig.slice(1))}" target="_blank" rel="noopener">Instagram ${esc(k.ig)}</a>`,
+    k.tt && `<a class="ch" href="https://www.tiktok.com/${encodeURIComponent(k.tt)}" target="_blank" rel="noopener">TikTok ${esc(k.tt)}</a>`,
+    wa && `<a class="ch g" href="https://wa.me/${wa}" target="_blank" rel="noopener">WhatsApp admin ${esc(k.wa)}</a>`].filter(Boolean);
+  return `<div class="cd"><b>Kontak resmi</b>${it.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${it.join("")}</div>` : '<p class="mu">Belum diisi.</p>'}`
+    + (ME.role === "viewer" ? '<p class="mu" style="font-size:12.5px;margin:8px 0 0">Butuh menghubungi admin? Tanya lewat <a href="#" data-goinfo>Pusat Info</a>.</p>' : "") + "</div>";
+}
+document.addEventListener("click", e => { const a = e.target.closest && e.target.closest("[data-goinfo]"); if (a) { e.preventDefault(); show("info"); } });
 async function loadTentang() {
   try { TK = await api("/api/tentang"); renderTentang(); $("#te").hidden = ME.role !== "admin"; }
   catch (e) { $("#tv").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
@@ -1591,6 +1602,7 @@ function edRow(kind, x = {}) {
 $("#te").onclick = () => {
   const f = $("#tf"), t = TK; f.hidden = false; $("#tv").hidden = true; $("#te").hidden = true;
   f.innerHTML = `<div class="cd fl"><label>Judul<input type="text" id="tj" value="${esc(t.judul)}"></label><label>Semboyan<input type="text" id="tsb" maxlength="150" value="${esc(t.semboyan || "")}" placeholder="Contoh: Rakit, uji, wujudkan."></label><label class="full">Deskripsi / cerita MCI<textarea id="td" rows="5">${esc(t.deskripsi)}</textarea></label></div>
+   <div class="cd fl"><b class="full">Kontak resmi</b><label>WhatsApp admin (hanya anggota yang lihat; viewer lewat Pusat Info)<input type="text" id="tkWa" maxlength="20" value="${esc((t.kontak || {}).wa || "")}" placeholder="08xxxxxxxxxx"></label><label>Instagram<input type="text" id="tkIg" maxlength="40" value="${esc((t.kontak || {}).ig || "")}" placeholder="@mci.corporation"></label><label>TikTok<input type="text" id="tkTt" maxlength="40" value="${esc((t.kontak || {}).tt || "")}" placeholder="@mci.corp"></label></div>
    <div class="cd"><b>Sejarah</b><p class="mu" style="font-size:12px">Otomatis diurutkan berdasarkan tahun.</p><div id="ts"></div><button class="bt o" type="button" id="tsa">+ Tambah peristiwa</button></div>
    <div class="cd"><b>Anggota</b><div id="ta"></div><button class="bt o" type="button" id="taa">+ Tambah anggota</button></div>
    <div class="bar"><button class="bt g" id="tsv">Simpan</button><button class="bt o" id="tbl">Batal</button><span class="mu" id="tmsg"></span></div>`;
@@ -1603,7 +1615,7 @@ $("#te").onclick = () => {
   $("#tsv").onclick = async () => {
     const rows = k => $$(`#tf .ed[data-k="${k}"]`).map(d => Object.fromEntries([...d.querySelectorAll("[data-f]")].map(i => [i.dataset.f, i.value])));
     $("#tsv").disabled = true;
-    try { TK = await api("/api/tentang", {json: {judul: $("#tj").value, semboyan: $("#tsb").value, deskripsi: $("#td").value, sejarah: rows("sejarah"), anggota: rows("anggota")}}); renderTentang(); tutup(); }
+    try { TK = await api("/api/tentang", {json: {judul: $("#tj").value, semboyan: $("#tsb").value, deskripsi: $("#td").value, sejarah: rows("sejarah"), anggota: rows("anggota"), kontak: {wa: $("#tkWa").value, ig: $("#tkIg").value, tt: $("#tkTt").value}}}); renderTentang(); tutup(); }
     catch (e) { $("#tmsg").textContent = e.message; }
     $("#tsv").disabled = false;
   };
