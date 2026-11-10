@@ -195,7 +195,7 @@ SET = {"caveman": False, "mcp": False, "mem_tg": "tidak", "laporan_on": True}   
 TASKLOG = deque(maxlen=40)
 JOBS = {}
 LOOP = None
-KAT = ["Jasa", "Penjualan", "Iuran", "Hibah", "Komponen", "Operasional", "Transport", "Gaji", "Lainnya"]
+KAT = ["Jasa", "Penjualan", "Iuran", "Hibah", "Komponen", "Operasional", "Transport", "Gaji", "Proyek", "Lainnya"]
 MULTI = re.compile(r"\b(lalu|kemudian|setelah itu|terus minta|dan minta|sekaligus|juga minta|habis itu)\b", re.I)
 
 SKILL_SEED = [
@@ -279,6 +279,8 @@ def db_init():
         sql(c, "CREATE UNIQUE INDEX IF NOT EXISTS ot_inv ON ongkir_titipan (invoice_id)")
         sql(c, f"CREATE TABLE IF NOT EXISTS tanya (id {pk}, tiket TEXT NOT NULL, ip TEXT NOT NULL, nama TEXT, kontak TEXT, produk_id INTEGER, produk_nama TEXT, pesan TEXT NOT NULL, "
                "jawaban_ai TEXT, balasan TEXT, dibalas_oleh TEXT, status TEXT, dibuat TEXT, dibalas TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS proyek_kas (id {pk}, proyek_id INTEGER NOT NULL, tanggal TEXT NOT NULL, jenis TEXT NOT NULL, keterangan TEXT, "
+               f"masuk {big} NOT NULL DEFAULT 0, keluar {big} NOT NULL DEFAULT 0, mitra TEXT, jatuh_tempo TEXT, ref INTEGER, status TEXT, bukti TEXT, oleh TEXT, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS pusat_info (id {pk}, ip TEXT NOT NULL, tanya TEXT NOT NULL, jawab TEXT, token {big} NOT NULL DEFAULT 0, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS stok (id {pk}, nama TEXT NOT NULL, jumlah {big} NOT NULL DEFAULT 0, satuan TEXT, kategori TEXT, minimum {big} NOT NULL DEFAULT 0, catatan TEXT, mime TEXT, gambar TEXT, diubah TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS laporan (id {pk}, minggu TEXT, dibuat TEXT, dari TEXT, sampai TEXT, sumber TEXT, isi TEXT, data TEXT)")
@@ -2123,6 +2125,10 @@ async def laporan_jadwal():
                         pass
         except Exception:
             log.exception("Cek hutang telat gagal")
+        try:
+            await asyncio.to_thread(pk_cek_pinjaman)
+        except Exception:
+            log.exception("Cek pinjaman mitra proyek gagal")
         await asyncio.sleep(300)
 
 
@@ -3324,10 +3330,11 @@ JENIS = {
         F("pj", "Pemilik proyek", "anggota", info="Pengusul proyek. Boleh langsung mengeluarkan anggota tim yang hak proyeknya dicabut (Peraturan Kas Pasal 6)."),
         F("setuju", "Anggota yang menyetujui", "anggota_banyak", info="Minimal 3 anggota aktif yang haknya tidak dicabut, termasuk pemilik proyek (Peraturan Kas Pasal 7)."),
         F("tim", "Tim", "anggota_banyak"), F("progres", "Progres (%)", "angka", maks=100, bawaan=0),
-        F("dana", "Dana kas terpakai (Rp)", "angka", maks=10**9, bawaan=0, info="Paling banyak Rp75.000 per proyek. Lebih dari itu perlu persetujuan Bendahara atau Pemilik MCI (Peraturan Kas Pasal 7)."),
+        F("dana", "Dana kas MCI diminta (Rp)", "angka", maks=10**9, bawaan=0, info="Paling banyak Rp75.000 per proyek; lebih dari itu perlu persetujuan Bendahara atau Pemilik MCI. Uangnya dipindah ke kas proyek setelah Bendahara mengonfirmasi pencairan (Peraturan Kas Pasal 7)."),
         F("dana_tambahan", "Tambahan dana disetujui (Rp)", "angka", maks=10**9, bawaan=0, info="Diisi Bendahara atau Pemilik MCI."),
         F("deskripsi", "Deskripsi", "area", maks=4000), F("komponen", "Komponen / kebutuhan", "area", maks=4000),
-        F("hasil", "Pembagian hasil", "area", maks=2000, info="Peraturan Kas Pasal 4: anggota yang hak proyeknya dicabut tidak menerima bagian hasil, dan bagian itu tidak diberikan kemudian."),
+        F("tidak_kerja", "Tidak ikut bagi hasil (tidak bekerja)", "anggota_banyak", info="Diisi pemilik proyek. Anggota tim yang dipilih di sini tidak mendapat bagian keuntungan saat tutup buku (Peraturan Kas Pasal 11)."),
+        F("hasil", "Catatan hasil proyek", "area", maks=2000, info="Keuntungan dibagi otomatis saat tutup buku: 20% ke kas MCI, 80% dibagi rata ke tim yang bekerja. Anggota yang hak proyeknya dicabut tidak menerima bagian (Peraturan Kas Pasal 4 & 11)."),
         F("link", "Tautan (repo, dokumen)", "url", maks=400), {**F("riwayat", "Riwayat tim", "area", maks=8000), "sistem": True}]},
     "konten": {"judul": "Jadwal Konten", "tulis": "konten_kelola", "lihat": "anggota", "fields": [
         F("judul", "Judul / topik", wajib=True), F("tanggal", "Tanggal tayang", "tanggal"),
@@ -3516,6 +3523,8 @@ def rk_setelah(jenis, x, lama, r):
                 inbox_kirim([i], "proyek", f"Kamu dikeluarkan dari proyek {x.get('nama', '')}",
                             ("Hak proyekmu sedang dicabut karena tunggakan kas, jadi pemilik proyek mengeluarkanmu dari tim (Peraturan Kas Pasal 6). "
                              "Setelah tunggakan dan denda lunas, kamu boleh bergabung lagi jika pemilik proyek setuju.") if tg.get(i, 0) >= 2 else f"Diubah oleh {nama_peran(r)}.", sid)
+    if jenis == "proyek":
+        pk_sinkron_alokasi(x, r)
     if jenis == "pengumuman" and lama is None and x.get("kirim"):
         inbox_kirim(sorted(rk_anggota_ids()), "pengumuman", f"📣 {x['judul']}", x.get("isi", ""), sid, maks=8200)
     if jenis == "agenda" and lama is None:
@@ -3558,6 +3567,7 @@ def rk_cek(jenis, data, lama, r):
     batas = DANA_PROYEK_MAKS + int(data.get("dana_tambahan") or 0)
     if int(data.get("dana") or 0) > batas:
         return f"Dana kas proyek paling banyak Rp{batas:,}".replace(",", ".") + ". Untuk tambahan, ajukan ke Bendahara atau Pemilik MCI (Peraturan Kas Pasal 7)."
+    data["tidak_kerja"] = [i for i in (data.get("tidak_kerja") or []) if i in (data.get("tim") or [])]
     if lama is not None:   # catat perubahan tim
         keluar = set(lama.get("tim") or []) - set(data.get("tim") or [])
         masuk = set(data.get("tim") or []) - set(lama.get("tim") or [])
@@ -3616,6 +3626,8 @@ def api_rekord_one(jenis, i):
     if request.method == "DELETE":
         if e != "semua":
             abort(403)
+        if jenis == "proyek" and pk_ada_uang(i) and not pk_ditutup(i):
+            return jsonify({"error": "Proyek ini masih punya kas proyek. Tutup buku dulu supaya uangnya kembali ke kas MCI atau dibagi."}), 400
         with db() as c:
             sql(c, "DELETE FROM rekord WHERE id=? AND jenis=?", (i, jenis))
         return jsonify(rk_payload(jenis, r))
@@ -3624,6 +3636,8 @@ def api_rekord_one(jenis, i):
     d = request.get_json(silent=True) or {}
     simpan = {k: v for k, v in lama.items() if not k.startswith("_") and k not in ("id", "oleh_id", "oleh", "dibuat", "diubah")}
     data, err = rk_bersih(jenis, d, lama=simpan, hanya=None if e == "semua" else set(e))
+    if not err and jenis == "proyek" and pk_ditutup(i) and int(data.get("dana") or 0) != int(simpan.get("dana") or 0):
+        err = "Kas proyek sudah ditutup, dana tidak bisa diubah lagi."
     if not err:
         err = rk_cek(jenis, data, simpan, r)
     if err:
@@ -3633,6 +3647,296 @@ def api_rekord_one(jenis, i):
     rk_setelah(jenis, rk_get(jenis, i), lama, r)
     return jsonify(rk_payload(jenis, r))
 
+
+
+# ---------- KAS PROYEK: tiap proyek punya "amplop" dana sendiri, terpisah dari kas MCI (Peraturan Kas Pasal 7 & 11) ----------
+PK_MASUK = {"subsidi": "Subsidi / hibah mitra", "pinjaman": "Pinjaman mitra", "patungan": "Patungan tim", "pendapatan": "Pendapatan / hasil proyek"}
+PK_KELUAR = {"pengeluaran": "Pengeluaran proyek", "bayar_pinjaman": "Bayar pinjaman mitra"}
+PK_SISTEM = {"alokasi": "Dana dari kas MCI", "talangan": "Talangan kas MCI untuk pinjaman", "kembali_kas": "Modal kembali ke kas MCI",
+             "bagi_kas": "Bagi hasil 20% ke kas MCI", "bagi_anggota": "Bagi hasil anggota", "tutup": "Tutup buku"}
+PK_LABEL = {**PK_MASUK, **PK_KELUAR, **PK_SISTEM}
+PK_BAGI_KAS = 20          # persen keuntungan yang masuk kas MCI; sisanya dibagi rata ke tim (Pasal 11)
+PK_NOTA_MIN = 10000       # pengeluaran >= ini wajib ada bukti (Pasal 9)
+
+
+def pk_rows(pid):
+    with db() as c:
+        rows = sql(c, "SELECT id,tanggal,jenis,keterangan,masuk,keluar,mitra,jatuh_tempo,ref,status,bukti,oleh,dibuat FROM proyek_kas WHERE proyek_id=? ORDER BY tanggal, id", (pid,)).fetchall()
+    return [{"id": int(a[0]), "tanggal": a[1], "jenis": a[2], "label": PK_LABEL.get(a[2], a[2]), "keterangan": a[3] or "", "masuk": int(a[4] or 0), "keluar": int(a[5] or 0),
+             "mitra": a[6] or "", "jatuh_tempo": a[7] or "", "ref": a[8], "status": a[9] or "", "bukti": a[10] or "", "oleh": a[11] or "", "dibuat": a[12] or ""} for a in rows]
+
+
+def pk_ins(c, pid, jenis, masuk=0, keluar=0, ket="", mitra="", jt="", ref=None, status="", bukti="", oleh="", tanggal=None):
+    q = "INSERT INTO proyek_kas (proyek_id,tanggal,jenis,keterangan,masuk,keluar,mitra,jatuh_tempo,ref,status,bukti,oleh,dibuat) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
+    p = (pid, tanggal or today(), jenis, ket[:300], int(masuk), int(keluar), mitra[:80], jt, ref, status, bukti[:400], oleh[:80], _now())
+    return int(sql(c, q + " RETURNING id", p).fetchone()[0] if PG else sql(c, q, p).lastrowid)
+
+
+def pk_ditutup(pid):
+    with db() as c:
+        return bool(sql(c, "SELECT 1 FROM proyek_kas WHERE proyek_id=? AND jenis='tutup' LIMIT 1", (pid,)).fetchone())
+
+
+def pk_ada_uang(pid):
+    with db() as c:
+        return bool(sql(c, "SELECT 1 FROM proyek_kas WHERE proyek_id=? AND COALESCE(status,'')<>'menunggu' LIMIT 1", (pid,)).fetchone())
+
+
+def pk_ringkas(pid, rows=None):
+    rows = pk_rows(pid) if rows is None else rows
+    aktif = [x for x in rows if x["status"] != "menunggu"]
+    sumber = {k: sum(x["masuk"] for x in aktif if x["jenis"] == k) for k in ("alokasi", *PK_MASUK)}
+    pinj = []
+    for p in (x for x in aktif if x["jenis"] == "pinjaman"):
+        dibayar = sum(x["keluar"] for x in aktif if x["jenis"] == "bayar_pinjaman" and x["ref"] == p["id"])
+        pinj.append({"id": p["id"], "mitra": p["mitra"], "jumlah": p["masuk"], "dibayar": dibayar, "sisa": max(0, p["masuk"] - dibayar), "jatuh_tempo": p["jatuh_tempo"]})
+    return {"saldo": sum(x["masuk"] - x["keluar"] for x in aktif), "masuk": sum(x["masuk"] for x in aktif), "keluar": sum(x["keluar"] for x in aktif),
+            "modal": sumber["alokasi"], "sumber": sumber, "terpakai": sum(x["keluar"] for x in aktif if x["jenis"] == "pengeluaran"),
+            "menunggu": sum(x["masuk"] for x in rows if x["status"] == "menunggu"), "pinjaman": pinj, "utang_mitra": sum(p["sisa"] for p in pinj),
+            "bukti_kurang": sum(1 for x in aktif if x["jenis"] == "pengeluaran" and x["keluar"] >= PK_NOTA_MIN and not x["bukti"]),
+            "ditutup": any(x["jenis"] == "tutup" for x in rows)}
+
+
+def pk_sinkron_alokasi(x, r):
+    """Dana kas MCI yang diminta proyek -> satu baris 'menunggu' sebesar (diminta - sudah cair). Bendahara yang mencairkan."""
+    pid = x["id"]
+    if pk_ditutup(pid):
+        return
+    rows = pk_rows(pid)
+    cair = sum(y["masuk"] for y in rows if y["jenis"] == "alokasi" and y["status"] == "cair")
+    lama = sum(y["masuk"] for y in rows if y["status"] == "menunggu")
+    perlu = max(0, int(x.get("dana") or 0) - cair)
+    if perlu == lama:
+        return
+    with db() as c:
+        sql(c, "DELETE FROM proyek_kas WHERE proyek_id=? AND status='menunggu'", (pid,))
+        if perlu:
+            pk_ins(c, pid, "alokasi", masuk=perlu, ket=f"Permintaan dana kas MCI untuk proyek {x.get('nama', '')}", status="menunggu", oleh=nama_peran(r))
+    if perlu:
+        inbox_kirim(penerima_invoice(), "proyek", f"💰 Pencairan dana proyek menunggu: {x.get('nama', '')}",
+                    f"Proyek meminta {rp(perlu)} dari kas MCI. Buka halaman Proyek, lalu konfirmasi pencairan di bagian Kas proyek (Peraturan Kas Pasal 7).", pid)
+
+
+def pk_boleh_catat(x, r):
+    return is_admin(r) or can("kas_edit", r) or boleh(r, "proyek_kelola") or (mid_of(r) is not None and x.get("pj") == mid_of(r))
+
+
+def pk_hitung_tutup(x, rows=None):
+    """Urutan tutup buku (Pasal 11): 1) lunasi pinjaman mitra (kurang = ditalangi kas MCI), 2) modal kembali ke kas MCI,
+    3) keuntungan: 20% kas MCI, 80% dibagi rata ke tim yang bekerja dan haknya tidak dicabut. Sisa pembulatan masuk kas MCI."""
+    rows = pk_rows(x["id"]) if rows is None else rows
+    rk = pk_ringkas(x["id"], rows)
+    S = rk["saldo"]
+    bayar, sisa_s = [], S
+    for p in sorted(rk["pinjaman"], key=lambda p: (p["jatuh_tempo"] or "9999", p["id"])):
+        if p["sisa"]:
+            bayar.append({"id": p["id"], "mitra": p["mitra"], "jumlah": p["sisa"]})
+    utang = sum(b["jumlah"] for b in bayar)
+    dari_saldo = min(S, utang)
+    talangan = utang - dari_saldo
+    sisa_s = S - dari_saldo
+    kembali = min(sisa_s, rk["modal"])
+    untung = sisa_s - kembali
+    tg = rk_tunggak()
+    tim = [i for i in (x.get("tim") or []) if i in MEMBERS]
+    tidak = set(x.get("tidak_kerja") or [])
+    dicabut = [i for i in tim if tg.get(i, 0) >= 2 and i not in tidak]
+    penerima = [i for i in tim if i not in tidak and i not in dicabut]
+    ke_kas = untung * PK_BAGI_KAS // 100
+    jatah = untung - ke_kas
+    per = jatah // len(penerima) if penerima else 0
+    ke_kas += jatah - per * len(penerima)   # sisa pembulatan / tidak ada penerima -> kas MCI
+    return {"saldo": S, "utang_mitra": utang, "bayar": bayar, "dari_saldo": dari_saldo, "talangan": talangan, "modal": rk["modal"], "kembali": kembali,
+            "untung": untung, "ke_kas": ke_kas, "per_orang": per, "persen_kas": PK_BAGI_KAS,
+            "penerima": [{"id": i, "nama": _nm(i)} for i in penerima], "tidak_kerja": [{"id": i, "nama": _nm(i)} for i in tim if i in tidak],
+            "dicabut": [{"id": i, "nama": _nm(i)} for i in dicabut], "menunggu": rk["menunggu"]}
+
+
+def pk_payload(x, r):
+    rows = pk_rows(x["id"])
+    rk = pk_ringkas(x["id"], rows)
+    out = {"rows": rows, "ringkas": rk, "catat": pk_boleh_catat(x, r) and not rk["ditutup"], "bendahara": is_admin(r) or can("kas_edit", r),
+           "jenis_masuk": PK_MASUK, "jenis_keluar": PK_KELUAR, "nota_min": PK_NOTA_MIN, "persen_kas": PK_BAGI_KAS, "status": x.get("status")}
+    if not rk["ditutup"] and out["bendahara"]:
+        out["tutup"] = pk_hitung_tutup(x, rows)
+    return out
+
+
+def _pk_proyek(pid, r):
+    if not r:
+        abort(401)
+    if mid_of(r) is None and not is_admin(r):
+        abort(403)   # viewer tidak melihat keuangan proyek
+    x = rk_get("proyek", pid)
+    if not x:
+        abort(404)
+    return x
+
+
+@app.route("/api/proyek/<int:pid>/kas", methods=["GET", "POST"])
+def api_proyek_kas(pid):
+    r = role()
+    x = _pk_proyek(pid, r)
+    if request.method == "POST":
+        if not pk_boleh_catat(x, r):
+            abort(403)
+        if pk_ditutup(pid):
+            return jsonify({"error": "Kas proyek sudah ditutup."}), 400
+        d = request.get_json(silent=True) or {}
+        jenis = str(d.get("jenis") or "")
+        try:
+            n = int(str(d.get("jumlah") or "0").replace(".", "").replace(",", "").strip() or 0)
+        except ValueError:
+            n = 0
+        if jenis not in PK_MASUK and jenis not in PK_KELUAR:
+            return jsonify({"error": "Jenis transaksi tidak dikenal"}), 400
+        if n <= 0 or n > 10**10:
+            return jsonify({"error": "Jumlah harus lebih dari 0"}), 400
+        tgl = str(d.get("tanggal") or "")[:10]
+        tgl = tgl if re.fullmatch(r"\d{4}-\d{2}-\d{2}", tgl) else today()
+        ket = str(d.get("keterangan") or "").strip()[:300]
+        mitra = str(d.get("mitra") or "").strip()[:80]
+        jt = str(d.get("jatuh_tempo") or "")[:10]
+        bukti = str(d.get("bukti") or "").strip()[:400]
+        ref = None
+        rk = pk_ringkas(pid)
+        if jenis in ("subsidi", "pinjaman") and not mitra:
+            return jsonify({"error": "Nama mitra wajib diisi"}), 400
+        if jenis == "pinjaman" and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", jt):
+            return jsonify({"error": "Pinjaman wajib punya tanggal jatuh tempo"}), 400
+        if jenis == "pengeluaran" and not ket:
+            return jsonify({"error": "Tulis untuk apa pengeluarannya"}), 400
+        if jenis in PK_KELUAR and n > rk["saldo"]:
+            return jsonify({"error": f"Saldo kas proyek tidak cukup (sisa {rp(rk['saldo'])})."}), 400
+        if jenis == "bayar_pinjaman":
+            p = next((p for p in rk["pinjaman"] if p["id"] == int(d.get("ref") or 0)), None)
+            if not p:
+                return jsonify({"error": "Pilih pinjaman yang dibayar"}), 400
+            if n > p["sisa"]:
+                return jsonify({"error": f"Sisa pinjaman ke {p['mitra']} hanya {rp(p['sisa'])}."}), 400
+            ref, mitra = p["id"], p["mitra"]
+            ket = ket or f"Cicilan pinjaman ke {mitra}"
+        with db() as c:
+            pk_ins(c, pid, jenis, masuk=n if jenis in PK_MASUK else 0, keluar=n if jenis in PK_KELUAR else 0, ket=ket or PK_LABEL[jenis],
+                   mitra=mitra, jt=jt if jenis == "pinjaman" else "", ref=ref, bukti=bukti, oleh=nama_peran(r), tanggal=tgl)
+    return jsonify(pk_payload(x, r))
+
+
+@app.route("/api/proyek/<int:pid>/kas/<int:i>", methods=["DELETE"])
+def api_proyek_kas_hapus(pid, i):
+    r = role()
+    x = _pk_proyek(pid, r)
+    if not pk_boleh_catat(x, r):
+        abort(403)
+    if pk_ditutup(pid):
+        return jsonify({"error": "Kas proyek sudah ditutup."}), 400
+    t = next((y for y in pk_rows(pid) if y["id"] == i), None)
+    if not t or t["jenis"] in PK_SISTEM:
+        return jsonify({"error": "Transaksi ini dicatat sistem dan tidak bisa dihapus"}), 400
+    if t["jenis"] == "pinjaman" and any(y["jenis"] == "bayar_pinjaman" and y["ref"] == i for y in pk_rows(pid)):
+        return jsonify({"error": "Pinjaman ini sudah ada pembayarannya. Hapus pembayarannya dulu."}), 400
+    if t["masuk"] and pk_ringkas(pid)["saldo"] - t["masuk"] < 0:
+        return jsonify({"error": "Tidak bisa dihapus: uang ini sudah terpakai (saldo jadi minus)."}), 400
+    with db() as c:
+        sql(c, "DELETE FROM proyek_kas WHERE id=? AND proyek_id=?", (i, pid))
+    return jsonify(pk_payload(x, r))
+
+
+@app.route("/api/proyek/<int:pid>/kas/<int:i>/cair", methods=["POST"])
+def api_proyek_kas_cair(pid, i):
+    """Bendahara mengonfirmasi pencairan: uang pindah dari kas MCI ke kas proyek."""
+    r = role()
+    x = _pk_proyek(pid, r)
+    if not (is_admin(r) or can("kas_edit", r)):
+        abort(403)
+    t = next((y for y in pk_rows(pid) if y["id"] == i and y["status"] == "menunggu"), None)
+    if not t:
+        return jsonify({"error": "Permintaan pencairan tidak ditemukan"}), 404
+    saldo_mci = kas_summary(kas_all())["saldo"]
+    if t["masuk"] > saldo_mci:
+        return jsonify({"error": f"Saldo kas MCI tidak cukup ({rp(saldo_mci)})."}), 400
+    kas_add([{"tanggal": today(), "keterangan": f"Alokasi dana proyek {x.get('nama', '')}"[:200], "kategori": "Proyek", "masuk": 0, "keluar": t["masuk"]}], "proyek")
+    with db() as c:
+        sql(c, "UPDATE proyek_kas SET status='cair', tanggal=?, keterangan=?, oleh=? WHERE id=?",
+            (today(), f"Dicairkan dari kas MCI oleh {nama_peran(r)}", nama_peran(r), i))
+    if x.get("pj"):
+        inbox_kirim([x["pj"]], "proyek", f"✅ Dana proyek dicairkan: {x.get('nama', '')}", f"{rp(t['masuk'])} sudah dipindah dari kas MCI ke kas proyek.", pid)
+    return jsonify(pk_payload(x, r))
+
+
+@app.route("/api/proyek/<int:pid>/tutup", methods=["POST"])
+def api_proyek_tutup(pid):
+    """Tutup buku proyek (Bendahara / Pemilik MCI). Proyek harus berstatus Selesai."""
+    r = role()
+    x = _pk_proyek(pid, r)
+    if not (is_admin(r) or can("kas_edit", r)):
+        abort(403)
+    if x.get("status") != "selesai":
+        return jsonify({"error": "Ubah status proyek menjadi Selesai dulu sebelum tutup buku."}), 400
+    with _KLOCK:
+        if pk_ditutup(pid):
+            return jsonify({"error": "Kas proyek sudah ditutup."}), 400
+        h = pk_hitung_tutup(x)
+        if h["talangan"] > kas_summary(kas_all())["saldo"]:
+            return jsonify({"error": f"Kas MCI tidak cukup untuk menalangi pinjaman mitra ({rp(h['talangan'])})."}), 400
+        nm, oleh = x.get("nama", ""), nama_peran(r)
+        kas = []
+        with db() as c:
+            sql(c, "DELETE FROM proyek_kas WHERE proyek_id=? AND status='menunggu'", (pid,))   # permintaan yang belum cair dibatalkan
+            if h["talangan"]:
+                pk_ins(c, pid, "talangan", masuk=h["talangan"], ket="Kekurangan bayar pinjaman mitra ditalangi kas MCI", oleh=oleh)
+                kas.append({"keterangan": f"Talangan pinjaman mitra proyek {nm}", "masuk": 0, "keluar": h["talangan"]})
+            for b in h["bayar"]:
+                pk_ins(c, pid, "bayar_pinjaman", keluar=b["jumlah"], ket=f"Pelunasan pinjaman ke {b['mitra']} (tutup buku)", mitra=b["mitra"], ref=b["id"], oleh=oleh)
+            if h["kembali"]:
+                pk_ins(c, pid, "kembali_kas", keluar=h["kembali"], ket="Modal dikembalikan ke kas MCI", oleh=oleh)
+                kas.append({"keterangan": f"Pengembalian modal proyek {nm}", "masuk": h["kembali"], "keluar": 0})
+            if h["ke_kas"]:
+                pk_ins(c, pid, "bagi_kas", keluar=h["ke_kas"], ket=f"Bagi hasil {PK_BAGI_KAS}% ke kas MCI" + (" (+ sisa pembulatan)" if h["per_orang"] else ""), oleh=oleh)
+                kas.append({"keterangan": f"Bagi hasil proyek {nm}", "masuk": h["ke_kas"], "keluar": 0})
+            for p in h["penerima"] if h["per_orang"] else []:
+                pk_ins(c, pid, "bagi_anggota", keluar=h["per_orang"], ket=f"Bagian hasil untuk {p['nama']}", ref=p["id"], oleh=oleh)
+            pk_ins(c, pid, "tutup", ket=f"Tutup buku oleh {oleh}. Keuntungan {rp(h['untung'])}", oleh=oleh)
+        if kas:
+            kas_add([{"tanggal": today(), "kategori": "Proyek", **k} for k in kas], "proyek")
+    if h["per_orang"]:
+        for p in h["penerima"]:
+            inbox_kirim([p["id"]], "proyek", f"🎉 Bagian hasil proyek {nm}", f"Kamu mendapat {rp(h['per_orang'])}. Uangnya diserahkan oleh Bendahara.", pid)
+    if h["dicabut"]:
+        inbox_kirim([p["id"] for p in h["dicabut"]], "proyek", f"Bagian hasil proyek {nm} tidak diberikan",
+                    "Saat tutup buku, hak proyekmu sedang dicabut karena tunggakan kas, jadi bagianmu tidak diberikan dan tidak diberikan kemudian (Peraturan Kas Pasal 4).", pid)
+    data = {k: v for k, v in x.items() if not k.startswith("_") and k not in ("id", "oleh_id", "oleh", "dibuat", "diubah")}
+    data["riwayat"] = ((data.get("riwayat") or "") + f"\n{today()}: Tutup buku oleh {oleh}. Keuntungan {rp(h['untung'])}, "
+                       f"{PK_BAGI_KAS}% ke kas MCI, {rp(h['per_orang'])} per orang untuk {len(h['penerima'])} anggota.").strip()[-8000:]
+    with db() as c:
+        sql(c, "UPDATE rekord SET data=?,diubah=? WHERE id=? AND jenis='proyek'", (json.dumps(data, ensure_ascii=False), _now(), pid))
+    return jsonify({**pk_payload(rk_get("proyek", pid), r), "hasil": h})
+
+
+def pk_cek_pinjaman():
+    """Pengingat pinjaman mitra: H-3 sampai lewat jatuh tempo, sekali sehari ke pemilik proyek & Bendahara."""
+    hari = today()
+    batas = (datetime.now(WIB) + timedelta(days=3)).date().isoformat()
+    ingat = SET.setdefault("pk_ingat", {})
+    with db() as c:
+        pids = [int(a[0]) for a in sql(c, "SELECT DISTINCT proyek_id FROM proyek_kas WHERE jenis='pinjaman'").fetchall()]
+    kirim = 0
+    for pid in pids:
+        if pk_ditutup(pid):
+            continue
+        x = rk_get("proyek", pid)
+        if not x:
+            continue
+        for p in pk_ringkas(pid)["pinjaman"]:
+            if p["sisa"] and p["jatuh_tempo"] and p["jatuh_tempo"] <= batas and ingat.get(str(p["id"])) != hari:
+                ingat[str(p["id"])] = hari
+                telat = p["jatuh_tempo"] < hari
+                inbox_kirim([x.get("pj")] + penerima_invoice(), "proyek", ("⚠️ Pinjaman mitra TELAT: " if telat else "⏰ Pinjaman mitra jatuh tempo: ") + x.get("nama", ""),
+                            f"Sisa pinjaman ke {p['mitra']}: {rp(p['sisa'])}, jatuh tempo {p['jatuh_tempo']}.", pid)
+                kirim += 1
+    if kirim:
+        set_save()
+    return kirim
 
 
 # ---------- STRUKTUR & DIVISI: bagan organisasi + logo divisi + batas wewenang (Pasal 5). Deskripsi divisi diubah Dev. ----------

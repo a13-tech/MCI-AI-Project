@@ -5,7 +5,7 @@ baris yang belum pernah diubah lewat web. Baris yang sudah diedit Dev di web tid
 Format isi: satu baris = satu ayat. Awali "* " untuk ayat, "** " untuk rincian di bawah ayat.
 """
 
-UU_VERSI = 2
+UU_VERSI = 3
 
 UU_SEED = {
     "info": "UNDANG-UNDANG MAHARDIKA CAKRAWALA INDONESIA (UU MCI)\n"
@@ -150,7 +150,9 @@ KAS_SEED = {
             "* Proyek sah jika disetujui paling sedikit 3 anggota aktif yang haknya tidak sedang dicabut, termasuk pengusul.",
             "* Proyek wajib dicatat di halaman Proyek, lengkap dengan pemilik proyek dan nama anggota yang menyetujui.",
             "* Setiap proyek boleh memakai dana kas paling banyak Rp75.000 secara keseluruhan.",
-            "* Jika membutuhkan tambahan dana, pemilik proyek mengajukannya kepada Bendahara atau Pemilik MCI. Dana tambahan baru boleh dipakai setelah disetujui."])},
+            "* Jika membutuhkan tambahan dana, pemilik proyek mengajukannya kepada Bendahara atau Pemilik MCI. Dana tambahan baru boleh dipakai setelah disetujui.",
+            "* Dana kas untuk proyek dipindahkan ke kas proyek setelah Bendahara mengonfirmasi pencairan. Kas proyek dicatat terpisah dari kas MCI.",
+            "* Subsidi, hibah, atau pinjaman dari mitra dicatat sebagai kas proyek dan tidak dihitung dalam batas Rp75.000. Pinjaman mitra wajib dicatat bersama tanggal jatuh temponya."])},
         {"nomor": 8, "judul": "Penyalahgunaan Dana Kas", "isi": "\n".join([
             "* Yang termasuk penyalahgunaan dana kas: memakai kas untuk kepentingan pribadi, mengambil kas tanpa izin, menahan uang setoran, atau memalsukan bukti pengeluaran.",
             "* Dugaan penyalahgunaan diperiksa oleh Dewan Pengawas atau Pemilik MCI. Terlapor diberi waktu membela diri paling lama 7 hari.",
@@ -165,5 +167,16 @@ KAS_SEED = {
             "* Iuran yang sudah dibayar menjadi milik kas MCI dan tidak dikembalikan.",
             "* Anggota yang ingin keluar wajib melunasi tunggakan kasnya terlebih dahulu.",
             "* Anggota yang keluar tanpa melunasi tunggakan dimasukkan ke dalam Blacklist."])},
+        {"nomor": 11, "judul": "Tutup Buku dan Pembagian Hasil Proyek", "isi": "\n".join([
+            "* Setelah proyek selesai, Bendahara atau Pemilik MCI menutup buku kas proyek.",
+            "* Saat tutup buku, uang kas proyek dipakai dengan urutan berikut:",
+            "** 1. Melunasi pinjaman mitra. Jika uangnya kurang, kekurangannya ditalangi kas MCI.",
+            "** 2. Mengembalikan modal dari kas MCI.",
+            "** 3. Sisanya adalah keuntungan proyek.",
+            "* Keuntungan proyek dibagi sebagai berikut: 20% masuk kas MCI sebagai uang perputaran, dan 80% dibagi rata kepada anggota tim proyek yang bekerja.",
+            "* Anggota tim yang tidak bekerja, sesuai catatan pemilik proyek, tidak mendapat bagian.",
+            "* Anggota yang hak proyeknya sedang dicabut tidak mendapat bagian, sesuai Pasal 4.",
+            "* Sisa pembulatan, atau bagian yang tidak punya penerima, masuk kas MCI.",
+            "* Proyek yang merugi tidak dibagi. Modal yang tidak kembali dicatat sebagai pengeluaran kas MCI."])},
     ],
 }

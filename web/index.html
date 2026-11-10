@@ -367,6 +367,7 @@ main .bar .seg button,#uuDok button{color:var(--mute);font-weight:600}main .bar 
  .kb{grid-template-columns:1fr}.fm{grid-template-columns:1fr}.cal{grid-template-columns:repeat(7,minmax(38px,1fr));overflow-x:auto}.cal div{min-height:60px;padding:4px}.dl{grid-template-columns:1fr}
 }
 a.ch{text-decoration:none;color:inherit;padding:7px 13px;font-size:13px;font-weight:600}a.ch:hover{filter:brightness(.95)}[data-goinfo]{color:var(--navy);font-weight:600}
+.lst>*,.pkd,.pkb{min-width:0;max-width:100%}.pkb .fl{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))}
 </style>
 </head>
 <body>
@@ -1887,7 +1888,7 @@ const RK_INFO = {
   pengumuman: ["Kabar resmi", "Pengumuman", "Pengumuman resmi MCI: kas, jadwal, dan keputusan. Formatnya seragam sesuai Pasal 14, dan bisa langsung dikirim ke Inbox serta Telegram semua anggota.", "Tulis pengumuman"],
   agenda: ["Organisasi", "Agenda & Rapat", "Jadwal rapat, agenda yang dibahas, notulen, dan daftar hadir. Anggota divisi terkait mendapat undangan di Inbox.", "Jadwalkan rapat"],
   tugas: ["Organisasi", "Tugas", "Siapa mengerjakan apa, sampai kapan. Penerima tugas mendapat notifikasi dan bisa memperbarui statusnya sendiri.", "Beri tugas"],
-  proyek: ["Organisasi", "Proyek", "Semua anggota boleh mengusulkan proyek. Proyek sah jika disetujui minimal 3 anggota, dan dana kasnya paling banyak Rp75.000 kecuali ada tambahan dari Bendahara atau Pemilik MCI (Peraturan Kas Pasal 7). Anggota yang menunggak 2 minggu tanpa izin dicabut hak proyeknya, dan pemilik proyek boleh langsung mengeluarkannya (Pasal 4 & 6).", "Usulkan proyek"],
+  proyek: ["Organisasi", "Proyek", "Semua anggota boleh mengusulkan proyek. Proyek sah jika disetujui minimal 3 anggota, dan dana kasnya paling banyak Rp75.000 kecuali ada tambahan dari Bendahara atau Pemilik MCI (Peraturan Kas Pasal 7). Dana kas dipindah ke Kas proyek setelah Bendahara mengonfirmasi; subsidi dan pinjaman mitra dicatat di sana juga. Saat tutup buku, keuntungan dibagi 20% ke kas MCI dan 80% rata ke tim yang bekerja (Pasal 11). Anggota yang menunggak 2 minggu tanpa izin dicabut hak proyeknya, dan pemilik proyek boleh langsung mengeluarkannya (Pasal 4 & 6).", "Usulkan proyek"],
   konten: ["Konten & karya", "Jadwal Konten", "Kalender posting Instagram dan TikTok: dari ide, draf, siap tayang, sampai hasil tayangnya.", "Tambah konten"],
   sidang: ["Hukum & disiplin", "Pelanggaran & Sidang", "Laporan pelanggaran UU MCI. Terlapor berhak membela diri sebelum sanksi ditetapkan (Pasal 18). Hanya Dewan, Dev, dan terlapor yang bisa melihat kasusnya.", "Laporkan pelanggaran"],
   putusan: ["Hukum & disiplin", "Arsip Putusan", "Semua putusan resmi Dewan, hasil sidang, keputusan rapat, dan perubahan UU, tersusun dan bisa dicari.", "Catat putusan"],
@@ -2014,7 +2015,8 @@ const RK_RENDER = {
       <div class="prg"><i style="width:${Math.min(100, batas ? dana / batas * 100 : 0)}%;background:${dana > batas * 0.85 ? "#B4532A" : "var(--gold)"}"></i></div>
       ${(x.tim || []).length ? `<div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">${x.tim.map(i => orang(x, i)).join("")}</div>` : ""}
       ${x.deskripsi ? `<div class="bd">${esc(x.deskripsi)}</div>` : ""}
-      ${x.komponen || x.hasil ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Kebutuhan & pembagian hasil</summary>${x.komponen ? `<div class="bd"><b>Komponen / kebutuhan</b>\n${esc(x.komponen)}</div>` : ""}${x.hasil ? `<div class="bd"><b>Pembagian hasil</b>\n${esc(x.hasil)}</div>` : ""}</details>` : ""}
+      ${x.komponen || x.hasil ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Kebutuhan & catatan hasil</summary>${x.komponen ? `<div class="bd"><b>Komponen / kebutuhan</b>\n${esc(x.komponen)}</div>` : ""}${x.hasil ? `<div class="bd"><b>Catatan hasil</b>\n${esc(x.hasil)}</div>` : ""}</details>` : ""}
+      ${d.saya != null || ADM() ? `<details class="pkd" data-pkas="${x.id}" style="margin-top:10px"${PK_BUKA.has(x.id) ? " open" : ""}><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Kas proyek</summary><div class="pkb" id="pkb${x.id}"><p class="mu">Memuat…</p></div></details>` : ""}
       ${x.riwayat ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Riwayat tim</summary><div class="bd" style="font-size:13px">${esc(x.riwayat)}</div></details>` : ""}
       <div class="ac">${rkAksi(x)}</div></article>`; }).join("") || rkKosong("Belum ada proyek.")}</div>`;
   },
@@ -2054,8 +2056,73 @@ const RK_RENDER = {
       <div class="bd">${esc(x.isi)}</div><div class="ac">${rkAksi(x)}</div></article>`).join("") || rkKosong("Belum ada putusan.")}</div>`;
   },
 };
+/* ===== Kas proyek: amplop dana per proyek (Peraturan Kas Pasal 7 & 11) ===== */
+const PK_BUKA = new Set(), PKD = {};
+function pkRender(pid) {
+  const d = PKD[pid], el = $("#pkb" + pid); if (!d || !el) return;
+  const r = d.ringkas, s = r.sumber, hari = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
+  const kotak = (l, v, w) => `<div style="padding:8px 10px;border:1px solid var(--line,#E5E0D5);border-radius:10px;min-width:120px"><div class="mu" style="font-size:11.5px">${l}</div><b style="font-size:15px;${w ? "color:" + w : ""}">${rp(v)}</b></div>`;
+  let h = r.ditutup ? '<p class="ch g" style="display:inline-block;margin:8px 0">Buku proyek sudah ditutup</p>' : "";
+  h += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0">${kotak("Saldo kas proyek", r.saldo, "var(--navy)")}${kotak("Dari kas MCI", s.alokasi)}${s.subsidi ? kotak("Subsidi mitra", s.subsidi) : ""}${s.pinjaman ? kotak("Pinjaman mitra", s.pinjaman) : ""}${s.patungan ? kotak("Patungan tim", s.patungan) : ""}${s.pendapatan ? kotak("Pendapatan", s.pendapatan) : ""}${kotak("Terpakai", r.terpakai)}${r.utang_mitra ? kotak("Utang ke mitra", r.utang_mitra, "#B4532A") : ""}</div>`;
+  const tunggu = d.rows.filter(x => x.status === "menunggu");
+  tunggu.forEach(x => { h += `<div class="cd" style="padding:10px 12px;margin:8px 0;background:#FBF6E9"><b>Menunggu pencairan ${rp(x.masuk)}</b> dari kas MCI. ${d.bendahara ? `<button class="bt g" data-pkcair="${pid}:${x.id}" style="min-height:30px;padding:4px 10px;font-size:12.5px;margin-left:6px">Konfirmasi pencairan</button>` : '<span class="mu">Menunggu Bendahara.</span>'}</div>`; });
+  if (r.bukti_kurang) h += `<p class="er" style="font-size:12.5px">${r.bukti_kurang} pengeluaran ≥ ${rp(d.nota_min)} belum ada buktinya (Peraturan Kas Pasal 9).</p>`;
+  if (r.pinjaman.length) h += `<div style="margin:8px 0"><b style="font-size:13px">Pinjaman mitra</b>${r.pinjaman.map(p => `<div class="meta"><span>${esc(p.mitra)}: ${rp(p.jumlah)}, sisa <b>${rp(p.sisa)}</b></span><span class="ch ${!p.sisa ? "g" : p.jatuh_tempo < hari ? "r" : "y"}">${!p.sisa ? "Lunas" : "Jatuh tempo " + esc(tglID(p.jatuh_tempo))}</span></div>`).join("")}</div>`;
+  const tx = d.rows.filter(x => x.status !== "menunggu" && x.jenis !== "tutup");
+  h += tx.length ? `<div style="overflow-x:auto"><table class="tb" style="font-size:12.5px;margin-top:6px"><thead><tr><th>Tanggal</th><th>Jenis</th><th>Keterangan</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th><th></th></tr></thead><tbody>${tx.map(x => `<tr><td>${esc(tglID(x.tanggal))}</td><td>${esc(x.label)}${x.mitra ? `<br><span class="mu">${esc(x.mitra)}</span>` : ""}</td><td>${esc(x.keterangan)}${x.bukti ? ` · <a href="${esc(x.bukti)}" target="_blank" rel="noopener">bukti</a>` : x.jenis === "pengeluaran" && x.keluar >= d.nota_min ? ' · <span class="er">tanpa bukti</span>' : ""}</td><td style="text-align:right">${x.masuk ? rp(x.masuk) : ""}</td><td style="text-align:right">${x.keluar ? rp(x.keluar) : ""}</td><td>${d.catat && (d.jenis_masuk[x.jenis] || d.jenis_keluar[x.jenis]) ? `<button class="bt o" data-pkdel="${pid}:${x.id}" style="min-height:26px;padding:2px 8px;font-size:11.5px" aria-label="Hapus transaksi">Hapus</button>` : ""}</td></tr>`).join("")}</tbody></table></div>` : '<p class="mu" style="font-size:13px">Belum ada transaksi.</p>';
+  if (d.catat) {
+    const op = (o, g) => `<optgroup label="${g}">${Object.entries(o).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</optgroup>`;
+    h += `<div class="cd fl" style="margin-top:10px;padding:12px" id="pkf${pid}"><b class="full">Catat transaksi</b>
+      <label>Jenis<select data-pkj>${op(d.jenis_masuk, "Uang masuk")}${op(d.jenis_keluar, "Uang keluar")}</select></label>
+      <label>Jumlah (Rp)<input type="number" min="1" data-pkn placeholder="50000"></label>
+      <label>Tanggal<input type="date" data-pkt value="${hari}"></label>
+      <label data-pkx="mitra">Nama mitra<input type="text" maxlength="80" data-pkm placeholder="Contoh: Toko Elektronik Jaya"></label>
+      <label data-pkx="jt">Jatuh tempo<input type="date" data-pkjt></label>
+      <label data-pkx="ref">Pinjaman yang dibayar<select data-pkr>${r.pinjaman.filter(p => p.sisa).map(p => `<option value="${p.id}">${esc(p.mitra)} · sisa ${rp(p.sisa)}</option>`).join("")}</select></label>
+      <label class="full">Keterangan<input type="text" maxlength="300" data-pkk placeholder="Untuk apa / dari mana"></label>
+      <label class="full" data-pkx="bukti">Link bukti / nota (wajib untuk pengeluaran ≥ ${rp(d.nota_min)}, boleh menyusul 7 hari)<input type="url" maxlength="400" data-pkb placeholder="https://…"></label>
+      <div class="bar full" style="margin:0"><button class="bt g" data-pksave="${pid}">Simpan</button><span class="mu" data-pkmsg></span></div></div>`;
+  }
+  if (d.tutup && !r.ditutup) {
+    const t = d.tutup, nm = a => a.map(x => esc(x.nama)).join(", ") || "-";
+    h += `<details class="cd" style="margin-top:10px;padding:12px"><summary style="cursor:pointer;font-weight:700;color:var(--navy)">Tutup buku proyek (Bendahara)</summary>
+      <ol style="font-size:13px;line-height:1.7;margin:10px 0 0;padding-left:20px">
+      <li>Saldo kas proyek: <b>${rp(t.saldo)}</b>${t.menunggu ? ` (permintaan ${rp(t.menunggu)} yang belum cair akan dibatalkan)` : ""}</li>
+      <li>Lunasi utang ke mitra: ${rp(t.utang_mitra)}${t.talangan ? `, kurang <b>${rp(t.talangan)}</b> ditalangi kas MCI` : ""}</li>
+      <li>Modal kembali ke kas MCI: <b>${rp(t.kembali)}</b> dari ${rp(t.modal)}</li>
+      <li>Keuntungan: <b>${rp(t.untung)}</b>. ${t.persen_kas}% + sisa pembulatan ke kas MCI: <b>${rp(t.ke_kas)}</b>${t.per_orang ? `; ${100 - t.persen_kas}% dibagi rata: <b>${rp(t.per_orang)}</b> per orang` : ""}</li>
+      <li>Menerima bagian: ${nm(t.penerima)}</li>
+      ${t.tidak_kerja.length ? `<li>Tidak bekerja (diisi pemilik proyek): ${nm(t.tidak_kerja)}</li>` : ""}
+      ${t.dicabut.length ? `<li>Hak proyek dicabut, tidak menerima bagian (Pasal 4): ${nm(t.dicabut)}</li>` : ""}</ol>
+      ${d.status === "selesai" ? `<button class="bt g" data-pktutup="${pid}" style="margin-top:10px">Tutup buku sekarang</button>` : '<p class="mu" style="font-size:12.5px;margin:8px 0 0">Ubah status proyek menjadi Selesai dulu untuk menutup buku.</p>'}</details>`;
+  }
+  el.innerHTML = h;
+  const f = $("#pkf" + pid);
+  if (f) { const j = f.querySelector("[data-pkj]"), atur = () => { const v = j.value; f.querySelector('[data-pkx="mitra"]').hidden = !["subsidi", "pinjaman"].includes(v); f.querySelector('[data-pkx="jt"]').hidden = v !== "pinjaman"; f.querySelector('[data-pkx="ref"]').hidden = v !== "bayar_pinjaman"; f.querySelector('[data-pkx="bukti"]').hidden = v !== "pengeluaran"; }; j.onchange = atur; atur(); }
+}
+async function pkMuat(pid, url, opt) {
+  const el = $("#pkb" + pid);
+  try { PKD[pid] = await api(url || `/api/proyek/${pid}/kas`, opt); pkRender(pid); return true; }
+  catch (e) { if (el) el.insertAdjacentHTML("afterbegin", `<p class="er">${esc(e.message)}</p>`); return false; }
+}
+function pkBind(el) {
+  el.querySelectorAll("details[data-pkas]").forEach(dt => { const pid = +dt.dataset.pkas; if (dt.open) { pkRender(pid); pkMuat(pid); }
+    dt.ontoggle = () => { if (dt.open) { PK_BUKA.add(pid); pkMuat(pid); } else PK_BUKA.delete(pid); }; });
+  el.onclick = async e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.pkcair) { const [pid, id] = b.dataset.pkcair.split(":"); if (!confirm("Pindahkan dana ini dari kas MCI ke kas proyek? Kas MCI akan tercatat keluar.")) return; b.disabled = true; await pkMuat(+pid, `/api/proyek/${pid}/kas/${id}/cair`, {method: "POST", json: {}}); }
+    if (b.dataset.pkdel) { const [pid, id] = b.dataset.pkdel.split(":"); if (!confirm("Hapus transaksi ini?")) return; await pkMuat(+pid, `/api/proyek/${pid}/kas/${id}`, {method: "DELETE"}); }
+    if (b.dataset.pksave) { const pid = +b.dataset.pksave, f = $("#pkf" + pid), q = k => f.querySelector(k).value;
+      b.disabled = true; f.querySelector("[data-pkmsg]").textContent = "";
+      const ok = await pkMuat(pid, `/api/proyek/${pid}/kas`, {json: {jenis: q("[data-pkj]"), jumlah: q("[data-pkn]"), tanggal: q("[data-pkt]"), mitra: q("[data-pkm]"), jatuh_tempo: q("[data-pkjt]"), ref: q("[data-pkr]"), keterangan: q("[data-pkk]"), bukti: q("[data-pkb]")}});
+      if (!ok) { b.disabled = false; const m = $("#pkb" + pid).querySelector(".er"); if (m && $("#pkf" + pid)) { $("#pkf" + pid).querySelector("[data-pkmsg]").textContent = m.textContent; m.remove(); } } }
+    if (b.dataset.pktutup) { const pid = +b.dataset.pktutup; if (!confirm("Tutup buku proyek ini? Uang dipindah ke kas MCI dan bagian anggota dicatat. Tidak bisa dibatalkan.")) return; b.disabled = true;
+      if (await pkMuat(pid, `/api/proyek/${pid}/tutup`, {method: "POST", json: {}})) { try { RK.proyek = await api("/api/r/proyek"); renderRK("proyek"); } catch (e) {} } }
+  };
+}
 const RK_BIND = {
   proyek(el, d) {
+    pkBind(el);
     el.querySelectorAll("[data-pkel]").forEach(b => b.onclick = async () => {
       const [pid, mid] = b.dataset.pkel.split(":").map(Number), x = d.items.find(y => y.id === pid);
       if (!confirm(`Keluarkan ${rkNama(d, mid)} dari proyek "${x.nama}"? Hak proyeknya sedang dicabut karena tunggakan kas (Peraturan Kas Pasal 6). Ia akan diberi tahu lewat Inbox.`)) return;
