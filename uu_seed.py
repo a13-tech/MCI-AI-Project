@@ -5,7 +5,7 @@ baris yang belum pernah diubah lewat web. Baris yang sudah diedit Dev di web tid
 Format isi: satu baris = satu ayat. Awali "* " untuk ayat, "** " untuk rincian di bawah ayat.
 """
 
-UU_VERSI = 4
+UU_VERSI = 5
 
 UU_SEED = {
     "info": "UNDANG-UNDANG MAHARDIKA CAKRAWALA INDONESIA (UU MCI)\n"
@@ -161,7 +161,10 @@ KAS_SEED = {
             "* Setiap proyek boleh memakai dana kas paling banyak Rp75.000 secara keseluruhan.",
             "* Jika membutuhkan tambahan dana, pemilik proyek mengajukannya kepada Bendahara atau Pemilik MCI. Dana tambahan baru boleh dipakai setelah disetujui.",
             "* Dana kas untuk proyek dipindahkan ke kas proyek setelah Bendahara mengonfirmasi pencairan. Kas proyek dicatat terpisah dari kas MCI.",
-            "* Subsidi, hibah, atau pinjaman dari mitra dicatat sebagai kas proyek dan tidak dihitung dalam batas Rp75.000. Pinjaman mitra wajib dicatat bersama tanggal jatuh temponya."])},
+            "* Subsidi, hibah, atau pinjaman dari mitra dicatat sebagai kas proyek dan tidak dihitung dalam batas Rp75.000. Pinjaman mitra wajib dicatat bersama tanggal jatuh temponya.",
+            "* Proyek lama atau proyek arsip boleh dicatat pengurus tanpa persetujuan 3 anggota, dengan syarat tidak meminta dana kas MCI. Proyek yang dibekukan (Freeze) wajib ditulis alasannya.",
+            "* Pembelian memakai kas proyek diajukan lewat Pengajuan dana (barang, harga, alasan). Yang disetujui Bendahara atau Pemilik MCI langsung dicatat keluar dari kas proyek.",
+            "* Catatan dan jurnal proyek menyimpan nama penulis dan tanggalnya. Jejak itu hanya boleh dihapus Pemilik MCI."])},
         {"nomor": 8, "judul": "Penyalahgunaan Dana Kas", "isi": "\n".join([
             "* Yang termasuk penyalahgunaan dana kas: memakai kas untuk kepentingan pribadi, mengambil kas tanpa izin, menahan uang setoran, atau memalsukan bukti pengeluaran.",
             "* Dugaan penyalahgunaan diperiksa oleh Dewan Pengawas atau Pemilik MCI. Terlapor diberi waktu membela diri paling lama 7 hari.",

@@ -10,6 +10,7 @@ Prinsip hemat token (Gemini Tier 1):
 
 Studio Gambar: Cloudflare Workers AI (FLUX schnell + img2img), gratis 10.000 neuron/hari.
 """
+import studio3d
 import os, io, csv, json, re, time, gzip, random, base64, asyncio, secrets, logging, sqlite3, threading, contextlib, hashlib, zipfile
 from collections import deque, OrderedDict
 from datetime import datetime, date, timedelta, timezone
@@ -286,6 +287,12 @@ def db_init():
                f"idx INTEGER NOT NULL DEFAULT 0, salah INTEGER NOT NULL DEFAULT 0, jam TEXT, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS absen_izin (id {pk}, anggota INTEGER NOT NULL, tanggal TEXT NOT NULL, alasan TEXT, status TEXT NOT NULL DEFAULT 'menunggu', oleh TEXT, dibuat TEXT)")
         sql(c, "CREATE TABLE IF NOT EXISTS kuis (tanggal TEXT PRIMARY KEY, data TEXT NOT NULL, sumber TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS proyek_log (id {pk}, proyek_id INTEGER NOT NULL, jenis TEXT NOT NULL, isi TEXT NOT NULL, foto TEXT, oleh_id INTEGER, oleh TEXT, tanggal TEXT, dibuat TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS proyek_kartu (id {pk}, proyek_id INTEGER NOT NULL, judul TEXT NOT NULL, pj INTEGER, status TEXT NOT NULL DEFAULT 'rencana', oleh TEXT, dibuat TEXT, diubah TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS proyek_ajuan (id {pk}, proyek_id INTEGER NOT NULL, barang TEXT NOT NULL, harga {big} NOT NULL DEFAULT 0, alasan TEXT, bukti TEXT, "
+               "status TEXT NOT NULL DEFAULT 'menunggu', oleh_id INTEGER, oleh TEXT, dibuat TEXT, diputus_oleh TEXT, diputus TEXT, catatan TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS model3d (id {pk}, judul TEXT NOT NULL, permintaan TEXT, resep TEXT NOT NULL, laporan TEXT, mesin TEXT, oleh_id INTEGER, oleh TEXT, dibuat TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS gambar_kode (id {pk}, prompt TEXT NOT NULL, svg TEXT NOT NULL, mesin TEXT, oleh TEXT, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS pusat_info (id {pk}, ip TEXT NOT NULL, tanya TEXT NOT NULL, jawab TEXT, token {big} NOT NULL DEFAULT 0, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS stok (id {pk}, nama TEXT NOT NULL, jumlah {big} NOT NULL DEFAULT 0, satuan TEXT, kategori TEXT, minimum {big} NOT NULL DEFAULT 0, catatan TEXT, mime TEXT, gambar TEXT, diubah TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS laporan (id {pk}, minggu TEXT, dibuat TEXT, dari TEXT, sampai TEXT, sumber TEXT, isi TEXT, data TEXT)")
@@ -2067,6 +2074,7 @@ async def laporan_buat(kirim=True, sumber="otomatis"):
                f"Kas minggu ini: masuk {k['masuk']}, keluar {k['keluar']}, selisih {k['saldo']}, saldo total {k['saldo_total']}, per kategori {k['kategori']}.\n"
                f"Transaksi: " + "; ".join(f"{r['tanggal']} {r['keterangan']} +{r['masuk']} -{r['keluar']}" for r in k["rows"]) +
                f"\nStok barang: {d['stok']['jenis']} jenis, menipis: {d['stok']['menipis'] or 'tidak ada'}"
+               f"\nJurnal proyek minggu ini (tulisan anggota, pakai sebagai bahan, jangan mengarang): {await asyncio.to_thread(pl_minggu, d['dari']) or '-'}"
                f"\nLain: {d['lain']}\nIde minggu-minggu lalu (JANGAN diulang): {d['ide_lama'] or '-'}")
     try:
         tk = await asyncio.to_thread(tentang_get)
@@ -3369,7 +3377,10 @@ JENIS = {
         F("judul", "Judul", wajib=True), F("isi", "Isi pengumuman", "area", wajib=True, maks=8000),
         F("sematkan", "Sematkan di atas", "bool"), F("kirim", "Kirim ke Inbox & Telegram semua anggota", "bool", bawaan=True)]},
     "proyek": {"judul": "Proyek", "tulis": "proyek_kelola", "buat": "anggota", "lihat": "anggota", "fields": [   # Peraturan Kas Pasal 6 & 7
-        F("nama", "Nama proyek", wajib=True), F("status", "Status", "pilih", opsi=[["ide", "Ide"], ["berjalan", "Berjalan"], ["ditunda", "Ditunda"], ["selesai", "Selesai"]], bawaan="berjalan"),
+        F("nama", "Nama proyek", wajib=True), F("status", "Status", "pilih", opsi=[["ide", "Ide"], ["berjalan", "Berjalan (progress)"], ["ditunda", "Freeze (dibekukan)"], ["selesai", "Selesai"]], bawaan="berjalan"),
+        F("alasan_freeze", "Alasan dibekukan", maks=300, info="Wajib diisi kalau status Freeze, misalnya: ada proyek lain yang lebih penting."),
+        F("lama", "Proyek lama / arsip (dicatat pengurus, tanpa persetujuan 3 anggota)", "bool", info="Untuk proyek yang sudah ada sebelum web ini, atau yang dicatat pengurus. Tidak boleh meminta dana kas MCI."),
+        F("tgl_mulai", "Tanggal mulai", "tanggal"), F("tgl_selesai", "Tanggal selesai", "tanggal"),
         F("pj", "Pemilik proyek", "anggota", info="Pengusul proyek. Boleh langsung mengeluarkan anggota tim yang hak proyeknya dicabut (Peraturan Kas Pasal 6)."),
         F("setuju", "Anggota yang menyetujui", "anggota_banyak", info="Minimal 3 anggota aktif yang haknya tidak dicabut, termasuk pemilik proyek (Peraturan Kas Pasal 7)."),
         F("tim", "Tim", "anggota_banyak"), F("progres", "Progres (%)", "angka", maks=100, bawaan=0),
@@ -3378,6 +3389,7 @@ JENIS = {
         F("deskripsi", "Deskripsi", "area", maks=4000), F("komponen", "Komponen / kebutuhan", "area", maks=4000),
         F("tidak_kerja", "Tidak ikut bagi hasil (tidak bekerja)", "anggota_banyak", info="Diisi pemilik proyek. Anggota tim yang dipilih di sini tidak mendapat bagian keuntungan saat tutup buku (Peraturan Kas Pasal 11)."),
         F("hasil", "Catatan hasil proyek", "area", maks=2000, info="Keuntungan dibagi otomatis saat tutup buku: 20% ke kas MCI, 80% dibagi rata ke tim yang bekerja. Anggota yang hak proyeknya dicabut tidak menerima bagian (Peraturan Kas Pasal 4 & 11)."),
+        F("laporan_akhir", "Laporan akhir proyek", "area", maks=8000, info="Ringkasan untuk Arsip: apa yang dibuat, hasilnya, kendala, dan pelajaran."),
         F("link", "Tautan (repo, dokumen)", "url", maks=400),
         F("publik", "Tampilkan di Portofolio publik", "bool", info="Hanya untuk proyek berstatus Selesai. Pengunjung (viewer) dan Pusat Info bisa melihat nama, ringkasan, dan foto proyek ini."),
         F("ringkasan_publik", "Ringkasan untuk Portofolio", "area", maks=1500, info="Tulis untuk orang luar: apa yang dibuat dan hasilnya. Jangan tulis data internal (dana, nama mitra, masalah tim)."),
@@ -3521,7 +3533,7 @@ def rk_edit_fields(jenis, x, r):
     if jenis == "proyek":
         f = []
         if x.get("pj") == me:   # pemilik proyek: semua kecuali persetujuan dana tambahan
-            f = [k["nama"] for k in JENIS["proyek"]["fields"] if k["nama"] not in ("dana_tambahan", "riwayat")]
+            f = [k["nama"] for k in JENIS["proyek"]["fields"] if k["nama"] not in ("dana_tambahan", "riwayat", "lama")]
         if can("kas_edit", r):   # Bendahara menyetujui dana tambahan
             f.append("dana_tambahan")
         return f
@@ -3626,8 +3638,16 @@ def rk_cek(jenis, data, lama, r):
         data["pj"] = me
     if not data.get("pj"):
         return "Pemilik proyek wajib diisi"
+    if not boleh(r, "proyek_kelola"):   # hanya pengurus yang boleh menandai proyek lama (tanpa persetujuan 3 anggota)
+        data["lama"] = bool((lama or {}).get("lama"))
+    if data.get("lama") and int(data.get("dana") or 0) > 0:
+        return "Proyek lama / arsip tidak boleh meminta dana kas MCI. Kosongkan dananya, atau ajukan sebagai proyek biasa dengan persetujuan 3 anggota."
+    if data.get("status") == "ditunda" and not (data.get("alasan_freeze") or "").strip():
+        return "Tulis alasan proyek dibekukan (Freeze)."
+    if data.get("status") == "selesai" and not data.get("tgl_selesai"):
+        data["tgl_selesai"] = today()
     data["setuju"] = sorted(set(data.get("setuju") or []) | {data["pj"]})
-    if lama is None or set(data["setuju"]) != set(lama.get("setuju") or []):
+    if not data.get("lama") and (lama is None or set(data["setuju"]) != set(lama.get("setuju") or []) or lama.get("lama")):
         tg = rk_tunggak()
         dicabut = [_nm(i) for i in data["setuju"] if tg.get(i, 0) >= 2]
         if dicabut:
@@ -3646,6 +3666,9 @@ def rk_cek(jenis, data, lama, r):
         tg = rk_tunggak() if keluar else {}
         baris = [f"{today()}: {_nm(i)} dikeluarkan oleh {nama_peran(r)}" + (" (hak proyek dicabut, Peraturan Kas Pasal 6)" if tg.get(i, 0) >= 2 else "") for i in sorted(keluar)]
         baris += [f"{today()}: {_nm(i)} masuk tim" for i in sorted(masuk)]
+        if lama.get("status") != data.get("status"):
+            st = dict(JENIS["proyek"]["fields"][1]["opsi"])
+            baris.append(f"{today()}: status {st.get(lama.get('status'), '-')} menjadi {st.get(data.get('status'), '-')} oleh {nama_peran(r)}" + (f" (alasan: {data.get('alasan_freeze')})" if data.get("status") == "ditunda" else ""))
         if baris:
             data["riwayat"] = ((lama.get("riwayat") or "") + "\n" + "\n".join(baris)).strip()[-8000:]
     return None
@@ -4552,11 +4575,17 @@ def skor_semua():
         rapat = [x for x in agenda if awal <= (x.get("tanggal") or "") <= kemarin and (not x.get("divisi") or x["divisi"] in m["divisi"])]
         if rapat:
             komp["rapat"] = sum(1 for x in rapat if i in (x.get("hadir") or [])) / len(rapat)
-        komp["proyek"] = 1.0 if any(i in (x.get("tim") or []) and x.get("status") in ("berjalan", "selesai") for x in proyek) else 0.0
+        komp["proyek"] = 1.0 if any(i in (x.get("tim") or []) and x.get("status") in ("berjalan", "selesai", "ditunda") for x in proyek) else 0.0   # proyek Freeze tidak membuat anggotanya dianggap tidak aktif
         bobot = sum(SKOR_BOBOT[k] for k in komp)
         skor = round(sum(SKOR_BOBOT[k] * v for k, v in komp.items()) * 100 / bobot) if bobot else 0
         out.append({"id": i, "nama": m["nama"], "skor": skor, "komponen": {k: round(v * 100) for k, v in komp.items()}, "tugas_selesai": selesai})
     out.sort(key=lambda x: (-x["skor"], x["nama"].lower()))
+    try:
+        L = lencana_semua()
+        for n, x in enumerate(out):
+            x["lencana"] = ([{"nama": "Juara bulan ini", "ket": "Skor keaktifan tertinggi 30 hari terakhir"}] if n == 0 and x["skor"] >= 60 else []) + L.get(x["id"], [])
+    except Exception:
+        log.exception("lencana gagal")
     return out
 
 
@@ -4568,6 +4597,607 @@ def api_skor():
     if mid_of(r) is None:
         abort(403)
     return jsonify({"items": skor_semua(), "bobot": SKOR_BOBOT, "saya": mid_of(r), "periode": "30 hari terakhir"})
+
+
+# ======================================================================================================
+# RUANG PROYEK: jurnal & catatan (berjejak), papan tugas (kanban), pengajuan dana, pemakaian stok
+# STUDIO 3D (STL) & GAMBAR DARI KODE (SVG), LENCANA, BERANDA
+# ======================================================================================================
+PL_JENIS = {"jurnal": "Jurnal", "catatan": "Catatan tambahan", "sistem": "Sistem"}
+KARTU_STATUS = [["rencana", "Rencana"], ["dikerjakan", "Dikerjakan"], ["selesai", "Selesai"]]
+AJUAN_MAKS = 10**8
+
+
+def pl_boleh(x, r):
+    """Yang boleh menulis di ruang proyek: Dev, pengelola proyek, pemilik proyek, dan anggota tim."""
+    me = mid_of(r)
+    return is_admin(r) or boleh(r, "proyek_kelola") or (me is not None and (x.get("pj") == me or me in (x.get("tim") or [])))
+
+
+def pl_ins(c, pid, jenis, isi, r=None, foto="", oleh=None):
+    sql(c, "INSERT INTO proyek_log (proyek_id,jenis,isi,foto,oleh_id,oleh,tanggal,dibuat) VALUES (?,?,?,?,?,?,?,?)",
+        (pid, jenis, isi[:4000], foto[:400], mid_of(r) if r else None, oleh or (nama_peran(r) if r else "Sistem"), today(), _now()))
+
+
+def pl_progres(pid):
+    """Progres proyek mengikuti papan tugas: kartu selesai / semua kartu."""
+    with db() as c:
+        rows = sql(c, "SELECT status FROM proyek_kartu WHERE proyek_id=?", (pid,)).fetchall()
+        if not rows:
+            return
+        x = rk_get("proyek", pid)
+        if not x:
+            return
+        p = round(100 * sum(1 for a in rows if a[0] == "selesai") / len(rows))
+        if int(x.get("progres") or 0) != p:
+            data = {k: v for k, v in x.items() if not k.startswith("_") and k not in ("id", "oleh_id", "oleh", "dibuat", "diubah")}
+            data["progres"] = p
+            sql(c, "UPDATE rekord SET data=?,diubah=? WHERE id=? AND jenis='proyek'", (json.dumps(data, ensure_ascii=False), _now(), pid))
+
+
+def ruang_payload(x, r):
+    pid = x["id"]
+    with db() as c:
+        log_ = sql(c, "SELECT id,jenis,isi,foto,oleh,tanggal,dibuat FROM proyek_log WHERE proyek_id=? ORDER BY id DESC LIMIT 300", (pid,)).fetchall()
+        kartu = sql(c, "SELECT id,judul,pj,status,oleh,diubah FROM proyek_kartu WHERE proyek_id=? ORDER BY id", (pid,)).fetchall()
+        ajuan = sql(c, "SELECT id,barang,harga,alasan,bukti,status,oleh_id,oleh,dibuat,diputus_oleh,catatan FROM proyek_ajuan WHERE proyek_id=? ORDER BY id DESC LIMIT 200", (pid,)).fetchall()
+    return {"id": pid, "nama": x.get("nama", ""), "status": x.get("status"), "tulis": pl_boleh(x, r), "bendahara": is_admin(r) or can("kas_edit", r), "admin": is_admin(r),
+            "ditutup": pk_ditutup(pid), "saldo": pk_ringkas(pid)["saldo"],
+            "log": [{"id": int(a[0]), "jenis": a[1], "label": PL_JENIS.get(a[1], a[1]), "isi": a[2] or "", "foto": a[3] or "", "oleh": a[4] or "", "tanggal": a[5] or "", "dibuat": a[6] or ""} for a in log_],
+            "kartu": [{"id": int(a[0]), "judul": a[1], "pj": int(a[2]) if a[2] is not None else None, "status": a[3], "oleh": a[4] or "", "diubah": a[5] or ""} for a in kartu],
+            "kolom": KARTU_STATUS,
+            "ajuan": [{"id": int(a[0]), "barang": a[1], "harga": int(a[2] or 0), "alasan": a[3] or "", "bukti": a[4] or "", "status": a[5], "oleh_id": a[6], "oleh": a[7] or "",
+                       "dibuat": a[8] or "", "diputus_oleh": a[9] or "", "catatan": a[10] or ""} for a in ajuan]}
+
+
+def _ruang(pid):
+    r = role()
+    return _pk_proyek(pid, r), r
+
+
+@app.route("/api/proyek/<int:pid>/ruang")
+def api_ruang(pid):
+    x, r = _ruang(pid)
+    return jsonify(ruang_payload(x, r))
+
+
+@app.route("/api/proyek/<int:pid>/log", methods=["POST"])
+def api_ruang_log(pid):
+    x, r = _ruang(pid)
+    if not pl_boleh(x, r):
+        abort(403)
+    d = request.get_json(silent=True) or {}
+    isi = str(d.get("isi") or "").replace("\r", "").strip()
+    foto = str(d.get("foto") or "").strip()
+    if len(isi) < 3:
+        return jsonify({"error": "Tulis isinya dulu (minimal 3 huruf)."}), 400
+    if foto and not re.match(r"^https?://", foto):
+        return jsonify({"error": "Link foto harus diawali http:// atau https://"}), 400
+    with db() as c:
+        if int(sql(c, "SELECT COUNT(*) FROM proyek_log WHERE proyek_id=?", (pid,)).fetchone()[0]) >= 2000:
+            return jsonify({"error": "Batas 2000 catatan per proyek tercapai."}), 400
+        pl_ins(c, pid, "catatan" if x.get("status") == "selesai" else "jurnal", isi, r, foto)   # proyek selesai: tambahan dicatat sebagai catatan berjejak
+    return jsonify(ruang_payload(x, r))
+
+
+@app.route("/api/proyek/<int:pid>/log/<int:i>", methods=["DELETE"])
+def api_ruang_log_hapus(pid, i):
+    x, r = _ruang(pid)
+    if not is_admin(r):
+        return jsonify({"error": "Jejak catatan hanya bisa dihapus Pemilik MCI / Dev."}), 403
+    with db() as c:
+        sql(c, "DELETE FROM proyek_log WHERE id=? AND proyek_id=?", (i, pid))
+    return jsonify(ruang_payload(x, r))
+
+
+@app.route("/api/proyek/<int:pid>/kartu", methods=["POST"])
+def api_kartu(pid):
+    x, r = _ruang(pid)
+    if not pl_boleh(x, r):
+        abort(403)
+    d = request.get_json(silent=True) or {}
+    judul = re.sub(r"\s+", " ", str(d.get("judul") or "")).strip()[:160]
+    if len(judul) < 2:
+        return jsonify({"error": "Tulis nama tugasnya."}), 400
+    pj = int(d["pj"]) if str(d.get("pj") or "").isdigit() and int(d["pj"]) in MEMBERS else None
+    with db() as c:
+        if int(sql(c, "SELECT COUNT(*) FROM proyek_kartu WHERE proyek_id=?", (pid,)).fetchone()[0]) >= 200:
+            return jsonify({"error": "Batas 200 kartu per proyek tercapai."}), 400
+        sql(c, "INSERT INTO proyek_kartu (proyek_id,judul,pj,status,oleh,dibuat,diubah) VALUES (?,?,?,?,?,?,?)", (pid, judul, pj, "rencana", nama_peran(r), _now(), _now()))
+    pl_progres(pid)
+    if pj and pj != mid_of(r):
+        inbox_kirim([pj], "proyek", f"Kartu tugas baru di proyek {x.get('nama', '')}", judul, pid)
+    return jsonify(ruang_payload(x, r))
+
+
+@app.route("/api/proyek/<int:pid>/kartu/<int:i>", methods=["POST", "DELETE"])
+def api_kartu_one(pid, i):
+    x, r = _ruang(pid)
+    if not pl_boleh(x, r):
+        abort(403)
+    with db() as c:
+        row = sql(c, "SELECT judul,status FROM proyek_kartu WHERE id=? AND proyek_id=?", (i, pid)).fetchone()
+        if not row:
+            return jsonify({"error": "Kartu tidak ditemukan"}), 404
+        if request.method == "DELETE":
+            sql(c, "DELETE FROM proyek_kartu WHERE id=? AND proyek_id=?", (i, pid))
+        else:
+            st = str((request.get_json(silent=True) or {}).get("status") or "")
+            if st not in [k[0] for k in KARTU_STATUS]:
+                return jsonify({"error": "Status kartu tidak dikenal"}), 400
+            sql(c, "UPDATE proyek_kartu SET status=?,diubah=? WHERE id=? AND proyek_id=?", (st, _now(), i, pid))
+            if st == "selesai" and row[1] != "selesai":
+                pl_ins(c, pid, "sistem", f"Kartu selesai: {row[0]}", r)
+    pl_progres(pid)
+    return jsonify(ruang_payload(rk_get("proyek", pid) or x, r))
+
+
+def _bendahara_ids():
+    return [m["id"] for m in MEMBERS.values() if m["aktif"] and "bendahara" in m["jabatan"]]
+
+
+@app.route("/api/proyek/<int:pid>/ajuan", methods=["POST"])
+def api_ajuan(pid):
+    x, r = _ruang(pid)
+    if not pl_boleh(x, r):
+        abort(403)
+    if pk_ditutup(pid) or x.get("status") == "selesai":
+        return jsonify({"error": "Proyek sudah selesai, tidak bisa mengajukan dana lagi."}), 400
+    d = request.get_json(silent=True) or {}
+    barang = re.sub(r"\s+", " ", str(d.get("barang") or "")).strip()[:160]
+    alasan = str(d.get("alasan") or "").strip()[:1000]
+    bukti = str(d.get("bukti") or "").strip()[:400]
+    try:
+        harga = int(str(d.get("harga") or "0").replace(".", "").replace(",", "").strip() or 0)
+    except ValueError:
+        harga = 0
+    if len(barang) < 2:
+        return jsonify({"error": "Tulis barang atau kebutuhan yang diajukan."}), 400
+    if harga <= 0 or harga > AJUAN_MAKS:
+        return jsonify({"error": "Harga harus lebih dari 0."}), 400
+    if len(alasan) < 5:
+        return jsonify({"error": "Tulis alasan singkat kenapa barang ini dibutuhkan."}), 400
+    if bukti and not re.match(r"^https?://", bukti):
+        return jsonify({"error": "Link penawaran harus diawali http:// atau https://"}), 400
+    with db() as c:
+        if int(sql(c, "SELECT COUNT(*) FROM proyek_ajuan WHERE proyek_id=? AND status='menunggu'", (pid,)).fetchone()[0]) >= 20:
+            return jsonify({"error": "Masih ada 20 pengajuan yang belum diputus. Tunggu Bendahara dulu."}), 400
+        sql(c, "INSERT INTO proyek_ajuan (proyek_id,barang,harga,alasan,bukti,status,oleh_id,oleh,dibuat) VALUES (?,?,?,?,?,?,?,?,?)",
+            (pid, barang, harga, alasan, bukti, "menunggu", mid_of(r), nama_peran(r), _now()))
+    inbox_kirim([i for i in _bendahara_ids() if i != mid_of(r)], "proyek", f"Pengajuan dana proyek {x.get('nama', '')}", f"{barang} · {rp(harga)}\nOleh {nama_peran(r)}\n\n{alasan}", pid)
+    return jsonify(ruang_payload(x, r))
+
+
+@app.route("/api/proyek/<int:pid>/ajuan/<int:i>", methods=["POST", "DELETE"])
+def api_ajuan_one(pid, i):
+    x, r = _ruang(pid)
+    with db() as c:
+        a = sql(c, "SELECT barang,harga,bukti,status,oleh_id,oleh FROM proyek_ajuan WHERE id=? AND proyek_id=?", (i, pid)).fetchone()
+    if not a:
+        return jsonify({"error": "Pengajuan tidak ditemukan"}), 404
+    if a[3] != "menunggu":
+        return jsonify({"error": "Pengajuan ini sudah diputus."}), 400
+    if request.method == "DELETE":   # pengaju membatalkan pengajuannya sendiri
+        if not (is_admin(r) or (mid_of(r) is not None and a[4] == mid_of(r))):
+            abort(403)
+        with db() as c:
+            sql(c, "DELETE FROM proyek_ajuan WHERE id=? AND proyek_id=? AND status='menunggu'", (i, pid))
+        return jsonify(ruang_payload(x, r))
+    if not (is_admin(r) or can("kas_edit", r)):
+        return jsonify({"error": "Yang memutus pengajuan dana: Bendahara atau Pemilik MCI."}), 403
+    d = request.get_json(silent=True) or {}
+    aksi, cat = str(d.get("aksi") or ""), str(d.get("catatan") or "").strip()[:300]
+    if aksi not in ("setuju", "tolak"):
+        return jsonify({"error": "Aksi tidak dikenal"}), 400
+    if aksi == "tolak" and len(cat) < 3:
+        return jsonify({"error": "Tulis alasan penolakan supaya pengaju tahu."}), 400
+    harga = int(a[1] or 0)
+    with db() as c:
+        if aksi == "setuju":
+            if pk_ditutup(pid):
+                return jsonify({"error": "Kas proyek sudah ditutup."}), 400
+            saldo = pk_ringkas(pid)["saldo"]
+            if harga > saldo:
+                return jsonify({"error": f"Saldo kas proyek tidak cukup ({rp(saldo)}). Tambah dana proyek dulu, lalu setujui lagi."}), 400
+            pk_ins(c, pid, "pengeluaran", keluar=harga, ket=f"{a[0]} (pengajuan #{i} oleh {a[5]})", bukti=a[2] or "", oleh=nama_peran(r))
+            audit("kas proyek", "pengajuan disetujui", f"{x.get('nama', '')}: {a[0]} (pengajuan #{i} oleh {a[5]})", harga, nama_peran(r), c=c)
+        n = sql(c, "UPDATE proyek_ajuan SET status=?,diputus_oleh=?,diputus=?,catatan=? WHERE id=? AND proyek_id=? AND status='menunggu'",
+                ("setuju" if aksi == "setuju" else "tolak", nama_peran(r), _now(), cat, i, pid)).rowcount
+        if not n:
+            raise RuntimeError("pengajuan sudah diputus bersamaan")
+        pl_ins(c, pid, "sistem", f"Pengajuan dana {'disetujui' if aksi == 'setuju' else 'ditolak'}: {a[0]} · {rp(harga)}" + (f" ({cat})" if cat else ""), r)
+    if a[4]:
+        inbox_kirim([a[4]], "proyek", f"Pengajuan dana {'disetujui' if aksi == 'setuju' else 'ditolak'}: {a[0]}",
+                    f"Proyek {x.get('nama', '')} · {rp(harga)}\nDiputus oleh {nama_peran(r)}" + (f"\nCatatan: {cat}" if cat else "") +
+                    ("\n\nDana sudah dicatat keluar dari kas proyek. Simpan nota pembeliannya." if aksi == "setuju" else ""), pid)
+    return jsonify(ruang_payload(x, r))
+
+
+@app.route("/api/stok/<int:i>/pakai", methods=["POST"])
+def api_stok_pakai(i):
+    """Komponen stok dipakai proyek: stok berkurang dan tercatat di jurnal proyek."""
+    r = need_perm("stok")
+    d = request.get_json(silent=True) or {}
+    x = rk_get("proyek", int(d["proyek"])) if str(d.get("proyek") or "").isdigit() else None
+    if not x:
+        return jsonify({"error": "Pilih proyeknya."}), 400
+    if not pl_boleh(x, r):
+        return jsonify({"error": "Kamu bukan anggota tim proyek itu."}), 403
+    if x.get("status") == "selesai":
+        return jsonify({"error": "Proyek itu sudah selesai."}), 400
+    try:
+        n = int(d.get("jumlah") or 0)
+    except (TypeError, ValueError):
+        n = 0
+    s = next((s for s in stok_load() if s["id"] == i), None)
+    if not s:
+        return jsonify({"error": "Barang tidak ditemukan"}), 404
+    if n <= 0 or n > s["jumlah"]:
+        return jsonify({"error": f"Jumlah harus 1 sampai {s['jumlah']} {s['satuan']}."}), 400
+    with db() as c:
+        if not sql(c, "UPDATE stok SET jumlah=jumlah-?, diubah=? WHERE id=? AND jumlah>=?", (n, _now(), i, n)).rowcount:
+            return jsonify({"error": "Stok baru saja berubah, coba lagi."}), 409
+        pl_ins(c, x["id"], "sistem", f"Memakai {n} {s['satuan']} {s['nama']} dari stok MCI", r)
+    stok_load()
+    sisa = s["jumlah"] - n
+    if s["minimum"] and sisa <= s["minimum"]:
+        inbox_kirim(_bendahara_ids(), "stok", f"Stok menipis: {s['nama']}", f"Sisa {sisa} {s['satuan']} (batas minimum {s['minimum']}). Terakhir dipakai proyek {x.get('nama', '')}.", i)
+    return jsonify({"ok": True, "sisa": sisa})
+
+
+def pl_minggu(d0):
+    """Jurnal proyek sejak tanggal d0, untuk bahan laporan mingguan."""
+    with db() as c:
+        rows = sql(c, "SELECT proyek_id,isi,oleh,tanggal FROM proyek_log WHERE jenis IN ('jurnal','catatan') AND tanggal>=? ORDER BY id DESC LIMIT 40", (d0,)).fetchall()
+    nm = {x["id"]: x.get("nama", "") for x in rk_rows("proyek")}
+    return "; ".join(f"[{nm.get(int(a[0]), '?')}] {a[2]} ({a[3]}): {(a[1] or '')[:160]}" for a in rows)
+
+
+# ---------- LENCANA: dihitung dari data yang sudah ada, tidak ada yang diisi manual ----------
+def lencana_semua():
+    proyek = rk_rows("proyek")
+    with db() as c:
+        hadir = dict(sql(c, "SELECT anggota,COUNT(*) FROM absen WHERE status='hadir' GROUP BY anggota").fetchall())
+        jitu = dict(sql(c, "SELECT anggota,COUNT(*) FROM absen WHERE status='hadir' AND salah=0 GROUP BY anggota").fetchall())
+        jurnal = dict(sql(c, "SELECT oleh_id,COUNT(*) FROM proyek_log WHERE jenis IN ('jurnal','catatan') AND oleh_id IS NOT NULL GROUP BY oleh_id").fetchall())
+        kartu = dict(sql(c, "SELECT pj,COUNT(*) FROM proyek_kartu WHERE status='selesai' AND pj IS NOT NULL GROUP BY pj").fetchall())
+    tg = rk_tunggak()
+    out = {}
+    for m in MEMBERS.values():
+        if not m["aktif"]:
+            continue
+        i, L = m["id"], []
+        h, j = int(hadir.get(i, 0)), int(jitu.get(i, 0))
+        if h >= 7:
+            L.append({"nama": "Rajin 30 hari" if h >= 30 else "Rajin 7 hari", "ket": f"Sudah absen {h} hari"})
+        if j >= 5:
+            L.append({"nama": "Pemecah kuis", "ket": f"{j} kali menjawab kuis absen benar di percobaan pertama"})
+        sel = sum(1 for x in proyek if x.get("status") == "selesai" and i in (x.get("tim") or []) and i not in (x.get("tidak_kerja") or []))
+        if sel:
+            L.append({"nama": "Penyelesai proyek", "ket": f"Ikut menyelesaikan {sel} proyek"})
+        if int(jurnal.get(i, 0)) >= 5:
+            L.append({"nama": "Penulis jurnal", "ket": f"{int(jurnal[i])} catatan jurnal proyek"})
+        if int(kartu.get(i, 0)) >= 5:
+            L.append({"nama": "Penuntas tugas", "ket": f"{int(kartu[i])} kartu tugas proyek selesai"})
+        if h >= 7 and not tg.get(i):
+            L.append({"nama": "Kas tertib", "ket": "Tidak punya tunggakan iuran"})
+        out[i] = L
+    return out
+
+
+# ---------- BERANDA: yang perlu dikerjakan hari ini, sesuai peran ----------
+@app.route("/api/beranda")
+def api_beranda():
+    r = role()
+    if not r:
+        abort(401)
+    me = mid_of(r)
+    if me is None and not is_admin(r):
+        abort(403)
+    hi = today()
+    perlu, info = [], []
+    def tambah(hal, judul, ket="", penting=False):
+        perlu.append({"hal": hal, "judul": judul, "ket": ket, "penting": penting})
+    with db() as c:
+        if me is not None:
+            libur = datetime.now(WIB).weekday() == 6 or hi < absen_mulai()
+            sudah = sql(c, "SELECT 1 FROM absen WHERE anggota=? AND tanggal=? AND status='hadir'", (me, hi)).fetchone()
+            izin = sql(c, "SELECT status FROM absen_izin WHERE anggota=? AND tanggal=?", (me, hi)).fetchone()
+            if not libur and not sudah and not (izin and izin[0] == "disetujui"):
+                tambah("absen", "Absen hari ini", "Jawab 1 kuis, lalu kirim absen." + (" Izinmu masih menunggu persetujuan." if izin else ""), True)
+            baca = sql(c, "SELECT COUNT(*) FROM inbox WHERE untuk=? AND dibaca=0", (me,)).fetchone()
+            if baca and int(baca[0]):
+                tambah("inbox", f"{int(baca[0])} pesan Inbox belum dibaca")
+        if is_admin(r) or can("kas_edit", r):
+            n = int(sql(c, "SELECT COUNT(*) FROM proyek_ajuan WHERE status='menunggu'").fetchone()[0])
+            if n:
+                tambah("proyek", f"{n} pengajuan dana proyek menunggu keputusan", "Buka proyeknya, bagian Pengajuan dana.", True)
+            n = int(sql(c, "SELECT COUNT(*) FROM proyek_kas WHERE status='menunggu'").fetchone()[0])
+            if n:
+                tambah("proyek", f"{n} pencairan dana proyek menunggu konfirmasi", "", True)
+        if boleh(r, "absen_kelola"):
+            n = int(sql(c, "SELECT COUNT(*) FROM absen_izin WHERE status='menunggu' AND tanggal>=?", (hi,)).fetchone()[0])
+            if n:
+                tambah("absen", f"{n} izin absen menunggu persetujuan")
+    tugas = [x for x in rk_rows("tugas") if me is not None and x.get("pj") == me and x.get("status") != "selesai"]
+    for x in sorted(tugas, key=lambda x: x.get("tenggat") or "9")[:5]:
+        lewat = bool(x.get("tenggat")) and x["tenggat"] < hi
+        tambah("tugas", f"Tugas: {x.get('judul', '')}", ("Lewat tenggat " if lewat else "Tenggat ") + tglid(x["tenggat"]) if x.get("tenggat") else "Tanpa tenggat", lewat)
+    m = MEMBERS.get(me) if me is not None else None
+    for x in sorted((x for x in rk_rows("agenda") if (x.get("tanggal") or "") >= hi and (m is None or not x.get("divisi") or x["divisi"] in m["divisi"])), key=lambda x: (x.get("tanggal") or "") + (x.get("jam") or ""))[:3]:
+        (tambah if x["tanggal"] == hi else lambda h, j, k="", p=False: info.append({"hal": h, "judul": j, "ket": k}))(
+            "agenda", f"Rapat: {x.get('judul', '')}", ("Hari ini" if x["tanggal"] == hi else tglid(x["tanggal"])) + (f" pukul {x['jam'].replace(':', '.')}" if x.get("jam") else "") + (f" · {x['tempat']}" if x.get("tempat") else ""))
+    if me is not None:
+        for x in rk_rows("alat"):
+            if x.get("peminjam") == me:
+                telat = bool(x.get("tenggat")) and x["tenggat"] < hi
+                tambah("alat", f"Kembalikan {x.get('nama', '')}", ("Sudah lewat " if telat else "Paling lambat ") + tglid(x.get("tenggat") or hi), telat)
+        t = rk_tunggak().get(me, 0)
+        if t:
+            tambah("bayarkas", f"Iuran kas menunggak {t} minggu", "Dua minggu tanpa izin = hak proyek dicabut (Peraturan Kas Pasal 4).", True)
+    proyek = [{"id": x["id"], "nama": x.get("nama", ""), "progres": int(x.get("progres") or 0), "status": x.get("status")} for x in rk_rows("proyek")
+              if x.get("status") in ("berjalan", "ide") and (me is None or me in (x.get("tim") or []) or x.get("pj") == me)][:6]
+    umum = [{"judul": x.get("judul", ""), "tanggal": (x.get("dibuat") or "")[:10]} for x in sorted(rk_rows("pengumuman"), key=lambda x: (-bool(x.get("sematkan")), -x["id"]))[:3]]
+    perlu.sort(key=lambda x: not x["penting"])
+    return jsonify({"nama": m["nama"] if m else nama_peran(r), "hari": tglid(hi), "perlu": perlu, "info": info, "proyek": proyek, "pengumuman": umum})
+
+
+# ---------- MESIN KODE: Gemini sekarang; otomatis pindah ke Claude kalau ANTHROPIC_API_KEY dipasang di Render ----------
+ANTHROPIC_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
+CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-5-5")
+KUOTA["studio"] = max(0, int(os.getenv("KUOTA_STUDIO", "8")))
+IZIN_PILIHAN["studio_buat"] = "Membuat model 3D & gambar kode"
+for _k in ("manager", "pj", "designer", "dokumentasi"):
+    IZIN_BARU_DEFAULT.setdefault(_k, set()).add("studio_buat")
+
+
+def mesin_kode():
+    return "claude" if ANTHROPIC_KEY else "gemini"
+
+
+def _claude(sistem, prompt, maks=8000):
+    import urllib.request
+    req = urllib.request.Request("https://api.anthropic.com/v1/messages", method="POST",
+                                 data=json.dumps({"model": CLAUDE_MODEL, "max_tokens": maks, "system": sistem, "messages": [{"role": "user", "content": prompt}]}).encode(),
+                                 headers={"x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"})
+    with urllib.request.urlopen(req, timeout=120) as f:
+        d = json.loads(f.read().decode())
+    return "".join(b.get("text", "") for b in d.get("content", []) if b.get("type") == "text").strip()
+
+
+async def kode_ai(sistem, prompt, act, schema=None):
+    """Kembalikan teks mentah dari mesin kode. Claude kalau kuncinya ada (gagal -> jatuh ke Gemini)."""
+    if ANTHROPIC_KEY:
+        try:
+            return await asyncio.to_thread(_claude, sistem, prompt), "claude"
+        except Exception:
+            log.exception("Claude gagal, pakai Gemini")
+    return await ask("canvas", prompt, sistem=sistem, schema=schema, use_mcp=False, cache=False, act=act, model=MODEL), "gemini"
+
+
+def _json_dari(teks):
+    t = str(teks or "")
+    a, b = t.find("{"), t.rfind("}")
+    if a < 0 or b <= a:
+        raise ValueError("AI tidak mengembalikan JSON")
+    return json.loads(t[a:b + 1])
+
+
+class Bagian3D(BaseModel):
+    nama: str
+    bentuk: str
+    operasi: str
+    x: float
+    y: float
+    z: float
+    rx: float
+    ry: float
+    rz: float
+    sx: float
+    sy: float
+    sz: float
+    r: float
+    r2: float
+    h: float
+    radius: float
+    titik: list[float]
+
+
+class Resep3D(BaseModel):
+    judul: str
+    penjelasan: str
+    bagian: list[Bagian3D]
+
+
+SISTEM_3D = """Kamu insinyur mekanik MCI yang merancang benda untuk dicetak 3D (FDM). Kamu TIDAK menulis kode program. Kamu menulis RESEP JSON; mesin CSG kami yang menghitung bentuknya dengan pasti.
+
+FORMAT (JSON saja, tanpa teks lain):
+{"judul": "...", "penjelasan": "1-3 kalimat: cara kerja desain dan saran cetak", "bagian": [ ... ]}
+
+Tiap bagian: {"nama", "bentuk", "operasi", "x","y","z", "rx","ry","rz", "sx","sy","sz", "r","r2","h", "radius", "titik"}. Isi 0 (atau [] untuk titik) pada field yang tidak dipakai.
+- Semua ukuran MILIMETER. x,y,z = posisi TITIK PUSAT bentuk. rx,ry,rz = rotasi derajat (urutan X lalu Y lalu Z).
+- bentuk "kotak": sx,sy,sz = panjang X, lebar Y, tinggi Z. radius = pembulatan sudut tegak (0 = siku).
+- bentuk "silinder": r = jari-jari, h = tinggi; sumbu tegak (Z). Untuk lubang mendatar putar rx=90 (sumbu jadi Y) atau ry=90 (sumbu jadi X).
+- bentuk "kerucut": r = jari-jari bawah, r2 = jari-jari atas (0 = lancip), h = tinggi.
+- bentuk "bola": r.
+- bentuk "prisma": titik = [x1,y1,x2,y2,...] poligon tampak atas (berlawanan arah jarum jam, tidak saling silang), h = tebal. Titik relatif terhadap x,y bagian.
+- operasi "tambah" = menambah bahan; "potong" = melubangi/mengurangi semua bahan yang SUDAH ada sebelumnya. Urutan penting. Bagian pertama harus "tambah".
+
+ATURAN DESAIN (wajib):
+1. Hitung koordinat dengan teliti. Sebuah benda setinggi H dengan alas di z=0 punya pusat z = H/2.
+2. Bagian "tambah" harus SALING TUMPANG minimal 0.2 mm dengan benda lain (jangan hanya bersentuhan, jangan melayang).
+3. Pemotong lubang tembus harus lebih panjang 2 mm dari tebal yang ditembus (lebih 1 mm di tiap sisi).
+4. Tebal dinding minimal 1.6 mm. Lubang baut: M3 = r 1.7, M4 = r 2.2. Beri kelonggaran 0.3 mm untuk bagian yang dipasangkan (mis. PCB, tutup).
+5. Rongga wadah: buat kotak luar, lalu "potong" kotak dalam yang pusat z-nya dinaikkan setebal alas.
+6. Pakai ukuran nyata komponen kalau disebut (Arduino Uno 68.6 x 53.4, ESP32 DevKit 55 x 28, HC-SR04 45 x 20 dengan dua mata r 8 berjarak 26, breadboard mini 47 x 35, baterai 18650 r 9.2 h 65, servo SG90 23 x 12.5 x 22.5).
+7. Hindari bagian menggantung tanpa penyangga kalau bisa. Maksimal 40 bagian. Benda muat di alas 220 x 220 mm.
+Mesin akan otomatis menaruh benda di alas cetak (z terendah = 0)."""
+
+SISTEM_SVG = """Kamu ilustrator vektor MCI. Gambarlah dengan KODE SVG yang rapi dan presisi, bukan asal-asalan.
+Keluarkan HANYA satu dokumen <svg> lengkap (tanpa penjelasan, tanpa markdown).
+Aturan: viewBox wajib (bawaan "0 0 1080 1080" kecuali diminta lain); semua bentuk tersusun pada grid, rata, dan simetris bila pantas; pakai <defs> untuk gradien; teks pakai font-family "Arial, Helvetica, sans-serif" dan text-anchor yang benar; maksimal 250 elemen.
+Dilarang: <script>, <image>, <foreignObject>, tautan/berkas luar, CSS @import, animasi.
+Palet MCI kalau tidak diminta lain: biru tua #0B1F4D, biru #1B3A80, emas #D4AF5A, krem #F4F1EA, putih.
+Sebelum menulis, rencanakan komposisi: latar, subjek utama di tengah visual, hierarki ukuran, ruang kosong yang cukup."""
+
+
+def _resep_dari(teks):
+    d = _json_dari(teks)
+    for b in d.get("bagian") or []:
+        t = b.get("titik") if isinstance(b, dict) else None
+        if isinstance(t, list) and t and not isinstance(t[0], (list, tuple)):   # daftar rata [x1,y1,x2,y2] -> pasangan
+            b["titik"] = [[t[k], t[k + 1]] for k in range(0, len(t) - 1, 2)]
+    return d
+
+
+async def model3d_buat(permintaan, lama=None):
+    """AI menulis resep -> mesin menghitung & mengukur -> kalau salah/ada peringatan, AI memperbaiki (maks 2 putaran)."""
+    prompt = f"PERMINTAAN:\n{permintaan}"
+    if lama:
+        prompt = f"RESEP SEBELUMNYA:\n{json.dumps(lama, ensure_ascii=False)}\n\nPERUBAHAN YANG DIMINTA:\n{permintaan}\n\nKeluarkan resep lengkap yang sudah diperbaiki."
+    galat, resep, polis, lap, mesin = "", None, None, None, "gemini"
+    for putaran in range(3):
+        teks, mesin = await kode_ai(SISTEM_3D, prompt, "Merancang model 3D", schema=Resep3D)
+        try:
+            resep = _resep_dari(teks)
+            polis, lap = await asyncio.to_thread(studio3d.bangun, resep)
+            galat = ""
+        except (ValueError, KeyError, TypeError) as e:
+            galat, polis = str(e)[:400], None
+        if polis is not None and (not lap["peringatan"] or putaran >= 1):
+            break
+        if putaran == 2:
+            break
+        masalah = f"GALAT: {galat}" if galat else "PERINGATAN MESIN:\n- " + "\n- ".join(lap["peringatan"])
+        ukur = "" if galat else f"\nHASIL UKUR MESIN: {json.dumps({k: lap[k] for k in ('ukuran_mm', 'volume_cm3', 'bagian')}, ensure_ascii=False)}"
+        prompt = (f"PERMINTAAN:\n{permintaan}\n\nRESEP KAMU SEBELUMNYA:\n{json.dumps(resep, ensure_ascii=False) if resep else teks[:3000]}\n\n{masalah}{ukur}\n\n"
+                  "Periksa ulang koordinat tiap bagian, perbaiki masalah di atas, lalu keluarkan resep lengkap yang benar.")
+    if polis is None:
+        raise RuntimeError(f"AI belum berhasil membuat model yang sah ({galat}). Coba jelaskan ukurannya lebih rinci.")
+    return resep, lap, mesin
+
+
+def m3d_rows(batas=60):
+    with db() as c:
+        rows = sql(c, "SELECT id,judul,permintaan,laporan,mesin,oleh,dibuat FROM model3d ORDER BY id DESC LIMIT ?", (batas,)).fetchall()
+    out = []
+    for a in rows:
+        try:
+            lap = json.loads(a[3] or "{}")
+        except ValueError:
+            lap = {}
+        out.append({"id": int(a[0]), "judul": a[1], "permintaan": a[2] or "", "laporan": lap, "mesin": a[4] or "", "oleh": a[5] or "", "dibuat": a[6] or ""})
+    return out
+
+
+def _m3d_get(i):
+    with db() as c:
+        a = sql(c, "SELECT judul,resep FROM model3d WHERE id=?", (i,)).fetchone()
+    if not a:
+        abort(404)
+    return a[0], json.loads(a[1])
+
+
+def _studio_payload(r):
+    with db() as c:
+        g = sql(c, "SELECT id,prompt,mesin,oleh,dibuat FROM gambar_kode ORDER BY id DESC LIMIT 60").fetchall()
+    k = SET.get("kuota", {})
+    return {"model": m3d_rows(), "gambar": [{"id": int(a[0]), "prompt": a[1], "mesin": a[2] or "", "oleh": a[3] or "", "dibuat": a[4] or ""} for a in g],
+            "buat": is_admin(r) or boleh(r, "studio_buat"), "admin": is_admin(r), "mesin": mesin_kode(),
+            "kuota": None if is_admin(r) else {"pakai": k.get(f"{r}:studio", 0) if k.get("tgl") == today() else 0, "batas": KUOTA["studio"]}}
+
+
+def _studio_izin():
+    r = role()
+    if not r:
+        abort(401)
+    if mid_of(r) is None and not is_admin(r):
+        abort(403)
+    return r
+
+
+@app.route("/api/studio", methods=["GET", "POST"])
+def api_studio():
+    r = _studio_izin()
+    if request.method == "GET":
+        return jsonify(_studio_payload(r))
+    if not (is_admin(r) or boleh(r, "studio_buat")):
+        return jsonify({"error": "Jabatan atau divisimu belum diberi izin membuat di Studio 3D."}), 403
+    d = request.get_json(silent=True) or {}
+    jenis, minta = str(d.get("jenis") or "3d"), str(d.get("permintaan") or "").strip()[:2000]
+    if jenis not in ("3d", "svg"):
+        return jsonify({"error": "Jenis tidak dikenal"}), 400
+    if len(minta) < 8:
+        return jsonify({"error": "Jelaskan lebih rinci apa yang mau dibuat (bentuk dan ukurannya)."}), 400
+    if not kuota_pakai(r, "studio", cek_saja=True):
+        return jsonify({"error": f"Jatah Studio kamu hari ini sudah habis ({KUOTA['studio']}/{KUOTA['studio']}). Reset jam 00.00 WIB."}), 429
+    if not LOOP:
+        return jsonify({"error": "Mesin AI belum siap"}), 503
+    try:
+        if jenis == "3d":
+            lama = _m3d_get(int(d["dari"]))[1] if str(d.get("dari") or "").isdigit() else None
+            resep, lap, mesin = asyncio.run_coroutine_threadsafe(model3d_buat(minta, lama), LOOP).result(240)
+            with db() as c:
+                sql(c, "INSERT INTO model3d (judul,permintaan,resep,laporan,mesin,oleh_id,oleh,dibuat) VALUES (?,?,?,?,?,?,?,?)",
+                    (str(resep.get("judul") or minta)[:120], minta, json.dumps(resep, ensure_ascii=False), json.dumps({**lap, "penjelasan": str(resep.get("penjelasan") or "")[:800]}, ensure_ascii=False),
+                     mesin, mid_of(r), nama_peran(r), _now()))
+        else:
+            teks, mesin = asyncio.run_coroutine_threadsafe(kode_ai(SISTEM_SVG, f"Gambarlah: {minta}", "Menggambar dengan kode SVG"), LOOP).result(180)
+            svg, err = studio3d.svg_bersih(teks)
+            if err:
+                return jsonify({"error": f"{err}. Coba ulangi atau sederhanakan permintaannya."}), 502
+            with db() as c:
+                sql(c, "INSERT INTO gambar_kode (prompt,svg,mesin,oleh,dibuat) VALUES (?,?,?,?,?)", (minta, svg, mesin, nama_peran(r), _now()))
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception:
+        log.exception("studio gagal")
+        return jsonify({"error": "Mesin AI gagal menjawab, coba lagi sebentar lagi."}), 502
+    kuota_pakai(r, "studio")
+    return jsonify({**_studio_payload(r), "baru": jenis})
+
+
+@app.route("/api/studio/3d/<int:i>.<ext>", methods=["GET"])
+def api_studio_3d(i, ext):
+    _studio_izin()
+    judul, resep = _m3d_get(i)
+    try:
+        polis, _lap = studio3d.bangun(resep)
+    except ValueError:
+        abort(410)
+    if ext == "stl":
+        nama = re.sub(r"[^A-Za-z0-9]+", "-", judul).strip("-")[:50] or "model"
+        return Response(studio3d.stl(polis, judul), mimetype="model/stl", headers={"Content-Disposition": f"attachment; filename=mci-{i}-{nama}.stl"})
+    if ext == "svg":
+        return Response(studio3d.pratinjau(polis), mimetype="image/svg+xml", headers={"Cache-Control": "private, max-age=86400", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'"})
+    if ext == "json":
+        return jsonify(resep)
+    abort(404)
+
+
+@app.route("/api/studio/<jenis>/<int:i>", methods=["DELETE"])
+def api_studio_hapus(jenis, i):
+    r = _studio_izin()
+    if not is_admin(r):
+        abort(403)
+    if jenis not in ("3d", "svg"):
+        abort(404)
+    with db() as c:
+        sql(c, "DELETE FROM model3d WHERE id=?" if jenis == "3d" else "DELETE FROM gambar_kode WHERE id=?", (i,))
+    return jsonify(_studio_payload(r))
+
+
+@app.route("/api/studio/svg/<int:i>")
+def api_studio_svg(i):
+    _studio_izin()
+    with db() as c:
+        a = sql(c, "SELECT svg FROM gambar_kode WHERE id=?", (i,)).fetchone()
+    if not a:
+        abort(404)
+    h = {"Cache-Control": "private, max-age=86400", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'", "X-Content-Type-Options": "nosniff"}
+    if request.args.get("unduh"):
+        h["Content-Disposition"] = f"attachment; filename=mci-gambar-kode-{i}.svg"
+    return Response(a[0], mimetype="image/svg+xml", headers=h)
 
 
 # ---------- PROYEKSI KAS 8 MINGGU ----------
