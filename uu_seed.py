@@ -5,7 +5,7 @@ baris yang belum pernah diubah lewat web. Baris yang sudah diedit Dev di web tid
 Format isi: satu baris = satu ayat. Awali "* " untuk ayat, "** " untuk rincian di bawah ayat.
 """
 
-UU_VERSI = 6
+UU_VERSI = 7
 
 UU_SEED = {
     "info": "UNDANG-UNDANG MAHARDIKA CAKRAWALA INDONESIA (UU MCI)\n"
@@ -106,6 +106,14 @@ UU_SEED = {
                 "* Anggota yang bolos lebih dari 5 kali otomatis dikeluarkan dari MCI. Ketentuan ini adalah pengecualian dari sanksi bertahap pada Pasal 18.\n"
                 "* Anggota yang dikeluarkan karena absen dapat mengajukan keberatan kepada Pemilik MCI. Jika Pemilik MCI memulihkannya, hitungan bolos dimulai lagi dari nol.",
          "artinya": "isi absen setiap hari kecuali Minggu dan jawab kuisnya. Kalau berhalangan, minta izin (maksimal 3 kali sebulan, lebih dari itu hanya lewat izin khusus Manager atau Dev). Bolos lebih dari 5 kali berarti otomatis keluar."},
+        {"bab": "BAB VII. JASA INTERNAL", "nomor": 20, "judul": "Jasa Internal",
+         "isi": "* Jasa internal adalah jasa yang dikerjakan anggota MCI untuk sesama anggota, misalnya pembuatan website, desain, atau perakitan.\n"
+                "* Jasa internal hanya untuk anggota MCI. Jasa internal tidak ditawarkan kepada orang luar dan tidak dimuat di katalog publik.\n"
+                "* Setiap jasa baru dan setiap pesanan jasa wajib disetujui Dev sebelum berlaku. Jasa atau pesanan yang dibuat Dev langsung berlaku.\n"
+                "* Dev menetapkan harga yang disepakati saat menyetujui pesanan. Pesanan boleh gratis.\n"
+                "* Pesanan berbayar dibuatkan invoice. Pembayaran dinyatakan lunas oleh Bendahara atau Dev, lalu dicatat ke kas MCI sesuai Peraturan Kas.\n"
+                "* Pesanan dinyatakan selesai oleh pengerja jasa atau Dev.",
+         "artinya": "jasa antaranggota hanya untuk orang dalam MCI. Jasa baru dan pesanan harus disetujui Dev. Kalau berbayar, ada invoice dan uangnya tercatat di kas."},
     ],
 }
 

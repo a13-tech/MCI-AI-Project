@@ -295,7 +295,7 @@ def db_init():
         sql(c, f"CREATE TABLE IF NOT EXISTS jasa (id {pk}, nama TEXT NOT NULL, deskripsi TEXT, harga TEXT, pengerja INTEGER, status TEXT NOT NULL DEFAULT 'menunggu', "
                f"oleh_id INTEGER, oleh TEXT, dibuat TEXT, diputus_oleh TEXT, diputus TEXT, catatan TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS jasa_pesan (id {pk}, jasa_id INTEGER NOT NULL, kebutuhan TEXT NOT NULL, tenggat TEXT, status TEXT NOT NULL DEFAULT 'menunggu', "
-               f"oleh_id INTEGER, oleh TEXT, dibuat TEXT, diputus_oleh TEXT, diputus TEXT, catatan TEXT)")
+               f"oleh_id INTEGER, oleh TEXT, dibuat TEXT, diputus_oleh TEXT, diputus TEXT, catatan TEXT, harga BIGINT NOT NULL DEFAULT 0, invoice_id INTEGER)")
         sql(c, f"CREATE TABLE IF NOT EXISTS gambar_kode (id {pk}, prompt TEXT NOT NULL, svg TEXT NOT NULL, mesin TEXT, oleh TEXT, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS pusat_info (id {pk}, ip TEXT NOT NULL, tanya TEXT NOT NULL, jawab TEXT, token {big} NOT NULL DEFAULT 0, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS stok (id {pk}, nama TEXT NOT NULL, jumlah {big} NOT NULL DEFAULT 0, satuan TEXT, kategori TEXT, minimum {big} NOT NULL DEFAULT 0, catatan TEXT, mime TEXT, gambar TEXT, diubah TEXT)")
@@ -358,6 +358,12 @@ def db_init():
         try:
             with db() as c:
                 sql(c, f"ALTER TABLE perpus ADD COLUMN {kol}")
+        except Exception:
+            pass   # sudah ada
+    for kol in ("harga BIGINT NOT NULL DEFAULT 0", "invoice_id INTEGER"):   # pesanan jasa terhubung ke invoice
+        try:
+            with db() as c:
+                sql(c, f"ALTER TABLE jasa_pesan ADD COLUMN {kol}")
         except Exception:
             pass   # sudah ada
     try:   # database lama: tanda izin khusus (dicatat Dev/Manager, tidak memakai jatah bulanan)
@@ -5268,17 +5274,43 @@ def jasa_payload(r):
     me, adm = mid_of(r), is_admin(r)
     with db() as c:
         js = sql(c, "SELECT id,nama,deskripsi,harga,pengerja,status,oleh_id,oleh,dibuat,diputus_oleh,catatan FROM jasa ORDER BY id DESC").fetchall()
-        ps = sql(c, "SELECT id,jasa_id,kebutuhan,tenggat,status,oleh_id,oleh,dibuat,diputus_oleh,catatan FROM jasa_pesan ORDER BY id DESC LIMIT 300").fetchall()
+        ps = sql(c, "SELECT id,jasa_id,kebutuhan,tenggat,status,oleh_id,oleh,dibuat,diputus_oleh,catatan,harga,invoice_id FROM jasa_pesan ORDER BY id DESC LIMIT 300").fetchall()
+        iv_ids = sorted({int(x[11]) for x in ps if x[11]})
+        iv = {}
+        if iv_ids:
+            for a, no, tk, st_, tot in sql(c, f"SELECT id,nomor,token,status,total FROM invoice WHERE id IN ({','.join('?' * len(iv_ids))})", tuple(iv_ids)).fetchall():
+                iv[int(a)] = {"id": int(a), "nomor": no, "token": tk, "status": st_, "status_label": INV_STATUS.get(st_, st_), "total": int(tot or 0)}
     nama_j = {j[0]: j[1] for j in js}
     kerja = {j[0]: j[4] for j in js}
     jasa = [{"id": i, "nama": n, "deskripsi": d or "", "harga": h or "", "pengerja": pg, "pengerja_nama": _nm(pg) if pg else "", "status": st, "oleh_id": oi, "oleh": o or "",
              "dibuat": db_ or "", "diputus_oleh": dp or "", "catatan": ct or "", "milikku": oi == me}
             for i, n, d, h, pg, st, oi, o, db_, dp, ct in js if adm or st == "aktif" or oi == me]
     pesan = [{"id": i, "jasa_id": ji, "jasa": nama_j.get(ji, "(jasa dihapus)"), "kebutuhan": k, "tenggat": t or "", "status": st, "oleh_id": oi, "oleh": o or "", "dibuat": db_ or "",
-              "diputus_oleh": dp or "", "catatan": ct or "", "milikku": oi == me, "kukerjakan": kerja.get(ji) == me and me != 0}
-             for i, ji, k, t, st, oi, o, db_, dp, ct in ps if adm or oi == me or (kerja.get(ji) == me and me != 0 and st in ("disetujui", "selesai"))]
-    return {"dev": adm, "saya": me, "jasa": jasa, "pesan": pesan,
+              "diputus_oleh": dp or "", "catatan": ct or "", "milikku": oi == me, "kukerjakan": kerja.get(ji) == me and me != 0, "harga": int(hg or 0),
+              "invoice": ({k2: v2 for k2, v2 in iv[int(ivd)].items() if k2 != "token" or adm or oi == me} if ivd and int(ivd) in iv else None)}   # link tagihan hanya untuk pemesan & Dev
+             for i, ji, k, t, st, oi, o, db_, dp, ct, hg, ivd in ps if adm or oi == me or (kerja.get(ji) == me and me != 0 and st in ("disetujui", "selesai"))]
+    return {"dev": adm, "saya": me, "jasa": jasa, "pesan": pesan, "bisa_invoice": bisa_produk(r),
             "anggota": [{"id": m["id"], "nama": m["nama"]} for m in sorted(MEMBERS.values(), key=lambda m: m["nama"].lower()) if m["aktif"]]}
+
+
+def _jasa_harga(v):
+    try:
+        h = int(re.sub(r"[^\d]", "", str(v if v is not None else "")) or 0)
+    except (TypeError, ValueError):
+        h = 0
+    if h > 1_000_000_000:
+        raise ValueError("Harga tidak masuk akal")
+    return h
+
+
+def jasa_tagih(pid, nama_jasa, pemesan, harga, tenggat, r):
+    """Pesanan berbayar: buat invoice (langsung 'Menunggu bayar') lalu tautkan ke pesanan. Lunas dicatat Bendahara/Dev di halaman Invoice dan otomatis masuk Kas."""
+    iid = inv_simpan({"pembeli": pemesan or "Anggota MCI", "tanggal": today(), "jatuh_tempo": tenggat or "", "catatan": f"Jasa internal MCI · pesanan #{pid}",
+                      "item": [{"sumber": "manual", "nama": f"Jasa: {nama_jasa}"[:120], "satuan": "paket", "jumlah": 1, "harga": int(harga)}]}, nama_peran(r))
+    inv_aksi(iid, "kirim", r)
+    with db() as c:
+        sql(c, "UPDATE jasa_pesan SET harga=?, invoice_id=? WHERE id=?", (int(harga), iid, pid))
+    return iid
 
 
 @app.route("/api/jasa", methods=["GET", "POST"])
@@ -5361,14 +5393,24 @@ def api_jasa_pesan(i):
         return jsonify({"error": "Jelaskan kebutuhanmu: untuk apa, isinya apa, dan kapan dibutuhkan."}), 400
     adm, me = is_admin(r), mid_of(r)
     status = "disetujui" if adm else "menunggu"
+    try:
+        harga = _jasa_harga(d.get("harga")) if adm else 0   # harga ditetapkan Dev saat menyetujui
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     with db() as c:
         j = sql(c, "SELECT nama,status,pengerja FROM jasa WHERE id=?", (i,)).fetchone()
         if not j or j[1] != "aktif":
             return jsonify({"error": "Jasa ini tidak tersedia."}), 400
         if not adm and int(sql(c, "SELECT COUNT(*) FROM jasa_pesan WHERE oleh_id=? AND status='menunggu'", (me,)).fetchone()[0]) >= JASA_MAKS_TUNGGU:
             return jsonify({"error": f"Kamu masih punya {JASA_MAKS_TUNGGU} pesanan jasa yang belum diputus Dev."}), 400
-        sql(c, "INSERT INTO jasa_pesan (jasa_id,kebutuhan,tenggat,status,oleh_id,oleh,dibuat,diputus_oleh,diputus) VALUES (?,?,?,?,?,?,?,?,?)",
-            (i, butuh, tenggat, status, me, nama_peran(r), _now(), nama_peran(r) if adm else None, _now() if adm else None))
+        q = "INSERT INTO jasa_pesan (jasa_id,kebutuhan,tenggat,status,oleh_id,oleh,dibuat,diputus_oleh,diputus) VALUES (?,?,?,?,?,?,?,?,?)"
+        pr = (i, butuh, tenggat, status, me, nama_peran(r), _now(), nama_peran(r) if adm else None, _now() if adm else None)
+        pid = int(sql(c, q + " RETURNING id", pr).fetchone()[0] if PG else sql(c, q, pr).lastrowid)
+    if adm and harga > 0:
+        try:
+            jasa_tagih(pid, j[0], nama_peran(r), harga, tenggat, r)
+        except ValueError as e:
+            return jsonify({"error": f"Pesanan tercatat, tetapi invoice gagal dibuat: {e}"}), 400
     if adm:
         if j[2]:
             inbox_kirim([j[2]], "jasa", f"Pesanan jasa untuk kamu kerjakan: {j[0]}", f"Dipesan oleh {nama_peran(r)}" + (f" · tenggat {tglid(tenggat)}" if tenggat else "") + f"\n\n{butuh}")
@@ -5381,7 +5423,7 @@ def api_jasa_pesan(i):
 def api_jasa_pesan_one(i):
     r = _jasa_need()
     with db() as c:
-        p = sql(c, "SELECT jasa_id,status,oleh_id FROM jasa_pesan WHERE id=?", (i,)).fetchone()
+        p = sql(c, "SELECT jasa_id,status,oleh_id,oleh,tenggat,invoice_id FROM jasa_pesan WHERE id=?", (i,)).fetchone()
         j = sql(c, "SELECT nama,pengerja FROM jasa WHERE id=?", (p[0],)).fetchone() if p else None
     if not p:
         return jsonify({"error": "Pesanan tidak ditemukan"}), 404
@@ -5390,6 +5432,16 @@ def api_jasa_pesan_one(i):
     if request.method == "DELETE":   # pemesan membatalkan pesanan yang belum diputus
         if not (adm or (p[2] == me and p[1] == "menunggu")):
             abort(403)
+        if p[5]:   # ada invoice: yang sudah lunas tidak boleh hilang jejaknya; yang belum lunas ikut dibatalkan
+            with db() as c:
+                ivs = sql(c, "SELECT status FROM invoice WHERE id=?", (p[5],)).fetchone()
+            if ivs and ivs[0] == "lunas":
+                return jsonify({"error": "Pesanan ini sudah dibayar. Batalkan invoicenya dulu di halaman Invoice supaya catatan Kas ikut dikoreksi."}), 400
+            if ivs and ivs[0] in ("draft", "terkirim"):
+                try:
+                    inv_aksi(int(p[5]), "batal", r)
+                except (ValueError, LookupError):
+                    pass
         with db() as c:
             sql(c, "DELETE FROM jasa_pesan WHERE id=?", (i,))
         return jsonify(jasa_payload(r))
@@ -5403,6 +5455,10 @@ def api_jasa_pesan_one(i):
         if aksi == "tolak" and len(cat) < 3:
             return jsonify({"error": "Tulis alasan penolakan supaya pemesan tahu."}), 400
         baru = "disetujui" if aksi == "setuju" else "ditolak"
+        try:
+            harga = _jasa_harga(d.get("harga")) if aksi == "setuju" else 0
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
     elif aksi == "selesai":
         if not (adm or (pengerja is not None and pengerja == me and me != 0)):
             return jsonify({"error": "Yang menandai selesai: pengerja jasa atau Dev."}), 403
@@ -5413,9 +5469,16 @@ def api_jasa_pesan_one(i):
         return jsonify({"error": "Aksi tidak dikenal"}), 400
     with db() as c:
         sql(c, "UPDATE jasa_pesan SET status=?,diputus_oleh=?,diputus=?,catatan=? WHERE id=?", (baru, nama_peran(r), _now(), cat, i))
+    tagih = ""
+    if baru == "disetujui" and harga > 0:
+        try:
+            jasa_tagih(i, nama_j, p[3] or _nm(p[2]), harga, p[4] or "", r)
+            tagih = f"\nHarga disepakati {rp(harga)}. Tagihannya ada di halaman Jasa Internal (tombol Lihat tagihan); unggah bukti bayar di sana."
+        except ValueError as e:
+            return jsonify({"error": f"Pesanan disetujui, tetapi invoice gagal dibuat: {e}. Buat invoice manual di halaman Invoice."}), 400
     label = {"disetujui": "disetujui", "ditolak": "ditolak", "selesai": "selesai"}[baru]
     if p[2] and p[2] != me:
-        inbox_kirim([p[2]], "jasa", f"Pesanan jasa {label}: {nama_j}", f"Oleh {nama_peran(r)}." + (f"\nCatatan: {cat}" if cat else ""))
+        inbox_kirim([p[2]], "jasa", f"Pesanan jasa {label}: {nama_j}", f"Oleh {nama_peran(r)}." + (f"\nCatatan: {cat}" if cat else "") + tagih)
     if baru == "disetujui" and pengerja and pengerja != me:
         inbox_kirim([pengerja], "jasa", f"Pesanan jasa untuk kamu kerjakan: {nama_j}", "Lihat detailnya di halaman Jasa Internal.")
     return jsonify(jasa_payload(r))
