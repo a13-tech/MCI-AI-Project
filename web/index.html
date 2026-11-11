@@ -392,13 +392,66 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
  #sd.bk button.ng{display:flex;margin:16px 10px 2px;pointer-events:none}#sd.bk button.ng::after{content:""}
  #sd.bk .who,#sd.bk .brand{display:flex}
 }
+/* ===== HP: teks terbaca, tombol nyaman ditekan, tabel jadi kartu, menu di bawah ===== */
+#hpNav,#nvCari,#hpJudul{display:none}
+@media(max-width:860px){
+ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+ body{font-size:15.5px;line-height:1.55}
+ input,select,textarea{font-size:16px!important}   /* 16px: iPhone tidak memperbesar layar saat mengetik */
+ main [style*="font-size:10"],main [style*="font-size:11"],main [style*="font-size:12"]{font-size:13px!important}
+ .k,.ch,th,.ey,.fl label,.it2 .meta,.rgl .meta,.hl small,.demo,details.cara summary{font-size:13px}
+ .ey{letter-spacing:.12em}
+ h1{font-size:25px;line-height:1.2}h2{font-size:19px}
+ .bt{min-height:44px;font-size:15px}
+ main .it2 .ac .bt,main .mem .bar .bt,main .pp .bd .bar .bt,main .rgc .bt,main .bt[style*="min-height"]{min-height:40px!important;padding:8px 14px!important;font-size:13.5px!important}
+ main .picks label,main .mm label,.exb,.cal .hd,.kb b,.hcl span,main .seg button,.clr,.aih .mu,.boss small,.boss .sv,main .bar .bt.o{font-size:13.5px}
+ .exb,.clr,.uu-jump button,main .bar .bt{min-height:40px}
+ main input[type=checkbox],main input[type=radio]{width:20px;height:20px;flex:none;vertical-align:middle}
+ main .picks label{padding-top:8px;padding-bottom:8px}
+ .cd,.it2{padding:16px}
+ .gr{grid-template-columns:1fr 1fr;gap:10px}.gr .cd{padding:14px}.v{font-size:20px;overflow-wrap:anywhere}
+ main{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
+ .tst{bottom:calc(84px + env(safe-area-inset-bottom))}
+ /* bilah atas: logo + nama halaman; menu utama pindah ke bawah */
+ #sd:not(.bk) .nv{display:none}
+ #sd:not(.bk){overflow:hidden}#sd:not(.bk) .who{display:none}
+ #sd:not(.bk) #hpJudul{display:block;margin-left:auto;padding-right:6px;color:#F2EBDD;font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ #hpNav{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:2px;position:fixed;left:0;right:0;bottom:0;z-index:45;background:#0F1E3A;border-top:1px solid rgba(212,175,90,.4);padding:5px 6px calc(5px + env(safe-area-inset-bottom))}
+ #hpNav button{all:unset;box-sizing:border-box;cursor:pointer;min-height:52px;display:grid;place-items:center;text-align:center;font-size:13.5px;font-weight:600;color:#C9D7F5;border-radius:10px;position:relative;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+ #hpNav button.on{color:#F1D58A;background:rgba(212,175,90,.18);font-weight:700}
+ #hpNav button:focus-visible{outline:2px solid #F1D58A}
+ #hpNav .nb{position:absolute;top:3px;left:calc(50% + 14px);margin:0}
+ /* menu terbuka: kotak cari + kelompok bisa dilipat */
+ #sd.bk{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+ #sd.bk #nvCari{display:block;box-sizing:border-box;width:100%;margin:10px 0 6px;padding:12px 14px;min-height:46px;border-radius:10px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:#fff}
+ #sd.bk #nvCari::placeholder{color:#AFC2EA}
+ #sd.bk .nv{padding:13px 12px;font-size:16px}
+ #sd.bk .nv.lp{display:none}
+ #sd.bk button.ng{pointer-events:auto;font-size:12.5px;color:#D8C48F;padding:14px 2px;margin:8px 10px 0;border-top:1px solid rgba(255,255,255,.1)}
+ #sd.bk button.ng::after{content:"+";font-size:20px;color:#D8C48F}#sd.bk button.ng.bk::after{content:"–"}
+ #sd.bk.cari .nv.lp{display:block}#sd.bk.cari button.ng{display:none}#sd.bk .nv.cr0{display:none!important}
+}
+@media(max-width:700px){
+ /* tabel jadi kartu: tiap baris satu blok, judul kolom jadi label di kiri */
+ table.tk{display:block;min-width:0}table.tk thead{display:none}table.tk tbody{display:block}
+ table.tk tr{display:block;padding:12px 14px;border-top:1px solid var(--line)}table.tk tbody tr:first-child{border-top:0}
+ table.tk td{display:block;position:relative;border:0;padding:6px 0 6px 42%;min-height:34px;text-align:left!important;overflow-wrap:anywhere}
+ table.tk td::before{content:attr(data-l);position:absolute;left:0;top:7px;width:39%;color:var(--mute);font-size:13px;font-weight:600;line-height:1.35}
+ table.tk td:first-child{padding:0 0 8px;min-height:0;font-weight:700;font-size:16.5px}table.tk td:first-child::before{content:none}
+ table.tk td[data-l=""]{padding-left:0}table.tk td[data-l=""]::before{content:none}
+ table.tk td:empty{display:none}
+ table.tk tr.tk1 td{padding:0;min-height:0;font-weight:400;font-size:inherit}
+}
+@media print{#hpNav{display:none!important}}
 </style>
 </head>
 <body>
 <div id="app">
 <aside id="sd">
  <div class="brand"><img src="/aset/logo-mci-64.webp" srcset="/aset/logo-mci-64.webp 1x, /aset/logo-mci-192.webp 3x" width="52" height="52" alt="Logo MCI"><div><b>MCI</b><small>Mahardika Cakrawala Indonesia</small></div></div>
+ <span id="hpJudul" aria-hidden="true"></span>
  <button class="nv ut" id="nvMenu" type="button" aria-expanded="false">☰ Menu</button>
+ <input id="nvCari" type="search" placeholder="Cari menu…" aria-label="Cari menu" autocomplete="off">
  <button class="nv ut on" data-p="beranda">Beranda</button>
  <button class="nv ut" data-p="inbox">Inbox <span class="nb" id="nbInbox" hidden>0</span></button>
  <button class="nv ut" data-p="absen">Absen <span class="nb" id="nbAbsen" hidden>!</span></button>
@@ -461,6 +514,7 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
 <div id="viewer" hidden role="dialog" aria-modal="true" aria-label="Penampil"><div class="vh"><button type="button" id="vwTutup">← Kembali</button><b id="vwJudul"></b><a id="vwUnduh" href="#" download>Unduh</a></div><div class="vb2" id="vwIsi"></div></div>
 <div class="tst" id="tst" hidden></div>
 <div id="cetak"></div>
+<nav id="hpNav" aria-label="Menu utama"></nav>
 <main>
  <div class="demo" id="demoBanner" hidden>DEMO: semua data contoh. Tanpa server dan tanpa AI sungguhan.</div>
 
@@ -5565,6 +5619,33 @@ function navBuka(p) { $$("#sd button.ng").forEach(g => g.classList.toggle("bk", 
 $$("#sd button.ng").forEach(g => g.onclick = () => { g.classList.toggle("bk"); navAtur(); });
 $("#nvMenu").onclick = () => { const bk = $("#sd").classList.toggle("bk"); $("#nvMenu").textContent = bk ? "✕ Tutup" : "☰ Menu"; $("#nvMenu").setAttribute("aria-expanded", bk); if (bk) $("#sd").scrollTop = 0; };
 new MutationObserver(() => { if (!$("#sd").classList.contains("bk")) $("#nvMenu").textContent = "☰ Menu"; }).observe($("#sd"), {attributes: true, attributeFilter: ["class"]});
+/* ===== HP: menu bawah, cari menu, tabel jadi kartu ===== */
+function hpNavBangun() {
+  const nav = $("#hpNav"), sd = $("#sd"), buka = sd.classList.contains("bk"), lbl = b => b.childNodes[0].textContent.trim();
+  const utama = $$("#sd .nv.ut").filter(b => b.id !== "nvMenu" && b.style.display !== "none").slice(0, 4);
+  const html = utama.map(b => { const nb = b.querySelector(".nb"); return `<button type="button" data-hp="${b.dataset.p}" class="${b.classList.contains("on") && !buka ? "on" : ""}">${esc(lbl(b))}${nb && !nb.hidden ? `<span class="nb">${esc(nb.textContent)}</span>` : ""}</button>`; }).join("")
+    + `<button type="button" data-hp="_menu" class="${buka ? "on" : ""}" aria-expanded="${buka}">${buka ? "Tutup" : "Menu"}</button>`;
+  if (nav.innerHTML !== html) nav.innerHTML = html;
+  const on = $("#sd .nv.on"), j = $("#hpJudul"), t = on ? lbl(on) : "";
+  if (j.textContent !== t) j.textContent = t;
+}
+$("#hpNav").onclick = e => { const b = e.target.closest("button"); if (!b) return; if (b.dataset.hp === "_menu") return $("#nvMenu").click(); const n = $(`#sd .nv[data-p="${b.dataset.hp}"]`); if (n) n.click(); if ($("#sd").classList.contains("bk")) $("#nvMenu").click(); window.scrollTo(0, 0); };
+$("#nvCari").oninput = e => { const q = e.target.value.trim().toLowerCase(); $("#sd").classList.toggle("cari", !!q); $$("#sd .nv").forEach(b => { if (b.id !== "nvMenu") b.classList.toggle("cr0", !!q && !b.textContent.toLowerCase().includes(q)); }); };
+$("#nvMenu").addEventListener("click", () => { const c = $("#nvCari"); if (c.value) { c.value = ""; c.oninput({target: c}); } });
+{ let tunda = 0; new MutationObserver(() => { if (!tunda) tunda = requestAnimationFrame(() => { tunda = 0; hpNavBangun(); }); }).observe($("#sd"), {attributes: true, subtree: true, attributeFilter: ["class", "style", "hidden"], childList: true, characterData: true}); }
+function tabelHp() {   // beri label kolom ke tiap sel supaya di HP tabel tampil sebagai kartu (CSS table.tk)
+  $$("main table").forEach(t => {
+    const th = [...t.querySelectorAll(":scope > thead th")]; if (th.length < 3) return;
+    let ok = true;
+    t.querySelectorAll(":scope > tbody > tr").forEach(tr => { const td = tr.children;
+      if (td.length === 1 && th.length > 1) return tr.classList.add("tk1");
+      if (td.length !== th.length) return void (ok = false);
+      for (let i = 0; i < td.length; i++) if (td[i].dataset.l === undefined) td[i].dataset.l = th[i].textContent.trim(); });
+    t.classList.toggle("tk", ok);
+  });
+}
+{ let tunda = 0; new MutationObserver(() => { if (!tunda) tunda = requestAnimationFrame(() => { tunda = 0; tabelHp(); }); }).observe($("main"), {childList: true, subtree: true}); }
+hpNavBangun(); tabelHp();
 
 /* ===== Beranda: yang perlu dikerjakan hari ini ===== */
 async function brMuat() {
