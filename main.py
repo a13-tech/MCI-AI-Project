@@ -5157,14 +5157,23 @@ def api_studio():
     return jsonify({**_studio_payload(r), "baru": jenis})
 
 
+M3D_CACHE = {}   # hasil hitung model terakhir, supaya unduh STL + pratinjau tidak menghitung ulang
+
+
 @app.route("/api/studio/3d/<int:i>.<ext>", methods=["GET"])
 def api_studio_3d(i, ext):
     _studio_izin()
     judul, resep = _m3d_get(i)
-    try:
-        polis, _lap = studio3d.bangun(resep)
-    except ValueError:
-        abort(410)
+    kunci = (i, hash(json.dumps(resep, sort_keys=True)))
+    polis = M3D_CACHE.get(kunci)
+    if polis is None:
+        try:
+            polis, _lap = studio3d.bangun(resep)
+        except ValueError:
+            abort(410)
+        if len(M3D_CACHE) >= 12:
+            M3D_CACHE.pop(next(iter(M3D_CACHE)))
+        M3D_CACHE[kunci] = polis
     if ext == "stl":
         nama = re.sub(r"[^A-Za-z0-9]+", "-", judul).strip("-")[:50] or "model"
         return Response(studio3d.stl(polis, judul), mimetype="model/stl", headers={"Content-Disposition": f"attachment; filename=mci-{i}-{nama}.stl"})
