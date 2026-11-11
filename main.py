@@ -356,6 +356,11 @@ def db_init():
                 sql(c, f"ALTER TABLE perpus ADD COLUMN {kol}")
         except Exception:
             pass   # sudah ada
+    try:   # database lama: tanda izin khusus (dicatat Dev/Manager, tidak memakai jatah bulanan)
+        with db() as c:
+            sql(c, "ALTER TABLE absen_izin ADD COLUMN khusus INTEGER NOT NULL DEFAULT 0")
+    except Exception:
+        pass   # sudah ada
     for kol in ("stok_id INTEGER", "modal BIGINT NOT NULL DEFAULT 0", "biaya_lain BIGINT NOT NULL DEFAULT 0", "harga_min BIGINT NOT NULL DEFAULT 0"):   # database lama
         try:
             with db() as c:
@@ -4230,11 +4235,13 @@ def absen_payload(r):
     hari = today()
     minggu = datetime.now(WIB).weekday() == 6
     out = {"hari_ini": hari, "hari_label": tglid(hari), "minggu": minggu, "mulai": absen_mulai(), "maks": ABSEN_MAKS_BOLOS, "kelola": boleh(r, "absen_kelola"),
-           "pemilik": is_admin(r), "saya": me}
+           "pemilik": is_admin(r), "saya": me, "izin_maks": ABSEN_IZIN_BULAN, "bisa_khusus": absen_khusus(r)}
     if me is not None:
         with db() as c:
+            out["izin_bulan_ini"] = izin_bulan_pakai(c, me, hari[:7])
+            out["bulan_label"] = _bulan_label(date.fromisoformat(hari))
             b = _absen_baris(c, me, hari)
-            iz = sql(c, "SELECT id,tanggal,alasan,status,oleh FROM absen_izin WHERE anggota=? ORDER BY tanggal DESC LIMIT 30", (me,)).fetchall()
+            iz = sql(c, "SELECT id,tanggal,alasan,status,oleh,khusus FROM absen_izin WHERE anggota=? ORDER BY tanggal DESC LIMIT 30", (me,)).fetchall()
         izin_hari = next((x for x in iz if x[1] == hari and x[3] != "ditolak"), None)
         if minggu:
             st = "libur"
@@ -4247,7 +4254,7 @@ def absen_payload(r):
         else:
             st = "belum"
         out.update({"status": st, "jam": b[4] if b else None, "salah": b[3] if b else 0, "rekap": absen_rekap(me),
-                    "izin": [{"id": i, "tanggal": t, "label": tglid(t), "alasan": a or "", "status": s, "oleh": o or ""} for i, t, a, s, o in iz]})
+                    "izin": [{"id": i, "tanggal": t, "label": tglid(t), "alasan": a or "", "status": s, "oleh": o or "", "khusus": bool(k)} for i, t, a, s, o, k in iz]})
         if st in ("belum", "belum_berlaku") and not minggu:
             soal = kuis_hari(hari)
             out["soal"] = _soal_publik(soal, b[2] if b else 0)
@@ -4315,6 +4322,25 @@ def api_absen_jawab():
     return jsonify({**absen_payload(r), **hasil})
 
 
+ABSEN_IZIN_BULAN = 3   # jatah izin per anggota per bulan (menurut bulan tanggal izinnya); izin khusus Dev/Manager tidak dihitung
+
+
+def absen_khusus(r):
+    """Dev (admin) atau jabatan Manager: boleh mencatat izin khusus di luar jatah bulanan."""
+    m = member_of(r)
+    return bool(is_admin(r) or (m and "manager" in m["jabatan"]))
+
+
+def izin_bulan_pakai(c, mid, bulan):
+    """Izin anggota pada bulan 'YYYY-MM' yang memakai jatah (menunggu atau disetujui, bukan khusus)."""
+    return int(sql(c, "SELECT COUNT(*) FROM absen_izin WHERE anggota=? AND tanggal LIKE ? AND status<>'ditolak' AND khusus=0",
+                   (mid, bulan + "-%")).fetchone()[0])
+
+
+def _bulan_label(d):
+    return f"{['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'][d.month - 1]} {d.year}"
+
+
 @app.route("/api/absen/izin", methods=["POST"])
 def api_absen_izin():
     """Anggota mengajukan izin (menunggu persetujuan). Pengurus (absen_kelola) bisa langsung mencatat izin untuk anggota lain."""
@@ -4339,10 +4365,16 @@ def api_absen_izin():
     if len(alasan) < 3:
         return jsonify({"error": "Tulis alasan izin"}), 400
     status = "disetujui" if kelola and siapa != mid_of(r) else "menunggu"   # pengurus tidak menyetujui izinnya sendiri
+    khusus = 1 if status == "disetujui" and absen_khusus(r) else 0   # izin khusus dari Dev/Manager: di luar jatah bulanan
     with db() as c:
         if sql(c, "SELECT 1 FROM absen_izin WHERE anggota=? AND tanggal=? AND status<>'ditolak'", (siapa, tgl)).fetchone():
             return jsonify({"error": "Sudah ada izin untuk tanggal itu"}), 400
-        sql(c, "INSERT INTO absen_izin (anggota,tanggal,alasan,status,oleh,dibuat) VALUES (?,?,?,?,?,?)", (siapa, tgl, alasan, status, nama_peran(r), _now()))
+        if not khusus:
+            pakai = izin_bulan_pakai(c, siapa, tgl[:7])
+            if pakai >= ABSEN_IZIN_BULAN:
+                return jsonify({"error": f"Jatah izin {_bulan_label(t)} sudah habis ({pakai} dari {ABSEN_IZIN_BULAN}). "
+                                         "Izin tambahan hanya bisa dicatat sebagai izin khusus oleh Manager atau Dev."}), 400
+        sql(c, "INSERT INTO absen_izin (anggota,tanggal,alasan,status,oleh,dibuat,khusus) VALUES (?,?,?,?,?,?,?)", (siapa, tgl, alasan, status, nama_peran(r), _now(), khusus))
     if status == "menunggu":
         pengurus = [0] + [m["id"] for m in MEMBERS.values() if m["aktif"] and m["id"] != siapa and boleh(f"m:{m['id']}", "absen_kelola")]
         inbox_kirim(pengurus, "absen", f"📝 Izin absen: {_nm(siapa)}", f"{tglid(tgl)}: {alasan}\nSetujui atau tolak di halaman Absen.")

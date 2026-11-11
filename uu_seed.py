@@ -5,7 +5,7 @@ baris yang belum pernah diubah lewat web. Baris yang sudah diedit Dev di web tid
 Format isi: satu baris = satu ayat. Awali "* " untuk ayat, "** " untuk rincian di bawah ayat.
 """
 
-UU_VERSI = 5
+UU_VERSI = 6
 
 UU_SEED = {
     "info": "UNDANG-UNDANG MAHARDIKA CAKRAWALA INDONESIA (UU MCI)\n"
@@ -100,11 +100,12 @@ UU_SEED = {
          "isi": "* Setiap anggota wajib mengisi absen harian di web MCI setiap hari Senin sampai Sabtu, paling lambat pukul 23.59 WIB. Hari Minggu libur.\n"
                 "* Sebelum absen, anggota wajib menjawab satu soal kuis dengan benar. Jika jawabannya salah, anggota mendapat soal lain sampai benar.\n"
                 "* Anggota yang berhalangan wajib mengajukan izin melalui web. Izin disetujui atau ditolak oleh pengurus yang berwenang. Hari yang diizinkan tidak dihitung bolos.\n"
+                "* Setiap anggota paling banyak 3 kali izin dalam satu bulan. Izin tambahan hanya dapat diberikan sebagai izin khusus oleh Manager atau Dev, dan izin khusus tidak dihitung dalam batas 3 kali tersebut.\n"
                 "* Hari tanpa absen dan tanpa izin yang disetujui dihitung sebagai bolos. Jumlah bolos dihitung keseluruhan sejak absen harian berlaku.\n"
                 "* Anggota diberi peringatan saat bolos mencapai 4 kali dan 5 kali.\n"
                 "* Anggota yang bolos lebih dari 5 kali otomatis dikeluarkan dari MCI. Ketentuan ini adalah pengecualian dari sanksi bertahap pada Pasal 18.\n"
                 "* Anggota yang dikeluarkan karena absen dapat mengajukan keberatan kepada Pemilik MCI. Jika Pemilik MCI memulihkannya, hitungan bolos dimulai lagi dari nol.",
-         "artinya": "isi absen setiap hari kecuali Minggu dan jawab kuisnya. Kalau berhalangan, minta izin. Bolos lebih dari 5 kali berarti otomatis keluar."},
+         "artinya": "isi absen setiap hari kecuali Minggu dan jawab kuisnya. Kalau berhalangan, minta izin (maksimal 3 kali sebulan, lebih dari itu hanya lewat izin khusus Manager atau Dev). Bolos lebih dari 5 kali berarti otomatis keluar."},
     ],
 }
 
