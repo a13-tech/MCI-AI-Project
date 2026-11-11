@@ -4998,8 +4998,49 @@ for _k in ("manager", "pj", "designer", "dokumentasi"):
     IZIN_BARU_DEFAULT.setdefault(_k, set()).add("studio_buat")
 
 
+# Mesin AI tambahan: semuanya memakai format API "kompatibel OpenAI", jadi satu fungsi (_kompatibel) melayani semua.
+# Menyalakan: isi kuncinya di environment Render (mis. GROQ_API_KEY). Model bisa diganti lewat <NAMA>_MODEL tanpa mengubah kode.
+MESIN_LAIN = {
+    "groq": {"nama": "Groq", "url": "https://api.groq.com/openai/v1/chat/completions", "kunci": "GROQ_API_KEY", "model": os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")},
+    "cerebras": {"nama": "Cerebras", "url": "https://api.cerebras.ai/v1/chat/completions", "kunci": "CEREBRAS_API_KEY", "model": os.getenv("CEREBRAS_MODEL", "llama-3.3-70b")},
+    "openrouter": {"nama": "OpenRouter", "url": "https://openrouter.ai/api/v1/chat/completions", "kunci": "OPENROUTER_API_KEY",
+                   "model": os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free")},
+    "mistral": {"nama": "Mistral", "url": "https://api.mistral.ai/v1/chat/completions", "kunci": "MISTRAL_API_KEY", "model": os.getenv("MISTRAL_MODEL", "mistral-small-latest")},
+}
+AI_KODE = os.getenv("AI_KODE", "").strip().lower()   # mesin pilihan Studio: claude | gemini | groq | cerebras | openrouter | mistral (kosong = otomatis)
+
+
+def mesin_kunci(k):
+    return os.getenv(MESIN_LAIN[k]["kunci"], "").strip()
+
+
+def mesin_daftar():
+    """Semua mesin + apakah kuncinya sudah diisi. Tidak pernah mengembalikan isi kunci."""
+    out = [{"id": "gemini", "nama": "Gemini", "model": MODEL, "siap": bool(client("canvas"))},
+           {"id": "claude", "nama": "Claude", "model": CLAUDE_MODEL, "siap": bool(ANTHROPIC_KEY)}]
+    return out + [{"id": k, "nama": v["nama"], "model": v["model"], "siap": bool(mesin_kunci(k))} for k, v in MESIN_LAIN.items()]
+
+
 def mesin_kode():
+    if AI_KODE == "gemini" or (AI_KODE in MESIN_LAIN and mesin_kunci(AI_KODE)):
+        return AI_KODE
     return "claude" if ANTHROPIC_KEY else "gemini"
+
+
+def _kompatibel(k, sistem, prompt, maks=8000, json_mode=False):
+    m = MESIN_LAIN[k]
+    body = {"model": m["model"], "max_tokens": maks, "temperature": 0.2, "messages": [{"role": "system", "content": sistem}, {"role": "user", "content": prompt}]}
+    if json_mode:
+        body["response_format"] = {"type": "json_object"}
+    import urllib.request, urllib.error
+    req = urllib.request.Request(m["url"], method="POST", data=json.dumps(body).encode(),
+                                 headers={"Authorization": f"Bearer {mesin_kunci(k)}", "Content-Type": "application/json", "User-Agent": "MCI-HQ/1.0"})   # User-Agent bawaan urllib ditolak sebagian penyedia
+    try:
+        with urllib.request.urlopen(req, timeout=120) as f:
+            d = json.loads(f.read().decode())
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"{m['nama']} menolak ({e.code}): {e.read().decode(errors='replace')[:300]}") from None
+    return str(d["choices"][0]["message"]["content"] or "").strip()
 
 
 def _claude(sistem, prompt, maks=8000):
@@ -5013,8 +5054,14 @@ def _claude(sistem, prompt, maks=8000):
 
 
 async def kode_ai(sistem, prompt, act, schema=None):
-    """Kembalikan teks mentah dari mesin kode. Claude kalau kuncinya ada (gagal -> jatuh ke Gemini)."""
-    if ANTHROPIC_KEY:
+    """Kembalikan teks mentah dari mesin kode. Urutan: mesin pilihan (AI_KODE) -> Claude kalau kuncinya ada -> Gemini. Yang gagal dilewati."""
+    pilih = mesin_kode()
+    if pilih in MESIN_LAIN:
+        try:
+            return await asyncio.to_thread(_kompatibel, pilih, sistem, prompt, 8000, schema is not None), pilih
+        except Exception:
+            log.exception("%s gagal, pakai mesin cadangan", pilih)
+    if ANTHROPIC_KEY and pilih != "gemini":
         try:
             return await asyncio.to_thread(_claude, sistem, prompt), "claude"
         except Exception:
@@ -5122,6 +5169,65 @@ async def model3d_buat(permintaan, lama=None):
     if polis is None:
         raise RuntimeError(f"AI belum berhasil membuat model yang sah ({galat}). Coba jelaskan ukurannya lebih rinci.")
     return resep, lap, mesin
+
+
+# ---------- LAB MESIN AI (khusus Dev): bandingkan mesin dengan satu perintah yang sama ----------
+async def _mesin_jawab(mid, sistem, prompt, json_mode):
+    if mid == "gemini":
+        return await ask("canvas", prompt, sistem=sistem, schema=Resep3D if json_mode else None, use_mcp=False, cache=False, act="Uji mesin AI", model=MODEL)
+    if mid == "claude":
+        return await asyncio.to_thread(_claude, sistem, prompt)
+    return await asyncio.to_thread(_kompatibel, mid, sistem, prompt, 8000, json_mode)
+
+
+async def mesin_uji(prompt, ids, mode):
+    """mode 'teks': jawaban biasa. mode '3d': tiap mesin menulis resep 3D, lalu mesin hitung MCI menilai sah/tidaknya (satu kali, tanpa putaran perbaikan)."""
+    sistem = SISTEM_3D if mode == "3d" else "Kamu asisten MCI (Mahardika Cakrawala Indonesia). Jawab dalam bahasa Indonesia yang jelas dan ringkas."
+    teks_p = f"PERMINTAAN:\n{prompt}" if mode == "3d" else prompt
+
+    async def satu(m):
+        t0, o = time.time(), {"id": m["id"], "nama": m["nama"], "model": m["model"]}
+        try:
+            teks = await asyncio.wait_for(_mesin_jawab(m["id"], sistem, teks_p, mode == "3d"), 150)
+            o["detik"] = round(time.time() - t0, 1)
+            if mode == "3d":
+                resep = _resep_dari(teks)
+                _, lap = await asyncio.to_thread(studio3d.bangun, resep)
+                o.update(ok=True, judul=str(resep.get("judul") or "")[:120], bagian=len(resep.get("bagian") or []), ukuran=lap.get("ukuran_mm"), volume=lap.get("volume_cm3"),
+                         peringatan=[str(x)[:200] for x in (lap.get("peringatan") or [])][:8])
+            else:
+                o.update(ok=True, jawaban=str(teks)[:4000])
+        except Exception as e:
+            o.update(ok=False, detik=round(time.time() - t0, 1), error=(str(e) or type(e).__name__)[:300])
+        return o
+
+    return await asyncio.gather(*[satu(m) for m in mesin_daftar() if m["id"] in ids and m["siap"]])
+
+
+@app.route("/api/mesin", methods=["GET", "POST"])
+def api_mesin():
+    r = role()
+    if not r:
+        abort(401)
+    if not is_admin(r):
+        abort(403)
+    if request.method == "GET":
+        return jsonify({"mesin": mesin_daftar(), "studio": mesin_kode(), "ai_kode": AI_KODE})
+    d = request.get_json(silent=True) or {}
+    prompt, mode = str(d.get("prompt") or "").strip()[:2000], ("3d" if d.get("mode") == "3d" else "teks")
+    ids = {str(x) for x in (d.get("mesin") or [])}
+    if len(prompt) < 5:
+        return jsonify({"error": "Tulis perintah ujinya dulu."}), 400
+    siap = [m for m in mesin_daftar() if m["id"] in ids and m["siap"]]
+    if not siap:
+        return jsonify({"error": "Pilih minimal satu mesin yang kuncinya sudah diisi."}), 400
+    if not LOOP:
+        return jsonify({"error": "Mesin AI belum siap"}), 503
+    try:
+        hasil = asyncio.run_coroutine_threadsafe(mesin_uji(prompt, ids, mode), LOOP).result(200)
+    except Exception as e:
+        return jsonify({"error": f"Uji gagal: {(str(e) or type(e).__name__)[:200]}"}), 502
+    return jsonify({"hasil": hasil, "mode": mode})
 
 
 def m3d_rows(batas=60):

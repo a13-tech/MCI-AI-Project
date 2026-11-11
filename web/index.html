@@ -549,6 +549,13 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
    <div id="s3Rev" class="mu" hidden style="margin-top:8px;font-size:13px"></div>
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="s3Go">Buat</button><span class="mu" id="s3Msg"></span></div></div>
   <div id="s3Box"><p class="mu">Memuat…</p></div>
+  <details class="cd" id="labMesin" hidden style="margin-top:18px"><summary style="cursor:pointer;font-weight:700">Lab Mesin AI (khusus Dev)</summary>
+   <p class="mu" style="font-size:13.5px">Kirim satu perintah yang sama ke beberapa mesin AI, lalu bandingkan jawaban dan kecepatannya. Mode "Resep 3D" menguji apakah resep tiap mesin lolos mesin hitung MCI. Mesin tanpa kunci tidak bisa dipilih: isi kuncinya di environment Render.</p>
+   <div id="labDaftar" class="picks" style="margin:10px 0"></div>
+   <div class="seg" style="margin:0 0 10px;background:#EFECE4" id="labSeg"><button class="on" data-lab="teks">Jawaban teks</button><button data-lab="3d">Resep 3D</button></div>
+   <textarea id="labPrompt" rows="3" maxlength="2000" aria-label="Perintah uji" placeholder="Contoh: Jelaskan cara kerja sensor ultrasonik HC-SR04 dalam 3 kalimat."></textarea>
+   <div class="bar" style="margin:12px 0 0"><button class="bt g" id="labGo" type="button">Uji mesin</button><span class="mu" id="labMsg"></span></div>
+   <div id="labHasil" style="margin-top:14px"></div></details>
  </section>
  <section id="p-cmd" class="pg" hidden>
   <h1>Command Center</h1>
@@ -5831,8 +5838,8 @@ function s3Mode() { $$("#s3Seg button").forEach(b => b.classList.toggle("on", b.
 $$("#s3Seg button").forEach(b => b.onclick = () => { S3_J = b.dataset.s3; S3_DARI = null; s3Mode(); s3Render(); });
 function s3Render() {
   const d = S3; if (!d) return;
-  $("#s3Buat").hidden = !d.buat;
-  const info = `<p class="mu" style="font-size:12.5px">Mesin: ${d.mesin === "claude" ? "Claude" : "Gemini"}${d.kuota ? ` · jatah hari ini ${d.kuota.pakai} dari ${d.kuota.batas}` : ""}${d.buat ? "" : " · jabatan atau divisimu hanya bisa melihat dan mengunduh"}</p>`;
+  $("#s3Buat").hidden = !d.buat; $("#labMesin").hidden = !d.admin;
+  const info = `<p class="mu" style="font-size:12.5px">Mesin: ${esc({claude: "Claude", gemini: "Gemini", groq: "Groq", cerebras: "Cerebras", openrouter: "OpenRouter", mistral: "Mistral"}[d.mesin] || d.mesin)}${d.kuota ? ` · jatah hari ini ${d.kuota.pakai} dari ${d.kuota.batas}` : ""}${d.buat ? "" : " · jabatan atau divisimu hanya bisa melihat dan mengunduh"}</p>`;
   if (S3_J === "3d") $("#s3Box").innerHTML = info + (d.model.length ? `<div class="s3g">${d.model.map(m => { const u = (m.laporan.ukuran_mm || {}), w = m.laporan.peringatan || [];
     return `<article class="it2"><img src="/api/studio/3d/${m.id}.svg" alt="Pratinjau ${esc(m.judul)}" loading="lazy" width="520" height="400"><h3 style="margin-top:10px">${esc(m.judul)}</h3>
     <div class="meta"><span>${u.panjang_x} × ${u.lebar_y} × ${u.tinggi_z} mm</span><span>${m.laporan.volume_cm3} cm³</span><span>${esc(m.oleh)} · ${esc(tglID(m.dibuat))}</span></div>
@@ -5847,6 +5854,27 @@ function s3Render() {
   $$("[data-s3png]").forEach(b => b.onclick = () => { const im = $(`[data-s3i="${b.dataset.s3png}"]`), r = (im.naturalHeight || 1) / (im.naturalWidth || 1), c = document.createElement("canvas"); c.width = 2160; c.height = Math.round(2160 * r);
     c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); c.toBlob(bl => { const a = document.createElement("a"); a.href = URL.createObjectURL(bl); a.download = `mci-gambar-kode-${b.dataset.s3png}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }, "image/png"); });
 }
+/* Lab Mesin AI (khusus Dev) */
+let LAB_MODE = "teks", LAB_T = 0;
+async function labMuat() {
+  try { const d = await api("/api/mesin");
+    $("#labDaftar").innerHTML = d.mesin.map(m => `<label style="opacity:${m.siap ? 1 : .55}"><input type="checkbox" value="${m.id}" ${m.siap ? "checked" : "disabled"}> ${esc(m.nama)} <span class="mu">${esc(m.model)}${m.siap ? "" : " · kunci belum diisi"}${m.id === d.studio ? " · dipakai Studio" : ""}</span></label>`).join("");
+  } catch (e) { $("#labDaftar").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
+}
+$("#labSeg").onclick = e => { const b = e.target.closest("[data-lab]"); if (!b) return; LAB_MODE = b.dataset.lab; $$("#labSeg button").forEach(x => x.classList.toggle("on", x === b));
+  $("#labPrompt").placeholder = LAB_MODE === "3d" ? "Contoh: Kotak casing 60 x 40 x 25 mm, dinding 2 mm, lubang kabel 8 mm di sisi kiri." : "Contoh: Jelaskan cara kerja sensor ultrasonik HC-SR04 dalam 3 kalimat."; };
+$("#labMesin").addEventListener("toggle", () => { if ($("#labMesin").open) labMuat(); });
+$("#labGo").onclick = async () => {
+  const b = $("#labGo"), t0 = Date.now(), mesin = $$("#labDaftar input:checked").map(x => x.value); b.disabled = true; clearInterval(LAB_T);
+  LAB_T = setInterval(() => { $("#labMsg").textContent = `Menunggu jawaban… ${Math.round((Date.now() - t0) / 1000)} detik`; }, 1000);
+  try { const d = await api("/api/mesin", {json: {prompt: $("#labPrompt").value, mode: LAB_MODE, mesin}});
+    $("#labMsg").textContent = "Selesai.";
+    $("#labHasil").innerHTML = `<div class="lst">${d.hasil.slice().sort((a, b) => (b.ok - a.ok) || (a.detik - b.detik)).map(x => `<article class="it2"><h3>${esc(x.nama)}</h3>
+      <div class="meta"><span class="ch ${x.ok ? "g" : "r"}">${x.ok ? (d.mode === "3d" ? "Resep sah" : "Berhasil") : "Gagal"}</span><span>${esc(x.model)}</span><span>${x.detik} detik</span>${x.ok && d.mode === "3d" ? `<span>${x.bagian} bagian</span><span>${x.ukuran ? `${x.ukuran.panjang_x} × ${x.ukuran.lebar_y} × ${x.ukuran.tinggi_z} mm` : ""}</span><span class="ch ${x.peringatan.length ? "y" : "g"}">${x.peringatan.length} peringatan</span>` : ""}</div>
+      ${x.ok ? (d.mode === "3d" ? `<div class="bd"><b>${esc(x.judul)}</b>${x.peringatan.length ? "<br>" + x.peringatan.map(esc).join("<br>") : ""}</div>` : `<div class="bd" style="white-space:pre-wrap">${esc(x.jawaban)}</div>`) : `<p class="er" style="margin:8px 0 0">${esc(x.error)}</p>`}</article>`).join("")}</div>`;
+  } catch (e) { $("#labMsg").textContent = e.message; }
+  clearInterval(LAB_T); b.disabled = false;
+};
 async function s3Muat() { s3Mode(); try { delete APIC["/api/studio"]; S3 = await api("/api/studio"); s3Mode(); s3Render(); } catch (e) { $("#s3Box").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; } }
 $("#s3Go").onclick = async () => {
   const b = $("#s3Go"), t0 = Date.now(); b.disabled = true; clearInterval(S3_T);
