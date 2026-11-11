@@ -64,9 +64,10 @@ footer{text-align:center;color:var(--mute);font-size:12.5px;padding:20px 16px 34
  <div class="bar"><input type="search" class="cari" id="q" placeholder="Cari nama barang…" aria-label="Cari barang">
   <button class="chip on" id="vK" aria-pressed="true">Kartu</button><button class="chip" id="vD" aria-pressed="false">Daftar harga</button></div>
  <div id="list"><p class="msg">Memuat katalog…</p></div>
+ <div id="jasa"></div>
 
  <section class="tanya" id="tanya" aria-labelledby="tj">
-  <h2 id="tj" style="margin-top:0">Tanya barang</h2>
+  <h2 id="tj" style="margin-top:0">Tanya barang atau jasa</h2>
   <div class="msg" id="kuota"></div>
   <div class="fl">
    <label>Nama (opsional)<input type="text" id="tNama" maxlength="60" autocomplete="name"></label>
@@ -103,7 +104,7 @@ function render() {
   const q = $("#q").value.trim().toLowerCase(), vis = pool.filter(x => (!KAT || x.kategori === KAT) && (!q || (x.nama + " " + x.deskripsi + " " + x.kategori).toLowerCase().includes(q)));
   const grup = {}; vis.forEach(x => (grup[x.kategori] = grup[x.kategori] || []).push(x));
   const keys = Object.keys(grup).sort();
-  if (!vis.length) { $("#list").innerHTML = `<p class="msg">${it.length ? "Tidak ada barang yang cocok." : "Katalog masih kosong. Cek lagi nanti ya."}</p>`; return; }
+  if (!vis.length) { $("#list").innerHTML = `<p class="msg">${it.length ? "Tidak ada barang yang cocok." : (D.jasa || []).length ? "" : "Katalog masih kosong. Cek lagi nanti ya."}</p>`; return; }
   if (VIEW === "d") {
     $("#list").innerHTML = `<div class="tbl"><table><thead><tr><th>Barang</th><th>Mitra</th><th>Ketersediaan</th><th class="rt">Harga</th></tr></thead><tbody>${keys.map(k => `<tr class="grp"><td colspan="4">${esc(k)}</td></tr>` + grup[k].map(x => `<tr><td>${esc(x.nama)}</td><td>${esc(x.mitra)}</td><td><span class="tag s-${x.sedia}">${esc(x.sedia_label)}</span></td><td class="rt"><b>${rp(x.harga)}</b> <span class="kecil">/${esc(x.satuan)}</span></td></tr>`).join("")).join("")}</tbody></table></div>`;
   } else {
@@ -115,6 +116,14 @@ function render() {
       <button class="btn o" style="margin-top:auto" data-t="${x.id}">Tanya barang ini</button></div></article>`).join("")}</div>`).join("");
   }
   $$("[data-t]").forEach(b => b.onclick = () => { $("#tProduk").value = b.dataset.t; $("#tanya").scrollIntoView({behavior: "smooth"}); setTimeout(() => $("#tPesan").focus(), 400); });
+}
+function renderJasa() {   // jasa yang oleh MCI diizinkan tampil untuk umum
+  const q = $("#q").value.trim().toLowerCase(), js = (D.jasa || []).filter(x => !q || (x.nama + " " + x.deskripsi).toLowerCase().includes(q));
+  $("#jasa").innerHTML = js.length ? `<h2>Jasa <small>${js.length} layanan</small></h2><div class="grid">${js.map(x => `<article class="card">
+    <div class="bd"><span><span class="tag">Jasa MCI</span></span><b>${esc(x.nama)}</b>
+    <div class="harga" style="font-size:16px">${x.harga ? esc(x.harga) : "Harga dibicarakan"}</div>${x.deskripsi ? `<div class="ds">${esc(x.deskripsi)}</div>` : ""}
+    <button class="btn o" style="margin-top:auto" data-tj="${esc(x.nama)}">Tanya jasa ini</button></div></article>`).join("")}</div>` : "";
+  $$("[data-tj]").forEach(b => b.onclick = () => { $("#tProduk").value = ""; const t = $("#tPesan"); if (!t.value.trim()) t.value = "Tentang jasa " + b.dataset.tj + ": "; $("#tanya").scrollIntoView({behavior: "smooth"}); setTimeout(() => { t.focus(); t.setSelectionRange(t.value.length, t.value.length); }, 400); });
 }
 function renderKuota(sisa) {
   D.sisa_tanya = sisa;
@@ -136,9 +145,9 @@ async function muat() {
   const j = D.jam; $("#jamDot").classList.toggle("on", j.buka);
   $("#jamT").textContent = (j.buka ? "Admin online sekarang · " : "Admin offline · ") + "Jam kerja " + j.teks;
   $("#tProduk").innerHTML = '<option value="">Umum / beberapa barang</option>' + D.items.map(x => `<option value="${x.id}">${esc(x.nama)} (${esc(x.mitra)})</option>`).join("");
-  renderKuota(D.sisa_tanya); render();
+  renderKuota(D.sisa_tanya); render(); renderJasa();
 }
-$("#q").oninput = render;
+$("#q").oninput = () => { render(); renderJasa(); };
 $("#vK").onclick = () => { VIEW = "k"; $("#vK").classList.add("on"); $("#vD").classList.remove("on"); $("#vK").setAttribute("aria-pressed", "true"); $("#vD").setAttribute("aria-pressed", "false"); render(); };
 $("#vD").onclick = () => { VIEW = "d"; $("#vD").classList.add("on"); $("#vK").classList.remove("on"); $("#vD").setAttribute("aria-pressed", "true"); $("#vK").setAttribute("aria-pressed", "false"); render(); };
 $("#tKirim").onclick = async () => {

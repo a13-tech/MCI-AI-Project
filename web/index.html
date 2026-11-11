@@ -525,12 +525,13 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
  </section>
  <section id="p-jasa" class="pg" hidden>
   <div class="ey">Khusus anggota MCI</div><h1>Jasa Internal</h1>
-  <p class="mu" style="max-width:760px">Daftar jasa antaranggota MCI, misalnya pembuatan website, desain, atau perakitan. Hanya anggota yang bisa melihat halaman ini; jasa di sini tidak tampil di katalog publik. Jasa baru dan setiap pesanan harus disetujui Dev dulu. Pesanan berbayar otomatis dibuatkan invoice, dan pembayarannya masuk kas MCI setelah dinyatakan lunas (<a href="#" id="jsPasal">UU MCI Pasal 20</a>).</p>
+  <p class="mu" style="max-width:760px">Daftar jasa antaranggota MCI, misalnya pembuatan website, desain, atau perakitan. Hanya anggota yang bisa melihat halaman ini; jasa di sini tidak tampil di katalog publik, kecuali Dev menyalakan setelan "Tampilkan di katalog publik" pada jasa tertentu. Jasa baru dan setiap pesanan harus disetujui Dev dulu. Pesanan berbayar otomatis dibuatkan invoice, dan pembayarannya masuk kas MCI setelah dinyatakan lunas (<a href="#" id="jsPasal">UU MCI Pasal 20</a>).</p>
   <details class="cd" id="jsBaru"><summary style="cursor:pointer;font-weight:700">Ajukan jasa baru</summary>
    <div class="fl" style="margin-top:12px"><label>Nama jasa<input type="text" id="jsNama" maxlength="100" placeholder="Contoh: Pembuatan website"></label>
     <label>Harga atau kisaran (boleh kosong)<input type="text" id="jsHarga" maxlength="80" placeholder="Contoh: Rp 300.000 – 1.000.000"></label>
     <label class="full">Penjelasan<textarea id="jsDesk" rows="3" maxlength="1500" placeholder="Apa yang dikerjakan, apa yang didapat pemesan, berapa lama."></textarea></label>
     <label>Pengerja<select id="jsPg"></select></label>
+    <label class="full" id="jsPubW" hidden style="display:flex;gap:10px;align-items:center;font-weight:600"><input type="checkbox" id="jsPub" style="width:20px;height:20px;flex:none"> Tampilkan juga di katalog publik (setelan khusus Dev)</label>
     <div class="bar full" style="margin:0"><button class="bt g" id="jsKirim" type="button">Ajukan jasa</button><span class="mu" id="jsMsg"></span></div></div></details>
   <div id="jsBox"><p class="mu">Memuat…</p></div>
  </section>
@@ -5653,16 +5654,16 @@ async function jsMuat(url, opt) {
 function jsRender() {
   const d = JS, pg = $("#jsPg");
   pg.innerHTML = (d.dev ? '<option value="">Belum ditentukan</option>' : "") + d.anggota.map(a => `<option value="${a.id}" ${a.id === d.saya ? "selected" : ""}>${esc(a.nama)}</option>`).join("");
-  $("#jsKirim").textContent = d.dev ? "Tambah jasa (langsung aktif)" : "Ajukan jasa";
+  $("#jsKirim").textContent = d.dev ? "Tambah jasa (langsung aktif)" : "Ajukan jasa"; $("#jsPubW").hidden = !d.dev;
   const aksiJ = x => { const a = [];
     if (x.status === "aktif") a.push(`<button class="bt g" data-jsp="${x.id}">Pesan jasa ini</button>`);
     if (d.dev && x.status === "menunggu") a.push(`<button class="bt g" data-jsa="${x.id}:setuju">Setujui</button>`, `<button class="bt o" data-jsa="${x.id}:tolak">Tolak</button>`);
-    if (d.dev && x.status === "aktif") a.push(`<button class="bt o" data-jsa="${x.id}:nonaktif">Nonaktifkan</button>`);
+    if (d.dev && x.status === "aktif") a.push(`<button class="bt o" data-jsa="${x.id}:${x.publik ? "internal" : "publik"}">${x.publik ? "Jadikan internal saja" : "Tampilkan di katalog publik"}</button>`, `<button class="bt o" data-jsa="${x.id}:nonaktif">Nonaktifkan</button>`);
     if (d.dev && ["nonaktif", "ditolak"].includes(x.status)) a.push(`<button class="bt o" data-jsa="${x.id}:aktif">Aktifkan</button>`);
     if (d.dev || (x.milikku && x.status === "menunggu")) a.push(`<button class="bt o" data-jsh="${x.id}">${d.dev ? "Hapus" : "Tarik pengajuan"}</button>`);
     return a.length ? `<div class="ac">${a.join("")}</div>` : ""; };
   const kartuJ = x => `<article class="it2"><div class="ey">${x.harga ? esc(x.harga) : "Harga dibicarakan"}</div><h3>${esc(x.nama)}</h3>
-    <div class="meta">${jsCh(x.status)}${x.pengerja_nama ? `<span>Pengerja: ${esc(x.pengerja_nama)}</span>` : ""}<span>Diajukan ${esc(x.oleh)}</span></div>
+    <div class="meta">${jsCh(x.status)}<span class="ch ${x.publik ? "y" : "n"}">${x.publik ? "Tampil di katalog publik" : "Internal saja"}</span>${x.pengerja_nama ? `<span>Pengerja: ${esc(x.pengerja_nama)}</span>` : ""}<span>Diajukan ${esc(x.oleh)}</span></div>
     <div class="bd">${esc(x.deskripsi)}</div>${x.catatan ? `<p class="mu" style="margin:8px 0 0">Catatan Dev: ${esc(x.catatan)}</p>` : ""}
     ${JS_PESAN === x.id ? `<div class="fl" style="margin-top:12px"><label class="full">Kebutuhanmu<textarea id="jsButuh" rows="3" maxlength="1500" placeholder="Untuk apa, isinya apa, dan kapan dibutuhkan."></textarea></label><label>Tenggat (boleh kosong)<input type="date" id="jsTgl"></label>${d.dev ? '<label>Harga disepakati (Rp, 0 = gratis)<input type="number" id="jsHrg" min="0" step="1000" value="0" inputmode="numeric"></label>' : ""}
       <div class="bar full" style="margin:0"><button class="bt g" data-jsk="${x.id}">${d.dev ? "Pesan (langsung disetujui)" : "Kirim pesanan"}</button><button class="bt o" data-jsp="0">Batal</button></div></div>` : aksiJ(x)}</article>`;
@@ -5685,8 +5686,8 @@ function jsRender() {
 }
 $("#jsPasal").onclick = e => { e.preventDefault(); show("uu"); setTimeout(() => uuKe("uu", 20), 400); };
 $("#jsKirim").onclick = async () => { const b = $("#jsKirim"); b.disabled = true; $("#jsMsg").textContent = "";
-  const ok = await jsMuat("/api/jasa", {json: {nama: $("#jsNama").value, harga: $("#jsHarga").value, deskripsi: $("#jsDesk").value, pengerja: $("#jsPg").value}});
-  b.disabled = false; if (ok) { ["#jsNama", "#jsHarga", "#jsDesk"].forEach(q => $(q).value = ""); $("#jsBaru").open = false; pesan(JS.dev ? "Jasa ditambahkan" : "Pengajuan terkirim, menunggu Dev"); } };
+  const ok = await jsMuat("/api/jasa", {json: {nama: $("#jsNama").value, harga: $("#jsHarga").value, deskripsi: $("#jsDesk").value, pengerja: $("#jsPg").value, publik: $("#jsPub").checked}});
+  b.disabled = false; if (ok) { ["#jsNama", "#jsHarga", "#jsDesk"].forEach(q => $(q).value = ""); $("#jsPub").checked = false; $("#jsBaru").open = false; pesan(JS.dev ? "Jasa ditambahkan" : "Pengajuan terkirim, menunggu Dev"); } };
 $("#jsBox").addEventListener("click", async e => { const b = e.target.closest("button"); if (!b) return; const ds = b.dataset;
   if (ds.jsp !== undefined) { JS_PESAN = +ds.jsp; jsRender(); const t = $("#jsButuh"); if (t) t.focus(); return; }
   if (ds.jsk) { b.disabled = true; const ok = await jsMuat(`/api/jasa/${ds.jsk}/pesan`, {json: {kebutuhan: $("#jsButuh").value, tenggat: $("#jsTgl").value, harga: $("#jsHrg") ? $("#jsHrg").value : 0}}); if (ok) { JS_PESAN = 0; jsRender(); pesan(JS.dev ? "Pesanan dicatat" : "Pesanan terkirim, menunggu Dev"); } else b.disabled = false; return; }
@@ -5695,7 +5696,7 @@ $("#jsBox").addEventListener("click", async e => { const b = e.target.closest("b
     if (aksi === "setuju" && pesanan) { const h = prompt("Harga yang disepakati dalam rupiah (angka saja). Isi 0 kalau gratis.\nKalau lebih dari 0, invoice dibuat otomatis untuk pemesan.", "0"); if (h === null) return; harga = +String(h).replace(/[^\d]/g, "") || 0; }
     b.disabled = true; await jsMuat(url, {json: {aksi, catatan, harga}}); };
   if (ds.jsgo) return show(ds.jsgo);
-  if (ds.jsa) { const [i, aksi] = ds.jsa.split(":"); return putus("/api/jasa/" + i, aksi); }
+  if (ds.jsa) { const [i, aksi] = ds.jsa.split(":"); if (aksi === "publik" && !confirm("Tampilkan jasa ini di katalog publik? Orang luar akan melihat nama, harga, dan penjelasannya (nama pengerja tidak ditampilkan).")) return; return putus("/api/jasa/" + i, aksi); }
   if (ds.jpa) { const [i, aksi] = ds.jpa.split(":"); return putus("/api/jasa/pesan/" + i, aksi, true); }
   if (ds.jsh && confirm("Hapus jasa ini?")) return jsMuat("/api/jasa/" + ds.jsh, {method: "DELETE"});
   if (ds.jph && confirm("Batalkan pesanan ini?")) return jsMuat("/api/jasa/pesan/" + ds.jph, {method: "DELETE"});

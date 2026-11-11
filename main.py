@@ -293,7 +293,7 @@ def db_init():
                "status TEXT NOT NULL DEFAULT 'menunggu', oleh_id INTEGER, oleh TEXT, dibuat TEXT, diputus_oleh TEXT, diputus TEXT, catatan TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS model3d (id {pk}, judul TEXT NOT NULL, permintaan TEXT, resep TEXT NOT NULL, laporan TEXT, mesin TEXT, oleh_id INTEGER, oleh TEXT, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS jasa (id {pk}, nama TEXT NOT NULL, deskripsi TEXT, harga TEXT, pengerja INTEGER, status TEXT NOT NULL DEFAULT 'menunggu', "
-               f"oleh_id INTEGER, oleh TEXT, dibuat TEXT, diputus_oleh TEXT, diputus TEXT, catatan TEXT)")
+               f"oleh_id INTEGER, oleh TEXT, dibuat TEXT, diputus_oleh TEXT, diputus TEXT, catatan TEXT, publik INTEGER NOT NULL DEFAULT 0)")
         sql(c, f"CREATE TABLE IF NOT EXISTS jasa_pesan (id {pk}, jasa_id INTEGER NOT NULL, kebutuhan TEXT NOT NULL, tenggat TEXT, status TEXT NOT NULL DEFAULT 'menunggu', "
                f"oleh_id INTEGER, oleh TEXT, dibuat TEXT, diputus_oleh TEXT, diputus TEXT, catatan TEXT, harga BIGINT NOT NULL DEFAULT 0, invoice_id INTEGER)")
         sql(c, f"CREATE TABLE IF NOT EXISTS gambar_kode (id {pk}, prompt TEXT NOT NULL, svg TEXT NOT NULL, mesin TEXT, oleh TEXT, dibuat TEXT)")
@@ -360,6 +360,11 @@ def db_init():
                 sql(c, f"ALTER TABLE perpus ADD COLUMN {kol}")
         except Exception:
             pass   # sudah ada
+    try:   # setelan khusus Dev: jasa boleh tampil di katalog publik
+        with db() as c:
+            sql(c, "ALTER TABLE jasa ADD COLUMN publik INTEGER NOT NULL DEFAULT 0")
+    except Exception:
+        pass   # sudah ada
     for kol in ("harga BIGINT NOT NULL DEFAULT 0", "invoice_id INTEGER"):   # pesanan jasa terhubung ke invoice
         try:
             with db() as c:
@@ -5252,7 +5257,8 @@ def api_studio_svg(i):
 
 
 # ---------- JASA INTERNAL ----------
-# Jasa (mis. pembuatan website) hanya untuk anggota MCI: tidak tampil di katalog publik dan tidak bisa dibuka viewer.
+# Jasa (mis. pembuatan website) bawaannya hanya untuk anggota MCI: tidak bisa dibuka viewer dan tidak tampil di katalog publik,
+# kecuali Dev menyalakan setelan "Tampil di katalog publik" pada jasa itu (yang tampil ke luar hanya nama, harga, dan penjelasan).
 # Jasa baru dan pesanan jasa harus disetujui Dev; yang dibuat dengan akses Dev/token admin langsung berlaku.
 JASA_MAKS_TUNGGU = 5   # batas pengajuan/pesanan yang masih menunggu per anggota
 
@@ -5273,7 +5279,7 @@ def _dev_ids():
 def jasa_payload(r):
     me, adm = mid_of(r), is_admin(r)
     with db() as c:
-        js = sql(c, "SELECT id,nama,deskripsi,harga,pengerja,status,oleh_id,oleh,dibuat,diputus_oleh,catatan FROM jasa ORDER BY id DESC").fetchall()
+        js = sql(c, "SELECT id,nama,deskripsi,harga,pengerja,status,oleh_id,oleh,dibuat,diputus_oleh,catatan,publik FROM jasa ORDER BY id DESC").fetchall()
         ps = sql(c, "SELECT id,jasa_id,kebutuhan,tenggat,status,oleh_id,oleh,dibuat,diputus_oleh,catatan,harga,invoice_id FROM jasa_pesan ORDER BY id DESC LIMIT 300").fetchall()
         iv_ids = sorted({int(x[11]) for x in ps if x[11]})
         iv = {}
@@ -5283,14 +5289,21 @@ def jasa_payload(r):
     nama_j = {j[0]: j[1] for j in js}
     kerja = {j[0]: j[4] for j in js}
     jasa = [{"id": i, "nama": n, "deskripsi": d or "", "harga": h or "", "pengerja": pg, "pengerja_nama": _nm(pg) if pg else "", "status": st, "oleh_id": oi, "oleh": o or "",
-             "dibuat": db_ or "", "diputus_oleh": dp or "", "catatan": ct or "", "milikku": oi == me}
-            for i, n, d, h, pg, st, oi, o, db_, dp, ct in js if adm or st == "aktif" or oi == me]
+             "dibuat": db_ or "", "diputus_oleh": dp or "", "catatan": ct or "", "milikku": oi == me, "publik": bool(pb)}
+            for i, n, d, h, pg, st, oi, o, db_, dp, ct, pb in js if adm or st == "aktif" or oi == me]
     pesan = [{"id": i, "jasa_id": ji, "jasa": nama_j.get(ji, "(jasa dihapus)"), "kebutuhan": k, "tenggat": t or "", "status": st, "oleh_id": oi, "oleh": o or "", "dibuat": db_ or "",
               "diputus_oleh": dp or "", "catatan": ct or "", "milikku": oi == me, "kukerjakan": kerja.get(ji) == me and me != 0, "harga": int(hg or 0),
               "invoice": ({k2: v2 for k2, v2 in iv[int(ivd)].items() if k2 != "token" or adm or oi == me} if ivd and int(ivd) in iv else None)}   # link tagihan hanya untuk pemesan & Dev
              for i, ji, k, t, st, oi, o, db_, dp, ct, hg, ivd in ps if adm or oi == me or (kerja.get(ji) == me and me != 0 and st in ("disetujui", "selesai"))]
     return {"dev": adm, "saya": me, "jasa": jasa, "pesan": pesan, "bisa_invoice": bisa_produk(r),
             "anggota": [{"id": m["id"], "nama": m["nama"]} for m in sorted(MEMBERS.values(), key=lambda m: m["nama"].lower()) if m["aktif"]]}
+
+
+def jasa_publik():
+    """Jasa aktif yang oleh Dev diizinkan tampil di katalog publik. Hanya nama, harga, dan penjelasan: tanpa nama pengerja atau pengaju."""
+    with db() as c:
+        rows = sql(c, "SELECT id,nama,harga,deskripsi FROM jasa WHERE status='aktif' AND publik=1 ORDER BY LOWER(nama)").fetchall()
+    return [{"id": int(i), "nama": n, "harga": h or "", "deskripsi": d or ""} for i, n, h, d in rows]
 
 
 def _jasa_harga(v):
@@ -5339,8 +5352,9 @@ def api_jasa():
             return jsonify({"error": "Jasa dengan nama itu sudah ada."}), 400
         if not adm and int(sql(c, "SELECT COUNT(*) FROM jasa WHERE oleh_id=? AND status='menunggu'", (me,)).fetchone()[0]) >= JASA_MAKS_TUNGGU:
             return jsonify({"error": f"Kamu masih punya {JASA_MAKS_TUNGGU} pengajuan jasa yang belum diputus Dev."}), 400
-        sql(c, "INSERT INTO jasa (nama,deskripsi,harga,pengerja,status,oleh_id,oleh,dibuat,diputus_oleh,diputus) VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (nama, desk, harga, pg if pg is not None else (me or None), status, me, nama_peran(r), _now(), nama_peran(r) if adm else None, _now() if adm else None))
+        sql(c, "INSERT INTO jasa (nama,deskripsi,harga,pengerja,status,oleh_id,oleh,dibuat,diputus_oleh,diputus,publik) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (nama, desk, harga, pg if pg is not None else (me or None), status, me, nama_peran(r), _now(), nama_peran(r) if adm else None, _now() if adm else None,
+             1 if adm and d.get("publik") else 0))   # setelan publik hanya bisa dinyalakan Dev
     if not adm:
         inbox_kirim(_dev_ids(), "jasa", f"Pengajuan jasa internal: {nama}", f"Oleh {nama_peran(r)}" + (f" · {harga}" if harga else "") + f"\n\n{desk}\n\nSetujui atau tolak di halaman Jasa Internal.")
     return jsonify(jasa_payload(r))
@@ -5366,6 +5380,10 @@ def api_jasa_one(i):
         return jsonify({"error": "Jasa internal hanya bisa disetujui atau diubah statusnya oleh Dev."}), 403
     d = request.get_json(silent=True) or {}
     aksi, cat = str(d.get("aksi") or ""), str(d.get("catatan") or "").strip()[:300]
+    if aksi in ("publik", "internal"):   # setelan khusus Dev: tampil di katalog publik atau hanya internal
+        with db() as c:
+            sql(c, "UPDATE jasa SET publik=? WHERE id=?", (1 if aksi == "publik" else 0, i))
+        return jsonify(jasa_payload(r))
     baru = {"setuju": "aktif", "aktif": "aktif", "tolak": "ditolak", "nonaktif": "nonaktif"}.get(aksi)
     if not baru:
         return jsonify({"error": "Aksi tidak dikenal"}), 400
@@ -6929,6 +6947,9 @@ async def produk_jawab(pesan, pid=None):
     fokus = next((x for x in items if x["id"] == pid), None)
     katalog = "\n".join(f"- [{x['mitra']} / {x['kategori']}] {x['nama']}: {rp(x['harga'])}/{x['satuan']}, {x['sedia_label']}. {x['deskripsi'][:300]}"
                         + (f" Spesifikasi: {x['spesifikasi'][:400]}" if x["spesifikasi"] else "") for x in items[:120]) or "(katalog masih kosong)"
+    jp = jasa_publik()
+    if jp:
+        katalog += "\nJasa yang ditawarkan:\n" + "\n".join(f"- [Jasa] {x['nama']}: {x['harga'] or 'harga dibicarakan dengan admin'}. {x['deskripsi'][:300]}" for x in jp[:40])
     prompt = (f"Kamu asisten toko MCI (Mahardika Cakrawala Indonesia). Jawab pertanyaan pembeli tentang DETAIL BARANG hanya berdasarkan katalog ini:\n{katalog}\n\n"
               + (f"Pembeli sedang melihat produk: {fokus['nama']}.\n" if fokus else "")
               + "Aturan: bahasa Indonesia ramah dan singkat (maks 90 kata). Jangan mengarang harga, stok, atau spesifikasi yang tidak ada di katalog; kalau tidak ada, bilang admin akan memastikan. "
@@ -6962,7 +6983,7 @@ def api_publik_produk():
     ih = _ip_hash(client_ip())
     with db() as c:
         n = sql(c, "SELECT COUNT(*) FROM tanya WHERE ip=? AND dibuat>=?", (ih, (datetime.now(WIB) - timedelta(hours=24)).isoformat(timespec="seconds"))).fetchone()[0]
-    return jsonify({"items": [{k: v for k, v in x.items() if k != "stok_id"} for x in produk_list()], "sedia": SEDIA, "jam": jam_kerja(),
+    return jsonify({"items": [{k: v for k, v in x.items() if k != "stok_id"} for x in produk_list()], "jasa": jasa_publik(), "sedia": SEDIA, "jam": jam_kerja(),
                     "sisa_tanya": max(0, TANYA_PER_IP - int(n)), "batas_tanya": TANYA_PER_IP})
 
 
@@ -7103,6 +7124,9 @@ def pi_konteks():
             + (f". {x['deskripsi'][:160]}" if x["deskripsi"] else "") for x in pr[:60]))
     else:
         out.append("Katalog produk: belum ada produk yang dijual.")
+    jp = jasa_publik()
+    if jp:
+        out.append("Jasa yang ditawarkan untuk umum:\n" + "\n".join(f"- {x['nama']}: {x['harga'] or 'harga dibicarakan dengan admin'}" + (f". {x['deskripsi'][:160]}" if x["deskripsi"] else "") for x in jp[:30]))
     jk = jam_kerja()
     out.append(f"Jam kerja admin: {jk['teks']}. Pembelian dan pertanyaan produk bisa lewat halaman /produk.")
     k = t["kontak"]   # nomor WA sengaja TIDAK dimasukkan; server yang menyisipkan kalau obrolan aman
