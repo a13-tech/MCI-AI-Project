@@ -292,6 +292,10 @@ def db_init():
         sql(c, f"CREATE TABLE IF NOT EXISTS proyek_ajuan (id {pk}, proyek_id INTEGER NOT NULL, barang TEXT NOT NULL, harga {big} NOT NULL DEFAULT 0, alasan TEXT, bukti TEXT, "
                "status TEXT NOT NULL DEFAULT 'menunggu', oleh_id INTEGER, oleh TEXT, dibuat TEXT, diputus_oleh TEXT, diputus TEXT, catatan TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS model3d (id {pk}, judul TEXT NOT NULL, permintaan TEXT, resep TEXT NOT NULL, laporan TEXT, mesin TEXT, oleh_id INTEGER, oleh TEXT, dibuat TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS jasa (id {pk}, nama TEXT NOT NULL, deskripsi TEXT, harga TEXT, pengerja INTEGER, status TEXT NOT NULL DEFAULT 'menunggu', "
+               f"oleh_id INTEGER, oleh TEXT, dibuat TEXT, diputus_oleh TEXT, diputus TEXT, catatan TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS jasa_pesan (id {pk}, jasa_id INTEGER NOT NULL, kebutuhan TEXT NOT NULL, tenggat TEXT, status TEXT NOT NULL DEFAULT 'menunggu', "
+               f"oleh_id INTEGER, oleh TEXT, dibuat TEXT, diputus_oleh TEXT, diputus TEXT, catatan TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS gambar_kode (id {pk}, prompt TEXT NOT NULL, svg TEXT NOT NULL, mesin TEXT, oleh TEXT, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS pusat_info (id {pk}, ip TEXT NOT NULL, tanya TEXT NOT NULL, jawab TEXT, token {big} NOT NULL DEFAULT 0, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS stok (id {pk}, nama TEXT NOT NULL, jumlah {big} NOT NULL DEFAULT 0, satuan TEXT, kategori TEXT, minimum {big} NOT NULL DEFAULT 0, catatan TEXT, mime TEXT, gambar TEXT, diubah TEXT)")
@@ -5239,6 +5243,182 @@ def api_studio_svg(i):
     if request.args.get("unduh"):
         h["Content-Disposition"] = f"attachment; filename=mci-gambar-kode-{i}.svg"
     return Response(a[0], mimetype="image/svg+xml", headers=h)
+
+
+# ---------- JASA INTERNAL ----------
+# Jasa (mis. pembuatan website) hanya untuk anggota MCI: tidak tampil di katalog publik dan tidak bisa dibuka viewer.
+# Jasa baru dan pesanan jasa harus disetujui Dev; yang dibuat dengan akses Dev/token admin langsung berlaku.
+JASA_MAKS_TUNGGU = 5   # batas pengajuan/pesanan yang masih menunggu per anggota
+
+
+def _jasa_need():
+    r = role()
+    if not r:
+        abort(401)
+    if mid_of(r) is None:
+        abort(403)   # viewer/orang luar tidak boleh melihat jasa internal
+    return r
+
+
+def _dev_ids():
+    return [0] + [m["id"] for m in MEMBERS.values() if m["aktif"] and is_admin(f"m:{m['id']}")]
+
+
+def jasa_payload(r):
+    me, adm = mid_of(r), is_admin(r)
+    with db() as c:
+        js = sql(c, "SELECT id,nama,deskripsi,harga,pengerja,status,oleh_id,oleh,dibuat,diputus_oleh,catatan FROM jasa ORDER BY id DESC").fetchall()
+        ps = sql(c, "SELECT id,jasa_id,kebutuhan,tenggat,status,oleh_id,oleh,dibuat,diputus_oleh,catatan FROM jasa_pesan ORDER BY id DESC LIMIT 300").fetchall()
+    nama_j = {j[0]: j[1] for j in js}
+    kerja = {j[0]: j[4] for j in js}
+    jasa = [{"id": i, "nama": n, "deskripsi": d or "", "harga": h or "", "pengerja": pg, "pengerja_nama": _nm(pg) if pg else "", "status": st, "oleh_id": oi, "oleh": o or "",
+             "dibuat": db_ or "", "diputus_oleh": dp or "", "catatan": ct or "", "milikku": oi == me}
+            for i, n, d, h, pg, st, oi, o, db_, dp, ct in js if adm or st == "aktif" or oi == me]
+    pesan = [{"id": i, "jasa_id": ji, "jasa": nama_j.get(ji, "(jasa dihapus)"), "kebutuhan": k, "tenggat": t or "", "status": st, "oleh_id": oi, "oleh": o or "", "dibuat": db_ or "",
+              "diputus_oleh": dp or "", "catatan": ct or "", "milikku": oi == me, "kukerjakan": kerja.get(ji) == me and me != 0}
+             for i, ji, k, t, st, oi, o, db_, dp, ct in ps if adm or oi == me or (kerja.get(ji) == me and me != 0 and st in ("disetujui", "selesai"))]
+    return {"dev": adm, "saya": me, "jasa": jasa, "pesan": pesan,
+            "anggota": [{"id": m["id"], "nama": m["nama"]} for m in sorted(MEMBERS.values(), key=lambda m: m["nama"].lower()) if m["aktif"]]}
+
+
+@app.route("/api/jasa", methods=["GET", "POST"])
+def api_jasa():
+    r = _jasa_need()
+    if request.method == "GET":
+        return jsonify(jasa_payload(r))
+    d = request.get_json(silent=True) or {}
+    nama = re.sub(r"\s+", " ", str(d.get("nama") or "")).strip()[:100]
+    desk = str(d.get("deskripsi") or "").strip()[:1500]
+    harga = re.sub(r"\s+", " ", str(d.get("harga") or "")).strip()[:80]
+    try:
+        pg = int(d.get("pengerja") or 0) or None
+    except (TypeError, ValueError):
+        pg = None
+    if pg is not None and pg not in MEMBERS:
+        return jsonify({"error": "Pengerja tidak ditemukan"}), 400
+    if len(nama) < 3:
+        return jsonify({"error": "Tulis nama jasa, misalnya: Pembuatan website."}), 400
+    if len(desk) < 10:
+        return jsonify({"error": "Jelaskan jasanya: apa yang dikerjakan dan apa yang didapat pemesan."}), 400
+    adm, me = is_admin(r), mid_of(r)
+    status = "aktif" if adm else "menunggu"
+    with db() as c:
+        if sql(c, "SELECT 1 FROM jasa WHERE LOWER(nama)=? AND status IN ('aktif','menunggu')", (nama.lower(),)).fetchone():
+            return jsonify({"error": "Jasa dengan nama itu sudah ada."}), 400
+        if not adm and int(sql(c, "SELECT COUNT(*) FROM jasa WHERE oleh_id=? AND status='menunggu'", (me,)).fetchone()[0]) >= JASA_MAKS_TUNGGU:
+            return jsonify({"error": f"Kamu masih punya {JASA_MAKS_TUNGGU} pengajuan jasa yang belum diputus Dev."}), 400
+        sql(c, "INSERT INTO jasa (nama,deskripsi,harga,pengerja,status,oleh_id,oleh,dibuat,diputus_oleh,diputus) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (nama, desk, harga, pg if pg is not None else (me or None), status, me, nama_peran(r), _now(), nama_peran(r) if adm else None, _now() if adm else None))
+    if not adm:
+        inbox_kirim(_dev_ids(), "jasa", f"Pengajuan jasa internal: {nama}", f"Oleh {nama_peran(r)}" + (f" · {harga}" if harga else "") + f"\n\n{desk}\n\nSetujui atau tolak di halaman Jasa Internal.")
+    return jsonify(jasa_payload(r))
+
+
+@app.route("/api/jasa/<int:i>", methods=["POST", "DELETE"])
+def api_jasa_one(i):
+    r = _jasa_need()
+    with db() as c:
+        j = sql(c, "SELECT nama,status,oleh_id FROM jasa WHERE id=?", (i,)).fetchone()
+    if not j:
+        return jsonify({"error": "Jasa tidak ditemukan"}), 404
+    adm = is_admin(r)
+    if request.method == "DELETE":   # pengaju menarik pengajuannya yang belum diputus; Dev boleh menghapus kapan saja
+        if not (adm or (j[2] == mid_of(r) and j[1] == "menunggu")):
+            abort(403)
+        with db() as c:
+            if int(sql(c, "SELECT COUNT(*) FROM jasa_pesan WHERE jasa_id=? AND status IN ('menunggu','disetujui')", (i,)).fetchone()[0]):
+                return jsonify({"error": "Masih ada pesanan berjalan untuk jasa ini. Selesaikan atau tolak dulu, atau nonaktifkan jasanya."}), 400
+            sql(c, "DELETE FROM jasa WHERE id=?", (i,))
+        return jsonify(jasa_payload(r))
+    if not adm:
+        return jsonify({"error": "Jasa internal hanya bisa disetujui atau diubah statusnya oleh Dev."}), 403
+    d = request.get_json(silent=True) or {}
+    aksi, cat = str(d.get("aksi") or ""), str(d.get("catatan") or "").strip()[:300]
+    baru = {"setuju": "aktif", "aktif": "aktif", "tolak": "ditolak", "nonaktif": "nonaktif"}.get(aksi)
+    if not baru:
+        return jsonify({"error": "Aksi tidak dikenal"}), 400
+    if aksi == "tolak" and len(cat) < 3:
+        return jsonify({"error": "Tulis alasan penolakan supaya pengaju tahu."}), 400
+    with db() as c:
+        sql(c, "UPDATE jasa SET status=?,diputus_oleh=?,diputus=?,catatan=? WHERE id=?", (baru, nama_peran(r), _now(), cat, i))
+    if j[2] and j[2] != mid_of(r) and aksi in ("setuju", "tolak"):
+        inbox_kirim([j[2]], "jasa", f"Jasa {'disetujui' if aksi == 'setuju' else 'ditolak'}: {j[0]}", f"Diputus oleh {nama_peran(r)}." + (f"\nCatatan: {cat}" if cat else ""))
+    return jsonify(jasa_payload(r))
+
+
+@app.route("/api/jasa/<int:i>/pesan", methods=["POST"])
+def api_jasa_pesan(i):
+    r = _jasa_need()
+    d = request.get_json(silent=True) or {}
+    butuh = str(d.get("kebutuhan") or "").strip()[:1500]
+    tenggat = str(d.get("tenggat") or "").strip()[:10]
+    if tenggat:
+        try:
+            date.fromisoformat(tenggat)
+        except ValueError:
+            return jsonify({"error": "Tanggal tenggat tidak valid"}), 400
+    if len(butuh) < 10:
+        return jsonify({"error": "Jelaskan kebutuhanmu: untuk apa, isinya apa, dan kapan dibutuhkan."}), 400
+    adm, me = is_admin(r), mid_of(r)
+    status = "disetujui" if adm else "menunggu"
+    with db() as c:
+        j = sql(c, "SELECT nama,status,pengerja FROM jasa WHERE id=?", (i,)).fetchone()
+        if not j or j[1] != "aktif":
+            return jsonify({"error": "Jasa ini tidak tersedia."}), 400
+        if not adm and int(sql(c, "SELECT COUNT(*) FROM jasa_pesan WHERE oleh_id=? AND status='menunggu'", (me,)).fetchone()[0]) >= JASA_MAKS_TUNGGU:
+            return jsonify({"error": f"Kamu masih punya {JASA_MAKS_TUNGGU} pesanan jasa yang belum diputus Dev."}), 400
+        sql(c, "INSERT INTO jasa_pesan (jasa_id,kebutuhan,tenggat,status,oleh_id,oleh,dibuat,diputus_oleh,diputus) VALUES (?,?,?,?,?,?,?,?,?)",
+            (i, butuh, tenggat, status, me, nama_peran(r), _now(), nama_peran(r) if adm else None, _now() if adm else None))
+    if adm:
+        if j[2]:
+            inbox_kirim([j[2]], "jasa", f"Pesanan jasa untuk kamu kerjakan: {j[0]}", f"Dipesan oleh {nama_peran(r)}" + (f" · tenggat {tglid(tenggat)}" if tenggat else "") + f"\n\n{butuh}")
+    else:
+        inbox_kirim(_dev_ids(), "jasa", f"Pesanan jasa menunggu persetujuan: {j[0]}", f"Oleh {nama_peran(r)}" + (f" · tenggat {tglid(tenggat)}" if tenggat else "") + f"\n\n{butuh}\n\nSetujui atau tolak di halaman Jasa Internal.")
+    return jsonify(jasa_payload(r))
+
+
+@app.route("/api/jasa/pesan/<int:i>", methods=["POST", "DELETE"])
+def api_jasa_pesan_one(i):
+    r = _jasa_need()
+    with db() as c:
+        p = sql(c, "SELECT jasa_id,status,oleh_id FROM jasa_pesan WHERE id=?", (i,)).fetchone()
+        j = sql(c, "SELECT nama,pengerja FROM jasa WHERE id=?", (p[0],)).fetchone() if p else None
+    if not p:
+        return jsonify({"error": "Pesanan tidak ditemukan"}), 404
+    adm, me = is_admin(r), mid_of(r)
+    nama_j, pengerja = (j[0], j[1]) if j else ("(jasa dihapus)", None)
+    if request.method == "DELETE":   # pemesan membatalkan pesanan yang belum diputus
+        if not (adm or (p[2] == me and p[1] == "menunggu")):
+            abort(403)
+        with db() as c:
+            sql(c, "DELETE FROM jasa_pesan WHERE id=?", (i,))
+        return jsonify(jasa_payload(r))
+    d = request.get_json(silent=True) or {}
+    aksi, cat = str(d.get("aksi") or ""), str(d.get("catatan") or "").strip()[:300]
+    if aksi in ("setuju", "tolak"):
+        if not adm:
+            return jsonify({"error": "Pesanan jasa hanya bisa disetujui atau ditolak oleh Dev."}), 403
+        if p[1] != "menunggu":
+            return jsonify({"error": "Pesanan ini sudah diputus."}), 400
+        if aksi == "tolak" and len(cat) < 3:
+            return jsonify({"error": "Tulis alasan penolakan supaya pemesan tahu."}), 400
+        baru = "disetujui" if aksi == "setuju" else "ditolak"
+    elif aksi == "selesai":
+        if not (adm or (pengerja is not None and pengerja == me and me != 0)):
+            return jsonify({"error": "Yang menandai selesai: pengerja jasa atau Dev."}), 403
+        if p[1] != "disetujui":
+            return jsonify({"error": "Hanya pesanan yang sudah disetujui yang bisa ditandai selesai."}), 400
+        baru = "selesai"
+    else:
+        return jsonify({"error": "Aksi tidak dikenal"}), 400
+    with db() as c:
+        sql(c, "UPDATE jasa_pesan SET status=?,diputus_oleh=?,diputus=?,catatan=? WHERE id=?", (baru, nama_peran(r), _now(), cat, i))
+    label = {"disetujui": "disetujui", "ditolak": "ditolak", "selesai": "selesai"}[baru]
+    if p[2] and p[2] != me:
+        inbox_kirim([p[2]], "jasa", f"Pesanan jasa {label}: {nama_j}", f"Oleh {nama_peran(r)}." + (f"\nCatatan: {cat}" if cat else ""))
+    if baru == "disetujui" and pengerja and pengerja != me:
+        inbox_kirim([pengerja], "jasa", f"Pesanan jasa untuk kamu kerjakan: {nama_j}", "Lihat detailnya di halaman Jasa Internal.")
+    return jsonify(jasa_payload(r))
 
 
 # ---------- PROYEKSI KAS 8 MINGGU ----------
