@@ -1893,7 +1893,7 @@ function renderDok() {
   $("#dkForm").hidden = !DKD.kelola;
   $("#dkList").innerHTML = DKD.items.map(x => `<figure><img src="${dkImg(x.id)}" alt="${esc(x.judul)}" loading="lazy" data-dkz="${x.id}"><figcaption title="${esc(x.keterangan)}"><b>${esc(x.judul)}</b> · ${esc(x.tanggal)}${x.keterangan ? "<br>" + esc(x.keterangan) : ""}</figcaption>
     <div class="bar"><a class="bt o" href="${dkImg(x.id)}?unduh=1" download>Unduh</a>${DKD.kelola ? `<button class="bt o" data-dkd="${x.id}">Hapus</button>` : ""}</div></figure>`).join("") || '<div class="mu">Belum ada foto kegiatan.</div>';
-  $$("[data-dkz]").forEach(i => i.onclick = () => window.open(i.src, "_blank"));
+  $$("[data-dkz]").forEach(i => i.onclick = () => vwBuka(i.src, i.alt || "Foto"));
   $$("[data-dkd]").forEach(b => b.onclick = async () => { if (!confirm("Hapus foto ini?")) return; DKD = await api("/api/dokumentasi/" + b.dataset.dkd, {method: "DELETE"}); renderDok(); });
 }
 async function loadDok() { if (!$("#dkTgl").value) $("#dkTgl").value = new Date().toISOString().slice(0, 10); try { DKD = await api("/api/dokumentasi"); renderDok(); } catch (e) { $("#dkList").innerHTML = '<div class="er">' + esc(e.message) + "</div>"; } }
@@ -2554,6 +2554,7 @@ function exPDF(p, ts) {
   <footer>Trimatra Vijaya Mahe · Dokumen internal MCI</footer></body></html>`;
   if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {   // HP: buka di tab baru, lalu Bagikan/Cetak -> Simpan PDF
     const u = URL.createObjectURL(new Blob([html.replace("</body>", "<script>onload=()=>setTimeout(()=>print(),600)<\/script></body>")], {type: "text/html"}));
+    if (APP_MODE()) { vwBuka(u, "Ekspor PDF", "frame"); setTimeout(() => URL.revokeObjectURL(u), 600000); return; }   // PWA: tetap di dalam aplikasi, ada tombol Kembali
     const w = window.open(u, "_blank"); if (!w) location.href = u; setTimeout(() => URL.revokeObjectURL(u), 120000); return;
   }
   const f = document.createElement("iframe"); f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
@@ -2679,7 +2680,7 @@ function renderStok() {
     ${STP.length && x.jumlah > 0 ? `<div class="bar" style="gap:6px"><input type="number" min="1" max="${x.jumlah}" value="1" data-stn="${x.id}" aria-label="Jumlah dipakai" style="width:64px"><select data-stp="${x.id}" aria-label="Proyek" style="max-width:150px">${STP.map(p => `<option value="${p.id}">${esc(p.nama)}</option>`).join("")}</select><button class="bt o" data-stpakai="${x.id}">Pakai</button></div>` : ""}
     ${ed ? `<div class="bar"><button class="bt o" data-sm="${x.id}" aria-label="Kurangi ${esc(x.nama)}">−1</button><button class="bt o" data-sp="${x.id}" aria-label="Tambah ${esc(x.nama)}">+1</button><button class="bt o" data-se="${x.id}">Ubah</button><button class="bt o" data-sd="${x.id}">Hapus</button></div>` : ""}</div></div>`).join("")
     || `<p class="mu">${it.length ? "Tidak ada yang cocok." : "Belum ada barang." + (ed ? " Tambah lewat formulir di atas." : "")}</p>`;
-  $$("[data-stz]").forEach(i => i.onclick = () => window.open(i.src, "_blank"));
+  $$("[data-stz]").forEach(i => i.onclick = () => vwBuka(i.src, i.alt || "Foto"));
   const one = id => it.find(x => x.id == id);
   $$("[data-stpakai]").forEach(b => b.onclick = async () => { const i = b.dataset.stpakai, x = one(i), n = +$(`[data-stn="${i}"]`).value, pr = STP.find(p => p.id == $(`[data-stp="${i}"]`).value);
     if (!confirm(`Pakai ${n} ${x.satuan} ${x.nama} untuk proyek "${pr.nama}"? Stok berkurang dan tercatat di jurnal proyek.`)) return; b.disabled = true;
@@ -3507,7 +3508,7 @@ async function loadGambar() {
   try {
     const d = await api("/api/gambar"); gQuota(d);
     $("#gg").innerHTML = d.items.map(g => `<figure><img src="${gImg(g.id)}" alt="${esc(g.prompt)}" loading="lazy" data-zoom="${g.id}"><figcaption title="${esc(g.prompt)}">${esc(g.prompt)}</figcaption><div class="bar"><a class="bt o" href="${gImg(g.id)}${DEMO ? "" : "?unduh=1"}" download="mci-gambar-${g.id}">Unduh</a>${ADM() ? `<button class="bt o" data-gd="${g.id}" aria-label="Hapus gambar ${g.id}">Hapus</button>` : ""}</div></figure>`).join("") || '<div class="mu">Belum ada gambar. Coba buat yang pertama!</div>';
-    $$("[data-zoom]").forEach(i => i.onclick = () => window.open(i.src, "_blank"));
+    $$("[data-zoom]").forEach(i => i.onclick = () => vwBuka(i.src, i.alt || "Foto"));
     $$("[data-gd]").forEach(b => b.onclick = async () => { if (confirm("Hapus gambar ini?")) { await api("/api/gambar/" + b.dataset.gd, {method: "DELETE"}); loadGambar(); } });
   } catch (e) { $("#gg").innerHTML = '<div class="er">' + esc(e.message) + "</div>"; }
 }
@@ -5571,11 +5572,17 @@ function navGrup() {   // judul kelompok menu disembunyikan kalau semua menu di 
 }
 /* ================= PENAMPIL FOTO/FILE DI DALAM APLIKASI (ada tombol Kembali; tombol back HP juga menutup) ================= */
 const VW_POLA = /^\/api\/(iuran\/\d+\/foto|invoice\/\d+\/bukti|stok\/\d+\/gambar|produk\/\d+\/foto|perpus\/\d+\/(file|sampul)|gambar\/\d+|dokumentasi\/\d+)(\?.*)?$/;
-function vwBuka(url, judul) {
-  const u = new URL(url, location.href), gbr = !/\/perpus\/\d+\/file|\/dokumentasi\/\d+/.test(u.pathname);
-  $("#vwJudul").textContent = judul || (gbr ? "Foto" : "Dokumen");
-  $("#vwUnduh").href = u.pathname + (u.pathname.includes("/perpus/") && u.pathname.endsWith("/file") ? "?unduh=1" : "");
-  $("#vwIsi").innerHTML = gbr ? `<img src="${esc(u.pathname + u.search)}" alt="${esc(judul || "Foto")}">` : `<iframe src="${esc(u.pathname + u.search)}" title="${esc(judul || "Dokumen")}"></iframe>`;
+function vwBuka(url, judul, mode) {   // mode "frame" = paksa tampil sebagai halaman/dokumen
+  const lokal = /^(blob|data):/.test(url), u = lokal ? null : new URL(url, location.href), src = lokal ? url : u.pathname + u.search;
+  const api = !lokal && u.pathname.startsWith("/api/");
+  const frame = mode === "frame" || /^blob:/.test(url) || (!lokal && ((!api && !/\.(png|jpe?g|webp|gif|svg)$/i.test(u.pathname)) || /\/perpus\/\d+\/file|\/dokumentasi\/\d+/.test(u.pathname)));
+  const bingkai = () => `<iframe src="${esc(src)}" title="${esc(judul || "Dokumen")}"></iframe>`;
+  $("#vwJudul").textContent = judul || (frame ? "Dokumen" : "Foto");
+  const un = $("#vwUnduh"); un.hidden = !api;
+  if (api) un.href = u.pathname + (u.pathname.includes("/perpus/") && u.pathname.endsWith("/file") ? "?unduh=1" : "");
+  const isi = $("#vwIsi");
+  if (frame) isi.innerHTML = bingkai();
+  else { const im = new Image(); im.alt = judul || "Foto"; im.onerror = () => { if (im.isConnected) isi.innerHTML = bingkai(); }; im.src = src; isi.replaceChildren(im); }   // bukan gambar: tampilkan sebagai dokumen
   $("#viewer").hidden = false; document.body.classList.add("nofs");
   history.pushState({viewer: 1}, ""); $("#vwTutup").focus();
 }
@@ -5587,7 +5594,10 @@ function vwTutup(dariBack) {
 $("#vwTutup").onclick = () => vwTutup(false);
 document.addEventListener("click", e => {
   const a = e.target.closest && e.target.closest("a[href]"); if (!a || e.ctrlKey || e.metaKey || a.hasAttribute("download") || a.closest("#viewer")) return;
-  const u = new URL(a.getAttribute("href"), location.href); if (u.origin !== location.origin || !VW_POLA.test(u.pathname) || u.searchParams.get("unduh") === "1") return;
+  const u = new URL(a.getAttribute("href"), location.href); if (u.origin !== location.origin || u.searchParams.get("unduh") === "1") return;
+  // Aplikasi terpasang (PWA) tidak punya tombol back browser: semua halaman/berkas internal dibuka di penampil yang punya tombol Kembali.
+  const pwa = APP_MODE() && u.pathname !== location.pathname && !/^\/(logout|login)\b/.test(u.pathname) && !/\.(csv|zip|stl|json|xlsx)$/i.test(u.pathname);
+  if (!VW_POLA.test(u.pathname) && !pwa) return;
   e.preventDefault();
   const img = a.querySelector("img"); vwBuka(u.href, (img && img.alt) || a.textContent.trim() || "");
 });
