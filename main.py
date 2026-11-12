@@ -2479,8 +2479,13 @@ def role():
     return role_of(request.cookies.get("mci_auth", ""))
 
 
+COOKIE_HARI = 400   # batas maksimal yang diterima Chrome; diperpanjang otomatis setiap kali aplikasi dibuka (/api/me)
+
+
 def _setcookie(resp, token):
-    resp.set_cookie("mci_auth", token, max_age=30 * 86400, httponly=True, samesite="Strict", secure=bool(os.getenv("RENDER")))
+    # Lax, bukan Strict: dengan Strict, membuka web dari link WhatsApp/Instagram tidak mengirim cookie, sehingga pengguna dianggap orang baru
+    # dan loginnya tertimpa akses viewer. Permintaan yang mengubah data tetap aman karena wajib header X-MCI (lihat guard()).
+    resp.set_cookie("mci_auth", token, max_age=COOKIE_HARI * 86400, httponly=True, samesite="Lax", secure=bool(os.getenv("RENDER")))
     return resp
 
 
@@ -2511,7 +2516,8 @@ input{border:1px solid #2E4470;background:#14284B;color:#fff}input:focus{outline
 button{border:0;background:#E9E4D8;color:#0F1E3A;font-weight:600;letter-spacing:.04em;cursor:pointer}button:hover{background:#fff}
 p{margin:0;color:#F2B8B0;font-size:14px}.mt{font:italic 600 15px 'Cormorant Garamond',serif;color:#A88A55;letter-spacing:.06em;margin-top:8px}</style></head>
 <body><form method="post" action="/login"><img src="/aset/logo-mci-192.webp" alt="Logo MCI"><h1>MCI</h1><small>Mahardika Cakrawala Indonesia</small><hr>
-<label for="t">Token akses</label><input id="t" name="t" type="password" autocomplete="current-password" required>%s<button>Masuk</button><div class="mt">Trimatra Vijaya Mahe</div></form><script>if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{})</script></body></html>"""
+<input name="u" type="text" autocomplete="username" value="MCI HQ" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+<label for="t">Token akses</label><input id="t" name="t" type="password" autocomplete="current-password" required><small style="letter-spacing:0;text-transform:none;font-size:12.5px;color:#B9C2D3;justify-self:start;margin-top:-6px">Login tersimpan di hp ini. Saat hp menawarkan "Simpan kata sandi", pilih Simpan.</small>%s<button>Masuk</button><div class="mt">Trimatra Vijaya Mahe</div></form><script>if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{})</script></body></html>"""
 
 
 @app.before_request
@@ -2632,7 +2638,7 @@ def favicon():
 def logout():
     """Hapus cookie admin/divisi lalu kembali sebagai viewer (link biasa = mode lihat saja)."""
     resp = make_response(redirect("/" if VIEW_TOKEN else "/login"))
-    resp.delete_cookie("mci_auth", samesite="Strict", secure=bool(os.getenv("RENDER")), httponly=True)
+    resp.delete_cookie("mci_auth", samesite="Lax", secure=bool(os.getenv("RENDER")), httponly=True)
     return resp
 
 
@@ -2641,7 +2647,7 @@ def index():
     k = request.args.get("k")
     if k:
         return _try_login(k) or abort(404)
-    auto = not role()
+    auto = not role()   # tanpa login yang sah -> viewer. Login sah selalu terkirim berkat SameSite=Lax, jadi tidak tertimpa lagi.
     if auto and not VIEW_TOKEN:
         return redirect("/login")
     pg = page_bytes()
@@ -2665,6 +2671,12 @@ def api_me():
     need("viewer")
     r = role()
     m = member_of(r)
+    resp = _api_me_isi(r, m)
+    tok = request.cookies.get("mci_auth", "")
+    return _setcookie(resp, tok) if tok and r != "viewer" else resp   # login anggota/Dev diperpanjang 400 hari setiap aplikasi dibuka
+
+
+def _api_me_isi(r, m):
     return jsonify({"role": "admin" if is_admin(r) else ("anggota" if m else r), "nama_peran": nama_peran(r), "izin": sorted(perms_of(r)), "kuota": kuota_info(r),
                     "anggota": {"id": m["id"], "nama": m["nama"], "divisi": [DIVISI[x] for x in m["divisi"]], "jabatan": [JABATAN[x] for x in m["jabatan"]],
                                 "divisi_key": m["divisi"], "iuran": tingkat_of(m["id"]), "sp": sp_status().get(m["id"], 0)} if m else None, "daftar_divisi": DIVISI,

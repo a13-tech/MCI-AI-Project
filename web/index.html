@@ -512,7 +512,9 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
  <div class="who"><span id="whoRole">Memuat…</span><a class="lo" id="logout" href="/logout">Keluar</a></div>
 </aside>
 <div class="adm" id="adm" hidden><form id="admF"><b>MASUK</b><p>Masukkan token pribadi kamu (diawali nama depan) atau token admin.</p>
- <input type="password" id="admT" autocomplete="current-password" aria-label="Token akses" placeholder="Token akses">
+ <input type="text" name="username" id="admU" autocomplete="username" value="MCI HQ" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+ <input type="password" name="password" id="admT" autocomplete="current-password" aria-label="Token akses" placeholder="Token akses">
+ <p style="font-size:12.5px;margin:6px 0 0;opacity:.85">Login tersimpan di hp ini. Kalau hp menawarkan "Simpan kata sandi", pilih Simpan.</p>
  <div class="er" id="admE" role="alert"></div><div class="bar"><button type="button" class="bt o" id="admX">Batal</button><button class="bt g">Masuk</button></div></form></div>
 <div id="viewer" hidden role="dialog" aria-modal="true" aria-label="Penampil"><div class="vh"><button type="button" id="vwTutup">← Kembali</button><b id="vwJudul"></b><a id="vwUnduh" href="#" download>Unduh</a></div><div class="vb2" id="vwIsi"></div></div>
 <div class="tst" id="tst" hidden></div>
@@ -1669,7 +1671,9 @@ $("#lpBuat").onclick = async () => {
     if (DEMO) { $("#admE").textContent = "(DEMO) Di server asli, token yang benar langsung membuka mode admin/divisi."; return; }
     try { const r = await fetch("/api/masuk", {method: "POST", headers: {"X-MCI": "1", "Content-Type": "application/json"}, body: JSON.stringify({token: t})});
       const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || "Gagal masuk");
-      $("#admE").textContent = ""; toast("Masuk sebagai " + (d.nama || d.role)); setTimeout(() => location.replace("/"), 400);
+      $("#admE").textContent = ""; toast("Masuk sebagai " + (d.nama || d.role));
+      try { if (window.PasswordCredential) await navigator.credentials.store(new PasswordCredential({id: "MCI HQ", password: t, name: d.nama || "MCI HQ"})); } catch (_) {}   // Android/Chrome: tawarkan simpan token
+      setTimeout(() => location.replace("/"), 400);
     } catch (er) { $("#admE").textContent = er.message; }
   };
 })();
