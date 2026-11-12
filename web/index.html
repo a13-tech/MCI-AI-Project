@@ -289,6 +289,7 @@ td{border-top:1px solid var(--line)}
 .boss,.hero{background:var(--navy2);border:1px solid #2A3E66;border-radius:12px}
 .boss small{color:var(--gold2);letter-spacing:.18em;font-weight:600}
 .seg{border-radius:8px}.seg button{border-radius:6px}.seg button.on{background:#E9E4D8;color:var(--navy2)}
+.seg[style*="EFECE4"] button:not(.on){color:#4A4235}.seg[style*="EFECE4"] button.on{background:var(--navy2);color:#F1D58A}   /* segmen di latar terang (Studio, Lab, Surat) */
 .hero h2{color:#F2EBDD;font-family:var(--serif)}
 .uu-bab{font:700 19px/1.3 var(--serif);letter-spacing:.04em;color:var(--navy2);border-bottom:1px solid var(--line2)}
 .uu-ps h3{font:700 20px/1.3 var(--serif);color:var(--navy2)}
@@ -469,6 +470,7 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
  <button class="nv" data-p="mitra">Database Mitra</button>
  <button class="nv" data-p="anggota">Anggota</button>
  <button class="nv" data-p="struktur">Struktur &amp; Divisi</button>
+ <button class="nv" data-p="surat">Surat Penerimaan</button>
  <button class="nv" data-p="polling">Voting</button>
  <button class="nv" data-p="skor">Skor &amp; Lencana</button>
  <button class="nv" data-p="catatan">Catatan</button>
@@ -865,6 +867,24 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
  <section id="p-konten" class="pg" hidden><div id="rk-konten"></div></section>
  <section id="p-sidang" class="pg" hidden><div id="rk-sidang"></div></section>
  <section id="p-putusan" class="pg" hidden><div id="rk-putusan"></div></section>
+ <section id="p-surat" class="pg" hidden>
+  <div class="ey">Khusus Dev</div><h1>Surat Penerimaan</h1>
+  <p class="mu" style="max-width:760px">Buat surat penerimaan anggota, lalu salin linknya atau kirim langsung lewat WhatsApp. Orangnya bisa membuka link tanpa login dan menyimpannya sebagai PDF. Nomor surat dibuat otomatis per tahun. Surat yang dicabut tetap bisa dibuka, tetapi bertanda tidak berlaku.</p>
+  <details class="cd" id="srBaru" open><summary style="cursor:pointer;font-weight:700">Buat surat baru</summary>
+   <div class="fl" style="margin-top:12px">
+    <div class="full"><b style="font-size:14px">Format</b><div class="seg" id="srFmt" style="margin:8px 0 0;background:#EFECE4"><button type="button" class="on" data-f="a">Surat resmi</button><button type="button" data-f="b">Piagam</button><button type="button" data-f="c">Kartu sambutan</button></div></div>
+    <label>Nama lengkap<input type="text" id="srNama" maxlength="80" placeholder="Contoh: Raka Pratama"></label>
+    <label>Nomor WhatsApp (boleh kosong)<input type="tel" id="srWa" maxlength="20" placeholder="0812xxxxxxx" inputmode="tel"></label>
+    <label>Jabatan<input type="text" id="srJab" maxlength="60" value="Anggota" list="srJabL"><datalist id="srJabL"><option>Anggota</option><option>Manager</option><option>Sekretaris</option><option>Bendahara</option><option>Designer</option><option>Dokumentasi</option></datalist></label>
+    <label>Divisi (boleh kosong)<input type="text" id="srDiv" maxlength="60" list="srDivL"><datalist id="srDivL"></datalist></label>
+    <label>Mulai berlaku<input type="date" id="srMulai"></label>
+    <label>Tanggal surat<input type="date" id="srTgl"></label>
+    <label>Ditandatangani oleh<input type="text" id="srTtd" maxlength="60" placeholder="Nama penanda tangan"></label>
+    <label>Jabatan penanda tangan<input type="text" id="srTtdJ" maxlength="60" value="Dev MCI"></label>
+    <label class="full">Pesan tambahan (boleh kosong)<textarea id="srPesan" rows="2" maxlength="600" placeholder="Contoh: Kamu akan dibimbing langsung oleh tim Creative."></textarea></label>
+    <div class="bar full" style="margin:0"><button class="bt g" id="srKirim" type="button">Buat surat</button><span class="mu" id="srMsg"></span></div></div></details>
+  <div id="srBox"><p class="mu">Memuat…</p></div>
+ </section>
  <section id="p-struktur" class="pg" hidden>
   <div class="ey">Organisasi</div><h1>Struktur &amp; Divisi</h1>
   <p class="mu" style="margin:6px 0 6px;max-width:760px">Bagan organisasi MCI. Setiap jabatan punya batas wewenang tertulis (Pasal 5); perintah di luar wewenang boleh dipertanyakan.</p>
@@ -1468,6 +1488,7 @@ function show(p) {
   if (p === "beranda") brMuat();
   if (p === "arsip") arMuat();
   if (p === "jasa") jsMuat();
+  if (p === "surat") srMuat();
   if (p === "studio") s3Muat();
   navBuka(p);
   if (p === "riwayat") rwMuat();
@@ -5650,6 +5671,46 @@ function navBuka(p) { $$("#sd button.ng").forEach(g => g.classList.toggle("bk", 
 $$("#sd button.ng").forEach(g => g.onclick = () => { g.classList.toggle("bk"); navAtur(); });
 $("#nvMenu").onclick = () => { const bk = $("#sd").classList.toggle("bk"); $("#nvMenu").textContent = bk ? "✕ Tutup" : "☰ Menu"; $("#nvMenu").setAttribute("aria-expanded", bk); if (bk) $("#sd").scrollTop = 0; };
 new MutationObserver(() => { if (!$("#sd").classList.contains("bk")) $("#nvMenu").textContent = "☰ Menu"; }).observe($("#sd"), {attributes: true, attributeFilter: ["class"]});
+/* ================= SURAT PENERIMAAN (khusus Dev) ================= */
+let SR = null, SR_F = "a";
+const srLink = x => location.origin + "/surat/" + x.token;
+const srTeksWa = x => `Halo ${x.nama.split(" ")[0]}, selamat! Kamu resmi diterima sebagai ${x.jabatan}${x.divisi ? " divisi " + x.divisi : ""} di Mahardika Cakrawala Indonesia (MCI).\n\nIni surat penerimaanmu (nomor ${x.nomor}):\n${srLink(x)}\n\nSimpan baik-baik ya. Trimatra Vijaya Mahe!`;
+async function srMuat(url, opt) {
+  try { SR = await api(url || "/api/surat", opt); srRender(); return true; }
+  catch (e) { if (!SR) $("#srBox").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; else alert(e.message); return false; }
+}
+async function srSalin(teks) {
+  try { await navigator.clipboard.writeText(teks); return true; }
+  catch (e) { const t = document.createElement("textarea"); t.value = teks; t.setAttribute("readonly", ""); t.style.cssText = "position:fixed;top:0;opacity:0"; document.body.appendChild(t); t.select(); let ok = false; try { ok = document.execCommand("copy"); } catch (_) {} t.remove(); return ok; }
+}
+function srRender() {
+  const d = SR;
+  if (!$("#srTgl").value) $("#srTgl").value = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
+  if (!$("#srTtd").value && d.ttd.nama) $("#srTtd").value = d.ttd.nama;
+  if (d.ttd.jabatan && $("#srTtdJ").value === "Dev MCI") $("#srTtdJ").value = d.ttd.jabatan;
+  $("#srDivL").innerHTML = d.divisi.map(x => `<option>${esc(x)}</option>`).join("");
+  if (!d.surat.length) { $("#srBox").innerHTML = '<p class="mu">Belum ada surat. Buat yang pertama lewat form di atas.</p>'; return; }
+  $("#srBox").innerHTML = `<h2>Surat · ${d.surat.length}</h2><div class="lst">${d.surat.map(x => `<article class="it2" data-sr="${x.id}"><div class="ey">${esc(x.nomor)}</div><h3>${esc(x.nama)}</h3>
+    <div class="meta"><span class="ch ${x.status === "aktif" ? "g" : "r"}">${x.status === "aktif" ? "Berlaku" : "Dicabut"}</span><span>${esc(x.jabatan)}${x.divisi ? " · " + esc(x.divisi) : ""}</span><span>${esc(tglID(x.tanggal, true))}</span><span>Dibuka ${x.dilihat}×</span></div>
+    <div class="meta" style="margin-top:8px"><span>Format:</span><select data-srf="${x.id}" aria-label="Format surat">${Object.entries(d.format).map(([k, v]) => `<option value="${k}" ${k === x.format ? "selected" : ""}>${esc(v)}</option>`).join("")}</select><span>Kode ${esc(x.kode)}</span></div>
+    <div class="ac"><button class="bt g" data-srs="${x.id}">Salin link</button><button class="bt g" data-srw="${x.id}">Kirim via WA</button><a class="bt o" href="/surat/${esc(x.token)}" target="_blank" rel="noopener">Lihat surat</a>
+      <button class="bt o" data-srt="${x.id}">Salin pesan WA</button><button class="bt o" data-src="${x.id}:${x.status === "aktif" ? "cabut" : "aktif"}">${x.status === "aktif" ? "Cabut" : "Berlakukan lagi"}</button><button class="bt o" data-srh="${x.id}">Hapus</button></div></article>`).join("")}</div>`;
+}
+$("#srFmt").onclick = e => { const b = e.target.closest("[data-f]"); if (!b) return; SR_F = b.dataset.f; $$("#srFmt button").forEach(x => x.classList.toggle("on", x === b)); };
+$("#srKirim").onclick = async () => { const b = $("#srKirim"); b.disabled = true; $("#srMsg").textContent = "";
+  const ok = await srMuat("/api/surat", {json: {format: SR_F, nama: $("#srNama").value, wa: $("#srWa").value, jabatan: $("#srJab").value, divisi: $("#srDiv").value, mulai: $("#srMulai").value,
+    tanggal: $("#srTgl").value, ttd_nama: $("#srTtd").value, ttd_jabatan: $("#srTtdJ").value, pesan: $("#srPesan").value}});
+  b.disabled = false;
+  if (ok) { const x = SR.surat[0]; ["#srNama", "#srWa", "#srDiv", "#srMulai", "#srPesan"].forEach(q => $(q).value = ""); $("#srJab").value = "Anggota";
+    $("#srMsg").textContent = (await srSalin(srLink(x))) ? "Surat dibuat. Link sudah disalin." : "Surat dibuat."; pesan("Surat " + x.nomor + " dibuat"); } };
+$("#srBox").addEventListener("change", async e => { const s = e.target.closest("[data-srf]"); if (s) await srMuat("/api/surat/" + s.dataset.srf, {json: {aksi: "format", format: s.value}}); });
+$("#srBox").addEventListener("click", async e => { const b = e.target.closest("button"); if (!b) return; const ds = b.dataset, cari = i => SR.surat.find(x => x.id === +i);
+  if (ds.srs) { const ok = await srSalin(srLink(cari(ds.srs))); pesan(ok ? "Link disalin" : "Gagal menyalin, tekan lama link di Lihat surat"); return; }
+  if (ds.srt) { const ok = await srSalin(srTeksWa(cari(ds.srt))); pesan(ok ? "Pesan WA disalin, tinggal tempel" : "Gagal menyalin"); return; }
+  if (ds.srw) { const x = cari(ds.srw); window.open(`https://wa.me/${x.wa}?text=${encodeURIComponent(srTeksWa(x))}`, "_blank", "noopener"); return; }
+  if (ds.src) { const [i, aksi] = ds.src.split(":"); if (aksi === "cabut" && !confirm("Cabut surat ini? Link tetap bisa dibuka, tetapi bertanda tidak berlaku.")) return; return srMuat("/api/surat/" + i, {json: {aksi}}); }
+  if (ds.srh && confirm("Hapus surat ini? Link-nya tidak bisa dibuka lagi.")) return srMuat("/api/surat/" + ds.srh, {method: "DELETE"});
+});
 /* ================= JASA INTERNAL (khusus anggota; jasa & pesanan disetujui Dev) ================= */
 let JS = null, JS_PESAN = 0;
 const JS_ST = {menunggu: ["y", "Menunggu Dev"], aktif: ["g", "Aktif"], ditolak: ["r", "Ditolak"], nonaktif: ["n", "Nonaktif"], disetujui: ["g", "Disetujui"], selesai: ["n", "Selesai"]};
@@ -5912,6 +5973,7 @@ function bukaHash() { if (rapatDariHash()) return; const p = (location.hash || "
     : `<span class="wl">Masuk sebagai</span><span class="wh">⚡ Hemat token</span> <b>${esc(NP)}</b>`;
   if (ME.role === "viewer") ["beranda", "arsip", "studio", "absen", "pengumuman", "agenda", "tugas", "proyek", "mitra", "alat", "skor", "riwayat", "struktur", "uu", "sidang", "putusan", "rekapkas", "konten"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // halaman organisasi & UU khusus anggota
   if (ME.role === "viewer") $('.nv[data-p="jasa"]').style.display = "none";   // jasa internal khusus anggota
+  if (!ADM()) $('.nv[data-p="surat"]').style.display = "none";   // surat penerimaan khusus Dev
   if (ME.role === "viewer") ["blacklist", "sp"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // viewer tidak boleh melihat blacklist
   if (ME.role !== "admin") $('.nv[data-p="backup"]').style.display = "none";   // backup seluruh data khusus Pemilik/Dev
   if (ME.role === "viewer") $("#logout").style.display = "none";   // viewer tidak perlu tombol keluar

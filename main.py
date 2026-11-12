@@ -14,7 +14,7 @@ import studio3d
 import os, io, csv, json, re, time, gzip, random, base64, asyncio, secrets, logging, sqlite3, threading, contextlib, hashlib, zipfile
 from collections import deque, OrderedDict
 from datetime import datetime, date, timedelta, timezone
-from html import unescape as _unesc
+from html import unescape as _unesc, escape as _esc_html
 from email.utils import parsedate_to_datetime
 import xml.etree.ElementTree as ET
 
@@ -296,6 +296,9 @@ def db_init():
                f"oleh_id INTEGER, oleh TEXT, dibuat TEXT, diputus_oleh TEXT, diputus TEXT, catatan TEXT, publik INTEGER NOT NULL DEFAULT 0)")
         sql(c, f"CREATE TABLE IF NOT EXISTS jasa_pesan (id {pk}, jasa_id INTEGER NOT NULL, kebutuhan TEXT NOT NULL, tenggat TEXT, status TEXT NOT NULL DEFAULT 'menunggu', "
                f"oleh_id INTEGER, oleh TEXT, dibuat TEXT, diputus_oleh TEXT, diputus TEXT, catatan TEXT, harga BIGINT NOT NULL DEFAULT 0, invoice_id INTEGER)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS surat (id {pk}, token TEXT UNIQUE NOT NULL, nomor TEXT NOT NULL, urut INTEGER NOT NULL, tahun INTEGER NOT NULL, format TEXT NOT NULL DEFAULT 'a', "
+               f"nama TEXT NOT NULL, jabatan TEXT, divisi TEXT, mulai TEXT, tanggal TEXT NOT NULL, pesan TEXT, wa TEXT, ttd_nama TEXT, ttd_jabatan TEXT, kode TEXT NOT NULL, "
+               f"status TEXT NOT NULL DEFAULT 'aktif', oleh TEXT, dibuat TEXT, dilihat INTEGER NOT NULL DEFAULT 0)")
         sql(c, f"CREATE TABLE IF NOT EXISTS gambar_kode (id {pk}, prompt TEXT NOT NULL, svg TEXT NOT NULL, mesin TEXT, oleh TEXT, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS pusat_info (id {pk}, ip TEXT NOT NULL, tanya TEXT NOT NULL, jawab TEXT, token {big} NOT NULL DEFAULT 0, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS stok (id {pk}, nama TEXT NOT NULL, jumlah {big} NOT NULL DEFAULT 0, satuan TEXT, kategori TEXT, minimum {big} NOT NULL DEFAULT 0, catatan TEXT, mime TEXT, gambar TEXT, diubah TEXT)")
@@ -5606,6 +5609,196 @@ def api_jasa_pesan_one(i):
     if baru == "disetujui" and pengerja and pengerja != me:
         inbox_kirim([pengerja], "jasa", f"Pesanan jasa untuk kamu kerjakan: {nama_j}", "Lihat detailnya di halaman Jasa Internal.")
     return jsonify(jasa_payload(r))
+
+
+# ---------- SURAT PENERIMAAN (khusus Dev; dibuka orangnya lewat link tanpa login) ----------
+SURAT_FORMAT = {"a": "Surat resmi", "b": "Piagam", "c": "Kartu sambutan"}
+_ROMAWI = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"]
+
+
+def _surat_need():
+    r = role()
+    if not r:
+        abort(401)
+    if not is_admin(r):
+        abort(403)
+    return r
+
+
+def _surat_baris(x):
+    i, tk, no, fm, nm, jb, dv, mu, tg, ps, wa, tn, tj, kd, st, ol, dbt, dl = x
+    return {"id": int(i), "token": tk, "nomor": no, "format": fm, "format_label": SURAT_FORMAT.get(fm, fm), "nama": nm, "jabatan": jb or "", "divisi": dv or "",
+            "mulai": mu or "", "tanggal": tg, "pesan": ps or "", "wa": wa or "", "ttd_nama": tn or "", "ttd_jabatan": tj or "", "kode": kd, "status": st, "oleh": ol or "",
+            "dibuat": dbt or "", "dilihat": int(dl or 0)}
+
+
+_SURAT_KOL = "id,token,nomor,format,nama,jabatan,divisi,mulai,tanggal,pesan,wa,ttd_nama,ttd_jabatan,kode,status,oleh,dibuat,dilihat"
+
+
+def surat_payload():
+    with db() as c:
+        rows = sql(c, f"SELECT {_SURAT_KOL} FROM surat ORDER BY id DESC LIMIT 200").fetchall()
+    out = [_surat_baris(x) for x in rows]
+    ttd = next(({"nama": x["ttd_nama"], "jabatan": x["ttd_jabatan"]} for x in out if x["ttd_nama"]), {"nama": "", "jabatan": "Dev MCI"})   # isian terakhir jadi bawaan
+    divisi = sorted({str(m.get("divisi") or "").strip() for m in MEMBERS.values() if str(m.get("divisi") or "").strip()})
+    return {"surat": out, "format": SURAT_FORMAT, "ttd": ttd, "divisi": divisi}
+
+
+def _wa_bersih(v):
+    d = re.sub(r"\D", "", str(v or ""))
+    if d.startswith("0"):
+        d = "62" + d[1:]
+    elif d.startswith("8"):
+        d = "62" + d
+    return d if 9 <= len(d) <= 15 else ""
+
+
+@app.route("/api/surat", methods=["GET", "POST"])
+def api_surat():
+    r = _surat_need()
+    if request.method == "GET":
+        return jsonify(surat_payload())
+    d = request.get_json(silent=True) or {}
+    bersih = lambda k, n: re.sub(r"\s+", " ", str(d.get(k) or "")).strip()[:n]
+    nama, jab, div = bersih("nama", 80), bersih("jabatan", 60) or "Anggota", bersih("divisi", 60)
+    tn, tj, fm = bersih("ttd_nama", 60), bersih("ttd_jabatan", 60) or "Dev MCI", str(d.get("format") or "a")
+    pesan = str(d.get("pesan") or "").strip()[:600]
+    mulai, tgl = str(d.get("mulai") or "").strip()[:10], str(d.get("tanggal") or today()).strip()[:10]
+    wa_raw = str(d.get("wa") or "").strip()
+    wa = _wa_bersih(wa_raw)
+    if fm not in SURAT_FORMAT:
+        return jsonify({"error": "Pilih format surat"}), 400
+    if len(nama) < 2:
+        return jsonify({"error": "Tulis nama orang yang diterima"}), 400
+    if not tn:
+        return jsonify({"error": "Tulis nama yang menandatangani surat"}), 400
+    if wa_raw and not wa:
+        return jsonify({"error": "Nomor WhatsApp tidak valid. Contoh: 0812xxxxxxx"}), 400
+    try:
+        th = date.fromisoformat(tgl)
+        if mulai:
+            date.fromisoformat(mulai)
+    except ValueError:
+        return jsonify({"error": "Tanggal tidak valid"}), 400
+    tok = secrets.token_urlsafe(18)
+    kode = "MCI-" + "-".join(secrets.token_hex(2).upper() for _ in range(2))
+    with db() as c:
+        urut = int(sql(c, "SELECT COALESCE(MAX(urut),0) FROM surat WHERE tahun=?", (th.year,)).fetchone()[0]) + 1   # nomor urut per tahun
+        nomor = f"{urut:03d}/MCI/SP/{_ROMAWI[th.month - 1]}/{th.year}"
+        sql(c, "INSERT INTO surat (token,nomor,urut,tahun,format,nama,jabatan,divisi,mulai,tanggal,pesan,wa,ttd_nama,ttd_jabatan,kode,status,oleh,dibuat) "
+               "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (tok, nomor, urut, th.year, fm, nama, jab, div, mulai, tgl, pesan, wa, tn, tj, kode, "aktif", nama_peran(r), _now()))
+    return jsonify(surat_payload())
+
+
+@app.route("/api/surat/<int:i>", methods=["POST", "DELETE"])
+def api_surat_one(i):
+    _surat_need()
+    with db() as c:
+        if not sql(c, "SELECT 1 FROM surat WHERE id=?", (i,)).fetchone():
+            return jsonify({"error": "Surat tidak ditemukan"}), 404
+        if request.method == "DELETE":
+            sql(c, "DELETE FROM surat WHERE id=?", (i,))
+        else:
+            d = request.get_json(silent=True) or {}
+            aksi = str(d.get("aksi") or "")
+            if aksi == "format" and str(d.get("format")) in SURAT_FORMAT:
+                sql(c, "UPDATE surat SET format=? WHERE id=?", (str(d["format"]), i))
+            elif aksi in ("cabut", "aktif"):
+                sql(c, "UPDATE surat SET status=? WHERE id=?", ("dicabut" if aksi == "cabut" else "aktif", i))
+            else:
+                return jsonify({"error": "Aksi tidak dikenal"}), 400
+    return jsonify(surat_payload())
+
+
+def _surat_html(v, url):
+    e = lambda t: _esc_html(str(t or ""))
+    tgl, mulai = tglid(v["tanggal"]), (tglid(v["mulai"]) if v["mulai"] else "")
+    jd = e(v["jabatan"]) + (f" · Divisi {e(v['divisi'])}" if v["divisi"] else "")
+    pesan = f'<p class="ps">{e(v["pesan"])}</p>' if v["pesan"] else ""
+    dicabut = v["status"] == "dicabut"
+    pita = '<div class="cabut" role="alert">Surat ini sudah DICABUT oleh MCI dan tidak berlaku lagi.</div>' if dicabut else ""
+    depan = e(v["nama"].split(" ")[0])
+    if v["format"] == "b":
+        isi = f"""<div class="piagam"><div class="dlm"><img class="lg" src="/aset/logo-mci-512.webp" alt="Lambang MCI"><div class="ey">MAHARDIKA CAKRAWALA INDONESIA</div>
+<h1>Surat Penerimaan</h1><div class="gar"></div><div class="dib">Dengan bangga kami menyatakan</div><div class="nama">{e(v['nama'])}</div><div class="dib">resmi diterima sebagai</div>
+<div class="jab">{jd}</div><p class="tx">{f'Mulai {mulai}. ' if mulai else ''}Selamat bergabung di keluarga MCI. Jaga nama baik, patuhi UU MCI, dan berkarya bersama.</p>{pesan}
+<div class="bawah"><div><small>No. {e(v['nomor'])}<br>{tgl}</small><b>{e(v['ttd_nama'])}</b><small>{e(v['ttd_jabatan'])}</small></div><div class="qr" id="qr" aria-label="Kode QR keaslian"></div></div>
+<div class="motto">Trimatra Vijaya Mahe</div></div></div>"""
+    elif v["format"] == "c":
+        baris = "".join(f'<div class="row"><span>{k}</span><b>{x}</b></div>' for k, x in (("Jabatan", e(v["jabatan"])), ("Divisi", e(v["divisi"])), ("Mulai", mulai), ("Nomor surat", e(v["nomor"]))) if x)
+        isi = f"""<div class="kartu"><div class="atas"><div class="lgr"><img src="/aset/logo-mci-192.webp" alt="">MCI · MAHARDIKA CAKRAWALA INDONESIA</div><div class="ok" aria-hidden="true">✓</div>
+<h1>Selamat, {depan}!<br>Kamu diterima.</h1><p>Kamu resmi menjadi anggota MCI.</p></div><div class="isi">{baris}{pesan}
+<div class="lk">Langkah pertama:<ol><li>Masuk ke MCI HQ dengan token yang dikirim Dev</li><li>Baca UU MCI, terutama aturan absen harian</li><li>Absen pertama di hari mulai</li></ol></div>
+<a class="btn" href="/">Buka MCI HQ</a><button class="btn2" type="button" onclick="print()">Simpan sebagai PDF</button></div>
+<div class="kaki">Ditetapkan oleh {e(v['ttd_nama'])}, {e(v['ttd_jabatan'])}, {tgl} · Kode verifikasi {e(v['kode'])}</div></div>"""
+    else:
+        isi = f"""<div class="kertas"><div class="kop"><img src="/aset/logo-mci-192.webp" alt="Lambang MCI"><div><b>MAHARDIKA CAKRAWALA INDONESIA</b><small>3 Serangkai Production · Trimatra Vijaya Mahe</small></div></div>
+<table><tr><td>Nomor</td><td>: {e(v['nomor'])}</td></tr><tr><td>Perihal</td><td>: <b>Penerimaan Anggota</b></td></tr><tr><td>Tanggal</td><td>: {tgl}</td></tr></table>
+<div class="isi"><p>Kepada Yth.<br><b>{e(v['nama'])}</b><br>di tempat</p><p>Dengan hormat,</p>
+<p>Berdasarkan hasil seleksi dan persetujuan pengurus, dengan ini kami menyatakan bahwa saudara <b>DITERIMA</b> sebagai anggota Mahardika Cakrawala Indonesia dengan rincian:</p>
+<div class="data"><div><span>Jabatan</span>{e(v['jabatan'])}</div>{f"<div><span>Divisi</span>{e(v['divisi'])}</div>" if v['divisi'] else ''}{f'<div><span>Mulai berlaku</span>{mulai}</div>' if mulai else ''}</div>
+{pesan}<p>Saudara wajib mematuhi Undang-Undang MCI, termasuk absen harian dan Peraturan Kas. Selamat bergabung.</p></div>
+<div class="ttd">Hormat kami,<div class="nm">{e(v['ttd_nama'])}</div><small>{e(v['ttd_jabatan'])}</small></div>
+<div class="ver">Keaslian surat: buka link ini dari situs resmi MCI HQ.<br>Kode verifikasi: {e(v['kode'])}</div></div>"""
+    alat = "" if v["format"] == "c" else '<div class="alat"><button type="button" onclick="print()">Simpan sebagai PDF</button></div>'
+    qr = ""
+    if v["format"] == "b" and not dicabut:
+        qr = f"""<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>try{{const q=qrcode(0,"M");q.addData({json.dumps(url)});q.make();document.getElementById("qr").innerHTML=q.createSvgTag({{cellSize:2,margin:1}});}}catch(e){{}}</script>"""
+    return f"""<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>Surat Penerimaan · {e(v['nama'])}</title><meta property="og:title" content="Surat Penerimaan Anggota MCI"><meta property="og:description" content="Untuk {e(v['nama'])} · {e(v['nomor'])}">
+<meta property="og:image" content="/aset/logo-mci-512.webp"><link rel="icon" href="/aset/logo-mci-64.png"><style>{SURAT_CSS}</style></head>
+<body class="f{v['format']}{' dicabut' if dicabut else ''}"><main>{pita}{isi}{alat}</main>{qr}</body></html>"""
+
+
+SURAT_CSS = """*{box-sizing:border-box;margin:0}body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#E9E4D8;color:#1B2433;padding:18px 14px 40px}
+main{max-width:620px;margin:0 auto}.cabut{background:#B4532A;color:#fff;font-weight:700;padding:12px 14px;border-radius:10px;margin-bottom:12px;text-align:center}
+body.dicabut .kertas,body.dicabut .piagam,body.dicabut .kartu{opacity:.55;filter:grayscale(.6)}
+.alat{text-align:center;margin-top:16px}.alat button{font:700 15px system-ui;padding:12px 20px;border-radius:10px;border:1.5px solid #0B1F4D;background:#fff;color:#0B1F4D;cursor:pointer}
+.ps{margin:12px 0;font-style:italic}
+.kertas{background:#fff;border-radius:6px;padding:28px 24px 28px;box-shadow:0 2px 14px rgba(0,0,0,.08);font-family:Georgia,"Times New Roman",serif;font-size:15.5px;line-height:1.6}
+.kop{display:flex;gap:12px;align-items:center;border-bottom:3px double #0B1F4D;padding-bottom:12px}.kop img{width:60px;height:60px;border-radius:50%}
+.kop b{display:block;font:800 17px/1.2 system-ui;color:#0B1F4D}.kop small{font:12.5px/1.4 system-ui;color:#5B6472}
+table{margin:16px 0 12px;border-collapse:collapse}td{padding:1px 0;vertical-align:top}td:first-child{width:80px}
+.isi p{margin:0 0 10px}.data{margin:10px 0 12px;padding-left:14px;border-left:3px solid #D4AF5A}.data div{display:flex;gap:6px}.data span{min-width:110px;color:#5B6472}
+.ttd{margin-top:20px;text-align:right}.ttd .nm{margin-top:44px;font-weight:700;text-decoration:underline}.ttd small{display:block;color:#5B6472}
+.ver{margin-top:22px;padding-top:10px;border-top:1px solid #E3DFD3;font:12.5px/1.45 system-ui;color:#6B6253}
+.piagam{background:#0B1F4D;border-radius:8px;padding:12px;box-shadow:0 4px 18px rgba(11,31,77,.3)}
+.dlm{border:1.5px solid #D4AF5A;outline:1px solid rgba(212,175,90,.45);outline-offset:-7px;border-radius:4px;padding:30px 20px 26px;text-align:center;color:#F2EBDD;background:radial-gradient(circle at 50% 0,#173068,#0B1F4D 70%)}
+.dlm .lg{width:88px;height:88px;border-radius:50%;border:2px solid #D4AF5A}.ey{font:700 11.5px/1.4 system-ui;letter-spacing:.24em;color:#D4AF5A;margin:16px 0 8px}
+.f-b h1,.dlm h1{font:400 30px/1.15 Georgia,serif;color:#F1D58A}.gar{width:70px;height:2px;background:#D4AF5A;margin:14px auto}
+.dib{font:14.5px/1.5 system-ui;color:#C9D7F5}.nama{font:700 27px/1.2 Georgia,serif;color:#fff;margin:6px 0 4px;overflow-wrap:anywhere}
+.jab{display:inline-block;margin-top:8px;padding:6px 14px;border:1px solid rgba(212,175,90,.6);border-radius:999px;font:600 14px system-ui;color:#F1D58A}
+.tx{font:15px/1.6 system-ui;color:#DCE4F4;margin:16px 4px 0}.dlm .ps{color:#DCE4F4}.bawah{display:flex;justify-content:space-between;align-items:flex-end;margin-top:26px;text-align:left;gap:10px}
+.bawah small{display:block;font:12px/1.4 system-ui;color:#AFC2EA}.bawah b{font:700 14.5px system-ui;color:#fff}.qr{width:70px;height:70px;background:#fff;border-radius:4px;display:grid;place-items:center;padding:3px}.qr svg{width:100%;height:100%}
+.motto{margin-top:18px;font:italic 13.5px Georgia,serif;color:#D4AF5A}
+.kartu{background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,.1)}
+.atas{background:linear-gradient(135deg,#0B1F4D,#1B3A7A);color:#fff;padding:22px 20px 24px}.lgr{display:flex;align-items:center;gap:10px;font:700 13px system-ui;color:#F1D58A;letter-spacing:.08em}.lgr img{width:38px;height:38px;border-radius:50%}
+.ok{margin-top:22px;width:46px;height:46px;border-radius:50%;background:#D4AF5A;color:#0B1F4D;display:grid;place-items:center;font:800 24px system-ui}
+.atas h1{font:800 26px/1.2 system-ui;margin-top:12px}.atas p{margin-top:6px;color:#C9D7F5;font:15px/1.5 system-ui}
+.kartu .isi{padding:18px 20px 22px;font:15.5px/1.55 system-ui}.row{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #EEEAE0}.row span{color:#6B6253}.row b{text-align:right}
+.lk{margin-top:18px;font-weight:700}.lk ol{margin:8px 0 0 20px;font-weight:400;color:#33404F}.lk li{margin:3px 0}
+.btn,.btn2{display:block;width:100%;margin-top:12px;text-align:center;padding:14px;border-radius:12px;font:700 15.5px system-ui;text-decoration:none;cursor:pointer}
+.btn{background:#0B1F4D;color:#F1D58A;margin-top:18px}.btn2{border:1.5px solid #0B1F4D;color:#0B1F4D;background:#fff}
+.kaki{padding:12px 20px 16px;background:#F7F4EC;font:12.5px/1.45 system-ui;color:#6B6253}
+@media print{body{background:#fff;padding:0}.alat,.btn,.btn2{display:none!important}.kertas,.kartu,.piagam{box-shadow:none}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}"""
+
+
+@app.route("/surat/<token>")
+def halaman_surat(token):
+    if not re.fullmatch(r"[A-Za-z0-9_-]{16,40}", token or ""):
+        abort(404)
+    with db() as c:
+        x = sql(c, f"SELECT {_SURAT_KOL} FROM surat WHERE token=?", (token,)).fetchone()
+        if not x:
+            abort(404)
+        sql(c, "UPDATE surat SET dilihat=dilihat+1 WHERE token=?", (token,))
+    v = _surat_baris(x)
+    url = request.host_url.rstrip("/").replace("http://", "https://", 1) + "/surat/" + token
+    return Response(_surat_html(v, url), mimetype="text/html", headers={
+        "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex, nofollow, noarchive",
+        "Content-Security-Policy": "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline' https://cdnjs.cloudflare.com; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"})
 
 
 # ---------- PROYEKSI KAS 8 MINGGU ----------
