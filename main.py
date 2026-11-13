@@ -651,6 +651,14 @@ def gkey(key):
     return os.getenv(f"GEMINI_{key.upper()}") or os.getenv("GEMINI_API_KEY")
 
 
+def client_kunci(g):
+    if not g:
+        return None
+    if g not in _cl:
+        _cl[g] = genai.Client(api_key=g)
+    return _cl[g]
+
+
 def client(key):
     g = gkey(key)
     if not g:
@@ -716,8 +724,8 @@ async def mcp_tools():
 
 
 async def ask(key, text, history=None, parts=None, schema=None, model=None, act="Memproses permintaan",
-              use_mcp=True, skill=None, brief=False, cache=True, show=None, room=None, fungsi=None, sistem=None):
-    cl = client(key)
+              use_mcp=True, skill=None, brief=False, cache=True, show=None, room=None, fungsi=None, sistem=None, kunci=None):
+    cl = client_kunci(kunci) if kunci else client(key)   # kunci: API key khusus (mis. tier 1 untuk Argon, gratis untuk Hydrogen)
     if not cl:
         raise RuntimeError(f"Key Gemini untuk {AGENTS[key]['nama']} belum diisi (GEMINI_{key.upper()} atau GEMINI_API_KEY).")
     if DAILY_LIMIT and usage_today_total() >= DAILY_LIMIT:
@@ -5065,7 +5073,19 @@ MESIN_LAIN = {
 # Gemini 4 Argon: model terkuat Google (rilis umum 13 Okt 2026), BERBAYAR saja (tidak ada di paket gratis).
 # Aktif hanya kalau ARGON_AKTIF=1 (tanda billing Gemini sudah dinyalakan). Gagal/ditolak -> otomatis jatuh ke mesin biasa.
 ARGON_MODEL = os.getenv("ARGON_MODEL", "gemini-4-argon")
-ARGON_AKTIF = os.getenv("ARGON_AKTIF", "").strip() in ("1", "true", "ya")
+KUNCI_TIER1 = os.getenv("GEMINI_KEY_TIER1", "").strip()   # kunci Gemini berbayar (tier 1): dipakai Argon
+KUNCI_FREE = os.getenv("GEMINI_KEY_FREE", "").strip()     # kunci Gemini gratis: dipakai Hydrogen
+ARGON_AKTIF = bool(KUNCI_TIER1) or os.getenv("ARGON_AKTIF", "").strip() in ("1", "true", "ya")
+# Gemini 4 Hydrogen (kelas Flash, rilis 12 Nov 2026): ada paket gratis. Pakai GEMINI_KEY_FREE kalau diisi, kalau tidak pakai kunci biasa.
+HYDROGEN_MODEL = os.getenv("HYDROGEN_MODEL", "gemini-4-hydrogen")
+
+
+def kunci_argon():
+    return KUNCI_TIER1 or gkey("canvas")
+
+
+def kunci_hydrogen():
+    return KUNCI_FREE or gkey("canvas")
 AI_KODE = os.getenv("AI_KODE", "").strip().lower()   # mesin pilihan Studio: claude | gemini | groq | cerebras | openrouter | mistral (kosong = otomatis)
 
 
@@ -5076,15 +5096,19 @@ def mesin_kunci(k):
 def mesin_daftar():
     """Semua mesin + apakah kuncinya sudah diisi. Tidak pernah mengembalikan isi kunci."""
     out = [{"id": "gemini", "nama": "Gemini", "model": MODEL, "siap": bool(client("canvas"))},
-           {"id": "argon", "nama": "Gemini 4 Argon", "model": ARGON_MODEL, "siap": bool(client("canvas")) and ARGON_AKTIF,
-            "catatan": "" if ARGON_AKTIF else "berbayar: nyalakan billing Gemini, lalu isi ARGON_AKTIF=1 di Render"},
+           {"id": "hydrogen", "nama": "Gemini 4 Hydrogen", "model": HYDROGEN_MODEL, "siap": bool(kunci_hydrogen()),
+            "catatan": "" if kunci_hydrogen() else "isi GEMINI_KEY_FREE di Render"},
+           {"id": "argon", "nama": "Gemini 4 Argon", "model": ARGON_MODEL, "siap": bool(kunci_argon()) and ARGON_AKTIF,
+            "catatan": "" if ARGON_AKTIF else "berbayar: isi GEMINI_KEY_TIER1 (kunci tier 1) di Render"},
            {"id": "claude", "nama": "Claude", "model": CLAUDE_MODEL, "siap": bool(ANTHROPIC_KEY)}]
     return out + [{"id": k, "nama": v["nama"], "model": v["model"], "siap": bool(mesin_kunci(k))} for k, v in MESIN_LAIN.items()]
 
 
 def mesin_kode():
-    if AI_KODE == "argon" and ARGON_AKTIF and client("canvas"):
+    if AI_KODE == "argon" and ARGON_AKTIF and kunci_argon():
         return "argon"
+    if AI_KODE == "hydrogen" and kunci_hydrogen():
+        return "hydrogen"
     if AI_KODE == "gemini" or (AI_KODE in MESIN_LAIN and mesin_kunci(AI_KODE)):
         return AI_KODE
     return "claude" if ANTHROPIC_KEY else "gemini"
@@ -5119,11 +5143,12 @@ def _claude(sistem, prompt, maks=8000):
 async def kode_ai(sistem, prompt, act, schema=None):
     """Kembalikan teks mentah dari mesin kode. Urutan: mesin pilihan (AI_KODE) -> Claude kalau kuncinya ada -> Gemini. Yang gagal dilewati."""
     pilih = mesin_kode()
-    if pilih == "argon":
+    if pilih in ("argon", "hydrogen"):
         try:
-            return await ask("canvas", prompt, sistem=sistem, schema=schema, use_mcp=False, cache=False, act=act + " (Argon)", model=ARGON_MODEL), "argon"
+            return await ask("canvas", prompt, sistem=sistem, schema=schema, use_mcp=False, cache=False, act=f"{act} ({pilih.title()})",
+                             model=ARGON_MODEL if pilih == "argon" else HYDROGEN_MODEL, kunci=kunci_argon() if pilih == "argon" else kunci_hydrogen()), pilih
         except Exception:
-            log.exception("Gemini 4 Argon gagal (billing belum aktif / kuota?), pakai mesin cadangan")
+            log.exception("Gemini 4 %s gagal (billing / kuota / nama model?), pakai mesin cadangan", pilih)
     if pilih in MESIN_LAIN:
         try:
             return await asyncio.to_thread(_kompatibel, pilih, sistem, prompt, 8000, schema is not None), pilih
@@ -5243,8 +5268,9 @@ async def model3d_buat(permintaan, lama=None):
 async def _mesin_jawab(mid, sistem, prompt, json_mode):
     if mid == "gemini":
         return await ask("canvas", prompt, sistem=sistem, schema=Resep3D if json_mode else None, use_mcp=False, cache=False, act="Uji mesin AI", model=MODEL)
-    if mid == "argon":
-        return await ask("canvas", prompt, sistem=sistem, schema=Resep3D if json_mode else None, use_mcp=False, cache=False, act="Uji mesin AI (Argon)", model=ARGON_MODEL)
+    if mid in ("argon", "hydrogen"):
+        return await ask("canvas", prompt, sistem=sistem, schema=Resep3D if json_mode else None, use_mcp=False, cache=False, act=f"Uji mesin AI ({mid.title()})",
+                         model=ARGON_MODEL if mid == "argon" else HYDROGEN_MODEL, kunci=kunci_argon() if mid == "argon" else kunci_hydrogen())
     if mid == "claude":
         return await asyncio.to_thread(_claude, sistem, prompt)
     return await asyncio.to_thread(_kompatibel, mid, sistem, prompt, 8000, json_mode)
