@@ -103,7 +103,7 @@ try:
 except ValueError:
     MCP_SERVERS = []
 
-# Proyek unggulan yang sedang berjalan (poster tampil di Tentang Kami dan Beranda).
+# Proyek unggulan yang sedang berjalan (poster tampil di Portofolio dan Beranda; sengaja dipisah dari seri AI di Tentang Kami).
 PROYEK_SOROT = [{"nama": "JalaDhipa-1", "sub": "The Undercover Military Cargo Ship", "gambar": "/aset/jaladhipa-1.webp", "status": "Sedang berjalan",
                  "tim": ["A13", "A30", "A11", "N01", "R22", "S17", "S19"]}]
 # Seri sistem AI MCI, urut dari yang pertama. Yang terakhir = versi yang sedang dipakai.
@@ -2947,7 +2947,6 @@ def api_tentang():
         return jsonify(tentang_save(request.get_json(silent=True) or {}))
     t = tentang_get()
     t["ai_seri"] = AI_SERI
-    t["sorot"] = PROYEK_SOROT
     if mid_of(role()) is None and not is_admin(role()):   # viewer: nomor WA hanya lewat Pusat Info (dicek aman dulu)
         t["kontak"] = {k: v for k, v in t["kontak"].items() if k != "wa"}
     return jsonify(t)
@@ -5977,7 +5976,7 @@ def portofolio():
 def api_portofolio():
     if not role():
         abort(401)
-    return jsonify({"items": portofolio()})
+    return jsonify({"items": portofolio(), "sorot": PROYEK_SOROT})
 
 
 # ---------- RIWAYAT PERUBAHAN KEUANGAN (Peraturan Kas Pasal 5) ----------

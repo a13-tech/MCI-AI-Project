@@ -858,7 +858,8 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
  </section>
  <section id="p-portofolio" class="pg" hidden>
   <div class="ey">Karya MCI</div><h1>Portofolio</h1>
-  <p class="mu" style="margin:6px 0 20px;max-width:760px">Proyek yang sudah diselesaikan anggota MCI.</p>
+  <p class="mu" style="margin:6px 0 20px;max-width:760px">Proyek yang sedang dikerjakan dan yang sudah diselesaikan anggota MCI.</p>
+  <div id="pfSorot"></div>
   <div id="pfBox"><p class="mu">Memuat…</p></div>
  </section>
  <section id="p-backup" class="pg" hidden>
@@ -1768,14 +1769,13 @@ $("#mx").onclick = async () => { if (confirm("Hapus SEMUA memori? Tidak bisa dib
 /* Tentang Kami */
 let TK = null;
 const ini = n => esc(String(n || "?").trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase());
-const sorotHtml = list => (list || []).map(x => `<div class="cd" style="padding:14px"><div class="ey">${esc(x.status || "Proyek")}</div><h2 style="margin:4px 0 2px">${esc(x.nama)}</h2>${x.sub ? `<p class="mu" style="margin:0 0 10px">${esc(x.sub)}</p>` : ""}
+const sorotHtml = (list, tanpaLabel) => (list || []).map(x => `<div class="cd" style="padding:14px">${tanpaLabel ? "" : `<div class="ey">${esc(x.status || "Proyek")}</div>`}<h2 style="margin:4px 0 2px">${esc(x.nama)}</h2>${x.sub ? `<p class="mu" style="margin:0 0 10px">${esc(x.sub)}</p>` : ""}
   <a href="${esc(x.gambar)}" target="_blank" rel="noopener"><img src="${esc(x.gambar)}" alt="Poster proyek ${esc(x.nama)}" loading="lazy" style="width:100%;border-radius:10px;border:1px solid var(--line,#E5E0D5);display:block"></a>
   ${(x.tim || []).length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">${x.tim.map(k => `<span class="ch n">${esc(k)}</span>`).join("")}</div>` : ""}</div>`).join("");
 function renderTentang() {
   const t = TK;
   $("#tv").innerHTML = `<div class="hero"><h2>${esc(t.judul)}</h2>${t.semboyan ? `<div class="moto">“${esc(t.semboyan)}”</div>` : ""}<p>${esc(t.deskripsi)}</p></div>
    <div class="cd"><b>Sejarah MCI</b>${t.sejarah.length ? `<div class="tl">${[...t.sejarah].sort((x, y) => (parseInt(x.tahun) || 0) - (parseInt(y.tahun) || 0)).map(x => `<div class="it"><span class="y">${esc(x.tahun)}</span><b>${esc(x.judul)}</b>${x.isi ? `<p>${esc(x.isi)}</p>` : ""}</div>`).join("")}</div>` : '<p class="mu">Sejarah belum diisi.</p>'}</div>
-   ${(t.sorot || []).length ? `<h2 style="margin:18px 0 8px">Proyek yang sedang berjalan</h2>${sorotHtml(t.sorot)}` : ""}
    <div class="cd"><b>Teknologi AI kami: 7 Cipher AI</b><p style="margin:8px 0 0">7 Cipher AI adalah sistem AI yang dikembangkan MCI. Sistem ini menggabungkan beberapa model bahasa besar (LLM) dengan alat buatan MCI sendiri: Studio 3D dan mesin hitung model cetak, pemeriksa resep 3D, asisten katalog dan Pusat Info, serta bot-bot MCI di web dan Telegram.</p>
    ${(t.ai_seri || []).length ? `<div class="tl" style="margin-top:12px">${t.ai_seri.map((x, i, a) => `<div class="it"><span class="y">Seri ${i + 1}</span><b>${esc(x.seri)}${i === a.length - 1 ? ' <span class="ch g" style="font-size:12px">dipakai sekarang</span>' : ""}</b>${x.ket ? `<p>${esc(x.ket)}</p>` : ""}${x.video ? `<video src="${esc(x.video)}" poster="${esc(x.gambar || "")}" controls muted loop playsinline preload="none" style="width:100%;max-width:560px;border-radius:10px;margin-top:8px;background:#0F1E3A;aspect-ratio:16/9" aria-label="Rekaman desain pertama ${esc(x.seri)}"></video>` : x.gambar ? `<img src="${esc(x.gambar)}" alt="Desain pertama ${esc(x.seri)}" loading="lazy" style="width:100%;max-width:560px;border-radius:10px;margin-top:8px">` : ""}</div>`).join("")}</div>` : ""}</div>
    ${tkKontak(t.kontak || {})}
@@ -3181,7 +3181,8 @@ $("#rwArea").onchange = rwMuat; $("#rwQ").oninput = rwRender;
 /* ===== Portofolio ===== */
 let PF = null;
 async function pfMuat() {
-  try { PF = (await api("/api/portofolio")).items; } catch (e) { $("#pfBox").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; return; }
+  let d; try { d = await api("/api/portofolio"); PF = d.items; } catch (e) { $("#pfBox").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; return; }
+  $("#pfSorot").innerHTML = (d.sorot || []).length ? `<h2 style="margin:0 0 10px">Sedang berjalan</h2><div style="max-width:760px">${sorotHtml(d.sorot, true)}</div><h2 style="margin:22px 0 10px">Sudah selesai</h2>` : "";
   $("#pfBox").innerHTML = PF.length ? `<div class="pfg">${PF.map(x => `<article class="cd" style="padding:0;overflow:hidden">${x.foto ? `<img src="${esc(x.foto)}" alt="Foto proyek ${esc(x.nama)}" loading="lazy" style="width:100%;aspect-ratio:16/10;object-fit:cover;display:block" onerror="this.remove()">` : ""}<div style="padding:16px 18px"><div class="ey">${esc(x.tahun)}${x.tim ? ` · ${x.tim} anggota` : ""}</div><h3 style="margin:4px 0 8px">${esc(x.nama)}</h3><p class="mu" style="margin:0;white-space:pre-wrap">${esc(x.ringkasan || "")}</p></div></article>`).join("")}</div>`
     : `<p class="mu">Belum ada proyek di portofolio.${ME.role !== "viewer" ? " Pemilik proyek bisa mencentang “Tampilkan di Portofolio publik” setelah proyek Selesai." : ""}</p>`;
 }
