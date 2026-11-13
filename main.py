@@ -11,10 +11,12 @@ Prinsip hemat token (Gemini Tier 1):
 Studio Gambar: Cloudflare Workers AI (FLUX schnell + img2img), gratis 10.000 neuron/hari.
 """
 import studio3d
+import panduan as rakit
 import os, io, csv, json, re, time, gzip, random, base64, asyncio, secrets, logging, sqlite3, threading, contextlib, hashlib, zipfile, queue
 from types import SimpleNamespace
 from collections import deque, OrderedDict
 from datetime import datetime, date, timedelta, timezone
+from urllib.parse import quote
 from html import unescape as _unesc, escape as _esc_html
 from email.utils import parsedate_to_datetime
 import xml.etree.ElementTree as ET
@@ -314,6 +316,8 @@ def db_init():
         sql(c, f"CREATE TABLE IF NOT EXISTS surat (id {pk}, token TEXT UNIQUE NOT NULL, nomor TEXT NOT NULL, urut INTEGER NOT NULL, tahun INTEGER NOT NULL, format TEXT NOT NULL DEFAULT 'a', "
                f"nama TEXT NOT NULL, jabatan TEXT, divisi TEXT, mulai TEXT, tanggal TEXT NOT NULL, pesan TEXT, wa TEXT, ttd_nama TEXT, ttd_jabatan TEXT, kode TEXT NOT NULL, "
                f"status TEXT NOT NULL DEFAULT 'aktif', oleh TEXT, dibuat TEXT, dilihat INTEGER NOT NULL DEFAULT 0)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS panduan (id {pk}, oleh_id INTEGER, oleh TEXT, judul TEXT, papan TEXT, status TEXT NOT NULL DEFAULT 'rencana', permintaan TEXT NOT NULL, "
+               f"jawaban TEXT, rencana TEXT, data TEXT, laporan TEXT, mesin TEXT, proyek_id INTEGER, dikonfirmasi TEXT, dibuat TEXT, diubah TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS chat_riwayat (id {pk}, ruang TEXT NOT NULL, role TEXT NOT NULL, teks TEXT NOT NULL, model TEXT, waktu TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS gambar_kode (id {pk}, prompt TEXT NOT NULL, svg TEXT NOT NULL, mesin TEXT, oleh TEXT, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS pusat_info (id {pk}, ip TEXT NOT NULL, tanya TEXT NOT NULL, jawab TEXT, token {big} NOT NULL DEFAULT 0, dibuat TEXT)")
@@ -5363,6 +5367,452 @@ async def model3d_buat(permintaan, lama=None):
     if polis is None:
         raise RuntimeError(f"AI belum berhasil membuat model yang sah ({galat}). Coba jelaskan ukurannya lebih rinci.")
     return resep, lap, mesin
+
+
+# ---------- BUKU PANDUAN RAKIT: tutorial merakit elektronika, langkah demi langkah ----------
+# Alur SOP 2 tahap: (1) AI menulis RENCANA singkat -> anggota membaca & menjawab pertanyaan -> (2) setelah dikonfirmasi baru panduan lengkap dibuat.
+# AI menulis data (komponen, pin, sambungan); modul panduan.py yang memeriksa sambungan dan menggambar diagramnya.
+PANDUAN_BATAS = max(1, int(os.getenv("PANDUAN_BATAS", "2")))     # panduan jadi per anggota ...
+PANDUAN_HARI = max(1, int(os.getenv("PANDUAN_HARI", "3")))       # ... per sekian hari. Dev tanpa batas.
+KUOTA["panduan_rencana"] = max(1, int(os.getenv("KUOTA_PANDUAN_RENCANA", "8")))   # rencana per hari (murah, tetapi tetap dibatasi)
+PANDUAN_PAPAN = [{"id": k, "nama": v["nama"]} for k, v in rakit.PAPAN.items()]
+TOKO_CARI = {"tokopedia": "https://www.tokopedia.com/search?q=", "shopee": "https://shopee.co.id/search?keyword="}
+
+
+class RencanaRakit(BaseModel):
+    judul: str
+    ringkasan: str
+    papan: str
+    alasan_papan: str
+    kesulitan: str
+    waktu: str
+    biaya_min: int
+    biaya_max: int
+    komponen_kira: list[str]
+    pertanyaan: list[str]
+    ditolak: bool
+    alasan_tolak: str
+
+
+class PinRakit(BaseModel):
+    nama: str
+    jenis: str
+    arah: str
+    tegangan: str
+    level: float
+    analog: bool
+    pwm: bool
+    bus: str
+
+
+class KomponenRakit(BaseModel):
+    id: str
+    nama: str
+    jumlah: int
+    fungsi: str
+    harga_min: int
+    harga_max: int
+    kata_kunci: str
+    pin: list[PinRakit]
+
+
+class KantongRakit(BaseModel):
+    nama: str
+    komponen: list[KomponenRakit]
+
+
+class SambunganRakit(BaseModel):
+    dari: str
+    ke: str
+    warna: str
+    pembagi_tegangan: bool
+
+
+class LangkahRakit(BaseModel):
+    judul: str
+    penjelasan: str
+    sambungan: list[SambunganRakit]
+    checkpoint: str
+    peringatan: str
+
+
+class UjiRakit(BaseModel):
+    masalah: str
+    penyebab: str
+    solusi: str
+
+
+class PanduanRakit(BaseModel):
+    judul: str
+    ringkasan: str
+    papan: str
+    kantong: list[KantongRakit]
+    alat: list[str]
+    langkah: list[LangkahRakit]
+    kode: str
+    penjelasan_kode: str
+    pustaka: list[str]
+    uji: list[UjiRakit]
+
+
+SISTEM_RENCANA = """Kamu mentor elektronika MCI. Anggota ingin merakit sesuatu. Tugasmu sekarang HANYA membuat RENCANA singkat untuk dikonfirmasi, BUKAN panduan lengkap.
+Papan yang tersedia: "esp32" (ESP32 DevKit V4: WiFi/Bluetooth, logika 3,3V), "nano" (Arduino Nano: kecil, logika 5V), "uno" (Arduino Uno: paling mudah untuk pemula, logika 5V).
+Pilih papan yang paling cocok (kalau anggota menyebut papan, pakai itu kecuali jelas tidak mampu, lalu jelaskan). Butuh WiFi/internet/Bluetooth -> esp32.
+Biaya dalam Rupiah, kisaran harga pasar online Indonesia untuk komponen (tidak termasuk papan kalau anggota sudah punya). Waktu misalnya "1-2 jam".
+kesulitan: "pemula", "menengah", atau "mahir". komponen_kira: daftar singkat komponen utama.
+pertanyaan: 0-3 pertanyaan PENTING yang jawabannya mengubah rancangan (mis. "Sumber daya dari baterai atau USB?"). Kosongkan kalau permintaan sudah jelas.
+ditolak=true HANYA kalau permintaan berbahaya: menyentuh listrik PLN/220V, senjata, alat penyadap/pengintai orang lain, pengacau sinyal (jammer), atau baterai lithium tanpa modul pengaman. Isi alasan_tolak dan tawarkan alternatif aman di ringkasan.
+Bahasa Indonesia sederhana. JSON saja."""
+
+SISTEM_PANDUAN = """Kamu mentor elektronika MCI yang menulis BUKU PANDUAN RAKIT langkah demi langkah untuk pemula (seperti manual Lego). Tulis DATA JSON, bukan teks bebas; mesin MCI yang memeriksa sambungan dan menggambar diagram.
+
+FORMAT:
+{"judul","ringkasan","papan","kantong":[{"nama","komponen":[{"id","nama","jumlah","fungsi","harga_min","harga_max","kata_kunci","pin":[{"nama","jenis","arah","tegangan","level","analog","pwm","bus"}]}]}],
+ "alat":[...],"langkah":[{"judul","penjelasan","sambungan":[{"dari","ke","warna","pembagi_tegangan"}],"checkpoint","peringatan"}],"kode","penjelasan_kode","pustaka":[...],"uji":[{"masalah","penyebab","solusi"}]}
+
+ATURAN DATA (wajib, mesin akan menolak kalau salah):
+1. papan: "esp32", "nano", atau "uno" (sesuai rencana).
+2. kantong: kelompokkan komponen seperti kantong plastik Lego, mis. "Kantong A: Papan & kabel", "Kantong B: Sensor". Papan utama TIDAK perlu dimasukkan sebagai komponen.
+3. Komponen: id pendek huruf kecil tanpa spasi (mis. "dht22", "led1", "r1"). harga_min/harga_max Rupiah per buah, perkiraan pasar online. kata_kunci = kata pencarian toko online yang tepat (mis. "sensor DHT22 modul").
+4. pin: tulis SEMUA pin komponen yang disambung. jenis: "daya" (VCC/+), "gnd", "sinyal", atau "sumber_gnd" (GND dari catu daya eksternal). arah dilihat dari komponen: "masuk" (komponen menerima sinyal dari papan, mis. TRIG, IN relay, DIN), "keluar" (komponen mengirim sinyal ke papan, mis. ECHO, OUT sensor), "dua" (dua arah, mis. SDA/data DHT), "" untuk daya/gnd. tegangan: tegangan kerja pin daya, mis. "5" atau "3.3-5" ("" untuk pin lain). level: tegangan sinyal yang DIKELUARKAN komponen (mis. HC-SR04 ECHO = 5), 0 kalau bukan sinyal keluar. analog=true kalau harus ke pin analog. pwm=true kalau butuh PWM (servo, LED redup, buzzer nada). bus: "i2c_sda", "i2c_scl", atau "".
+   Resistor/LED: pin bernama "1"/"2" atau "A"/"K" dengan jenis "sinyal".
+5. sambungan: "dari" dan "ke" berformat "PAPAN:<pin>" atau "<id>:<NAMA PIN>". Pin papan ESP32 ditulis GPIO<n>, 3V3, 5V, GND. Pin Uno/Nano ditulis D<n>, A<n>, 5V, 3V3, GND, VIN.
+   Satu sambungan = satu kabel. Setiap pin daya dan GND komponen WAJIB tersambung. Satu pin GPIO hanya untuk satu sinyal (kecuali bus I2C).
+   warna: merah = daya, hitam = GND, warna lain (kuning/hijau/biru/oranye/ungu/putih) untuk sinyal.
+6. ESP32: logika 3,3V. GPIO34/35/36/39 hanya input. GPIO6-11 dilarang. Hindari GPIO0, 2, 12 (strapping) dan 1, 3 (Serial). Analog + WiFi -> pakai GPIO32-39. I2C bawaan SDA=GPIO21, SCL=GPIO22.
+   Sinyal 5V yang masuk ke ESP32 (mis. ECHO HC-SR04) WAJIB lewat pembagi tegangan; tulis resistornya sebagai komponen dan beri pembagi_tegangan=true pada sambungan sinyal tersebut, atau pilih komponen versi 3,3V.
+   Modul 5V diberi daya dari pin 5V (dari USB). Uno/Nano: PWM hanya D3, D5, D6, D9, D10, D11; I2C SDA=A4, SCL=A5; A6/A7 Nano hanya analog.
+7. Motor, servo lebih dari 1, relay banyak, atau LED strip: pakai catu daya terpisah dan sambungkan GND-nya ke GND papan (ground bersama).
+8. langkah: 4-10 langkah, tiap langkah 1-6 kabel. Langkah 1 biasanya memasang papan di breadboard. penjelasan: apa yang dilakukan dan KENAPA (beri perumpamaan sederhana). checkpoint: cara memastikan langkah ini benar sebelum lanjut. peringatan: kosongkan kalau tidak ada.
+9. kode: sketsa Arduino lengkap yang bisa langsung diunggah, pin di kode SAMA dengan sambungan, komentar bahasa Indonesia. pustaka: nama library di Library Manager (kosong kalau tidak perlu).
+10. uji: 3-6 masalah umum (mis. "Serial Monitor menampilkan tulisan aneh") beserta penyebab dan solusinya.
+DILARANG: listrik PLN/220V, senjata, penyadap, jammer. Bahasa Indonesia sederhana. JSON saja."""
+
+
+def _pd_json(teks):
+    d = _json_dari(teks)
+    if not isinstance(d, dict):
+        raise ValueError("Format panduan tidak sah")
+    return d
+
+
+def _pd_row(i):
+    with db() as c:
+        a = sql(c, "SELECT id,oleh_id,oleh,judul,papan,status,permintaan,jawaban,rencana,data,laporan,mesin,proyek_id,dikonfirmasi,dibuat,diubah FROM panduan WHERE id=?", (i,)).fetchone()
+    if not a:
+        return None
+    k = ["id", "oleh_id", "oleh", "judul", "papan", "status", "permintaan", "jawaban", "rencana", "data", "laporan", "mesin", "proyek_id", "dikonfirmasi", "dibuat", "diubah"]
+    x = dict(zip(k, a))
+    for f in ("rencana", "data", "laporan"):
+        try:
+            x[f] = json.loads(x[f]) if x[f] else None
+        except ValueError:
+            x[f] = None
+    return x
+
+
+def _pd_izin():
+    r = role()
+    if not r:
+        abort(401)
+    if mid_of(r) is None and not is_admin(r):
+        abort(403)   # viewer tidak memakai fitur AI anggota
+    return r
+
+
+def _pd_milik(x, r):
+    return is_admin(r) or (x["oleh_id"] is not None and x["oleh_id"] == mid_of(r))
+
+
+def panduan_sisa(r):
+    """(sisa, batas, kapan_bisa_lagi) jatah panduan jadi dalam PANDUAN_HARI hari terakhir. Dev: (None, None, None)."""
+    if is_admin(r):
+        return None, None, None
+    batas_waktu = (datetime.now(WIB) - timedelta(days=PANDUAN_HARI)).isoformat(timespec="seconds")
+    with db() as c:
+        rows = [a[0] for a in sql(c, "SELECT dikonfirmasi FROM panduan WHERE oleh_id=? AND status IN ('proses','jadi') AND dikonfirmasi>=? ORDER BY dikonfirmasi",
+                                  (mid_of(r), batas_waktu)).fetchall()]
+    sisa = max(0, PANDUAN_BATAS - len(rows))
+    lagi = None
+    if not sisa and rows:
+        try:
+            lagi = (datetime.fromisoformat(rows[0]) + timedelta(days=PANDUAN_HARI)).isoformat(timespec="minutes")
+        except ValueError:
+            lagi = None
+    return sisa, PANDUAN_BATAS, lagi
+
+
+def _pd_basi():
+    """Panduan yang macet di status 'proses' (mis. server mulai ulang) ditandai gagal, dan jatahnya kembali."""
+    batas = (datetime.now(WIB) - timedelta(minutes=9)).isoformat(timespec="seconds")
+    with db() as c:
+        sql(c, "UPDATE panduan SET status='gagal', laporan=?, diubah=? WHERE status='proses' AND diubah<?",
+            (json.dumps({"galat": ["Pembuatan terhenti (server dimulai ulang atau terlalu lama). Jatahmu tidak terpakai; coba konfirmasi lagi."]}), _now(), batas))
+
+
+def _pd_ringkas(x):
+    rc = x.get("rencana") or {}
+    return {"id": x["id"], "judul": x.get("judul") or rc.get("judul") or "Panduan", "papan": x.get("papan") or rc.get("papan") or "",
+            "papan_nama": rakit.PAPAN.get(x.get("papan") or "", {}).get("nama", ""), "status": x["status"], "oleh": x.get("oleh") or "",
+            "oleh_id": x.get("oleh_id"), "dibuat": x.get("dibuat") or "", "diubah": x.get("diubah") or "", "proyek_id": x.get("proyek_id"),
+            "kesulitan": rc.get("kesulitan", ""), "langkah": len((x.get("data") or {}).get("langkah") or [])}
+
+
+def panduan_payload(r):
+    _pd_basi()
+    with db() as c:
+        ids = [a[0] for a in sql(c, "SELECT id FROM panduan ORDER BY id DESC LIMIT 80").fetchall()]
+    semua = [_pd_ringkas(_pd_row(i)) for i in ids]
+    me = mid_of(r)
+    sisa, batas, lagi = panduan_sisa(r)
+    return {"daftar": [p for p in semua if p["status"] == "jadi" or p["oleh_id"] == me or is_admin(r)],
+            "papan": PANDUAN_PAPAN, "admin": is_admin(r), "me": me,
+            "jatah": {"sisa": sisa, "batas": batas, "hari": PANDUAN_HARI, "lagi": lagi}}
+
+
+def _stok_cocok(komp):
+    """Cari komponen di Stok MCI: cocok kalau kata penting nama komponen ada di nama barang stok."""
+    if not STOK:
+        try:
+            stok_load()
+        except Exception:
+            return None
+    kata = [w for w in re.findall(r"[a-z0-9]+", str(komp.get("nama", "")).lower()) if len(w) >= 3 and w not in ("modul", "module", "sensor", "kabel", "untuk", "dengan")]
+    if not kata:
+        return None
+    kode = [w for w in kata if re.search(r"\d", w) and re.search(r"[a-z]", w) and not re.fullmatch(r"\d+(mm|cm|v|k|ohm|ma|a|w|uf|nf|pf)", w)]   # kode model: sr04, dht22, esp32, sg90
+    for s in STOK:
+        n = re.sub(r"[^a-z0-9]", "", s["nama"].lower())
+        if (kode and any(w in n for w in kode)) or (not kode and all(w in n for w in kata[:2])):
+            return {"id": s["id"], "nama": s["nama"], "jumlah": s["jumlah"], "satuan": s["satuan"]}
+    return None
+
+
+def panduan_tampil(x, r):
+    o = {k: x.get(k) for k in ("id", "oleh", "oleh_id", "judul", "papan", "status", "permintaan", "jawaban", "rencana", "laporan", "mesin", "proyek_id", "dibuat", "diubah")}
+    o["milik"] = _pd_milik(x, r)
+    o["papan_nama"] = rakit.PAPAN.get(x.get("papan") or "", {}).get("nama", "")
+    if x["status"] == "jadi" and x.get("data"):
+        d = rakit.lengkapi(x["data"])
+        tot_min = tot_max = 0
+        for kt in d.get("kantong") or []:
+            for k in kt.get("komponen") or []:
+                q = str(k.get("kata_kunci") or k.get("nama") or "").strip()
+                k["beli"] = {t: u + quote(q) for t, u in TOKO_CARI.items()}
+                k["stok"] = _stok_cocok(k)
+                n = max(1, int(k.get("jumlah") or 1))
+                tot_min += max(0, int(k.get("harga_min") or 0)) * n
+                tot_max += max(0, int(k.get("harga_max") or 0)) * n
+        d["biaya"] = {"min": tot_min, "max": tot_max}
+        o["data"] = d
+    if x.get("proyek_id"):
+        p = rk_get("proyek", x["proyek_id"])
+        o["proyek"] = {"id": x["proyek_id"], "nama": (p or {}).get("nama", "(proyek dihapus)")}
+    return o
+
+
+async def panduan_rencana(permintaan, jawaban_lama=None, rencana_lama=None):
+    prompt = f"PERMINTAAN ANGGOTA:\n{permintaan}"
+    if rencana_lama:
+        prompt += f"\n\nRENCANA SEBELUMNYA:\n{json.dumps(rencana_lama, ensure_ascii=False)}\n\nPERUBAHAN YANG DIMINTA ANGGOTA:\n{jawaban_lama}\n\nTulis rencana baru yang sudah disesuaikan."
+    teks, mesin = await kode_ai(SISTEM_RENCANA, prompt, "Rencana panduan rakit", schema=RencanaRakit)
+    d = _pd_json(teks)
+    d["papan"] = str(d.get("papan") or "").lower().strip()
+    if d["papan"] not in rakit.PAPAN:
+        d["papan"] = "esp32" if re.search(r"wifi|internet|bluetooth|iot|telegram|web", permintaan, re.I) else "uno"
+    d["pertanyaan"] = [str(q)[:200] for q in (d.get("pertanyaan") or [])][:3]
+    d["komponen_kira"] = [str(q)[:80] for q in (d.get("komponen_kira") or [])][:15]
+    if rakit.BERBAHAYA.search(permintaan):
+        d["ditolak"] = True
+        d["alasan_tolak"] = d.get("alasan_tolak") or "Rangkaian yang menyentuh listrik PLN/220V tidak dibuatkan panduannya demi keselamatan."
+    return d, mesin
+
+
+async def panduan_bangun(permintaan, rencana, jawaban):
+    """AI menulis panduan -> mesin memeriksa sambungan -> kalau ada galat, AI memperbaiki (maks 3 putaran)."""
+    dasar = (f"PERMINTAAN ANGGOTA:\n{permintaan}\n\nRENCANA YANG SUDAH DIKONFIRMASI:\n{json.dumps(rencana, ensure_ascii=False)}"
+             + (f"\n\nJAWABAN / CATATAN ANGGOTA:\n{jawaban}" if jawaban else "") + f"\n\nPapan WAJIB: {rencana.get('papan')}.")
+    prompt, data, galat, waspada, mesin = dasar, None, [], [], "gemini"
+    for putaran in range(3):
+        teks, mesin = await kode_ai(SISTEM_PANDUAN, prompt, "Menulis panduan rakit", schema=PanduanRakit)
+        try:
+            data = _pd_json(teks)
+            data["papan"] = rencana.get("papan") or data.get("papan")
+            galat, waspada = rakit.periksa(data)
+        except (ValueError, KeyError, TypeError) as e:
+            data, galat, waspada = None, [f"JSON tidak sah: {str(e)[:200]}"], []
+        if data is not None and not galat:
+            break
+        if putaran == 2:
+            break
+        prompt = (f"{dasar}\n\nPANDUAN KAMU SEBELUMNYA:\n{json.dumps(data, ensure_ascii=False)[:30000] if data else teks[:4000]}\n\n"
+                  "MESIN PEMERIKSA MENEMUKAN KESALAHAN:\n- " + "\n- ".join(galat) + "\n\nPerbaiki semua kesalahan di atas (periksa peta pin papan), lalu keluarkan panduan LENGKAP yang benar.")
+    if data is None or galat:
+        raise RuntimeError("; ".join(galat[:6]) or "AI belum berhasil membuat panduan yang sah.")
+    return data, waspada, mesin
+
+
+def _pd_selesai(i, oleh_id, fut):
+    try:
+        data, waspada, mesin = fut.result()
+        with db() as c:
+            sql(c, "UPDATE panduan SET status='jadi', data=?, laporan=?, mesin=?, judul=?, diubah=? WHERE id=?",
+                (json.dumps(data, ensure_ascii=False), json.dumps({"peringatan": waspada}, ensure_ascii=False), mesin, str(data.get("judul") or "")[:120] or None, _now(), i))
+        judul = str(data.get("judul") or "Panduan")[:120]
+        if oleh_id:
+            inbox_kirim([oleh_id], "panduan", f"Buku panduan siap: {judul}", "Buka halaman Buku Panduan Rakit untuk mulai merakit.", ref=i, tg=True)
+    except Exception as e:
+        log.exception("panduan %s gagal", i)
+        with db() as c:
+            sql(c, "UPDATE panduan SET status='gagal', laporan=?, diubah=? WHERE id=?",
+                (json.dumps({"galat": [(str(e) or type(e).__name__)[:600]]}, ensure_ascii=False), _now(), i))
+
+
+@app.route("/api/panduan", methods=["GET", "POST"])
+def api_panduan():
+    r = _pd_izin()
+    if request.method == "GET":
+        return jsonify(panduan_payload(r))
+    d = request.get_json(silent=True) or {}
+    minta = str(d.get("permintaan") or "").strip()[:1500]
+    papan = str(d.get("papan") or "").lower()
+    if len(minta) < 10:
+        return jsonify({"error": "Ceritakan dulu apa yang mau dirakit, misalnya: lampu otomatis yang menyala saat gelap."}), 400
+    if papan in rakit.PAPAN:
+        minta += f"\n(Papan yang dipilih anggota: {rakit.PAPAN[papan]['nama']})"
+    if not LOOP:
+        return jsonify({"error": "Mesin AI belum siap"}), 503
+    if not kuota_pakai(r, "panduan_rencana"):
+        return jsonify({"error": f"Jatah membuat rencana hari ini sudah habis ({KUOTA['panduan_rencana']}x). Coba lagi besok."}), 429
+    try:
+        rc, mesin = asyncio.run_coroutine_threadsafe(panduan_rencana(minta), LOOP).result(120)
+    except Exception as e:
+        return jsonify({"error": f"Rencana gagal dibuat: {(str(e) or type(e).__name__)[:200]}"}), 502
+    with db() as c:
+        q = "INSERT INTO panduan (oleh_id,oleh,judul,papan,status,permintaan,rencana,mesin,dibuat,diubah) VALUES (?,?,?,?,?,?,?,?,?,?)"
+        p = (mid_of(r), nama_peran(r), str(rc.get("judul") or "")[:120], rc["papan"], "ditolak" if rc.get("ditolak") else "rencana", minta,
+             json.dumps(rc, ensure_ascii=False), mesin, _now(), _now())
+        i = int(sql(c, q + " RETURNING id", p).fetchone()[0] if PG else sql(c, q, p).lastrowid)
+    audit("panduan", "rencana", str(rc.get("judul") or minta)[:120], oleh=nama_peran(r))
+    return jsonify({"panduan": panduan_tampil(_pd_row(i), r), **panduan_payload(r)})
+
+
+@app.route("/api/panduan/<int:i>", methods=["GET", "DELETE"])
+def api_panduan_one(i):
+    r = _pd_izin()
+    _pd_basi()
+    x = _pd_row(i)
+    if not x:
+        return jsonify({"error": "Panduan tidak ditemukan"}), 404
+    if x["status"] != "jadi" and not _pd_milik(x, r):
+        abort(403)
+    if request.method == "DELETE":
+        if not _pd_milik(x, r):
+            abort(403)
+        if x["status"] == "proses":
+            return jsonify({"error": "Panduan sedang dibuat. Tunggu sampai selesai dulu."}), 400
+        with db() as c:
+            sql(c, "DELETE FROM panduan WHERE id=?", (i,))
+        audit("panduan", "hapus", str(x.get("judul") or "")[:120], oleh=nama_peran(r))
+        return jsonify(panduan_payload(r))
+    return jsonify({"panduan": panduan_tampil(x, r)})
+
+
+@app.route("/api/panduan/<int:i>/ubah", methods=["POST"])
+def api_panduan_ubah(i):
+    """Minta rencana diubah sebelum dikonfirmasi (mis. ganti papan, tambah fitur)."""
+    r = _pd_izin()
+    x = _pd_row(i)
+    if not x:
+        return jsonify({"error": "Panduan tidak ditemukan"}), 404
+    if not _pd_milik(x, r):
+        abort(403)
+    if x["status"] not in ("rencana", "ditolak", "gagal"):
+        return jsonify({"error": "Rencana ini sudah dikonfirmasi."}), 400
+    catatan = str((request.get_json(silent=True) or {}).get("catatan") or "").strip()[:800]
+    if len(catatan) < 3:
+        return jsonify({"error": "Tulis apa yang mau diubah dari rencananya."}), 400
+    if not LOOP:
+        return jsonify({"error": "Mesin AI belum siap"}), 503
+    if not kuota_pakai(r, "panduan_rencana"):
+        return jsonify({"error": f"Jatah membuat rencana hari ini sudah habis ({KUOTA['panduan_rencana']}x). Coba lagi besok."}), 429
+    try:
+        rc, mesin = asyncio.run_coroutine_threadsafe(panduan_rencana(x["permintaan"], catatan, x.get("rencana")), LOOP).result(120)
+    except Exception as e:
+        return jsonify({"error": f"Rencana gagal diubah: {(str(e) or type(e).__name__)[:200]}"}), 502
+    with db() as c:
+        sql(c, "UPDATE panduan SET rencana=?, judul=?, papan=?, status=?, permintaan=?, laporan=NULL, mesin=?, diubah=? WHERE id=?",
+            (json.dumps(rc, ensure_ascii=False), str(rc.get("judul") or "")[:120], rc["papan"], "ditolak" if rc.get("ditolak") else "rencana",
+             (x["permintaan"] + f"\n(Perubahan: {catatan})")[:2500], mesin, _now(), i))
+    return jsonify({"panduan": panduan_tampil(_pd_row(i), r)})
+
+
+@app.route("/api/panduan/<int:i>/konfirmasi", methods=["POST"])
+def api_panduan_konfirmasi(i):
+    """Tahap 2 SOP: anggota sudah membaca rencana dan menjawab pertanyaan -> panduan lengkap dibuat di latar belakang."""
+    r = _pd_izin()
+    x = _pd_row(i)
+    if not x:
+        return jsonify({"error": "Panduan tidak ditemukan"}), 404
+    if not _pd_milik(x, r):
+        abort(403)
+    if x["status"] == "ditolak":
+        return jsonify({"error": "Rencana ini ditolak demi keselamatan. Ubah permintaannya dulu."}), 400
+    if x["status"] not in ("rencana", "gagal"):
+        return jsonify({"error": "Panduan ini sudah dibuat atau sedang dibuat."}), 400
+    d = request.get_json(silent=True) or {}
+    if not d.get("setuju"):
+        return jsonify({"error": "Centang konfirmasi bahwa rencananya sudah sesuai."}), 400
+    rc = x.get("rencana") or {}
+    jawab = d.get("jawaban") or []
+    if isinstance(jawab, list):
+        teks_jawab = "\n".join(f"- {q}\n  Jawaban: {str(a or '').strip()[:300] or '(tidak dijawab, pakai pilihan paling umum dan aman)'}"
+                               for q, a in zip(rc.get("pertanyaan") or [], jawab + [""] * 3))
+    else:
+        teks_jawab = str(jawab)[:900]
+    tambah = str(d.get("catatan") or "").strip()[:500]
+    if tambah:
+        teks_jawab += f"\nCatatan tambahan: {tambah}"
+    if not LOOP:
+        return jsonify({"error": "Mesin AI belum siap"}), 503
+    sisa, batas, lagi = panduan_sisa(r)
+    if sisa is not None and sisa <= 0:
+        return jsonify({"error": f"Jatah panduanmu {batas} per {PANDUAN_HARI} hari sudah terpakai." + (f" Bisa lagi mulai {tglid(lagi[:10])} pukul {lagi[11:16]}." if lagi else "")}), 429
+    with db() as c:
+        n = sql(c, "UPDATE panduan SET status='proses', jawaban=?, laporan=NULL, dikonfirmasi=?, diubah=? WHERE id=? AND status IN ('rencana','gagal')",
+                (teks_jawab, _now(), _now(), i)).rowcount
+    if not n:
+        return jsonify({"error": "Panduan ini sudah diproses."}), 400
+    fut = asyncio.run_coroutine_threadsafe(panduan_bangun(x["permintaan"], rc, teks_jawab), LOOP)
+    fut.add_done_callback(lambda f, i=i, o=x["oleh_id"]: _pd_selesai(i, o, f))
+    audit("panduan", "konfirmasi", str(x.get("judul") or "")[:120], oleh=nama_peran(r))
+    return jsonify({"panduan": panduan_tampil(_pd_row(i), r)})
+
+
+@app.route("/api/panduan/<int:i>/proyek", methods=["POST"])
+def api_panduan_proyek(i):
+    """Tautkan panduan ke proyek: tercatat di jurnal proyek supaya tim bisa membukanya."""
+    r = _pd_izin()
+    x = _pd_row(i)
+    if not x or x["status"] != "jadi":
+        return jsonify({"error": "Panduan belum jadi"}), 400
+    try:
+        pid = int((request.get_json(silent=True) or {}).get("proyek") or 0)
+    except (TypeError, ValueError):
+        pid = 0
+    if not pid:
+        with db() as c:
+            sql(c, "UPDATE panduan SET proyek_id=NULL, diubah=? WHERE id=?", (_now(), i))
+        return jsonify({"panduan": panduan_tampil(_pd_row(i), r)})
+    p = rk_get("proyek", pid)
+    if not p:
+        return jsonify({"error": "Proyek tidak ditemukan"}), 404
+    if not pl_boleh(p, r):
+        abort(403)
+    with db() as c:
+        sql(c, "UPDATE panduan SET proyek_id=?, diubah=? WHERE id=?", (pid, _now(), i))
+        pl_ins(c, pid, "catatan", f"Buku Panduan Rakit ditautkan: {x.get('judul') or 'Panduan'} (buka menu AI & Lab > Buku Panduan Rakit).", r)
+    return jsonify({"panduan": panduan_tampil(_pd_row(i), r)})
 
 
 # ---------- LAB MESIN AI (khusus Dev): bandingkan mesin dengan satu perintah yang sama ----------

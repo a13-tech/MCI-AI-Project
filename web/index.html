@@ -307,6 +307,19 @@ td{border-top:1px solid var(--line)}
 .it2 .meta{font-size:12.5px;color:var(--mute);margin-top:4px;display:flex;gap:6px 14px;flex-wrap:wrap}
 .it2 .bd{margin-top:10px;white-space:pre-wrap;line-height:1.6}
 .it2 .ac{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.pdG{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));margin-bottom:18px}.pdK{cursor:pointer}.pdK:hover{border-color:var(--gold,#D4AF5A)}
+.pdH{font:700 19px/1.3 var(--serif);color:var(--navy2);margin:22px 0 10px}
+.pdKonf{margin-top:16px;padding-top:14px;border-top:1px dashed var(--line)}.pdQ{display:block;font-weight:600;font-size:14px;margin:0 0 10px}.pdQ input,.pdQ textarea{display:block;width:100%;margin-top:6px}
+.pdWarn{background:#FFF6E0;border:1px solid #F2D58A;border-radius:10px;padding:12px 14px;margin:12px 0;font-size:14px;line-height:1.55}.pdWarn ul{margin:6px 0 0;padding-left:20px}.pdWarn.r{background:#FDECEA;border-color:#F5B5AE}
+.pdCek{background:#E9F7EF;border:1px solid #A9DFC0;border-radius:10px;padding:12px 14px;margin:12px 0 0;font-size:14px;line-height:1.55}
+.pdProses{display:flex;gap:12px;align-items:flex-start;background:#EEF3FF;border-radius:10px;padding:14px}.pdSpin{width:22px;height:22px;flex:none;border-radius:50%;border:3px solid #C7D5F5;border-top-color:#1B3A80;animation:pdPutar .9s linear infinite}@keyframes pdPutar{to{transform:rotate(360deg)}}
+.pdKom{display:flex;gap:12px;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--line)}.pdKom:first-of-type{border-top:0}.pdBeli{display:flex;gap:6px;flex:none}.pdBeli .bt{padding:7px 11px;font-size:13px}
+.pdNav{display:flex;gap:6px;flex-wrap:wrap}.pdNav button{min-width:36px;height:36px;border-radius:99px;border:1px solid var(--line);background:#fff;font-weight:700;color:var(--navy2);cursor:pointer}.pdNav button.ok{background:#DDF5E7;border-color:#A9DFC0;color:#0E6B3A}.pdNav button.on{background:var(--navy2);color:#F1D58A;border-color:var(--navy2)}
+.pdSvg{border-radius:12px;overflow-x:auto;overflow-y:hidden;border:1px solid var(--line);-webkit-overflow-scrolling:touch}.pdSvg svg{display:block;min-width:620px}
+.pdKabel{margin:12px 0 0;padding-left:22px;line-height:1.9;font-size:14px}.pdDot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:7px;vertical-align:-1px}
+.pdKode{position:relative}.pdKode pre{background:#0F1B33;color:#E6EDF7;border-radius:10px;padding:16px;overflow:auto;max-height:440px;font:12.5px/1.55 ui-monospace,Menlo,Consolas,monospace;margin:0}.pdKode .bt{position:absolute;top:8px;right:8px;padding:6px 10px;font-size:12.5px;background:#fff}
+.pdUji{border-top:1px solid var(--line);padding:10px 0}.pdUji:first-child{border-top:0}.pdUji summary{cursor:pointer}.pdUji p{margin:6px 0 0;font-size:14px;line-height:1.55}
+.pdGeser{display:none}@media (max-width:660px){.pdGeser{display:block}.pdKom{flex-direction:column;align-items:flex-start}.pdKabel{font-size:13.5px}}
 .it2 .ac .bt{min-height:34px;padding:6px 12px;font-size:12.5px}
 .it2.pin{border-left:3px solid var(--gold)}
 .kb{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
@@ -501,6 +514,7 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
  <button class="nv" data-p="apex" id="nvApex">Tanya Apex</button>
  <button class="nv" data-p="office">Virtual Office</button>
  <button class="nv" data-p="iot">Lab IoT</button>
+ <button class="nv" data-p="panduan">Buku Panduan Rakit</button>
  <button class="nv" data-p="laporan">Laporan</button>
  <button class="nv" data-p="memori">Memori</button>
  <button class="nv" data-p="skills">Skills</button>
@@ -545,6 +559,18 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
   <details class="cara"><summary>Tentang halaman ini</summary><p class="mu">Semua proyek yang sudah Selesai atau sedang Freeze tetap tersimpan di sini, termasuk proyek lama sebelum web ini ada. Pengurus dan tim boleh menambah catatan kapan saja; setiap tambahan mencatat nama dan tanggalnya. Uang proyek yang sudah tutup buku tetap terkunci.</p></details>
   <div class="bar"><div class="seg" style="margin:0;background:#EFECE4" id="arSeg"><button class="on" data-ar="">Semua</button><button data-ar="selesai">Selesai</button><button data-ar="ditunda">Freeze</button></div><span class="mu" id="arN" style="font-size:12.5px"></span></div>
   <div id="arBox"><p class="mu">Memuat…</p></div>
+ </section>
+ <section id="p-panduan" class="pg" hidden>
+  <div class="ey">AI &amp; Lab</div><h1>Buku Panduan Rakit</h1>
+  <details class="cara"><summary>Cara kerjanya</summary><p class="mu">Seperti buku manual Lego, tetapi untuk elektronika. (1) Tulis ide rakitanmu. (2) AI membuat <b>rencana singkat</b>: papan yang dipakai, perkiraan biaya, waktu, dan pertanyaan penting. (3) Kamu baca dan jawab pertanyaannya, atau minta rencananya diubah. (4) Setelah kamu konfirmasi, baru AI menulis panduan lengkap: isi kantong komponen dengan link beli, langkah demi langkah dengan diagram kabel, kode Arduino, dan cara mengatasi masalah. Setiap sambungan diperiksa mesin MCI terhadap peta pin papan sebelum panduan sampai ke kamu. Papan yang didukung: ESP32 DevKit V4, Arduino Nano, Arduino Uno. Harga adalah perkiraan AI; cek lagi di toko.</p></details>
+  <div id="pdAtas" class="cd">
+   <label style="display:block;font-weight:600;margin-bottom:6px" for="pdMinta">Mau merakit apa?</label>
+   <textarea id="pdMinta" rows="3" maxlength="1500" placeholder="Contoh: alat penyiram tanaman otomatis yang menyala kalau tanah kering, bisa dipantau dari hp."></textarea>
+   <div class="bar" style="margin:12px 0 0;flex-wrap:wrap"><label class="mu" style="display:flex;gap:8px;align-items:center;font-size:13.5px">Papan
+    <select id="pdPapan"><option value="">Biar AI pilihkan</option></select></label>
+    <button class="bt g" id="pdGo" type="button">Buat rencana</button><span class="mu" id="pdMsg" style="font-size:13px"></span></div>
+   <p class="mu" id="pdJatah" style="font-size:12.5px;margin:10px 0 0"></p></div>
+  <div id="pdBox"><p class="mu">Memuat…</p></div>
  </section>
  <section id="p-studio" class="pg" hidden>
   <div class="ey">Karya</div><h1>Studio 3D &amp; Kode</h1>
@@ -1496,6 +1522,7 @@ function show(p) {
   if (p === "jasa") jsMuat();
   if (p === "surat") srMuat();
   if (p === "studio") s3Muat();
+  clearTimeout(PD_T); if (p === "panduan") pdMuat();
   navBuka(p);
   if (p === "riwayat") rwMuat();
   if (p === "portofolio") pfMuat();
@@ -5789,6 +5816,151 @@ $("#srBox").addEventListener("click", async e => { const b = e.target.closest("b
 let JS = null, JS_PESAN = 0;
 const JS_ST = {menunggu: ["y", "Menunggu Dev"], aktif: ["g", "Aktif"], ditolak: ["r", "Ditolak"], nonaktif: ["n", "Nonaktif"], disetujui: ["g", "Disetujui"], selesai: ["n", "Selesai"]};
 const jsCh = st => `<span class="ch ${(JS_ST[st] || ["n"])[0]}">${(JS_ST[st] || ["", st])[1]}</span>`;
+/* ================= BUKU PANDUAN RAKIT ================= */
+var PD = null, PD_X = null, PD_T = 0, PD_L = 0, PD_UBAH = false;   // var: show() menyentuh PD_T sebelum baris ini dijalankan
+const PD_ST = {rencana: ["Menunggu konfirmasi", "y"], proses: ["Sedang dibuat", ""], jadi: ["Siap dirakit", "g"], gagal: ["Gagal dibuat", "r"], ditolak: ["Ditolak (keamanan)", "r"]};
+const pdCh = s => `<span class="ch ${(PD_ST[s] || ["", "n"])[1]}">${esc((PD_ST[s] || [s])[0])}</span>`;
+const pdSudah = id => { try { return JSON.parse(localStorage.getItem("pdSudah" + id) || "[]"); } catch (e) { return []; } };
+const pdSimpanSudah = (id, a) => { try { localStorage.setItem("pdSudah" + id, JSON.stringify(a)); } catch (e) {} };
+const pdRp = (a, b) => a || b ? (a === b || !b ? rp(a) : rp(a) + " – " + rp(b).replace("Rp ", "")) : "-";
+async function pdMuat(buka) {
+  try { PD = await api("/api/panduan"); }
+  catch (e) { $("#pdBox").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; return; }
+  const sel = $("#pdPapan"); if (sel.options.length < 2) sel.innerHTML += PD.papan.map(b => `<option value="${b.id}">${esc(b.nama)}</option>`).join("");
+  const j = PD.jatah;
+  $("#pdJatah").innerHTML = j.sisa == null ? "Dev: membuat panduan tanpa batas." : `Jatah panduan lengkap: <b>${j.sisa} dari ${j.batas}</b> tersisa per ${j.hari} hari${!j.sisa && j.lagi ? ` · bisa lagi ${esc(tglID(j.lagi))} pukul ${esc(j.lagi.slice(11, 16))}` : ""}. Membuat rencana tidak memakai jatah ini.`;
+  if (buka) return pdBuka(buka);
+  if (PD_X) return pdBuka(PD_X.id);
+  pdDaftar();
+}
+function pdDaftar() {
+  PD_X = null; $("#pdAtas").hidden = false;
+  const saya = PD.daftar.filter(x => x.oleh_id === PD.me && PD.me != null), lain = PD.daftar.filter(x => !(x.oleh_id === PD.me && PD.me != null));
+  const kartu = x => `<article class="it2 pdK" data-pdb="${x.id}" tabindex="0" role="button"><div class="ey">${esc(x.papan_nama || "Papan dipilih AI")}${x.kesulitan ? " · " + esc(x.kesulitan) : ""}</div><h3>${esc(x.judul)}</h3>
+    <div class="meta">${pdCh(x.status)}${x.langkah ? `<span>${x.langkah} langkah</span>` : ""}<span>Oleh ${esc(x.oleh)}</span><span>${esc(tglID(x.diubah || x.dibuat))}</span>${x.proyek_id ? '<span class="ch">Tertaut ke proyek</span>' : ""}</div></article>`;
+  let h = "";
+  if (saya.length) h += `<h2 class="pdH">Panduanku</h2><div class="pdG">${saya.map(kartu).join("")}</div>`;
+  if (lain.length) h += `<h2 class="pdH">${PD.admin ? "Semua panduan" : "Panduan anggota lain"}</h2><div class="pdG">${lain.map(kartu).join("")}</div>`;
+  $("#pdBox").innerHTML = h || '<div class="cd mu">Belum ada panduan. Tulis ide rakitan pertamamu di atas.</div>';
+  $$("[data-pdb]").forEach(b => { b.onclick = () => pdBuka(+b.dataset.pdb); b.onkeydown = e => { if (e.key === "Enter") pdBuka(+b.dataset.pdb); }; });
+}
+async function pdBuka(id) {
+  clearTimeout(PD_T);
+  try { const d = await api("/api/panduan/" + id); if (!PD_X || PD_X.id !== id) { PD_L = 0; PD_UBAH = false; } PD_X = d.panduan; }
+  catch (e) { alert(e.message); PD_X = null; return pdDaftar(); }
+  $("#pdAtas").hidden = true; pdDetail(); window.scrollTo({top: 0});
+  if (PD_X.status === "proses") PD_T = setTimeout(() => { if (PD_X && $("#p-panduan") && !$("#p-panduan").hidden) pdBuka(id).then(() => { if (PD_X && PD_X.status !== "proses") pdMuat(id); }); }, 5000);
+}
+function pdUjung(s, d) {
+  const [a, b] = String(s || "").split(":");
+  if ((a || "").toUpperCase() === "PAPAN") return `<b>${esc(d.papan_nama || "Papan")}</b> ${esc(b)}`;
+  let nm = a; (d.kantong || []).forEach(k => (k.komponen || []).forEach(c => { if (c.id === a) nm = c.nama; }));
+  return `<b>${esc(nm)}</b> ${esc(b)}`;
+}
+const PD_W = {merah: "#D92D20", hitam: "#1D2939", kuning: "#E7B008", hijau: "#12A150", biru: "#1570EF", oranye: "#F97316", jingga: "#F97316", ungu: "#7A5AF8", putih: "#98A2B3", coklat: "#8B5E34", cokelat: "#8B5E34", abu: "#667085", pink: "#EE46BC", cyan: "#06AED4"};
+function pdDetail() {
+  const x = PD_X, rc = x.rencana || {}, kembali = `<button class="bt o" id="pdKembali" type="button">← Semua panduan</button>`;
+  let h = `<div class="bar" style="margin:0 0 14px">${kembali}${x.milik && x.status !== "proses" ? `<button class="bt o" id="pdHapus" type="button">Hapus</button>` : ""}</div>`;
+  const chips = `<div class="meta">${pdCh(x.status)}<span class="ch">${esc(x.papan_nama || rc.papan || "-")}</span>${rc.kesulitan ? `<span>Tingkat: ${esc(rc.kesulitan)}</span>` : ""}${rc.waktu ? `<span>Waktu: ${esc(rc.waktu)}</span>` : ""}<span>Oleh ${esc(x.oleh)}</span></div>`;
+  if (x.status !== "jadi") {
+    h += `<article class="it2"><div class="ey">Rencana · tahap 1 dari 2</div><h3>${esc(rc.judul || "Rencana")}</h3>${chips}
+      <div class="bd">${esc(rc.ringkasan || "")}</div>
+      ${rc.alasan_papan ? `<p class="mu" style="margin:10px 0 0"><b>Kenapa ${esc(x.papan_nama)}:</b> ${esc(rc.alasan_papan)}</p>` : ""}
+      ${rc.biaya_min || rc.biaya_max ? `<p style="margin:10px 0 0">Perkiraan biaya komponen: <b>${pdRp(rc.biaya_min, rc.biaya_max)}</b> <span class="mu" style="font-size:12px">(perkiraan AI)</span></p>` : ""}
+      ${(rc.komponen_kira || []).length ? `<p class="mu" style="margin:10px 0 4px;font-weight:600">Komponen utama</p><div class="meta" style="gap:6px">${rc.komponen_kira.map(k => `<span class="ch n">${esc(k)}</span>`).join("")}</div>` : ""}
+      ${x.status === "ditolak" ? `<div class="pdWarn r" style="margin-top:14px"><b>Tidak dibuatkan panduan:</b> ${esc(rc.alasan_tolak || "permintaan ini berbahaya.")} Ubah permintaannya ke rangkaian tegangan rendah yang aman.</div>` : ""}
+      ${x.status === "gagal" ? `<div class="pdWarn r" style="margin-top:14px"><b>Panduan gagal dibuat.</b> ${esc(((x.laporan || {}).galat || []).join(" "))} Jatahmu tidak terpakai.</div>` : ""}
+      ${x.status === "proses" ? `<div class="pdProses" style="margin-top:14px"><span class="pdSpin" aria-hidden="true"></span><div><b>AI sedang menulis panduan dan mesin MCI sedang memeriksa setiap sambungan.</b><br><span class="mu">Biasanya 1–3 menit. Halaman ini memperbarui sendiri; boleh ditinggal, kabarnya masuk Inbox.</span></div></div>` : ""}
+      ${x.milik && ["rencana", "gagal"].includes(x.status) ? `<div class="pdKonf">
+        ${(rc.pertanyaan || []).length ? `<p style="font-weight:700;margin:0 0 8px">Jawab dulu supaya panduannya pas:</p>${rc.pertanyaan.map((q, i) => `<label class="pdQ">${esc(q)}<input type="text" data-pdq="${i}" maxlength="300" placeholder="Jawabanmu (boleh kosong, AI pakai pilihan paling aman)"></label>`).join("")}` : ""}
+        <label class="pdQ">Catatan tambahan (boleh kosong)<input type="text" id="pdCat" maxlength="500" placeholder="Contoh: aku sudah punya breadboard dan kabel jumper."></label>
+        <label style="display:flex;gap:10px;align-items:center;margin:12px 0 0;font-weight:600"><input type="checkbox" id="pdSetuju" style="width:20px;height:20px;flex:none"> Rencana sudah sesuai, buatkan panduan lengkapnya</label>
+        <p class="mu" style="font-size:12.5px;margin:6px 0 0">${PD.jatah.sisa == null ? "Dev: tanpa batas." : `Memakai 1 jatah (sisa ${PD.jatah.sisa} dari ${PD.jatah.batas} per ${PD.jatah.hari} hari).`}</p>
+        <div class="bar" style="margin:12px 0 0;flex-wrap:wrap"><button class="bt g" id="pdKonfirmasi" type="button" ${PD.jatah.sisa === 0 ? "disabled" : ""}>Konfirmasi &amp; buat panduan</button><button class="bt o" id="pdUbahBuka" type="button">Ubah rencana</button><span class="mu" id="pdKMsg" style="font-size:13px"></span></div></div>` : ""}
+      ${x.milik && x.status === "ditolak" ? `<div class="bar" style="margin:12px 0 0"><button class="bt o" id="pdUbahBuka" type="button">Ubah permintaan</button></div>` : ""}
+      ${PD_UBAH ? `<div class="pdKonf"><label class="pdQ">Apa yang mau diubah?<textarea id="pdUbahIsi" rows="2" maxlength="800" placeholder="Contoh: pakai Arduino Uno saja, dan tambahkan layar LCD."></textarea></label>
+        <div class="bar" style="margin:10px 0 0"><button class="bt g" id="pdUbahKirim" type="button">Buat ulang rencana</button><button class="bt o" id="pdUbahBatal" type="button">Batal</button><span class="mu" id="pdUMsg" style="font-size:13px"></span></div></div>` : ""}
+      <details style="margin-top:14px"><summary class="mu" style="cursor:pointer;font-size:13px">Permintaan asli</summary><p class="mu" style="white-space:pre-wrap;font-size:13px">${esc(x.permintaan)}</p></details></article>`;
+    $("#pdBox").innerHTML = h; pdPasang(); return;
+  }
+  const d = x.data, L = d.langkah || [], sudah = pdSudah(x.id);
+  PD_L = Math.max(0, Math.min(PD_L, L.length - 1));
+  const lg = L[PD_L] || {};
+  const war = (x.laporan || {}).peringatan || [];
+  h += `<article class="it2"><div class="ey">Buku panduan · ${esc(d.papan_nama)}</div><h3>${esc(d.judul)}</h3>${chips}<div class="bd">${esc(d.ringkasan || "")}</div>
+    <div class="meta" style="margin-top:10px"><span>Perkiraan biaya: <b>${pdRp(d.biaya.min, d.biaya.max)}</b></span><span>${L.length} langkah</span>${x.proyek ? `<span class="ch">Proyek: ${esc(x.proyek.nama)}</span>` : ""}</div>
+    <div class="ac"><button class="bt g" id="pdCetak" type="button">Cetak / simpan PDF</button><button class="bt o" id="pdTautBuka" type="button">${x.proyek ? "Ganti proyek" : "Tautkan ke proyek"}</button></div>
+    <div id="pdTaut"></div></article>`;
+  if (war.length) h += `<div class="pdWarn"><b>Perhatikan sebelum merakit</b><ul>${war.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>`;
+  h += `<h2 class="pdH">1 · Isi kantong</h2>` + (d.kantong || []).map(k => `<div class="cd pdKan"><h3 style="margin:0 0 10px;font-size:16px">${esc(k.nama)}</h3>${(k.komponen || []).map(c => `<div class="pdKom">
+      <div class="pdKomA"><b>${esc(c.nama)}</b> <span class="mu">× ${Math.max(1, +c.jumlah || 1)}</span><div class="mu" style="font-size:13px">${esc(c.fungsi || "")}</div>
+      <div class="meta" style="margin-top:4px"><span>${pdRp(c.harga_min, c.harga_max)} / buah</span>${c.stok ? `<span class="ch ${c.stok.jumlah > 0 ? "g" : "n"}">Stok MCI: ${esc(c.stok.nama)} (${c.stok.jumlah} ${esc(c.stok.satuan)})</span>` : ""}</div></div>
+      <div class="pdBeli"><a class="bt o" href="${esc(c.beli.tokopedia)}" target="_blank" rel="noopener">Tokopedia</a><a class="bt o" href="${esc(c.beli.shopee)}" target="_blank" rel="noopener">Shopee</a></div></div>`).join("")}</div>`).join("")
+    + ((d.alat || []).length ? `<div class="cd"><b>Alat yang disiapkan:</b> ${d.alat.map(esc).join(" · ")}</div>` : "");
+  h += `<h2 class="pdH">2 · Rakit langkah demi langkah</h2>
+    <div class="cd pdStep"><div class="pdNav">${L.map((_, i) => `<button type="button" data-pdl="${i}" class="${i === PD_L ? "on" : ""} ${sudah.includes(i) ? "ok" : ""}" aria-label="Langkah ${i + 1}">${sudah.includes(i) ? "✓" : i + 1}</button>`).join("")}</div>
+      <div class="ey" style="margin-top:12px">Langkah ${PD_L + 1} dari ${L.length}</div><h3 style="margin:2px 0 8px;font:700 20px/1.3 var(--serif);color:var(--navy2)">${esc(lg.judul || "")}</h3>
+      <p style="white-space:pre-wrap;line-height:1.65;margin:0 0 12px">${esc(lg.penjelasan || "")}</p>
+      <div class="pdSvg">${lg.diagram || ""}</div><p class="mu pdGeser" style="font-size:12px;margin:4px 0 0">Geser gambar ke samping untuk melihat semuanya.</p>
+      ${(lg.sambungan || []).length ? `<ol class="pdKabel">${lg.sambungan.map(s => `<li><span class="pdDot" style="background:${PD_W[String(s.warna || "").toLowerCase()] || "#1570EF"}"></span>${pdUjung(s.dari, d)} <span class="mu">→</span> ${pdUjung(s.ke, d)}${s.warna ? ` <span class="mu">(kabel ${esc(s.warna)})</span>` : ""}${s.pembagi_tegangan ? ' <span class="ch y">lewat pembagi tegangan</span>' : ""}</li>`).join("")}</ol>` : ""}
+      ${lg.peringatan ? `<div class="pdWarn r"><b>Hati-hati:</b> ${esc(lg.peringatan)}</div>` : ""}
+      ${lg.checkpoint ? `<div class="pdCek"><b>Cek dulu sebelum lanjut:</b> ${esc(lg.checkpoint)}</div>` : ""}
+      <div class="bar" style="margin:14px 0 0;flex-wrap:wrap"><button class="bt o" id="pdPrev" type="button" ${PD_L ? "" : "disabled"}>← Sebelumnya</button>
+        <button class="bt g" id="pdNext" type="button">${sudah.includes(PD_L) ? (PD_L < L.length - 1 ? "Lanjut →" : "Selesai merakit ✓") : (PD_L < L.length - 1 ? "Sudah, lanjut →" : "Sudah, selesai ✓")}</button></div></div>
+    <details class="cd"><summary style="cursor:pointer;font-weight:700">Lihat rangkaian lengkap</summary><div class="pdSvg" style="margin-top:12px">${d.diagram_lengkap || ""}</div></details>`;
+  h += `<h2 class="pdH">3 · Kode program</h2><div class="cd">${(d.pustaka || []).length ? `<p style="margin:0 0 8px"><b>Pasang library dulu</b> (Arduino IDE → Tools → Manage Libraries): ${d.pustaka.map(p => `<span class="ch n">${esc(p)}</span>`).join(" ")}</p>` : ""}
+    ${x.papan === "esp32" ? '<p class="mu" style="font-size:13px;margin:0 0 8px">Pilih board "ESP32 Dev Module" di Arduino IDE (pasang dulu paket board ESP32 dari Boards Manager).</p>' : `<p class="mu" style="font-size:13px;margin:0 0 8px">Pilih board "${x.papan === "nano" ? "Arduino Nano" : "Arduino Uno"}" di Arduino IDE.${x.papan === "nano" ? " Kalau gagal unggah, coba Processor: ATmega328P (Old Bootloader)." : ""}</p>`}
+    <div class="pdKode"><button class="bt o" id="pdSalin" type="button">Salin kode</button><pre><code>${esc(d.kode || "")}</code></pre></div>
+    ${d.penjelasan_kode ? `<p style="white-space:pre-wrap;line-height:1.6;margin:12px 0 0">${esc(d.penjelasan_kode)}</p>` : ""}</div>`;
+  if ((d.uji || []).length) h += `<h2 class="pdH">4 · Kalau belum jalan</h2><div class="cd">${d.uji.map(u => `<details class="pdUji"><summary><b>${esc(u.masalah)}</b></summary><p><b>Penyebab:</b> ${esc(u.penyebab)}</p><p><b>Solusi:</b> ${esc(u.solusi)}</p></details>`).join("")}</div>`;
+  h += `<p class="mu" style="font-size:12px">Harga dan link toko adalah perkiraan dan hasil pencarian, bukan rekomendasi penjual tertentu. Panduan ditulis AI dan diperiksa mesin MCI; tetap cek ulang sambungan sebelum menyalakan.</p>`;
+  $("#pdBox").innerHTML = h; pdPasang();
+}
+function pdPasang() {
+  const x = PD_X, on = (q, f) => { const e = $(q); if (e) e.onclick = f; };
+  on("#pdKembali", () => { clearTimeout(PD_T); PD_X = null; pdMuat(); window.scrollTo({top: 0}); });
+  on("#pdHapus", async () => { if (!confirm("Hapus panduan ini?")) return; try { await api("/api/panduan/" + x.id, {method: "DELETE"}); PD_X = null; pdMuat(); } catch (e) { alert(e.message); } });
+  on("#pdUbahBuka", () => { PD_UBAH = true; pdDetail(); const t = $("#pdUbahIsi"); if (t) t.focus(); });
+  on("#pdUbahBatal", () => { PD_UBAH = false; pdDetail(); });
+  on("#pdUbahKirim", async () => { const b = $("#pdUbahKirim"), t = $("#pdUbahIsi").value.trim(); if (t.length < 3) return $("#pdUMsg").textContent = "Tulis perubahannya dulu.";
+    b.disabled = true; $("#pdUMsg").textContent = "AI menulis ulang rencana…";
+    try { const d = await api(`/api/panduan/${x.id}/ubah`, {json: {catatan: t}}); PD_X = d.panduan; PD_UBAH = false; pdDetail(); } catch (e) { $("#pdUMsg").textContent = e.message; b.disabled = false; } });
+  on("#pdKonfirmasi", async () => { const b = $("#pdKonfirmasi");
+    if (!$("#pdSetuju").checked) return $("#pdKMsg").textContent = "Centang dulu kotak konfirmasinya.";
+    b.disabled = true; $("#pdKMsg").textContent = "Mengirim…";
+    try { const d = await api(`/api/panduan/${x.id}/konfirmasi`, {json: {setuju: true, jawaban: $$("[data-pdq]").map(i => i.value), catatan: $("#pdCat").value}}); PD_X = d.panduan; pdMuat(x.id); }
+    catch (e) { $("#pdKMsg").textContent = e.message; b.disabled = false; } });
+  $$("[data-pdl]").forEach(b => b.onclick = () => { PD_L = +b.dataset.pdl; pdDetail(); });
+  on("#pdPrev", () => { PD_L--; pdDetail(); $(".pdStep").scrollIntoView({block: "start"}); });
+  on("#pdNext", () => { const a = pdSudah(x.id); if (!a.includes(PD_L)) { a.push(PD_L); pdSimpanSudah(x.id, a); }
+    if (PD_L < x.data.langkah.length - 1) { PD_L++; pdDetail(); $(".pdStep").scrollIntoView({block: "start"}); } else { pdDetail(); pesan("Rangkaian selesai! Lanjut unggah kode di bagian 3."); } });
+  on("#pdSalin", async () => { try { await navigator.clipboard.writeText(x.data.kode || ""); pesan("Kode disalin"); } catch (e) { pesan("Tidak bisa menyalin otomatis; blok kodenya lalu salin manual."); } });
+  on("#pdCetak", pdCetak);
+  on("#pdTautBuka", async () => { const w = $("#pdTaut"); w.innerHTML = '<p class="mu">Memuat proyek…</p>';
+    try { const r = await api("/api/r/proyek"), its = (r.items || []).filter(p => !["selesai"].includes(p.status));
+      w.innerHTML = `<div class="bar" style="margin:12px 0 0;flex-wrap:wrap"><select id="pdTautSel"><option value="0">Tidak ditautkan</option>${its.map(p => `<option value="${p.id}" ${x.proyek_id === p.id ? "selected" : ""}>${esc(p.nama)}</option>`).join("")}</select><button class="bt g" id="pdTautOk" type="button">Simpan</button><span class="mu" id="pdTMsg" style="font-size:13px"></span></div>`;
+      $("#pdTautOk").onclick = async () => { try { const d = await api(`/api/panduan/${x.id}/proyek`, {json: {proyek: +$("#pdTautSel").value}}); PD_X = d.panduan; pdDetail(); pesan("Tautan proyek disimpan"); } catch (e) { $("#pdTMsg").textContent = e.message; } };
+    } catch (e) { w.innerHTML = '<p class="er">' + esc(e.message) + "</p>"; } });
+}
+function pdCetak() {
+  const x = PD_X, d = x.data;
+  $("#cetak").innerHTML = `<p>MCI · Mahardika Cakrawala Indonesia · Buku Panduan Rakit</p><h1>${esc(d.judul)}</h1><p>${esc(d.papan_nama)} · ${d.langkah.length} langkah · perkiraan biaya ${pdRp(d.biaya.min, d.biaya.max)}</p><p>${esc(d.ringkasan || "")}</p>
+    <h2>Isi kantong</h2>${(d.kantong || []).map(k => `<p><b>${esc(k.nama)}</b>\n${(k.komponen || []).map(c => `• ${esc(c.nama)} × ${Math.max(1, +c.jumlah || 1)}: ${esc(c.fungsi || "")}`).join("\n")}</p>`).join("")}
+    ${(d.alat || []).length ? `<p><b>Alat:</b> ${d.alat.map(esc).join(", ")}</p>` : ""}
+    <h2>Langkah</h2>${d.langkah.map((l, i) => `<div style="break-inside:avoid;margin-bottom:14px"><p><b>Langkah ${i + 1}: ${esc(l.judul)}</b>\n${esc(l.penjelasan || "")}</p><div style="max-width:640px">${l.diagram || ""}</div>
+      <p>${(l.sambungan || []).map(s => "• " + pdUjung(s.dari, d) + " → " + pdUjung(s.ke, d)).join("\n")}</p>${l.peringatan ? `<p><b>Hati-hati:</b> ${esc(l.peringatan)}</p>` : ""}${l.checkpoint ? `<p><b>Cek:</b> ${esc(l.checkpoint)}</p>` : ""}</div>`).join("")}
+    <h2>Kode program</h2>${(d.pustaka || []).length ? `<p>Library: ${d.pustaka.map(esc).join(", ")}</p>` : ""}<pre style="font:11px/1.45 monospace;white-space:pre-wrap">${esc(d.kode || "")}</pre>
+    ${(d.uji || []).length ? `<h2>Kalau belum jalan</h2>${d.uji.map(u => `<p><b>${esc(u.masalah)}</b>\nPenyebab: ${esc(u.penyebab)}\nSolusi: ${esc(u.solusi)}</p>`).join("")}` : ""}
+    <p style="margin-top:24px;font-size:12px">Dicetak dari MCI HQ. Panduan ditulis AI dan diperiksa mesin MCI.</p>`;
+  document.body.classList.add("ctk"); window.print();
+}
+$("#pdGo").onclick = async () => { const b = $("#pdGo"), t = $("#pdMinta").value.trim();
+  if (t.length < 10) return $("#pdMsg").textContent = "Ceritakan lebih jelas mau merakit apa.";
+  b.disabled = true; $("#pdMsg").textContent = "AI sedang menyusun rencana… (10–30 detik)";
+  try { const d = await api("/api/panduan", {json: {permintaan: t, papan: $("#pdPapan").value}}); $("#pdMinta").value = ""; $("#pdMsg").textContent = ""; PD_X = d.panduan; PD_L = 0; PD_UBAH = false; await pdMuat(d.panduan.id); }
+  catch (e) { $("#pdMsg").textContent = e.message; }
+  b.disabled = false; };
+
 async function jsMuat(url, opt) {
   try { JS = await api(url || "/api/jasa", opt); jsRender(); return true; }
   catch (e) { if (!JS) $("#jsBox").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; else alert(e.message); return false; }
@@ -6047,7 +6219,7 @@ function bukaHash() { if (rapatDariHash()) return; const p = (location.hash || "
   $("#whoRole").innerHTML = ADM() ? `<span class="wl">Masuk sebagai</span><span class="wh">Masuk sebagai</span> <b>Admin</b>`
     : `<span class="wl">Masuk sebagai</span><span class="wh">⚡ Hemat token</span> <b>${esc(NP)}</b>`;
   if (ME.role === "viewer") ["beranda", "arsip", "studio", "absen", "pengumuman", "agenda", "tugas", "proyek", "mitra", "alat", "skor", "riwayat", "struktur", "uu", "sidang", "putusan", "rekapkas", "konten"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // halaman organisasi & UU khusus anggota
-  if (ME.role === "viewer") $('.nv[data-p="jasa"]').style.display = "none";   // jasa internal khusus anggota
+  if (ME.role === "viewer") ["jasa", "panduan"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // jasa internal khusus anggota
   if (!ADM()) $('.nv[data-p="surat"]').style.display = "none";   // surat penerimaan khusus Dev
   if (ME.role === "viewer") ["blacklist", "sp"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // viewer tidak boleh melihat blacklist
   if (ME.role !== "admin") $('.nv[data-p="backup"]').style.display = "none";   // backup seluruh data khusus Pemilik/Dev
