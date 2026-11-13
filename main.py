@@ -103,6 +103,9 @@ try:
 except ValueError:
     MCP_SERVERS = []
 
+# Proyek unggulan yang sedang berjalan (poster tampil di Tentang Kami dan Beranda).
+PROYEK_SOROT = [{"nama": "JalaDhipa-1", "sub": "The Undercover Military Cargo Ship", "gambar": "/aset/jaladhipa-1.webp", "status": "Sedang berjalan",
+                 "tim": ["A13", "A30", "A11", "N01", "R22", "S17", "S19"]}]
 # Seri sistem AI MCI, urut dari yang pertama. Yang terakhir = versi yang sedang dipakai.
 AI_SERI = [{"seri": "1 Genesis", "ket": "Seri pertama sistem AI MCI. Desain web pertamanya: MCI Virtual Office, kantor isometrik berisi agen-agen AI yang bekerja dan beristirahat di meja masing-masing.",
             "gambar": "/aset/genesis-virtual-office.webp", "video": "/aset/genesis-virtual-office.mp4"},
@@ -2944,6 +2947,7 @@ def api_tentang():
         return jsonify(tentang_save(request.get_json(silent=True) or {}))
     t = tentang_get()
     t["ai_seri"] = AI_SERI
+    t["sorot"] = PROYEK_SOROT
     if mid_of(role()) is None and not is_admin(role()):   # viewer: nomor WA hanya lewat Pusat Info (dicek aman dulu)
         t["kontak"] = {k: v for k, v in t["kontak"].items() if k != "wa"}
     return jsonify(t)
@@ -5061,7 +5065,7 @@ def api_beranda():
               if x.get("status") in ("berjalan", "ide") and (me is None or me in (x.get("tim") or []) or x.get("pj") == me)][:6]
     umum = [{"judul": x.get("judul", ""), "tanggal": (x.get("dibuat") or "")[:10]} for x in sorted(rk_rows("pengumuman"), key=lambda x: (-bool(x.get("sematkan")), -x["id"]))[:3]]
     perlu.sort(key=lambda x: not x["penting"])
-    return jsonify({"nama": m["nama"] if m else nama_peran(r), "hari": tglid(hi), "perlu": perlu, "info": info, "proyek": proyek, "pengumuman": umum})
+    return jsonify({"nama": m["nama"] if m else nama_peran(r), "hari": tglid(hi), "perlu": perlu, "info": info, "proyek": proyek, "pengumuman": umum, "sorot": PROYEK_SOROT})
 
 
 # ---------- MESIN KODE: Gemini sekarang; otomatis pindah ke Claude kalau ANTHROPIC_API_KEY dipasang di Render ----------
