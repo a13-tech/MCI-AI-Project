@@ -5932,7 +5932,7 @@ $$("#s3Seg button").forEach(b => b.onclick = () => { S3_J = b.dataset.s3; S3_DAR
 function s3Render() {
   const d = S3; if (!d) return;
   $("#s3Buat").hidden = !d.buat; $("#labMesin").hidden = !d.admin;
-  const info = `<p class="mu" style="font-size:12.5px">Mesin: ${esc({claude: "Claude", gemini: "Gemini", groq: "Groq", cerebras: "Cerebras", openrouter: "OpenRouter", mistral: "Mistral"}[d.mesin] || d.mesin)}${d.kuota ? ` · jatah hari ini ${d.kuota.pakai} dari ${d.kuota.batas}` : ""}${d.buat ? "" : " · jabatan atau divisimu hanya bisa melihat dan mengunduh"}</p>`;
+  const info = `<p class="mu" style="font-size:12.5px">Mesin: ${esc({claude: "Claude", gemini: "Gemini", argon: "Gemini 4 Argon", groq: "Groq", cerebras: "Cerebras", openrouter: "OpenRouter", mistral: "Mistral"}[d.mesin] || d.mesin)}${d.kuota ? ` · jatah hari ini ${d.kuota.pakai} dari ${d.kuota.batas}` : ""}${d.buat ? "" : " · jabatan atau divisimu hanya bisa melihat dan mengunduh"}</p>`;
   if (S3_J === "3d") $("#s3Box").innerHTML = info + (d.model.length ? `<div class="s3g">${d.model.map(m => { const u = (m.laporan.ukuran_mm || {}), w = m.laporan.peringatan || [];
     return `<article class="it2"><img src="/api/studio/3d/${m.id}.svg" alt="Pratinjau ${esc(m.judul)}" loading="lazy" width="520" height="400"><h3 style="margin-top:10px">${esc(m.judul)}</h3>
     <div class="meta"><span>${u.panjang_x} × ${u.lebar_y} × ${u.tinggi_z} mm</span><span>${m.laporan.volume_cm3} cm³</span><span>${esc(m.oleh)} · ${esc(tglID(m.dibuat))}</span></div>
@@ -5951,7 +5951,7 @@ function s3Render() {
 let LAB_MODE = "teks", LAB_T = 0;
 async function labMuat() {
   try { const d = await api("/api/mesin");
-    $("#labDaftar").innerHTML = d.mesin.map(m => `<label style="opacity:${m.siap ? 1 : .55}"><input type="checkbox" value="${m.id}" ${m.siap ? "checked" : "disabled"}> ${esc(m.nama)} <span class="mu">${esc(m.model)}${m.siap ? "" : " · kunci belum diisi"}${m.id === d.studio ? " · dipakai Studio" : ""}</span></label>`).join("");
+    $("#labDaftar").innerHTML = d.mesin.map(m => `<label style="opacity:${m.siap ? 1 : .55}"><input type="checkbox" value="${m.id}" ${m.siap ? "checked" : "disabled"}> ${esc(m.nama)} <span class="mu">${esc(m.model)}${m.siap ? "" : " · " + esc(m.catatan || "kunci belum diisi")}${m.id === d.studio ? " · dipakai Studio" : ""}</span></label>`).join("");
   } catch (e) { $("#labDaftar").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
 }
 $("#labSeg").onclick = e => { const b = e.target.closest("[data-lab]"); if (!b) return; LAB_MODE = b.dataset.lab; $$("#labSeg button").forEach(x => x.classList.toggle("on", x === b));

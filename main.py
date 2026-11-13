@@ -5062,6 +5062,10 @@ MESIN_LAIN = {
                    "model": os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free")},
     "mistral": {"nama": "Mistral", "url": "https://api.mistral.ai/v1/chat/completions", "kunci": "MISTRAL_API_KEY", "model": os.getenv("MISTRAL_MODEL", "mistral-small-latest")},
 }
+# Gemini 4 Argon: model terkuat Google (rilis umum 13 Okt 2026), BERBAYAR saja (tidak ada di paket gratis).
+# Aktif hanya kalau ARGON_AKTIF=1 (tanda billing Gemini sudah dinyalakan). Gagal/ditolak -> otomatis jatuh ke mesin biasa.
+ARGON_MODEL = os.getenv("ARGON_MODEL", "gemini-4-argon")
+ARGON_AKTIF = os.getenv("ARGON_AKTIF", "").strip() in ("1", "true", "ya")
 AI_KODE = os.getenv("AI_KODE", "").strip().lower()   # mesin pilihan Studio: claude | gemini | groq | cerebras | openrouter | mistral (kosong = otomatis)
 
 
@@ -5072,11 +5076,15 @@ def mesin_kunci(k):
 def mesin_daftar():
     """Semua mesin + apakah kuncinya sudah diisi. Tidak pernah mengembalikan isi kunci."""
     out = [{"id": "gemini", "nama": "Gemini", "model": MODEL, "siap": bool(client("canvas"))},
+           {"id": "argon", "nama": "Gemini 4 Argon", "model": ARGON_MODEL, "siap": bool(client("canvas")) and ARGON_AKTIF,
+            "catatan": "" if ARGON_AKTIF else "berbayar: nyalakan billing Gemini, lalu isi ARGON_AKTIF=1 di Render"},
            {"id": "claude", "nama": "Claude", "model": CLAUDE_MODEL, "siap": bool(ANTHROPIC_KEY)}]
     return out + [{"id": k, "nama": v["nama"], "model": v["model"], "siap": bool(mesin_kunci(k))} for k, v in MESIN_LAIN.items()]
 
 
 def mesin_kode():
+    if AI_KODE == "argon" and ARGON_AKTIF and client("canvas"):
+        return "argon"
     if AI_KODE == "gemini" or (AI_KODE in MESIN_LAIN and mesin_kunci(AI_KODE)):
         return AI_KODE
     return "claude" if ANTHROPIC_KEY else "gemini"
@@ -5111,6 +5119,11 @@ def _claude(sistem, prompt, maks=8000):
 async def kode_ai(sistem, prompt, act, schema=None):
     """Kembalikan teks mentah dari mesin kode. Urutan: mesin pilihan (AI_KODE) -> Claude kalau kuncinya ada -> Gemini. Yang gagal dilewati."""
     pilih = mesin_kode()
+    if pilih == "argon":
+        try:
+            return await ask("canvas", prompt, sistem=sistem, schema=schema, use_mcp=False, cache=False, act=act + " (Argon)", model=ARGON_MODEL), "argon"
+        except Exception:
+            log.exception("Gemini 4 Argon gagal (billing belum aktif / kuota?), pakai mesin cadangan")
     if pilih in MESIN_LAIN:
         try:
             return await asyncio.to_thread(_kompatibel, pilih, sistem, prompt, 8000, schema is not None), pilih
@@ -5230,6 +5243,8 @@ async def model3d_buat(permintaan, lama=None):
 async def _mesin_jawab(mid, sistem, prompt, json_mode):
     if mid == "gemini":
         return await ask("canvas", prompt, sistem=sistem, schema=Resep3D if json_mode else None, use_mcp=False, cache=False, act="Uji mesin AI", model=MODEL)
+    if mid == "argon":
+        return await ask("canvas", prompt, sistem=sistem, schema=Resep3D if json_mode else None, use_mcp=False, cache=False, act="Uji mesin AI (Argon)", model=ARGON_MODEL)
     if mid == "claude":
         return await asyncio.to_thread(_claude, sistem, prompt)
     return await asyncio.to_thread(_kompatibel, mid, sistem, prompt, 8000, json_mode)
