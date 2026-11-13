@@ -363,6 +363,12 @@ def db_init():
                 sql(c, f"ALTER TABLE perpus ADD COLUMN {kol}")
         except Exception:
             pass   # sudah ada
+    for kol in ("rincian TEXT", "metode TEXT"):   # bayar kas: jumlah per minggu (cicilan / jumlah khusus) dan cara bayar (tunai/transfer)
+        try:
+            with db() as c:
+                sql(c, f"ALTER TABLE bayar_kas ADD COLUMN {kol}")
+        except Exception:
+            pass   # sudah ada
     try:   # setelan khusus Dev: jasa boleh tampil di katalog publik
         with db() as c:
             sql(c, "ALTER TABLE jasa ADD COLUMN publik INTEGER NOT NULL DEFAULT 0")
@@ -6080,7 +6086,7 @@ def rekap_kas(r, minggu=None):
         tg = a["tunggak"]
         denda = DENDA_KAS if (tanpa and a["tingkat"] == "biasa") else 0
         b = {k: v for k, v in a.items() if k != "tunggak_semua"}
-        baris.append({**b, "tagihan": tg * a["nominal"] + denda, "denda": denda, "denda_manual": bool(tanpa and a["tingkat"] == "ringan"),
+        baris.append({**b, "tagihan": a.get("tunggak_rp", tg * a["nominal"]) + denda, "denda": denda, "denda_manual": bool(tanpa and a["tingkat"] == "ringan"),
                       "izin_pakai": len(iz), "izin_minggu_ini": d["minggu"] in iz, "tanpa_izin": len(tanpa), "hak_dicabut": len(tanpa) >= 2})
     lk = (SET.get("lapkas") or {}).get(d["minggu"])
     batas = lapkas_tenggat(d["minggu"])
@@ -6652,33 +6658,56 @@ def nominal_of(mid):
 
 def bayar_rows():
     with db() as c:
-        rows = sql(c, "SELECT id,anggota,nama,periode,jumlah,status,catatan,alasan,dibuat,dikonfirmasi,oleh FROM bayar_kas ORDER BY id DESC LIMIT 5000").fetchall()
+        rows = sql(c, "SELECT id,anggota,nama,periode,jumlah,status,catatan,alasan,dibuat,dikonfirmasi,oleh,rincian,metode,"
+                      "CASE WHEN foto IS NULL OR foto='' THEN 0 ELSE 1 END FROM bayar_kas ORDER BY id DESC LIMIT 5000").fetchall()
     out = []
-    for i, a, n, p, j, s, ca, al, d, k, o in rows:
+    for i, a, n, p, j, s, ca, al, d, k, o, rc, mt, ft in rows:
         try:
             mg = json.loads(p or "[]")
         except ValueError:
             mg = []
+        try:
+            rinci = {str(x): int(v) for x, v in (json.loads(rc) if rc else {}).items()}
+        except (ValueError, TypeError, AttributeError):
+            rinci = {}
+        if not rinci and mg:   # data lama: jumlah dibagi rata ke minggu yang dibayar
+            rinci = {x: int(j or 0) // len(mg) for x in mg}
         out.append({"id": int(i), "anggota": int(a), "nama": n, "minggu": mg, "minggu_label": [minggu_label(x) for x in mg if minggu_valid(x)], "jumlah": int(j or 0),
-                    "status": s, "catatan": ca or "", "alasan": al or "", "dibuat": d or "", "dikonfirmasi": k or "", "oleh": o or ""})
+                    "status": s, "catatan": ca or "", "alasan": al or "", "dibuat": d or "", "dikonfirmasi": k or "", "oleh": o or "", "rincian": rinci,
+                    "metode": mt or "", "ada_foto": bool(ft)})
     return out
 
 
+def _dibayar(rows, mid, k):
+    """(sudah lunas, sedang menunggu konfirmasi) dalam rupiah untuk minggu k."""
+    lunas = sum(x["rincian"].get(k, 0) for x in rows if x["anggota"] == mid and x["status"] == "lunas" and k in x["minggu"])
+    tunggu = sum(x["rincian"].get(k, 0) for x in rows if x["anggota"] == mid and x["status"] == "menunggu" and k in x["minggu"])
+    return lunas, tunggu
+
+
+def _sisa_minggu(rows, mid, k):
+    return max(0, int(nominal_of(mid) or 0) - _dibayar(rows, mid, k)[0])
+
+
 def _st_minggu(rows, mid, k):
-    st = "belum"
-    for x in rows:
-        if x["anggota"] == mid and k in x["minggu"]:
-            if x["status"] == "lunas":
-                return "lunas"
-            if x["status"] == "menunggu":
-                st = "menunggu"
-    return st
+    """lunas | menunggu | kurang (baru dibayar sebagian) | belum."""
+    nom = int(nominal_of(mid) or 0)
+    lunas, tunggu = _dibayar(rows, mid, k)
+    if lunas >= nom:
+        return "lunas"
+    if tunggu:
+        return "menunggu"
+    return "kurang" if lunas > 0 else "belum"
 
 
 def minggu_bisa_bayar(rows, mid):
-    """Minggu yang boleh dibayar: sejak mulai s/d 4 minggu ke depan, yang belum lunas & tidak sedang menunggu."""
+    """Minggu yang boleh dibayar: sejak mulai s/d 4 minggu ke depan, yang belum lunas (termasuk yang baru dibayar sebagian) & tidak sedang menunggu."""
     cur, d = minggu_key(), iuran_set()
-    return [k for k in minggu_antara(d["mulai"], minggu_geser(cur, 4)) if _st_minggu(rows, mid, k) == "belum"][-16:]
+    return [k for k in minggu_antara(d["mulai"], minggu_geser(cur, 4)) if _st_minggu(rows, mid, k) in ("belum", "kurang")][-16:]
+
+
+def _pilihan_minggu(rows, mid):
+    return [{"k": k, "label": minggu_label(k), "sisa": _sisa_minggu(rows, mid, k)} for k in minggu_bisa_bayar(rows, mid)]
 
 
 def penerima_konfirmasi(kecuali=None):
@@ -6696,10 +6725,11 @@ def iuran_data(r, minggu=None):
     anggota = []
     for m in sorted((m for m in MEMBERS.values() if m["aktif"]), key=lambda m: m["nama"].lower()):
         t = tingkat_of(m["id"])
-        tg = [] if t == "bebas" else [k for k in lalu if _st_minggu(rows, m["id"], k) == "belum"]
+        tg = [] if t == "bebas" else [k for k in lalu if _st_minggu(rows, m["id"], k) in ("belum", "kurang")]
         anggota.append({"id": m["id"], "nama": m["nama"], "tingkat": t, "tingkat_label": TINGKAT[t], "nominal": nominal_of(m["id"]),
-                        "status": "bebas" if t == "bebas" else _st_minggu(rows, m["id"], minggu), "tunggak": len(tg), "tunggak_minggu": tg[-8:], "tunggak_semua": tg})
-    masuk = sum(x["jumlah"] // max(1, len(x["minggu"])) for x in rows if x["status"] == "lunas" and minggu in x["minggu"])
+                        "status": "bebas" if t == "bebas" else _st_minggu(rows, m["id"], minggu), "tunggak": len(tg), "tunggak_minggu": tg[-8:], "tunggak_semua": tg,
+                        "sisa": 0 if t == "bebas" else _sisa_minggu(rows, m["id"], minggu), "tunggak_rp": sum(_sisa_minggu(rows, m["id"], k) for k in tg)})
+    masuk = sum(x["rincian"].get(minggu, 0) for x in rows if x["status"] == "lunas" and minggu in x["minggu"])
     wajib = [a for a in anggota if a["tingkat"] != "bebas"]
     out = {"minggu": minggu, "label": minggu_label(minggu), "sekarang": cur, "mulai": d["mulai"], "mulai_tgl": _senin(d["mulai"]).isoformat(), "no_sekarang": minggu_no(cur), "no": minggu_no(minggu), "prev": minggu_geser(minggu, -1) if minggu > d["mulai"] else None,
            "next": minggu_geser(minggu, 1) if minggu < minggu_geser(cur, 4) else None, "tarif": {"biasa": d["biasa"], "ringan": d["ringan"]}, "tingkat_nama": TINGKAT,
@@ -6707,11 +6737,11 @@ def iuran_data(r, minggu=None):
            "bisa_konfirmasi": konf, "saya": None, "menunggu": [], "riwayat": []}
     if mine is not None and mine in MEMBERS:
         out["saya"] = {"id": mine, "tingkat": tingkat_of(mine), "tingkat_label": TINGKAT[tingkat_of(mine)], "nominal": nominal_of(mine),
-                       "pilihan": [{"k": k, "label": minggu_label(k)} for k in minggu_bisa_bayar(rows, mine)], "bendahara": "bendahara" in MEMBERS[mine]["jabatan"]}
+                       "pilihan": _pilihan_minggu(rows, mine), "bendahara": "bendahara" in MEMBERS[mine]["jabatan"]}
     if konf:
         out["menunggu"] = [x for x in rows if x["status"] == "menunggu"][:100]
         out["riwayat"] = rows[:60]
-        out["pilihan_anggota"] = {str(a["id"]): [{"k": k, "label": minggu_label(k)} for k in minggu_bisa_bayar(rows, a["id"])] for a in wajib}
+        out["pilihan_anggota"] = {str(a["id"]): _pilihan_minggu(rows, a["id"]) for a in wajib}
     elif mine is not None:
         out["riwayat"] = [x for x in rows if x["anggota"] == mine][:30]
     return out
@@ -6759,22 +6789,49 @@ def api_iuran_bayar():
         return jsonify({"error": "Pilih minimal satu minggu yang dibayar"}), 400
     if any(k not in boleh for k in mg):
         return jsonify({"error": "Ada minggu yang sudah lunas, sedang menunggu konfirmasi, atau di luar jangkauan. Muat ulang halaman."}), 400
+    metode = "transfer" if str(request.form.get("metode") or "") == "transfer" else "tunai"
     f = request.files.get("foto")
     data = f.read(4_000_001) if f and f.filename else b""
     mime = _gambar_mime(data) if data else None
-    if not mime:
-        return jsonify({"error": "Wajib lampirkan foto bukti (foto uangnya atau bukti transfer), format JPG/PNG/WEBP"}), 400
+    if data and not mime:
+        return jsonify({"error": "Foto bukti harus JPG/PNG/WEBP"}), 400
     if len(data) > 4_000_000:
         return jsonify({"error": "Foto maksimal 4 MB"}), 400
-    jumlah = nominal_of(m["id"]) * len(mg)
+    if metode == "transfer" and not mime:   # bukti hanya wajib untuk transfer; tunai boleh tanpa foto
+        return jsonify({"error": "Bayar lewat transfer wajib melampirkan foto bukti transfer."}), 400
+    sisa = {k: _sisa_minggu(rows, m["id"], k) for k in mg}
+    khusus_raw = str(request.form.get("jumlah") or "").strip()
+    if khusus_raw:   # jumlah khusus (mis. baru bayar Rp18.000): hanya Bendahara/Dev, dibagi ke minggu yang dipilih berurutan
+        if not konf:
+            return jsonify({"error": "Jumlah khusus hanya bisa dicatat Bendahara atau Dev."}), 403
+        try:
+            n = int(re.sub(r"[^\d]", "", khusus_raw) or 0)
+        except ValueError:
+            n = 0
+        if n <= 0:
+            return jsonify({"error": "Jumlah harus lebih dari 0"}), 400
+        if n > sum(sisa.values()):
+            return jsonify({"error": f"Jumlah melebihi tagihan minggu yang dipilih ({rp(sum(sisa.values()))}). Pilih minggu tambahan kalau dia bayar di muka."}), 400
+        rinci, tinggal = {}, n
+        for k in mg:
+            bagian = min(tinggal, sisa[k])
+            if bagian:
+                rinci[k] = bagian
+                tinggal -= bagian
+        mg = sorted(rinci)
+    else:
+        rinci = {k: v for k, v in sisa.items() if v > 0}
+    jumlah = sum(rinci.values())
+    if jumlah <= 0:
+        return jsonify({"error": "Minggu yang dipilih sudah lunas."}), 400
     sendiri = untuk == "" or int(untuk) == mid_of(r)
     auto = (konf and not sendiri) or "bendahara" in m["jabatan"]   # dicatat Bendahara langsung, atau Bendahara bayar sendiri
     oleh = nama_peran(r)
     catatan = str(request.form.get("catatan") or "").strip()[:300]
     with db() as c:
-        q = "INSERT INTO bayar_kas (anggota,nama,periode,jumlah,mime,foto,status,catatan,dibuat,dikonfirmasi,oleh) VALUES (?,?,?,?,?,?,?,?,?,?,?)"
-        p = (m["id"], m["nama"], json.dumps(mg), jumlah, mime, base64.b64encode(data).decode(), "lunas" if auto else "menunggu", catatan, _now(),
-             _now() if auto else None, oleh if auto else None)
+        q = "INSERT INTO bayar_kas (anggota,nama,periode,jumlah,mime,foto,status,catatan,dibuat,dikonfirmasi,oleh,rincian,metode) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
+        p = (m["id"], m["nama"], json.dumps(mg), jumlah, mime, base64.b64encode(data).decode() if mime else "", "lunas" if auto else "menunggu", catatan, _now(),
+             _now() if auto else None, oleh if auto else None, json.dumps(rinci), metode)
         pid = int(sql(c, q + " RETURNING id", p).fetchone()[0] if PG else sql(c, q, p).lastrowid)
     lbl = ", ".join(minggu_label(k) for k in mg)
     if auto:
@@ -6783,12 +6840,14 @@ def api_iuran_bayar():
             sql(c, "UPDATE bayar_kas SET kas_id=? WHERE id=?", (kid, pid))
         if sendiri:
             inbox_kirim([x for x in penerima_konfirmasi(m["id"]) if x == 0] + [x["id"] for x in MEMBERS.values() if x["aktif"] and "admin" in x["jabatan"] and x["id"] != m["id"]],
-                        "info", f"{m['nama']} (Bendahara) bayar kas {lbl}", f"{rp(jumlah)}, otomatis lunas. Bukti foto ada di halaman Bayar Kas.", pid, tg=False)
+                        "info", f"{m['nama']} (Bendahara) bayar kas {lbl}", f"{rp(jumlah)} ({metode}), otomatis lunas." + (" Bukti foto ada di halaman Bayar Kas." if mime else ""), pid, tg=False)
         else:
-            inbox_kirim([m["id"]], "bayar_ok", f"Bendahara mencatat iuran kas kamu {lbl} ✓", f"{rp(jumlah)} dicatat oleh {oleh}. Nama kamu sudah hijau.", pid)
+            kurang = sum(_sisa_minggu(bayar_rows(), m["id"], k) for k in mg)
+            inbox_kirim([m["id"]], "bayar_ok", f"Bendahara mencatat iuran kas kamu {lbl} ✓",
+                        f"{rp(jumlah)} dicatat oleh {oleh}." + (f" Masih kurang {rp(kurang)} untuk minggu itu." if kurang else " Nama kamu sudah hijau."), pid)
     else:
         inbox_kirim(penerima_konfirmasi(m["id"]), "bayar_kas", f"{m['nama']} bayar kas {lbl}", f"{rp(jumlah)} ({TINGKAT[tingkat_of(m['id'])]})"
-                    + (f" · catatan: {catatan}" if catatan else "") + ". Cek foto bukti lalu Terima atau Tolak.", pid)
+                    + f" · {metode}" + (f" · catatan: {catatan}" if catatan else "") + (". Cek foto bukti lalu Terima atau Tolak." if mime else ". Tanpa foto (tunai): pastikan uangnya sudah kamu terima, lalu Terima atau Tolak."), pid)
     return jsonify({"ok": True, "status": "lunas" if auto else "menunggu", **iuran_data(r, mg[0])})
 
 

@@ -933,7 +933,7 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
 
  <section id="p-bayarkas" class="pg" hidden>
   <h1>Bayar Kas</h1>
-  <p class="mu">Iuran kas <b>mingguan</b> (Minggu ke-1, ke-2, dst; Bendahara mengumumkan minggu ke berapa yang ditagih di grup WA). Setiap pembayaran <b>wajib foto bukti</b> (foto uangnya atau bukti transfer). Setelah kamu menekan <b>Saya sudah bayar</b>, Bendahara dapat notifikasi di Inbox untuk konfirmasi. Begitu diterima, namamu jadi <b style="color:#0E6B3A">hijau</b> dan uangnya tercatat otomatis di buku kas. Anggota berstatus <b>Tidak bayar</b> adalah <b>peminjam</b>: tidak punya hak atas barang dan komponen MCI, hanya boleh meminjam.</p>
+  <p class="mu">Iuran kas <b>mingguan</b> (Minggu ke-1, ke-2, dst; Bendahara mengumumkan minggu ke berapa yang ditagih di grup WA). Bayar <b>tunai</b> tidak perlu foto; bayar lewat <b>transfer</b> wajib melampirkan foto bukti transfer. Setelah kamu menekan <b>Saya sudah bayar</b>, Bendahara dapat notifikasi di Inbox untuk konfirmasi. Begitu diterima, namamu jadi <b style="color:#0E6B3A">hijau</b> dan uangnya tercatat otomatis di buku kas. Anggota berstatus <b>Tidak bayar</b> adalah <b>peminjam</b>: tidak punya hak atas barang dan komponen MCI, hanya boleh meminjam.</p>
   <div class="bar" style="flex-wrap:nowrap"><button class="bt o" id="bkPrev" aria-label="Minggu sebelumnya">‹</button><b id="bkLabel" style="flex:0 1 auto;min-width:0;text-align:center">Memuat…</b><button class="bt o" id="bkNext" aria-label="Minggu berikutnya">›</button><button class="bt o" id="bkNow">Minggu ini</button></div>
   <div class="gr">
    <div class="cd"><div class="k">Sudah lunas</div><div class="v" id="bk1">-</div></div>
@@ -948,9 +948,10 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
    <div class="tb" style="margin-top:12px"><table><thead><tr><th>Anggota</th><th>Tingkat</th><th class="rt">Per minggu</th></tr></thead><tbody id="bkTk"></tbody></table></div>
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="bkSaveT">Simpan pengaturan</button><span class="mu" id="bkMsgT"></span></div>
    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
-   <b>Catat pembayaran anggota</b><div class="mu" style="font-size:12.5px">Untuk yang bayar langsung ke Bendahara. Tetap wajib foto bukti; langsung tercatat lunas.</div>
-   <div class="fl" style="margin-top:10px"><label>Anggota<select id="bkCA"></select></label><label>Foto bukti<input type="file" id="bkCF" accept="image/*" capture="environment"></label></div>
-   <div class="bkw" id="bkCW"></div>
+   <b>Catat pembayaran anggota</b><div class="mu" style="font-size:12.5px">Untuk yang bayar langsung ke Bendahara; langsung tercatat. Kalau dia bayar kurang dari tagihan, isi <b>Jumlah khusus</b> (misal Rp18.000): sisanya otomatis tercatat sebagai kekurangan.</div>
+   <div class="fl" style="margin-top:10px"><label>Anggota<select id="bkCA"></select></label><label>Jumlah khusus (Rp, kosongkan = bayar penuh)<input type="number" id="bkCJ" min="1" step="500" inputmode="numeric" placeholder="contoh: 18000"></label>
+    <div class="full"><div class="k">Cara bayar</div><div id="bkcWrap"></div></div><label id="bkCFL">Foto bukti (tidak wajib untuk tunai)<input type="file" id="bkCF" accept="image/*" capture="environment"></label></div>
+   <div class="bkw" id="bkCW"></div><div class="mu" id="bkCInfo" style="font-size:13px;margin-top:6px"></div>
    <div class="bar" style="margin:10px 0 0"><button class="bt g" id="bkCS">Catat lunas</button><span class="mu" id="bkMsgC"></span></div>
   </div>
   <div class="cd" style="padding:0"><div class="bar" style="padding:16px 20px 0;margin:0"><b id="bkRT">Riwayat pembayaran</b></div>
@@ -2440,7 +2441,7 @@ async function loadRekapKas(minggu) {
     ${lp.denda_bendahara && lp.denda_bendahara.length ? `<div class="ch r" style="display:block;margin-top:10px;padding:8px 12px;line-height:1.5">Sanksi Bendahara (Peraturan Kas Pasal 2): ${lp.denda_bendahara.map(b => `${esc(b.nama)} denda ${rp(b.denda)}`).join(", ")} (2× iuran pribadi), atau penalti sesuai kesepakatan internal tim.</div>` : ""}
     ${d.bisa_lapor && d.tarif_beda ? `<div class="ch y" style="display:block;margin-top:10px;padding:8px 12px;line-height:1.5">Tarif kas biasa di sistem ${rp(d.tarif.biasa)}/minggu, sedangkan Peraturan Kas Pasal 1 menetapkan ${rp(d.tarif_aturan)}/minggu. Ubah di halaman Bayar Kas → Atur tarif.</div>` : ""}
     ${d.bisa_lapor ? `<div class="bar" style="margin:12px 0 0"><input type="text" id="rkkCat" maxlength="1000" placeholder="Catatan tambahan (opsional)" style="max-width:420px"><button class="bt g" id="rkkPub">${lp.waktu ? "Terbitkan ulang" : "Terbitkan rekap"}</button></div><p class="mu" style="font-size:12.5px;margin:6px 0 0">Rekap dikirim sebagai Pengumuman (kategori Kas) ke Inbox dan Telegram semua anggota.</p>` : ""}`;
-  $("#rkkList").innerHTML = d.anggota.map(a => { const st = a.status === "lunas" ? '<span class="ch g">Lunas</span>' : a.status === "menunggu" ? '<span class="ch y">Menunggu konfirmasi</span>' : a.status === "bebas" ? '<span class="ch n">Tidak wajib</span>' : '<span class="ch r">Belum</span>';
+  $("#rkkList").innerHTML = d.anggota.map(a => { const st = a.status === "lunas" ? '<span class="ch g">Lunas</span>' : a.status === "menunggu" ? '<span class="ch y">Menunggu konfirmasi</span>' : a.status === "bebas" ? '<span class="ch n">Tidak wajib</span>' : a.status === "kurang" ? `<span class="ch y">Kurang ${rp(a.sisa)}</span>` : '<span class="ch r">Belum</span>';
     const izinBtn = d.bisa_lapor && a.status !== "bebas" ? (a.izin_minggu_ini ? `<button class="bt o" data-rkiz="${a.id}" data-on="0" style="min-height:30px;padding:4px 9px;font-size:12px;margin-top:4px">Batalkan izin</button>`
       : a.izin_pakai < d.izin_maks ? `<button class="bt o" data-rkiz="${a.id}" data-on="1" style="min-height:30px;padding:4px 9px;font-size:12px;margin-top:4px">Catat izin</button>` : "") : "";
     return `<tr><td><b>${esc(a.nama)}</b><div class="mu" style="font-size:12px">${esc(a.tingkat_label)}${a.nominal ? " · " + rp(a.nominal) + "/minggu" : ""}</div></td>
@@ -2534,7 +2535,7 @@ const EKSPOR = {
       {nama: "Jabatan & wewenang", kolom: ["Jabatan", "Wewenang", "Dipegang oleh"], baris: d.jabatan.map(x => [x.nama, x.wewenang.join(", "), x.anggota.join(", ")])}]; },
   rekapkas: () => { const d = RKK; if (!d) return [];
     return [{nama: "Rekap kas " + d.label, kolom: ["Anggota", "Skema", "Nominal/minggu", "Minggu ini", "Izin dipakai", "Tunggakan (minggu)", "Tanpa izin (minggu)", "Tagihan", "Denda", "Hak proyek"],
-      baris: d.anggota.map(a => [a.nama, a.tingkat_label, a.nominal, a.izin_minggu_ini && a.status === "belum" ? "Izin" : ({lunas: "Lunas", menunggu: "Menunggu konfirmasi", bebas: "Tidak wajib"}[a.status] || "Belum"), `${a.izin_pakai}/${d.izin_maks}`, a.tunggak, a.tanpa_izin, a.tagihan, a.denda, a.hak_dicabut ? "Dicabut sampai lunas" : (a.status === "bebas" ? "-" : "Aktif")])},
+      baris: d.anggota.map(a => [a.nama, a.tingkat_label, a.nominal, a.izin_minggu_ini && a.status === "belum" ? "Izin" : (a.status === "kurang" ? "Kurang " + a.sisa : {lunas: "Lunas", menunggu: "Menunggu konfirmasi", bebas: "Tidak wajib"}[a.status] || "Belum"), `${a.izin_pakai}/${d.izin_maks}`, a.tunggak, a.tanpa_izin, a.tagihan, a.denda, a.hak_dicabut ? "Dicabut sampai lunas" : (a.status === "bebas" ? "-" : "Aktif")])},
       {nama: "Ringkasan", kolom: ["Keterangan", "Nilai"], baris: [["Minggu", d.label], ["Lunas", `${d.lunas} dari ${d.wajib}`], ["Masuk", d.masuk], ["Anggota menunggak", d.menunggak], ["Total tagihan", d.total_tagihan], ["Hak proyek dicabut", d.hak_dicabut], ["Laporan Bendahara", {belum: "Belum diterbitkan", tepat: "Tepat waktu", telat: "Terlambat"}[d.laporan.status]], ["Batas laporan", d.laporan.batas + " WIB"], ...(d.laporan.denda_bendahara || []).map(b => ["Denda Bendahara " + b.nama, b.denda])]}]; },
   inbox: () => [exTabel("Inbox", IBD && IBD.items, ["judul", "isi", "waktu", "jenis"])],
   berita: () => [exTabel("Berita " + (BRK || ""), BRD && BRD.items, ["judul", "sumber", "waktu", "url"])],
@@ -2888,14 +2889,17 @@ $("#brRB").onclick = async () => {
 };
 
 let BKD = null, BKW = null, BKF = null;
-const BK_ST = {lunas: ["g", "Lunas ✓"], menunggu: ["y", "Menunggu konfirmasi"], belum: ["r", "Belum bayar"], bebas: ["n", "Peminjam"], ditolak: ["r", "Ditolak"]};
-function bkMinggu(list, name, cek) { return list.length ? list.map(w => `<label class="bkc"><input type="checkbox" name="${name}" value="${w.k}" ${cek === w.k ? "checked" : ""}> ${esc(w.label)}</label>`).join("") : '<span class="mu">Semua minggu sudah lunas atau sedang menunggu konfirmasi.</span>'; }
+const BK_ST = {lunas: ["g", "Lunas ✓"], menunggu: ["y", "Menunggu konfirmasi"], kurang: ["y", "Kurang"], belum: ["r", "Belum bayar"], bebas: ["n", "Peminjam"], ditolak: ["r", "Ditolak"]};
+const bkMetode = (pre, def) => `<div class="seg" role="radiogroup" aria-label="Cara bayar" style="margin:0;background:#EFECE4" id="${pre}M"><button type="button" class="${def !== "transfer" ? "on" : ""}" data-m="tunai">Tunai</button><button type="button" class="${def === "transfer" ? "on" : ""}" data-m="transfer">Transfer</button></div>`;
+const bkMetodeVal = pre => (($(`#${pre}M .on`) || {}).dataset || {}).m || "tunai";
+function bkMetodeBind(pre, ubah) { const g = $(`#${pre}M`); if (!g) return; g.onclick = e => { const b = e.target.closest("[data-m]"); if (!b) return; g.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); ubah && ubah(b.dataset.m); }; ubah && ubah(bkMetodeVal(pre)); }
+function bkMinggu(list, name, cek) { return list.length ? list.map(w => `<label class="bkc"><input type="checkbox" name="${name}" value="${w.k}" ${cek === w.k ? "checked" : ""}> ${esc(w.label)}${w.sisa != null ? ` <span class="mu" style="font-size:12px">${rp(w.sisa)}</span>` : ""}</label>`).join("") : '<span class="mu">Semua minggu sudah lunas atau sedang menunggu konfirmasi.</span>'; }
 function renderBayarKas() {
   const d = BKD; if (!d) return;
   $("#bkLabel").textContent = d.label + (d.minggu === d.sekarang ? " (minggu ini)" : "");
   $("#bkPrev").disabled = !d.prev; $("#bkNext").disabled = !d.next; $("#bkNow").hidden = d.minggu === d.sekarang;
   $("#bk1").textContent = `${d.lunas} / ${d.wajib}`; $("#bk2").textContent = num(d.anggota.filter(a => a.status === "menunggu").length); $("#bk3").textContent = rp(d.masuk);
-  $("#bkList").innerHTML = d.anggota.map(a => `<div class="bkm ${a.status}"><b>${esc(a.nama)}</b><span class="ch ${BK_ST[a.status][0]}">${BK_ST[a.status][1]}</span>
+  $("#bkList").innerHTML = d.anggota.map(a => `<div class="bkm ${a.status}"><b>${esc(a.nama)}</b><span class="ch ${BK_ST[a.status][0]}">${BK_ST[a.status][1]}${a.status === "kurang" ? " " + rp(a.sisa) : ""}</span>
     <span class="mu" style="font-size:12px">${esc(a.tingkat_label)}${a.nominal ? " · " + rp(a.nominal) + "/minggu" : ""}</span>${a.tunggak ? `<span style="font-size:12px;color:#B42318;font-weight:600">Nunggak ${a.tunggak} minggu</span>` : ""}</div>`).join("") || '<p class="mu">Belum ada anggota.</p>';
   // formulir bayar milik sendiri
   const s = d.saya, B = $("#bkBayar");
@@ -2904,17 +2908,21 @@ function renderBayarKas() {
   else if (s) {
     B.innerHTML = `<b>Bayar iuran kamu</b><div class="mu" style="font-size:12.5px;margin-top:2px">Tingkat: ${esc(s.tingkat_label)} · ${rp(s.nominal)} per minggu${s.bendahara ? " · sebagai Bendahara, pembayaranmu langsung tercatat lunas" : ""}</div>
       <div class="k" style="margin-top:12px">Minggu yang dibayar (boleh lebih dari satu)</div><div class="bkw" id="bkW">${bkMinggu(s.pilihan, "bkw", (s.pilihan.find(w => w.k === d.sekarang) || s.pilihan[0] || {}).k)}</div>
-      <div class="fl" style="margin-top:10px"><label>Foto bukti (wajib)<input type="file" id="bkF" accept="image/*" capture="environment"></label><label>Catatan (opsional)<input type="text" id="bkC" maxlength="300" placeholder="contoh: cash ke Shera, transfer BCA"></label></div>
+      <div class="k" style="margin-top:12px">Cara bayar</div>${bkMetode("bk")}
+      <div class="fl" style="margin-top:10px"><label id="bkFL">Foto bukti transfer (wajib)<input type="file" id="bkF" accept="image/*" capture="environment"></label><label>Catatan (opsional)<input type="text" id="bkC" maxlength="300" placeholder="contoh: cash ke Shera, transfer BCA"></label></div>
       <img id="bkPv" class="bkpv" alt="Pratinjau foto bukti" hidden>
       <div class="bar" style="margin:12px 0 0"><button class="bt g" id="bkGo" ${s.pilihan.length ? "" : "disabled"}>Saya sudah bayar</button><b id="bkTot"></b><span class="mu" id="bkMsg"></span></div>`;
-    const tot = () => { const n = $$('input[name=bkw]:checked').length; $("#bkTot").textContent = n ? "Total " + rp(n * s.nominal) : ""; };
+    const sisaOf = k => ((s.pilihan.find(w => w.k === k) || {}).sisa ?? s.nominal);
+    const tot = () => { const t = $$('input[name=bkw]:checked').reduce((a, c) => a + sisaOf(c.value), 0); $("#bkTot").textContent = t ? "Total " + rp(t) : ""; };
     $$('input[name=bkw]').forEach(c => c.onchange = tot); tot();
+    bkMetodeBind("bk", m => { $("#bkFL").firstChild.textContent = m === "transfer" ? "Foto bukti transfer (wajib)" : "Foto bukti (tidak wajib untuk tunai)"; });
     $("#bkF").onchange = async () => { const f = $("#bkF").files[0]; BKF = null; $("#bkPv").hidden = true; if (!f) return; try { BKF = await resizeFoto(f, 1280); $("#bkPv").src = BKF.url; $("#bkPv").hidden = false; } catch (e) { $("#bkMsg").textContent = e.message; } };
     $("#bkGo").onclick = async () => {
       const mg = $$('input[name=bkw]:checked').map(c => c.value);
       if (!mg.length) { $("#bkMsg").textContent = "Pilih minimal satu minggu."; return; }
-      if (!BKF) { $("#bkMsg").textContent = "Wajib lampirkan foto bukti (foto uangnya atau bukti transfer)."; return; }
-      const fd = new FormData(); fd.append("minggu", mg.join(",")); fd.append("catatan", $("#bkC").value); fd.append("foto", BKF.blob, "bukti.jpg");
+      const metode = bkMetodeVal("bk");
+      if (metode === "transfer" && !BKF) { $("#bkMsg").textContent = "Bayar lewat transfer wajib melampirkan foto bukti transfer."; return; }
+      const fd = new FormData(); fd.append("minggu", mg.join(",")); fd.append("catatan", $("#bkC").value); fd.append("metode", metode); if (BKF) fd.append("foto", BKF.blob, "bukti.jpg");
       $("#bkGo").disabled = true; $("#bkMsg").textContent = "Mengirim…";
       try { BKD = await api("/api/iuran/bayar", {method: "POST", body: fd}); BKF = null; pesan(BKD.status === "lunas" ? "Tercatat lunas ✓" : "Terkirim. Tunggu konfirmasi Bendahara di Inbox"); renderBayarKas(); }
       catch (e) { $("#bkMsg").textContent = e.message; $("#bkGo").disabled = false; }
@@ -2922,9 +2930,9 @@ function renderBayarKas() {
   }
   // konfirmasi (Bendahara & Dev)
   $("#bkKonf").hidden = !d.bisa_konfirmasi;
-  $("#bkMenunggu").innerHTML = (d.menunggu || []).map(x => `<div class="bkk"><a href="/api/iuran/${x.id}/foto" target="_blank" rel="noopener"><img src="/api/iuran/${x.id}/foto" alt="Foto bukti ${esc(x.nama)}" loading="lazy"></a>
-    <div style="flex:1;min-width:0"><b>${esc(x.nama)}</b> · ${rp(x.jumlah)}<div class="mu" style="font-size:12.5px">${esc(x.minggu_label.join("; "))} · ${relW(x.dibuat)}</div>${x.catatan ? `<div style="font-size:13px">${esc(x.catatan)}</div>` : ""}
-    <div class="bar" style="margin:8px 0 0"><button class="bt g" data-bkt="${x.id}">Terima</button><button class="bt o" data-bkn="${x.id}">Tolak</button><button class="bt o" data-bkai="${x.id}">✨ Cek foto pakai AI</button></div><div id="bkai${x.id}" style="font-size:13px"></div></div></div>`).join("") || '<p class="mu">Tidak ada yang menunggu. Mantap.</p>';
+  $("#bkMenunggu").innerHTML = (d.menunggu || []).map(x => `<div class="bkk">${x.ada_foto ? `<a href="/api/iuran/${x.id}/foto" target="_blank" rel="noopener"><img src="/api/iuran/${x.id}/foto" alt="Foto bukti ${esc(x.nama)}" loading="lazy"></a>` : ""}
+    <div style="flex:1;min-width:0"><b>${esc(x.nama)}</b> · ${rp(x.jumlah)} · <span class="ch n">${x.metode === "transfer" ? "Transfer" : "Tunai"}</span><div class="mu" style="font-size:12.5px">${esc(x.minggu_label.join("; "))} · ${relW(x.dibuat)}</div>${x.catatan ? `<div style="font-size:13px">${esc(x.catatan)}</div>` : ""}${x.ada_foto ? "" : '<div class="mu" style="font-size:12.5px">Tanpa foto: pastikan uangnya sudah kamu terima.</div>'}
+    <div class="bar" style="margin:8px 0 0"><button class="bt g" data-bkt="${x.id}">Terima</button><button class="bt o" data-bkn="${x.id}">Tolak</button>${x.ada_foto ? `<button class="bt o" data-bkai="${x.id}">✨ Cek foto pakai AI</button>` : ""}</div><div id="bkai${x.id}" style="font-size:13px"></div></div></div>`).join("") || '<p class="mu">Tidak ada yang menunggu. Mantap.</p>';
   $$("[data-bkai]").forEach(b => b.onclick = async () => { const o = $("#bkai" + b.dataset.bkai); b.disabled = true; o.textContent = "AI sedang memeriksa foto…";
     try { const d = await api(`/api/iuran/${b.dataset.bkai}/cek`, {method: "POST"}), c = d.cek;
       o.innerHTML = `<span class="ch ${c.cocok ? "g" : "r"}">${c.cocok ? "Nominal cocok" : "Perlu dicek"}</span> Terbaca <b>${rp(c.jumlah_terbaca)}</b> (${esc(c.jenis)}) dari ${rp(d.harus)}. ${esc(c.catatan)} <span class="mu">· AI cuma membantu, keputusan tetap di Bendahara.</span>`; }
@@ -2937,13 +2945,17 @@ function renderBayarKas() {
     $("#bkTk").innerHTML = d.anggota.map(a => `<tr><td>${esc(a.nama)}</td><td><select data-tk="${a.id}" style="max-width:240px">${Object.entries(d.tingkat_nama).map(([k, v]) => `<option value="${k}" ${k === a.tingkat ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></td><td class="rt">${a.nominal ? rp(a.nominal) : "-"}</td></tr>`).join("");
     const cur = $("#bkCA").value, wajib = d.anggota.filter(a => a.tingkat !== "bebas");
     $("#bkCA").innerHTML = wajib.map(a => `<option value="${a.id}" ${String(a.id) === cur ? "selected" : ""}>${esc(a.nama)} (${rp(a.nominal)}/minggu)</option>`).join("");
-    const cw = () => { $("#bkCW").innerHTML = bkMinggu((d.pilihan_anggota || {})[$("#bkCA").value] || [], "bkcw"); }; $("#bkCA").onchange = cw; cw();
+    if (!$("#bkcM")) { $("#bkcWrap").innerHTML = bkMetode("bkc"); bkMetodeBind("bkc", m => { $("#bkCFL").firstChild.textContent = m === "transfer" ? "Foto bukti transfer (wajib)" : "Foto bukti (tidak wajib untuk tunai)"; }); }
+    const pil = () => (d.pilihan_anggota || {})[$("#bkCA").value] || [];
+    const info = () => { const dipilih = $$('input[name=bkcw]:checked').map(c => c.value), tag = pil().filter(w => dipilih.includes(w.k)).reduce((a, w) => a + w.sisa, 0), j = +$("#bkCJ").value || 0;
+      $("#bkCInfo").innerHTML = !dipilih.length ? "" : `Tagihan minggu dipilih: <b>${rp(tag)}</b>` + (j && j < tag ? ` · dibayar ${rp(j)} · <b style="color:#B4532A">kurang ${rp(tag - j)}</b>` : j > tag ? ` · <span style="color:#B42318">jumlah melebihi tagihan</span>` : j ? " · lunas" : ""); };
+    const cw = () => { $("#bkCW").innerHTML = bkMinggu(pil(), "bkcw"); $$('input[name=bkcw]').forEach(c => c.onchange = info); info(); }; $("#bkCA").onchange = cw; $("#bkCJ").oninput = info; cw();
   }
   // riwayat
   $("#bkRT").textContent = d.bisa_konfirmasi ? "Riwayat pembayaran (semua anggota)" : "Riwayat pembayaran kamu";
   $("#bkRiw").innerHTML = (d.riwayat || []).map(x => `<tr><td>${esc((x.dibuat || "").slice(0, 10))}</td><td>${esc(x.nama)}</td><td>${esc(x.minggu.map(k => "M" + +k.slice(-2)).join(", "))}</td><td class="rt">${rp(x.jumlah)}</td>
     <td><span class="ch ${BK_ST[x.status][0]}">${BK_ST[x.status][1]}</span>${x.alasan ? `<div class="mu" style="font-size:12px">${esc(x.alasan)}</div>` : ""}${x.oleh ? `<div class="mu" style="font-size:12px">oleh ${esc(x.oleh)}</div>` : ""}</td>
-    <td><a class="bt o" href="/api/iuran/${x.id}/foto" target="_blank" rel="noopener">Bukti</a>${ADM() ? ` <button class="bt o" data-bkh="${x.id}">Hapus</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="mu">Belum ada pembayaran.</td></tr>';
+    <td>${x.ada_foto ? `<a class="bt o" href="/api/iuran/${x.id}/foto" target="_blank" rel="noopener">Bukti</a>` : `<span class="mu" style="font-size:12.5px">${x.metode === "transfer" ? "Transfer" : "Tunai"}, tanpa foto</span>`}${ADM() ? ` <button class="bt o" data-bkh="${x.id}">Hapus</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="mu">Belum ada pembayaran.</td></tr>';
   $$("[data-bkh]").forEach(b => b.onclick = async () => { if (!confirm("Hapus data pembayaran ini? Catatan kasnya ikut dihapus.")) return; if (await bayarAksi(b.dataset.bkh, "hapus")) renderBayarKas(); });
 }
 async function loadBayarKas(m) {
@@ -2964,10 +2976,11 @@ $("#bkCS").onclick = async () => {
   const mg = $$('input[name=bkcw]:checked').map(c => c.value), f = $("#bkCF").files[0];
   if (!$("#bkCA").value) { $("#bkMsgC").textContent = "Pilih anggota."; return; }
   if (!mg.length) { $("#bkMsgC").textContent = "Pilih minimal satu minggu."; return; }
-  if (!f) { $("#bkMsgC").textContent = "Wajib foto bukti."; return; }
+  const metode = bkMetodeVal("bkc"), j = $("#bkCJ").value.trim();
+  if (metode === "transfer" && !f) { $("#bkMsgC").textContent = "Transfer wajib foto bukti transfer."; return; }
   $("#bkCS").disabled = true; $("#bkMsgC").textContent = "Menyimpan…";
-  try { const fd = new FormData(); fd.append("untuk", $("#bkCA").value); fd.append("minggu", mg.join(",")); fd.append("foto", (await resizeFoto(f, 1280)).blob, "bukti.jpg");
-    BKD = await api("/api/iuran/bayar", {method: "POST", body: fd}); $("#bkCF").value = ""; renderBayarKas(); $("#bkMsgC").textContent = "Tercatat lunas ✓"; }
+  try { const fd = new FormData(); fd.append("untuk", $("#bkCA").value); fd.append("minggu", mg.join(",")); fd.append("metode", metode); if (j) fd.append("jumlah", j); if (f) fd.append("foto", (await resizeFoto(f, 1280)).blob, "bukti.jpg");
+    BKD = await api("/api/iuran/bayar", {method: "POST", body: fd}); $("#bkCF").value = ""; $("#bkCJ").value = ""; renderBayarKas(); $("#bkMsgC").textContent = "Tercatat ✓"; }
   catch (e) { $("#bkMsgC").textContent = e.message; }
   $("#bkCS").disabled = false;
 };
