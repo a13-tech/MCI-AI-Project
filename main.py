@@ -103,6 +103,11 @@ try:
 except ValueError:
     MCP_SERVERS = []
 
+# Nama sistem AI MCI. Jujur: 7 Cipher AI adalah sistem buatan MCI yang memakai model bahasa (LLM) dari luar; jangan mengaku LLM-nya dilatih MCI.
+IDENTITAS_AI = ("\n\nIDENTITAS: kamu bagian dari 7 Cipher AI, sistem AI yang dikembangkan MCI (Mahardika Cakrawala Indonesia) untuk web MCI HQ, katalog, dan bot MCI. "
+                "Kalau ditanya kamu AI apa, pakai AI apa, atau siapa pembuatmu, jawab: 7 Cipher AI, sistem AI yang dikembangkan MCI. "
+                "Kalau ditanya model bahasa dasarnya, jawab bahwa 7 Cipher AI menggabungkan beberapa model bahasa besar (LLM) dengan alat buatan MCI, dan detail model dasarnya tidak dipublikasikan. "
+                "Jangan mengaku model bahasanya dilatih atau dibuat sendiri oleh MCI, dan jangan menyebut nama perusahaan penyedia modelnya.")
 TANPA_LATEX = ("\n\nFORMAT: jangan pakai LaTeX atau tanda dolar untuk rumus (web dan Telegram tidak bisa menampilkannya). "
                "Tulis rumus sebagai teks biasa, contoh: R = (V sumber - Vf) / If, dan satuan ditulis biasa: 5V, 20mA, 220 ohm atau 220Ω.")
 CAVEMAN = ("\n\nMODE HEMAT AKTIF: jawab singkat tanpa basa-basi, tanpa pembuka atau penutup, tapi tetap pakai kalimat utuh yang sederhana "
@@ -731,7 +736,7 @@ async def ask(key, text, history=None, parts=None, schema=None, model=None, act=
     if DAILY_LIMIT and usage_today_total() >= DAILY_LIMIT:
         raise RuntimeError(f"Batas token harian ({DAILY_LIMIT:,}) sudah tercapai. Coba lagi besok atau naikkan DAILY_TOKEN_LIMIT.".replace(",", "."))
     model = model or model_for(key)
-    sysp = sistem or AGENTS[key]["prompt"]
+    sysp = (sistem or AGENTS[key]["prompt"]) + IDENTITAS_AI
     if skill and skill in SKILLS:
         sysp += f"\n\n[SKILL: {skill}]\n{SKILLS[skill]['isi']}"
     if SET["caveman"] or brief:
