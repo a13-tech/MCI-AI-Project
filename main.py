@@ -104,7 +104,8 @@ except ValueError:
     MCP_SERVERS = []
 
 # Seri sistem AI MCI, urut dari yang pertama. Yang terakhir = versi yang sedang dipakai.
-AI_SERI = [{"seri": "1 Genesis", "ket": "Seri pertama sistem AI MCI."},
+AI_SERI = [{"seri": "1 Genesis", "ket": "Seri pertama sistem AI MCI. Desain web pertamanya: MCI Virtual Office, kantor isometrik berisi agen-agen AI yang bekerja dan beristirahat di meja masing-masing.",
+            "gambar": "/aset/genesis-virtual-office.webp", "video": "/aset/genesis-virtual-office.mp4"},
            {"seri": "4.9 Vertex", "ket": "Seri kedua."},
            {"seri": "7 Cipher", "ket": "Seri yang dipakai sekarang."}]
 # Nama sistem AI MCI. Jujur: 7 Cipher AI adalah sistem buatan MCI yang memakai model bahasa (LLM) dari luar; jangan mengaku LLM-nya dilatih MCI.
@@ -2596,7 +2597,7 @@ ASET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "aset
 @app.route("/aset/<path:f>")
 def aset(f):
     """Logo & ikon (publik, dipakai juga di halaman login). Cache 7 hari."""
-    if not re.fullmatch(r"[a-z0-9-]+\.(webp|png|ico)", f):
+    if not re.fullmatch(r"[a-z0-9-]+\.(webp|png|ico|mp4)", f):
         abort(404)
     r = send_from_directory(ASET_DIR, f)
     r.headers["Cache-Control"] = "public, max-age=604800"
