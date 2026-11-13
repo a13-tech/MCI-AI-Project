@@ -1024,7 +1024,7 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
 
  <section id="p-absen" class="pg" hidden>
   <h1>Absen Harian</h1>
-  <p class="mu">Wajib Senin–Sabtu sampai pukul 23.59 WIB, Minggu libur. Jawab 1 kuis dengan benar untuk absen. Berhalangan? Ajukan izin (maksimal 3 kali sebulan, lebih dari itu hanya izin khusus Manager atau Dev). Bolos lebih dari 5 kali tanpa izin = otomatis dikeluarkan (<a href="#" data-gopasal="19">UU MCI Pasal 19</a>).</p>
+  <p class="mu">Wajib Senin–Sabtu sampai pukul 23.59 WIB, Minggu libur. Cukup tekan tombol Absen sekarang. Berhalangan? Ajukan izin (maksimal 3 kali sebulan, lebih dari itu hanya izin khusus Manager atau Dev). Bolos lebih dari 5 kali tanpa izin = otomatis dikeluarkan (<a href="#" data-gopasal="19">UU MCI Pasal 19</a>).</p>
   <div id="abBox"><p class="mu">Memuat…</p></div>
  </section>
 
@@ -3195,7 +3195,7 @@ async function pjMuat() {
       ${d.risiko_pinjaman.map(r => `<li>Kemungkinan talangan pinjaman mitra proyek ${esc(r.proyek)}: ${rp(r.jumlah)} saat jatuh tempo ${esc(tglID(r.jatuh_tempo))}.</li>`).join("")}</ul></details>`;
 }
 
-/* ===== Absen harian + kuis (UU MCI Pasal 19) ===== */
+/* ===== Absen harian, satu ketukan (UU MCI Pasal 19) ===== */
 let AB = null, AB_PESAN = "";
 function abRender() {
   const d = AB, el = $("#abBox"); if (!d) return;
@@ -3203,15 +3203,13 @@ function abRender() {
   if (d.saya != null) {
     const st = d.status;
     if (st === "libur") h += `<div class="cd"><b>Hari Minggu libur</b><p class="mu" style="margin:6px 0 0">Tidak perlu absen hari ini.</p></div>`;
-    else if (st === "hadir") h += `<div class="cd" style="border-color:#9CC5A1;background:#F1F8F2"><b style="font-size:17px">✅ Kamu sudah absen hari ini</b><p class="mu" style="margin:6px 0 0">${esc(d.hari_label)} pukul ${esc(d.jam || "")} WIB${d.salah ? ` · ${d.salah} kali salah sebelum benar` : ""}.</p>${AB_PESAN ? `<p style="margin:8px 0 0">${esc(AB_PESAN)}</p>` : ""}</div>`;
+    else if (st === "hadir") h += `<div class="cd" style="border-color:#9CC5A1;background:#F1F8F2"><b style="font-size:17px">✅ Kamu sudah absen hari ini</b><p class="mu" style="margin:6px 0 0">${esc(d.hari_label)} pukul ${esc(d.jam || "")} WIB.</p></div>`;
     else if (st === "izin_menunggu") h += `<div class="cd"><b>Izin hari ini menunggu persetujuan</b><p class="mu" style="margin:6px 0 0">Selama belum diputus, hari ini tidak dihitung bolos. Kamu tetap boleh absen di bawah.</p></div>`;
     else if (st === "izin_disetujui") h += `<div class="cd"><b>Kamu izin hari ini</b><p class="mu" style="margin:6px 0 0">Izin sudah disetujui, hari ini tidak dihitung bolos.</p></div>`;
-    if (d.soal) { const q = d.soal;
-      h += `<div class="cd" id="abKuis">${st === "belum_berlaku" ? `<p class="mu" style="margin:0 0 8px">Absen wajib mulai ${esc(tglID(d.mulai, true))}. Hari ini boleh dicoba dulu.</p>` : ""}
-        <div class="ey">Kuis absen · ${esc(d.hari_label)}${q.topik ? " · " + esc(q.topik) : ""}${q.no > 1 ? ` · soal ke-${q.no}` : ""}</div>
-        <h2 style="margin:6px 0 12px;font-size:20px">${esc(q.soal)}</h2>
-        <div style="display:grid;gap:8px">${q.opsi.map((o, i) => `<button class="bt o" data-abj="${i}" style="justify-content:flex-start;text-align:left;min-height:46px;white-space:normal"><b style="margin-right:8px">${"ABCD"[i]}.</b>${esc(o)}</button>`).join("")}</div>
-        ${AB_PESAN ? `<p class="er" style="margin:10px 0 0">${esc(AB_PESAN)}</p>` : ""}</div>`; }
+    if (d.bisa_absen) h += `<div class="cd" id="abKuis" style="text-align:center;padding:22px 16px">${st === "belum_berlaku" ? `<p class="mu" style="margin:0 0 10px">Absen wajib mulai ${esc(tglID(d.mulai, true))}. Hari ini boleh dicoba dulu.</p>` : ""}
+        <div class="ey">${esc(d.hari_label)}</div><p style="margin:6px 0 14px;font-size:15.5px">Tekan tombol di bawah untuk mencatat kehadiranmu hari ini.</p>
+        <button class="bt g" id="abHadir" style="min-height:56px;font-size:18px;padding:12px 32px;width:min(320px,100%)">Absen sekarang</button>
+        ${AB_PESAN ? `<p class="er" style="margin:10px 0 0">${esc(AB_PESAN)}</p>` : ""}</div>`;
     const r = d.rekap;
     if (r) h += `<div class="cd"><b>Kehadiranku</b><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
       ${[["Hadir", r.hadir, ""], ["Izin", r.izin, ""], ["Bolos", `${r.bolos} / ${r.maks}`, r.bolos >= r.maks - 1 ? "#B4532A" : ""], ["Sisa jatah bolos", r.sisa, r.sisa <= 1 ? "#B4532A" : ""]].map(([l, v, w]) => `<div style="padding:8px 12px;border:1px solid var(--line,#E5E0D5);border-radius:10px;min-width:110px"><div class="mu" style="font-size:11.5px">${l}</div><b style="font-size:18px;${w ? "color:" + w : ""}">${v}</b></div>`).join("")}</div>
@@ -3239,9 +3237,8 @@ async function abMuat(url, opt) {
 }
 $("#abBox").addEventListener("click", async e => {
   const b = e.target.closest("button"); if (!b) return;
-  if (b.dataset.abj != null) { $$("#abKuis [data-abj]").forEach(x => x.disabled = true);
-    try { const d = await api("/api/absen/jawab", {json: {jawab: +b.dataset.abj}}); AB = d;
-      AB_PESAN = d.hasil === "benar" ? (d.penjelasan ? "Benar! " + d.penjelasan : "Benar!") : d.hasil === "salah" ? "Jawaban salah. Coba soal berikut ini." : ""; abRender(); }
+  if (b.id === "abHadir") { b.disabled = true; b.textContent = "Mencatat…";
+    try { AB = await api("/api/absen/hadir", {json: {}}); AB_PESAN = ""; abRender(); pesan("Absen tercatat. Terima kasih!"); }
     catch (er) { AB_PESAN = er.message; abRender(); } }
   if (b.id === "abIzK") { b.disabled = true; const ok = await abMuat("/api/absen/izin", {json: {tanggal: $("#abIzT").value, alasan: $("#abIzA").value}}); if (!ok) b.disabled = false; }
   if (b.dataset.abbatal && confirm("Batalkan pengajuan izin ini?")) await abMuat("/api/absen/izin/" + b.dataset.abbatal, {method: "DELETE"});

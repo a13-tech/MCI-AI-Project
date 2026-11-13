@@ -4120,7 +4120,7 @@ def pk_cek_pinjaman():
 
 
 # ---------- ABSEN HARIAN + KUIS (UU MCI Pasal 19) ----------
-# Senin–Sabtu wajib absen di web; Minggu libur. Sebelum absen, jawab 1 kuis sampai benar (salah = soal lain).
+# Senin–Sabtu wajib absen di web dengan satu ketukan; Minggu libur. (Kuis sebelum absen dihapus atas permintaan Pemilik; tabel/fungsi kuis dibiarkan untuk data lama.)
 # Hari tanpa absen & tanpa izin yang disetujui = bolos. Bolos dihitung total sejak absen berlaku; > 5 kali = otomatis dikeluarkan.
 ABSEN_MAKS_BOLOS = 5
 ABSEN_SOAL_PER_HARI = 6
@@ -4281,14 +4281,12 @@ def absen_cek():
             sudah |= {r[0] for r in sql(c, "SELECT anggota FROM absen_izin WHERE tanggal=? AND status<>'ditolak'", (hari,)).fetchall()}
         belum = [m["id"] for m in MEMBERS.values() if m["aktif"] and m["id"] not in sudah]
         if belum:
-            inbox_kirim(belum, "absen", "⏰ Jangan lupa absen hari ini", "Absen di web MCI paling lambat pukul 23.59 WIB. Jawab 1 kuis dulu ya (UU MCI Pasal 19).")
-    if now.weekday() != 6 and hari >= absen_mulai():   # siapkan kuis hari ini lebih awal supaya halaman absen cepat
-        kuis_hari(hari)
+            inbox_kirim(belum, "absen", "⏰ Jangan lupa absen hari ini", "Absen di web MCI paling lambat pukul 23.59 WIB. Cukup tekan tombol Absen sekarang (UU MCI Pasal 19).")
     if not SET.get("absen_umum"):   # pengumuman pertama kali fitur aktif
         SET["absen_umum"] = hari
         ubah = True
         inbox_kirim([m["id"] for m in MEMBERS.values() if m["aktif"]], "absen", "📋 Absen harian mulai berlaku",
-                    f"Mulai {tglid(absen_mulai())}, absen di web MCI wajib Senin–Sabtu (Minggu libur), didahului 1 kuis. Bolos lebih dari {ABSEN_MAKS_BOLOS} kali tanpa izin = otomatis dikeluarkan (UU MCI Pasal 19).")
+                    f"Mulai {tglid(absen_mulai())}, absen di web MCI wajib Senin–Sabtu (Minggu libur), cukup satu ketukan. Bolos lebih dari {ABSEN_MAKS_BOLOS} kali tanpa izin = otomatis dikeluarkan (UU MCI Pasal 19).")
     if ubah:
         set_save()
     return keluar
@@ -4331,9 +4329,7 @@ def absen_payload(r):
             st = "belum"
         out.update({"status": st, "jam": b[4] if b else None, "salah": b[3] if b else 0, "rekap": absen_rekap(me),
                     "izin": [{"id": i, "tanggal": t, "label": tglid(t), "alasan": a or "", "status": s, "oleh": o or "", "khusus": bool(k)} for i, t, a, s, o, k in iz]})
-        if st in ("belum", "belum_berlaku") and not minggu:
-            soal = kuis_hari(hari)
-            out["soal"] = _soal_publik(soal, b[2] if b else 0)
+        out["bisa_absen"] = st in ("belum", "belum_berlaku", "izin_menunggu") and not minggu
     if out["kelola"]:
         with db() as c:
             hadir = {r_[0]: r_[1] for r_ in sql(c, "SELECT anggota,jam FROM absen WHERE tanggal=? AND status='hadir'", (hari,)).fetchall()}
@@ -4364,7 +4360,8 @@ def api_absen():
     return jsonify(absen_payload(r))
 
 
-@app.route("/api/absen/jawab", methods=["POST"])
+@app.route("/api/absen/hadir", methods=["POST"])
+@app.route("/api/absen/jawab", methods=["POST"])   # alamat lama (halaman yang masih tersimpan di cache HP) tetap berfungsi
 def api_absen_jawab():
     r = role()
     _absen_need(r)
@@ -4374,28 +4371,17 @@ def api_absen_jawab():
     hari = today()
     if datetime.now(WIB).weekday() == 6:
         return jsonify({"error": "Hari Minggu libur, tidak perlu absen."}), 400
-    try:
-        jawab = int((request.get_json(silent=True) or {}).get("jawab"))
-    except (TypeError, ValueError):
-        return jsonify({"error": "Pilih salah satu jawaban"}), 400
-    soal = kuis_hari(hari)
-    with _KLOCK:
+    with _KLOCK:   # satu ketukan langsung hadir (tanpa kuis)
         with db() as c:
             b = _absen_baris(c, me, hari)
             if b and b[1] == "hadir":
                 return jsonify({**absen_payload(r), "hasil": "sudah"})
-            if not b:
-                q = "INSERT INTO absen (anggota,tanggal,status,idx,salah,dibuat) VALUES (?,?,'kuis',0,0,?)"
-                sql(c, q, (me, hari, _now()))
-                b = _absen_baris(c, me, hari)
-            x = soal[b[2] % len(soal)]
-            if jawab == x["benar"]:
-                sql(c, "UPDATE absen SET status='hadir', jam=? WHERE id=?", (datetime.now(WIB).strftime("%H:%M"), b[0]))
-                hasil = {"hasil": "benar", "penjelasan": x.get("penjelasan", "")}
+            jam = datetime.now(WIB).strftime("%H:%M")
+            if b:
+                sql(c, "UPDATE absen SET status='hadir', jam=? WHERE id=?", (jam, b[0]))
             else:
-                sql(c, "UPDATE absen SET idx=idx+1, salah=salah+1 WHERE id=?", (b[0],))
-                hasil = {"hasil": "salah"}   # kunci tidak dibuka; lanjut ke soal lain
-    return jsonify({**absen_payload(r), **hasil})
+                sql(c, "INSERT INTO absen (anggota,tanggal,status,idx,salah,jam,dibuat) VALUES (?,?,'hadir',0,0,?,?)", (me, hari, jam, _now()))
+    return jsonify({**absen_payload(r), "hasil": "benar"})
 
 
 ABSEN_IZIN_BULAN = 3   # jatah izin per anggota per bulan (menurut bulan tanggal izinnya); izin khusus Dev/Manager tidak dihitung
@@ -4968,7 +4954,7 @@ def lencana_semua():
     proyek = rk_rows("proyek")
     with db() as c:
         hadir = dict(sql(c, "SELECT anggota,COUNT(*) FROM absen WHERE status='hadir' GROUP BY anggota").fetchall())
-        jitu = dict(sql(c, "SELECT anggota,COUNT(*) FROM absen WHERE status='hadir' AND salah=0 GROUP BY anggota").fetchall())
+        jitu = dict(sql(c, "SELECT anggota,COUNT(*) FROM absen WHERE status='hadir' AND jam IS NOT NULL AND jam<'08:00' GROUP BY anggota").fetchall())   # absen sebelum 08.00 WIB
         jurnal = dict(sql(c, "SELECT oleh_id,COUNT(*) FROM proyek_log WHERE jenis IN ('jurnal','catatan') AND oleh_id IS NOT NULL GROUP BY oleh_id").fetchall())
         kartu = dict(sql(c, "SELECT pj,COUNT(*) FROM proyek_kartu WHERE status='selesai' AND pj IS NOT NULL GROUP BY pj").fetchall())
     tg = rk_tunggak()
@@ -4981,7 +4967,7 @@ def lencana_semua():
         if h >= 7:
             L.append({"nama": "Rajin 30 hari" if h >= 30 else "Rajin 7 hari", "ket": f"Sudah absen {h} hari"})
         if j >= 5:
-            L.append({"nama": "Pemecah kuis", "ket": f"{j} kali menjawab kuis absen benar di percobaan pertama"})
+            L.append({"nama": "Si Pagi", "ket": f"{j} kali absen sebelum pukul 08.00 WIB"})
         sel = sum(1 for x in proyek if x.get("status") == "selesai" and i in (x.get("tim") or []) and i not in (x.get("tidak_kerja") or []))
         if sel:
             L.append({"nama": "Penyelesai proyek", "ket": f"Ikut menyelesaikan {sel} proyek"})
@@ -5014,7 +5000,7 @@ def api_beranda():
             sudah = sql(c, "SELECT 1 FROM absen WHERE anggota=? AND tanggal=? AND status='hadir'", (me, hi)).fetchone()
             izin = sql(c, "SELECT status FROM absen_izin WHERE anggota=? AND tanggal=?", (me, hi)).fetchone()
             if not libur and not sudah and not (izin and izin[0] == "disetujui"):
-                tambah("absen", "Absen hari ini", "Jawab 1 kuis, lalu kirim absen." + (" Izinmu masih menunggu persetujuan." if izin else ""), True)
+                tambah("absen", "Absen hari ini", "Buka halaman Absen, lalu tekan Absen sekarang." + (" Izinmu masih menunggu persetujuan." if izin else ""), True)
             baca = sql(c, "SELECT COUNT(*) FROM inbox WHERE untuk=? AND dibaca=0", (me,)).fetchone()
             if baca and int(baca[0]):
                 tambah("inbox", f"{int(baca[0])} pesan Inbox belum dibaca")
