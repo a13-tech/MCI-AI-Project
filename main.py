@@ -103,11 +103,16 @@ try:
 except ValueError:
     MCP_SERVERS = []
 
+# Seri sistem AI MCI, urut dari yang pertama. Yang terakhir = versi yang sedang dipakai.
+AI_SERI = [{"seri": "1 Genesis", "ket": "Seri pertama sistem AI MCI."},
+           {"seri": "4.9 Vertex", "ket": "Seri kedua."},
+           {"seri": "7 Cipher", "ket": "Seri yang dipakai sekarang."}]
 # Nama sistem AI MCI. Jujur: 7 Cipher AI adalah sistem buatan MCI yang memakai model bahasa (LLM) dari luar; jangan mengaku LLM-nya dilatih MCI.
 IDENTITAS_AI = ("\n\nIDENTITAS: kamu bagian dari 7 Cipher AI, sistem AI yang dikembangkan MCI (Mahardika Cakrawala Indonesia) untuk web MCI HQ, katalog, dan bot MCI. "
                 "Kalau ditanya kamu AI apa, pakai AI apa, atau siapa pembuatmu, jawab: 7 Cipher AI, sistem AI yang dikembangkan MCI. "
                 "Kalau ditanya model bahasa dasarnya, jawab bahwa 7 Cipher AI menggabungkan beberapa model bahasa besar (LLM) dengan alat buatan MCI, dan detail model dasarnya tidak dipublikasikan. "
-                "Jangan mengaku model bahasanya dilatih atau dibuat sendiri oleh MCI, dan jangan menyebut nama perusahaan penyedia modelnya.")
+                "Jangan mengaku model bahasanya dilatih atau dibuat sendiri oleh MCI, dan jangan menyebut nama perusahaan penyedia modelnya. "
+                "Seri sistem AI MCI, dari yang pertama: " + " → ".join(x["seri"] for x in AI_SERI) + f". Versi yang dipakai sekarang: {AI_SERI[-1]['seri']}.")
 TANPA_LATEX = ("\n\nFORMAT: jangan pakai LaTeX atau tanda dolar untuk rumus (web dan Telegram tidak bisa menampilkannya). "
                "Tulis rumus sebagai teks biasa, contoh: R = (V sumber - Vf) / If, dan satuan ditulis biasa: 5V, 20mA, 220 ohm atau 220Ω.")
 CAVEMAN = ("\n\nMODE HEMAT AKTIF: jawab singkat tanpa basa-basi, tanpa pembuka atau penutup, tapi tetap pakai kalimat utuh yang sederhana "
@@ -2937,6 +2942,7 @@ def api_tentang():
         need("admin")
         return jsonify(tentang_save(request.get_json(silent=True) or {}))
     t = tentang_get()
+    t["ai_seri"] = AI_SERI
     if mid_of(role()) is None and not is_admin(role()):   # viewer: nomor WA hanya lewat Pusat Info (dicek aman dulu)
         t["kontak"] = {k: v for k, v in t["kontak"].items() if k != "wa"}
     return jsonify(t)
