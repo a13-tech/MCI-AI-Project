@@ -67,6 +67,7 @@ h2{margin:22px 0 10px;font-size:17px}
 .seg{display:inline-flex;background:rgba(255,255,255,.1);border-radius:12px;padding:4px;gap:4px;margin-top:12px}
 .seg button{border:0;background:transparent;color:#DCE6FB;border-radius:9px;padding:8px 14px;font-weight:700;cursor:pointer;min-height:38px}
 .seg button.on{background:var(--gold);color:var(--navy)}
+.seg button:disabled{opacity:.42;cursor:not-allowed}
 textarea,input[type=text],input[type=number],input[type=search],input[type=url],input[type=file],select{width:100%;border-radius:12px;border:1px solid #BFD0F2;padding:11px 12px;color:var(--ink);background:#fff}
 textarea{resize:vertical}
 .boss textarea{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.3);color:#fff;margin:10px 0}
@@ -1016,11 +1017,12 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
   <h1>Tanya Apex</h1>
   <p class="mu">Khusus kamu (token admin). Apex bisa <b>membaca</b> data MCI lewat alat: stok gudang, produk, kas, invoice, hutang, iuran, anggota, blacklist, catatan, perpustakaan, sensor IoT, dan status bot. Dia cek datanya dulu baru menjawab, dan label di bawah jawaban menunjukkan apa saja yang dia cek. Apex <b>tidak mengubah</b> data dan tidak pernah membuka token atau foto bukti.</p>
   <div class="cd">
+   <div class="seg" id="apxModel" role="radiogroup" aria-label="Model AI" style="margin:0 0 12px;background:#EFECE4;flex-wrap:wrap"></div>
    <div class="apx" id="apxLog" aria-live="polite"></div>
    <div class="apxs" id="apxSaran"></div>
    <div class="bar" style="margin:12px 0 0;align-items:flex-end"><textarea id="apxIn" rows="2" maxlength="1500" placeholder="Tanya apa saja, misal: LED sisa berapa?" style="flex:1 1 60%;min-width:220px" aria-label="Pertanyaan untuk Apex"></textarea>
     <button class="bt g" type="button" id="apxKirim">Kirim</button><button class="bt o" type="button" id="apxHapus">Obrolan baru</button></div>
-   <div class="mu" id="apxMsg" style="font-size:12.5px;margin-top:6px">Enter = kirim · Shift+Enter = baris baru. Apex ingat 12 pesan terakhir di obrolan ini; "Obrolan baru" mengosongkan.</div>
+   <div class="mu" id="apxMsg" style="font-size:12.5px;margin-top:6px">Enter = kirim · Shift+Enter = baris baru. Obrolan tersimpan di server, jadi tetap ada walau halaman dimuat ulang atau modelnya diganti. "Obrolan baru" mengosongkan.</div>
   </div>
  </section>
 
@@ -1480,7 +1482,7 @@ function show(p) {
   if (p === "invoice") loadInvoice();
   if (p === "info") piBuka();
   if (p === "absen") abMuat();
-  if (p === "apex") { apxRender(); setTimeout(() => $("#apxIn").focus(), 50); }
+  if (p === "apex") { apxRender(); apxMuat(); setTimeout(() => $("#apxIn").focus(), 50); }
   if (p === "hutang") loadHutang();
   if (p === "anggota") loadAnggota();
   if (p === "catatan") loadCatatan();
@@ -3119,28 +3121,61 @@ $("#prSave").onclick = async () => {
 const APX_LABEL = {cek_stok: "📦 Stok gudang", cek_produk: "🛒 Katalog produk", cek_kas: "💰 Buku kas", cek_invoice: "🧾 Invoice", cek_hutang: "📒 Hutang", cek_iuran: "💸 Iuran kas", cek_anggota: "👥 Anggota",
   cek_blacklist: "⛔ Blacklist", cek_catatan: "📝 Catatan", cek_perpustakaan: "📚 Perpustakaan", cek_dokumentasi_dan_voting: "🗳️ Dokumentasi & voting", cek_iot: "📡 Sensor IoT", cek_status_bot: "🤖 Status bot"};
 const APX_SARAN = ["LED sisa berapa?", "Barang apa yang perlu restock?", "Saldo kas sekarang berapa?", "Siapa yang belum bayar kas minggu ini?", "Invoice mana yang belum lunas?", "Siapa yang hutangnya telat?", "Bot mana yang lagi kerja?"];
-let APX = [], APX_BUSY = false;
+let APX = [], APX_BUSY = false, APX_MODEL = [], APX_PILIH = "gemini", APX_MUAT = false;
+try { APX_PILIH = localStorage.getItem("apxModel") || "gemini"; } catch (e) {}
 const apxMd = t => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/^\s*[*\-] /gm, "• ");
+const apxNamaModel = id => (APX_MODEL.find(m => m.id === id) || {}).nama || "";
 function apxRender() {
   const lg = $("#apxLog");
+  $("#apxModel").innerHTML = APX_MODEL.map(m => `<button type="button" data-apm="${m.id}" class="${m.id === APX_PILIH ? "on" : ""}" ${m.siap ? "" : "disabled"} title="${esc(m.ket)}${m.siap ? "" : " · belum aktif"}">${esc(m.nama)}</button>`).join("");
   lg.innerHTML = (APX.length ? "" : '<div class="m a">Halo Alvaro. Mau cek apa? Stok, kas, invoice, iuran… tinggal tanya, nanti gw cek datanya dulu.</div>')
-    + APX.map(x => x.role === "user" ? `<div class="m u">${esc(x.text)}</div>` : `<div class="m a${x.galat ? " g" : ""}">${apxMd(x.text)}${(x.alat || []).length ? `<div class="al">${x.alat.map(a => `<span class="ch n" title="${esc(JSON.stringify(a.arg || {}))}">${esc(APX_LABEL[a.alat] || a.alat)}${a.arg && Object.keys(a.arg).length ? ": " + esc(Object.values(a.arg).join(", ")) : ""}</span>`).join("")}</div>` : ""}</div>`).join("")
-    + (APX_BUSY ? '<div class="tp">Apex lagi mengecek data…</div>' : "");
+    + APX.map(x => x.role === "user" ? `<div class="m u">${esc(x.text)}</div>` : `<div class="m a${x.galat ? " g" : ""}">${apxMd(x.text)}${x.alir ? '<span class="tp" style="display:inline">▍</span>' : ""}${(x.alat || []).length ? `<div class="al">${x.alat.map(a => `<span class="ch n" title="${esc(JSON.stringify(a.arg || {}))}">${esc(APX_LABEL[a.alat] || a.alat)}</span>`).join("")}</div>` : ""}${x.model && apxNamaModel(x.model) ? `<div class="mu" style="font-size:11.5px;margin-top:4px">${esc(apxNamaModel(x.model))}</div>` : ""}</div>`).join("")
+    + (APX_BUSY && !(APX.length && APX[APX.length - 1].alir && APX[APX.length - 1].text) ? '<div class="tp">Apex lagi mengecek data…</div>' : "");
   lg.scrollTop = lg.scrollHeight; $("#apxKirim").disabled = APX_BUSY; $("#apxSaran").hidden = APX.length > 0;
+}
+async function apxMuat() {
+  if (APX_MUAT) return; APX_MUAT = true;
+  try { const d = await api("/api/apex"); APX_MODEL = d.model; APX = d.riwayat.map(x => ({role: x.role, text: x.text, model: x.model}));
+    if (!APX_MODEL.some(m => m.id === APX_PILIH && m.siap)) APX_PILIH = "gemini"; apxRender(); }
+  catch (e) { APX_MUAT = false; $("#apxMsg").textContent = e.message; }
 }
 async function apxTanya(teks) {
   teks = String(teks == null ? $("#apxIn").value : teks).trim(); if (!teks || APX_BUSY) return;
-  const riwayat = APX.filter(x => !x.galat).slice(-12).map(x => ({role: x.role, text: x.text}));
-  APX.push({role: "user", text: teks}); $("#apxIn").value = ""; $("#apxMsg").textContent = ""; APX_BUSY = true; apxRender();
-  try { const d = await api("/api/apex", {json: {pesan: teks, riwayat}}); APX.push({role: "model", text: d.jawaban, alat: d.alat}); }
-  catch (e) { APX.push({role: "model", text: "⚠️ " + e.message, galat: true}); }
+  APX.push({role: "user", text: teks}); $("#apxIn").value = ""; $("#apxMsg").textContent = ""; APX_BUSY = true;
+  const jwb = {role: "model", text: "", alir: true, model: APX_PILIH}; APX.push(jwb); apxRender();
+  let selesai = false;
+  try {   // butir 2: jawaban mengalir (Server-Sent Events lewat fetch)
+    const res = await fetch("/api/apex/alir", {method: "POST", headers: {"X-MCI": "1", "Content-Type": "application/json"}, body: JSON.stringify({pesan: teks, model: APX_PILIH})});
+    if (!res.ok || !res.body || !(res.headers.get("content-type") || "").includes("event-stream")) throw new Error("alir");
+    const rd = res.body.getReader(), dec = new TextDecoder(); let buf = "";
+    while (!selesai) {
+      const {value, done} = await rd.read(); if (done) break;
+      buf += dec.decode(value, {stream: true}); let k;
+      while ((k = buf.indexOf("\n\n")) >= 0) {
+        const blok = buf.slice(0, k); buf = buf.slice(k + 2);
+        const ev = (blok.match(/^event: (.+)$/m) || [])[1], dt = (blok.match(/^data: (.*)$/m) || [])[1]; if (!ev || dt == null) continue;
+        const isi = JSON.parse(dt);
+        if (ev === "t") { jwb.text += isi; apxRender(); }
+        else if (ev === "selesai") { Object.assign(jwb, {text: isi.jawaban, alat: isi.alat, model: isi.model, alir: false}); selesai = true; }
+        else if (ev === "error") { Object.assign(jwb, {text: "⚠️ " + isi, galat: true, alir: false}); selesai = true; }
+      }
+    }
+    if (!selesai && !jwb.text) throw new Error("alir");
+    if (!selesai) jwb.alir = false;
+  } catch (e) {
+    if (!jwb.text || e.message === "alir") {   // cadangan: cara lama, jawaban utuh
+      try { const d = await api("/api/apex", {json: {pesan: teks, model: APX_PILIH}}); Object.assign(jwb, {text: d.jawaban, alat: d.alat, model: d.model, alir: false}); }
+      catch (e2) { Object.assign(jwb, {text: "⚠️ " + e2.message, galat: true, alir: false}); }
+    } else jwb.alir = false;
+  }
   APX_BUSY = false; apxRender(); $("#apxIn").focus();
 }
+$("#apxModel").onclick = e => { const b = e.target.closest("[data-apm]"); if (!b || b.disabled) return; APX_PILIH = b.dataset.apm; try { localStorage.setItem("apxModel", APX_PILIH); } catch (er) {} apxRender(); };
 $("#apxSaran").innerHTML = APX_SARAN.map(q => `<button type="button">${esc(q)}</button>`).join("");
 $$("#apxSaran button").forEach(b => b.onclick = () => apxTanya(b.textContent));
 $("#apxKirim").onclick = () => apxTanya();
 $("#apxIn").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); apxTanya(); } };
-$("#apxHapus").onclick = () => { if (APX_BUSY) return; APX = []; apxRender(); };
+$("#apxHapus").onclick = async () => { if (APX_BUSY || !confirm("Mulai obrolan baru? Riwayat obrolan ini dihapus.")) return; try { await api("/api/apex", {method: "DELETE"}); } catch (e) {} APX = []; apxRender(); };
 apxRender();
 
 

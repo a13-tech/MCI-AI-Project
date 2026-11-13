@@ -11,7 +11,8 @@ Prinsip hemat token (Gemini Tier 1):
 Studio Gambar: Cloudflare Workers AI (FLUX schnell + img2img), gratis 10.000 neuron/hari.
 """
 import studio3d
-import os, io, csv, json, re, time, gzip, random, base64, asyncio, secrets, logging, sqlite3, threading, contextlib, hashlib, zipfile
+import os, io, csv, json, re, time, gzip, random, base64, asyncio, secrets, logging, sqlite3, threading, contextlib, hashlib, zipfile, queue
+from types import SimpleNamespace
 from collections import deque, OrderedDict
 from datetime import datetime, date, timedelta, timezone
 from html import unescape as _unesc, escape as _esc_html
@@ -45,7 +46,7 @@ WIB = pytz.timezone("Asia/Jakarta")
 MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 MODEL_LITE = os.getenv("GEMINI_MODEL_LITE", os.getenv("GEMINI_MODEL_BOSS", "gemini-3.5-flash-lite"))
 RPM = max(1, int(os.getenv("GEMINI_RPM", "60")))
-DAILY_LIMIT = int(os.getenv("DAILY_TOKEN_LIMIT", "0"))      # 0 = tanpa batas
+DAILY_LIMIT = int(os.getenv("DAILY_TOKEN_LIMIT", "1000000"))   # batas token AI per hari (puncak pemakaian Okt-Nov 2026 ~62 ribu); 0 = tanpa batas
 MAX_TASKS = max(1, min(4, int(os.getenv("BOSS_MAX_TASKS", "3"))))
 COUNCIL_MAX = max(2, min(6, int(os.getenv("COUNCIL_MAX", "4"))))
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
@@ -313,6 +314,7 @@ def db_init():
         sql(c, f"CREATE TABLE IF NOT EXISTS surat (id {pk}, token TEXT UNIQUE NOT NULL, nomor TEXT NOT NULL, urut INTEGER NOT NULL, tahun INTEGER NOT NULL, format TEXT NOT NULL DEFAULT 'a', "
                f"nama TEXT NOT NULL, jabatan TEXT, divisi TEXT, mulai TEXT, tanggal TEXT NOT NULL, pesan TEXT, wa TEXT, ttd_nama TEXT, ttd_jabatan TEXT, kode TEXT NOT NULL, "
                f"status TEXT NOT NULL DEFAULT 'aktif', oleh TEXT, dibuat TEXT, dilihat INTEGER NOT NULL DEFAULT 0)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS chat_riwayat (id {pk}, ruang TEXT NOT NULL, role TEXT NOT NULL, teks TEXT NOT NULL, model TEXT, waktu TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS gambar_kode (id {pk}, prompt TEXT NOT NULL, svg TEXT NOT NULL, mesin TEXT, oleh TEXT, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS pusat_info (id {pk}, ip TEXT NOT NULL, tanya TEXT NOT NULL, jawab TEXT, token {big} NOT NULL DEFAULT 0, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS stok (id {pk}, nama TEXT NOT NULL, jumlah {big} NOT NULL DEFAULT 0, satuan TEXT, kategori TEXT, minimum {big} NOT NULL DEFAULT 0, catatan TEXT, mime TEXT, gambar TEXT, diubah TEXT)")
@@ -596,6 +598,60 @@ def usage_add(model, masuk, keluar, pikir):
         log.exception("Gagal menyimpan pemakaian token")
 
 
+def gaya_model(model):
+    """Karakter tiap model (butir 3): Hydrogen/Flash-Lite cepat & ringkas, Argon penalaran berat."""
+    m = str(model or "").lower()
+    if "argon" in m:
+        return ("\n\nMODE PENALARAN MENDALAM: kamu dipakai untuk soal berat (logika, rangkaian, kode). Pikirkan langkah demi langkah sebelum menjawab, "
+                "periksa ulang hitungan dan pin, sebut asumsi yang kamu pakai, dan beri kode lengkap kalau diminta.")
+    if "hydrogen" in m or "lite" in m:
+        return "\n\nMODE CEPAT: jawab ringkas dan langsung ke inti. Kalau soalnya butuh analisis panjang, beri jawaban singkat lalu tawarkan penjelasan lebih dalam."
+    return ""
+
+
+def token_peringatan():
+    """Butir 4: beri tahu Dev sekali sehari saat pemakaian token mencapai 80% batas harian."""
+    if not DAILY_LIMIT or SET.get("token80") == today():
+        return
+    if usage_today_total() < 0.8 * DAILY_LIMIT:
+        return
+    SET["token80"] = today()
+    set_save()
+    try:
+        inbox_kirim(_dev_ids(), "info", "⚠️ Pemakaian token AI sudah 80% dari batas harian",
+                    f"Terpakai {usage_today_total():,} dari {DAILY_LIMIT:,} token hari ini. Kalau batas tercapai, fitur AI berhenti sampai besok. "
+                    "Naikkan DAILY_TOKEN_LIMIT di Render kalau memang perlu.".replace(",", "."))
+    except Exception:
+        log.exception("Peringatan token gagal dikirim")
+
+
+CHAT_SIMPAN = 200   # pesan maksimal yang disimpan per ruang obrolan
+
+
+def riwayat_ambil(ruang, n=40):
+    """Riwayat obrolan dalam format netral [{role: user|model, text, model}], dipakai model apa pun (butir 1)."""
+    with db() as c:
+        rows = sql(c, "SELECT role,teks,model,waktu FROM chat_riwayat WHERE ruang=? ORDER BY id DESC LIMIT ?", (ruang, int(n))).fetchall()
+    return [{"role": r_, "text": t, "model": m or "", "waktu": w or ""} for r_, t, m, w in reversed(rows)]
+
+
+def riwayat_tambah(ruang, role_, teks, model=""):
+    with db() as c:
+        sql(c, "INSERT INTO chat_riwayat (ruang,role,teks,model,waktu) VALUES (?,?,?,?,?)", (ruang, role_, str(teks)[:8000], model, _now()))
+        lama = sql(c, "SELECT id FROM chat_riwayat WHERE ruang=? ORDER BY id DESC LIMIT 1 OFFSET ?", (ruang, CHAT_SIMPAN)).fetchone()
+        if lama:
+            sql(c, "DELETE FROM chat_riwayat WHERE ruang=? AND id<=?", (ruang, lama[0]))
+
+
+def riwayat_hapus(ruang):
+    with db() as c:
+        sql(c, "DELETE FROM chat_riwayat WHERE ruang=?", (ruang,))
+
+
+def ke_content(riwayat):
+    return [types.Content(role=h["role"], parts=[types.Part(text=str(h["text"])[:3000])]) for h in riwayat if h.get("text") and h.get("role") in ("user", "model")]
+
+
 def usage_today_total():
     return sum(v["masuk"] + v["keluar"] + v["pikir"] for v in USAGE.get(today(), {}).values())
 
@@ -738,7 +794,8 @@ async def mcp_tools():
 
 
 async def ask(key, text, history=None, parts=None, schema=None, model=None, act="Memproses permintaan",
-              use_mcp=True, skill=None, brief=False, cache=True, show=None, room=None, fungsi=None, sistem=None, kunci=None):
+              use_mcp=True, skill=None, brief=False, cache=True, show=None, room=None, fungsi=None, sistem=None, kunci=None, alir=None):
+    """alir: fungsi(teks) dipanggil untuk tiap potongan jawaban (streaming). Gagal streaming -> otomatis jawaban utuh."""
     cl = client_kunci(kunci) if kunci else client(key)   # kunci: API key khusus (mis. tier 1 untuk Argon, gratis untuk Hydrogen)
     if not cl:
         raise RuntimeError(f"Key Gemini untuk {AGENTS[key]['nama']} belum diisi (GEMINI_{key.upper()} atau GEMINI_API_KEY).")
@@ -748,6 +805,7 @@ async def ask(key, text, history=None, parts=None, schema=None, model=None, act=
     sysp = (sistem or AGENTS[key]["prompt"]) + IDENTITAS_AI
     if skill and skill in SKILLS:
         sysp += f"\n\n[SKILL: {skill}]\n{SKILLS[skill]['isi']}"
+    sysp += gaya_model(model)
     if SET["caveman"] or brief:
         sysp += CAVEMAN
     if not schema:
@@ -763,8 +821,12 @@ async def ask(key, text, history=None, parts=None, schema=None, model=None, act=
         ck = hashlib.sha256(f"{model}|{sysp}|{text}|{getattr(schema, '__name__', schema)}".encode()).hexdigest()
         hit = cache_get(ck)
         if hit is not None:
+            if alir:
+                alir(hit)
             return hit
     extra = {"response_mime_type": "application/json", "response_schema": schema} if schema else {}
+
+    terkirim = [False]   # streaming: sudah ada potongan yang dikirim ke pengguna?
 
     async def call(tools, think=True):
         kw = dict(system_instruction=sysp, tools=tools, **extra)
@@ -774,7 +836,30 @@ async def ask(key, text, history=None, parts=None, schema=None, model=None, act=
         if tc is not None:
             kw["thinking_config"] = tc
         await LIMITER.acquire(model)
-        return await cl.aio.models.generate_content(model=model, contents=contents, config=types.GenerateContentConfig(**kw))
+        cfg = types.GenerateContentConfig(**kw)
+        if alir and not schema:
+            try:   # streaming: teruskan tiap potongan ke pengguna begitu datang
+                potong, usage = [], None
+                async for ch in await cl.aio.models.generate_content_stream(model=model, contents=contents, config=cfg):
+                    t = getattr(ch, "text", None) or ""
+                    if t:
+                        potong.append(t)
+                        terkirim[0] = True
+                        alir(t)
+                    if getattr(ch, "usage_metadata", None) is not None:
+                        usage = ch.usage_metadata
+                if potong:
+                    return SimpleNamespace(text="".join(potong), usage_metadata=usage or SimpleNamespace())
+            except Exception:
+                if terkirim[0]:
+                    raise   # sudah sebagian tampil: jangan diulang dari awal
+                log.warning("Streaming gagal untuk %s, pakai jawaban utuh", model)
+            r = await cl.aio.models.generate_content(model=model, contents=contents, config=cfg)
+            if (r.text or "").strip():
+                terkirim[0] = True
+                alir(r.text)
+            return r
+        return await cl.aio.models.generate_content(model=model, contents=contents, config=cfg)
 
     async def call_safe(tools):
         try:
@@ -812,6 +897,7 @@ async def ask(key, text, history=None, parts=None, schema=None, model=None, act=
         s["calls"] += 1
         s["tokens"] += total
         await asyncio.to_thread(usage_add, model, masuk, keluar, pikir)
+        await asyncio.to_thread(token_peringatan)
         out = (r.text or "").strip()
         if not schema:
             out = latex_bersih(out)
@@ -8629,40 +8715,111 @@ def cek_status_bot() -> dict:
 APEX_ALAT = [cek_stok, cek_produk, cek_kas, cek_invoice, cek_hutang, cek_iuran, cek_anggota, cek_blacklist, cek_catatan, cek_perpustakaan, cek_dokumentasi_dan_voting, cek_iot, cek_status_bot]
 
 
-async def apex_tanya(pesan, riwayat):
-    """Jalankan satu giliran obrolan. Balik (jawaban, daftar alat yang dipakai)."""
+def apex_model_daftar():
+    """Model yang bisa dipilih di Tanya Apex. Semuanya keluarga Gemini karena Apex memakai alat data (function calling)."""
+    return [{"id": "gemini", "nama": "Gemini Flash", "model": MODEL, "siap": bool(client("apex")), "ket": "seimbang"},
+            {"id": "hydrogen", "nama": "Gemini 4 Hydrogen", "model": HYDROGEN_MODEL, "siap": bool(kunci_hydrogen()), "ket": "cepat, ringan"},
+            {"id": "argon", "nama": "Gemini 4 Argon", "model": ARGON_MODEL, "siap": bool(kunci_argon()) and ARGON_AKTIF, "ket": "penalaran berat, berbayar"}]
+
+
+def _apex_mesin(mid):
+    pil = next((m for m in apex_model_daftar() if m["id"] == mid and m["siap"]), None) or apex_model_daftar()[0]
+    kunci = kunci_hydrogen() if pil["id"] == "hydrogen" else kunci_argon() if pil["id"] == "argon" else None
+    return pil, kunci
+
+
+async def apex_tanya(pesan, riwayat, model_id="gemini", alir=None):
+    """Jalankan satu giliran obrolan. riwayat: format netral [{role, text}] sehingga nyambung walau modelnya ganti. Balik (jawaban, alat, model)."""
     jejak = []
     _APEX_LOG.set(jejak)
-    hist = []
-    for h in riwayat[-APEX_RIWAYAT:]:
-        t = str(h.get("text") or "")[:3000]
-        if t and h.get("role") in ("user", "model"):
-            hist.append(types.Content(role=h["role"], parts=[types.Part(text=t)]))
-    jawab = await ask("apex", pesan, history=hist, model=MODEL, act="Menjawab pertanyaan Dev", use_mcp=False, cache=False, fungsi=APEX_ALAT, sistem=APEX_SISTEM)
-    return jawab, jejak
+    hist = ke_content([h for h in riwayat if isinstance(h, dict)][-APEX_RIWAYAT:])
+    pil, kunci = _apex_mesin(model_id)
+    jawab = await ask("apex", pesan, history=hist, model=pil["model"], act="Menjawab pertanyaan Dev", use_mcp=False, cache=False, fungsi=APEX_ALAT,
+                      sistem=APEX_SISTEM, kunci=kunci, alir=alir)
+    return jawab, jejak, pil["id"]
 
 
-@app.route("/api/apex", methods=["POST"])
-def api_apex():
-    """{pesan, riwayat: [{role: user|model, text}]}. Khusus admin/Dev (token admin master atau anggota berjabatan admin). Balik: {jawaban, alat: [{alat, arg}]}."""
+def _apex_ruang(r):
+    return f"apex:{mid_of(r) if mid_of(r) is not None else 'admin'}"
+
+
+def _apex_siap():
     r = role()
     if not r:
         abort(401)
     if not is_admin(r):   # sama dengan aturan menu di web: token admin master atau anggota berjabatan admin (Dev)
         abort(403)
+    return r
+
+
+@app.route("/api/apex", methods=["GET", "POST", "DELETE"])
+def api_apex():
+    """GET: riwayat tersimpan + pilihan model. POST {pesan, model}: satu giliran (tanpa streaming). DELETE: obrolan baru. Khusus Dev."""
+    r = _apex_siap()
+    ruang = _apex_ruang(r)
+    if request.method == "GET":
+        return jsonify({"riwayat": riwayat_ambil(ruang, 60), "model": apex_model_daftar()})
+    if request.method == "DELETE":
+        riwayat_hapus(ruang)
+        return jsonify({"ok": True})
     d = request.get_json(silent=True) or {}
     pesan = str(d.get("pesan") or "").strip()[:APEX_TEKS]
     if not pesan:
         return jsonify({"error": "Tulis pertanyaannya dulu"}), 400
-    riwayat = d.get("riwayat") if isinstance(d.get("riwayat"), list) else []
     if not LOOP:
         return jsonify({"error": "Mesin AI belum siap, coba lagi sebentar."}), 503
+    riwayat = riwayat_ambil(ruang, APEX_RIWAYAT)
     try:
-        jawab, jejak = asyncio.run_coroutine_threadsafe(apex_tanya(pesan, [h for h in riwayat if isinstance(h, dict)]), LOOP).result(120)
+        jawab, jejak, mid = asyncio.run_coroutine_threadsafe(apex_tanya(pesan, riwayat, str(d.get("model") or "gemini")), LOOP).result(120)
     except Exception as e:
         log.exception("Tanya Apex gagal")
         return jsonify({"error": f"Apex gagal menjawab: {e}"}), 502
-    return jsonify({"jawaban": jawab or "(Apex tidak memberi jawaban. Coba tulis ulang pertanyaannya.)", "alat": jejak})
+    jawab = jawab or "(Apex tidak memberi jawaban. Coba tulis ulang pertanyaannya.)"
+    riwayat_tambah(ruang, "user", pesan, mid)
+    riwayat_tambah(ruang, "model", jawab, mid)
+    return jsonify({"jawaban": jawab, "alat": jejak, "model": mid})
+
+
+@app.route("/api/apex/alir", methods=["POST"])
+def api_apex_alir():
+    """Butir 2: jawaban Apex mengalir kata per kata (Server-Sent Events). event t = potongan teks, selesai = {jawaban, alat, model}, error = pesan."""
+    r = _apex_siap()
+    ruang = _apex_ruang(r)
+    d = request.get_json(silent=True) or {}
+    pesan = str(d.get("pesan") or "").strip()[:APEX_TEKS]
+    if not pesan:
+        return jsonify({"error": "Tulis pertanyaannya dulu"}), 400
+    if not LOOP:
+        return jsonify({"error": "Mesin AI belum siap, coba lagi sebentar."}), 503
+    riwayat, q = riwayat_ambil(ruang, APEX_RIWAYAT), queue.Queue()
+
+    async def kerja():
+        try:
+            jawab, jejak, mid = await apex_tanya(pesan, riwayat, str(d.get("model") or "gemini"), alir=lambda t: q.put(("t", t)))
+            jawab = jawab or "(Apex tidak memberi jawaban. Coba tulis ulang pertanyaannya.)"
+            await asyncio.to_thread(riwayat_tambah, ruang, "user", pesan, mid)
+            await asyncio.to_thread(riwayat_tambah, ruang, "model", jawab, mid)
+            q.put(("selesai", {"jawaban": jawab, "alat": jejak, "model": mid}))
+        except Exception as e:
+            log.exception("Tanya Apex (alir) gagal")
+            q.put(("error", f"Apex gagal menjawab: {e}"))
+
+    asyncio.run_coroutine_threadsafe(kerja(), LOOP)
+
+    def aliran():
+        mulai = time.time()
+        while time.time() - mulai < 150:
+            try:
+                jenis, isi = q.get(timeout=10)
+            except queue.Empty:
+                yield ": tunggu\n\n"   # detak supaya koneksi tidak diputus proxy
+                continue
+            yield f"event: {jenis}\ndata: {json.dumps(isi, ensure_ascii=False)}\n\n"
+            if jenis in ("selesai", "error"):
+                return
+        yield f"event: error\ndata: {json.dumps('Waktu habis, coba lagi.')}\n\n"
+
+    return Response(aliran(), mimetype="text/event-stream", headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"})
 
 
 # ---------- PERPUSTAKAAN: semua yang bisa membuka web (termasuk viewer) boleh MEMBACA; mengunggah khusus anggota; ubah/hapus milik orang lain khusus Dev ----------
@@ -9375,10 +9532,15 @@ def make_handlers(key):
                 if sk and sk["bot"] == key:
                     ans = await ask(key, rctx + text, skill=sk["nama"], act=act, room=room)
                 else:
-                    h = HIST.setdefault((key, m.chat_id), [])
+                    ruang_tg = f"tg:{key}:{m.chat_id}"
+                    if (key, m.chat_id) not in HIST:   # setelah server restart: ambil lagi dari database
+                        HIST[(key, m.chat_id)] = ke_content(await asyncio.to_thread(riwayat_ambil, ruang_tg, 6))
+                    h = HIST[(key, m.chat_id)]
                     ans = await ask(key, rctx + text, history=h, act=act, room=room)
                     h += [types.Content(role="user", parts=[types.Part(text=text)]), types.Content(role="model", parts=[types.Part(text=ans)])]
                     del h[:-6]
+                    await asyncio.to_thread(riwayat_tambah, ruang_tg, "user", text, model_for(key))
+                    await asyncio.to_thread(riwayat_tambah, ruang_tg, "model", ans, model_for(key))
                 if note and ans:
                     ans += f"\n\n— {note}"
             ok = True
