@@ -5,7 +5,7 @@ baris yang belum pernah diubah lewat web. Baris yang sudah diedit Dev di web tid
 Format isi: satu baris = satu ayat. Awali "* " untuk ayat, "** " untuk rincian di bawah ayat.
 """
 
-UU_VERSI = 8
+UU_VERSI = 9
 
 UU_SEED = {
     "info": "UNDANG-UNDANG MAHARDIKA CAKRAWALA INDONESIA (UU MCI)\n"
@@ -155,7 +155,8 @@ KAS_SEED = {
             "** ikut memberi suara dan mengambil keputusan proyek;",
             "** memakai perlengkapan, dokumen, dan fasilitas proyek;",
             "** menerima bagian hasil, pengakuan, atau kepemilikan atas hasil proyek.",
-            "* Hak kembali penuh setelah semua tunggakan dan denda lunas.",
+            "* Proyek yang dimiliki anggota yang haknya dicabut tetap tercatat, tetapi ditangguhkan: kas proyek, permintaan dana, dan pengajuan dana dibekukan sementara.",
+            "* Hak kembali penuh setelah semua tunggakan dan denda lunas. Proyek yang ditangguhkan otomatis aktif kembali saat itu.",
             "* Anggota yang baru mulai membayar di tengah jalan tetap wajib melunasi semua tunggakan sejak kewajibannya dimulai. Membayar minggu berjalan saja tidak mengembalikan hak.",
             "* Bagian hasil yang dibagikan selama hak dicabut tidak diberikan kemudian, meskipun anggota sudah melunasi tunggakannya."])},
         {"nomor": 5, "judul": "Keterbukaan Laporan", "isi": "\n".join([
@@ -166,14 +167,13 @@ KAS_SEED = {
             "* Anggota yang menolak dikeluarkan, misalnya tetap memakai perlengkapan atau mengaku memiliki hasil proyek, dapat diberi Surat Peringatan melalui proses sidang. Ia tetap berhak membela diri.",
             "* Setelah haknya pulih, anggota boleh bergabung kembali jika pemilik proyek menyetujui."])},
         {"nomor": 7, "judul": "Membuat Proyek dan Dana Proyek", "isi": "\n".join([
-            "* Setiap anggota boleh mengusulkan proyek baru.",
-            "* Proyek sah jika disetujui paling sedikit 3 anggota aktif yang haknya tidak sedang dicabut, termasuk pengusul.",
-            "* Proyek wajib dicatat di halaman Proyek, lengkap dengan pemilik proyek dan nama anggota yang menyetujui.",
+            "* Setiap anggota boleh membuat proyek baru. Proyek langsung sah begitu dicatat di halaman Proyek lengkap dengan pemilik proyeknya, tanpa perlu persetujuan anggota lain.",
+            "* Jika hak proyek pemilik sedang dicabut menurut Pasal 4, proyeknya tetap boleh dicatat tetapi berstatus ditangguhkan sampai tunggakan dan denda lunas.",
             "* Setiap proyek boleh memakai dana kas paling banyak Rp75.000 secara keseluruhan.",
             "* Jika membutuhkan tambahan dana, pemilik proyek mengajukannya kepada Bendahara atau Pemilik MCI. Dana tambahan baru boleh dipakai setelah disetujui.",
             "* Dana kas untuk proyek dipindahkan ke kas proyek setelah Bendahara mengonfirmasi pencairan. Kas proyek dicatat terpisah dari kas MCI.",
             "* Subsidi, hibah, atau pinjaman dari mitra dicatat sebagai kas proyek dan tidak dihitung dalam batas Rp75.000. Pinjaman mitra wajib dicatat bersama tanggal jatuh temponya.",
-            "* Proyek lama atau proyek arsip boleh dicatat pengurus tanpa persetujuan 3 anggota, dengan syarat tidak meminta dana kas MCI. Proyek yang dibekukan (Freeze) wajib ditulis alasannya.",
+            "* Proyek lama atau proyek arsip boleh dicatat pengurus, dengan syarat tidak meminta dana kas MCI. Proyek yang dibekukan (Freeze) wajib ditulis alasannya.",
             "* Pembelian memakai kas proyek diajukan lewat Pengajuan dana (barang, harga, alasan). Yang disetujui Bendahara atau Pemilik MCI langsung dicatat keluar dari kas proyek.",
             "* Catatan dan jurnal proyek menyimpan nama penulis dan tanggalnya. Jejak itu hanya boleh dihapus Pemilik MCI."])},
         {"nomor": 8, "judul": "Penyalahgunaan Dana Kas", "isi": "\n".join([

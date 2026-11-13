@@ -3414,10 +3414,10 @@ JENIS = {
     "proyek": {"judul": "Proyek", "tulis": "proyek_kelola", "buat": "anggota", "lihat": "anggota", "fields": [   # Peraturan Kas Pasal 6 & 7
         F("nama", "Nama proyek", wajib=True), F("status", "Status", "pilih", opsi=[["ide", "Ide"], ["berjalan", "Berjalan (progress)"], ["ditunda", "Freeze (dibekukan)"], ["selesai", "Selesai"]], bawaan="berjalan"),
         F("alasan_freeze", "Alasan dibekukan", maks=300, info="Wajib diisi kalau status Freeze, misalnya: ada proyek lain yang lebih penting."),
-        F("lama", "Proyek lama / arsip (dicatat pengurus, tanpa persetujuan 3 anggota)", "bool", info="Untuk proyek yang sudah ada sebelum web ini, atau yang dicatat pengurus. Tidak boleh meminta dana kas MCI."),
+        F("lama", "Proyek lama / arsip (dicatat pengurus)", "bool", info="Untuk proyek yang sudah ada sebelum web ini, atau yang dicatat pengurus. Tidak boleh meminta dana kas MCI."),
         F("tgl_mulai", "Tanggal mulai", "tanggal"), F("tgl_selesai", "Tanggal selesai", "tanggal"),
-        F("pj", "Pemilik proyek", "anggota", info="Pengusul proyek. Boleh langsung mengeluarkan anggota tim yang hak proyeknya dicabut (Peraturan Kas Pasal 6)."),
-        F("setuju", "Anggota yang menyetujui", "anggota_banyak", info="Minimal 3 anggota aktif yang haknya tidak dicabut, termasuk pemilik proyek (Peraturan Kas Pasal 7)."),
+        F("pj", "Pemilik proyek", "anggota", info="Pengusul proyek. Kalau hak proyek pemilik sedang dicabut karena tunggakan kas, proyek otomatis Ditangguhkan sampai lunas (Peraturan Kas Pasal 4 & 7)."),
+        {**F("setuju", "Anggota yang menyetujui (aturan lama)", "anggota_banyak"), "sistem": True},   # data lama disimpan; proyek tidak lagi butuh persetujuan
         F("tim", "Tim", "anggota_banyak"), F("progres", "Progres (%)", "angka", maks=100, bawaan=0),
         F("dana", "Dana kas MCI diminta (Rp)", "angka", maks=10**9, bawaan=0, info="Paling banyak Rp75.000 per proyek; lebih dari itu perlu persetujuan Bendahara atau Pemilik MCI. Uangnya dipindah ke kas proyek setelah Bendahara mengonfirmasi pencairan (Peraturan Kas Pasal 7)."),
         F("dana_tambahan", "Tambahan dana disetujui (Rp)", "angka", maks=10**9, bawaan=0, info="Diisi Bendahara atau Pemilik MCI."),
@@ -3636,6 +3636,10 @@ def rk_setelah(jenis, x, lama, r):
                 inbox_kirim([i], "proyek", f"Kamu dikeluarkan dari proyek {x.get('nama', '')}",
                             ("Hak proyekmu sedang dicabut karena tunggakan kas, jadi pemilik proyek mengeluarkanmu dari tim (Peraturan Kas Pasal 6). "
                              "Setelah tunggakan dan denda lunas, kamu boleh bergabung lagi jika pemilik proyek setuju.") if tg.get(i, 0) >= 2 else f"Diubah oleh {nama_peran(r)}.", sid)
+    if jenis == "proyek" and lama is None and proyek_tangguh(x) and x.get("pj"):
+        inbox_kirim([x["pj"]], "proyek", f"Proyek {x.get('nama', '')} tercatat, tetapi ditangguhkan",
+                    "Hak proyekmu sedang dicabut karena tunggakan kas (Peraturan Kas Pasal 4). Proyeknya tetap tersimpan, tetapi kas proyek dan permintaan dana dibekukan sementara. "
+                    "Begitu tunggakan dan denda lunas, proyek otomatis aktif lagi.", sid)
     if jenis == "proyek":
         pk_sinkron_alokasi(x, r)
     if jenis == "pengumuman" and lama is None and x.get("kirim"):
@@ -3673,22 +3677,15 @@ def rk_cek(jenis, data, lama, r):
         data["pj"] = me
     if not data.get("pj"):
         return "Pemilik proyek wajib diisi"
-    if not boleh(r, "proyek_kelola"):   # hanya pengurus yang boleh menandai proyek lama (tanpa persetujuan 3 anggota)
+    if not boleh(r, "proyek_kelola"):   # hanya pengurus yang boleh menandai proyek lama
         data["lama"] = bool((lama or {}).get("lama"))
     if data.get("lama") and int(data.get("dana") or 0) > 0:
-        return "Proyek lama / arsip tidak boleh meminta dana kas MCI. Kosongkan dananya, atau ajukan sebagai proyek biasa dengan persetujuan 3 anggota."
+        return "Proyek lama / arsip tidak boleh meminta dana kas MCI. Kosongkan dananya, atau catat sebagai proyek biasa."
     if data.get("status") == "ditunda" and not (data.get("alasan_freeze") or "").strip():
         return "Tulis alasan proyek dibekukan (Freeze)."
     if data.get("status") == "selesai" and not data.get("tgl_selesai"):
         data["tgl_selesai"] = today()
-    data["setuju"] = sorted(set(data.get("setuju") or []) | {data["pj"]})
-    if not data.get("lama") and (lama is None or set(data["setuju"]) != set(lama.get("setuju") or []) or lama.get("lama")):
-        tg = rk_tunggak()
-        dicabut = [_nm(i) for i in data["setuju"] if tg.get(i, 0) >= 2]
-        if dicabut:
-            return f"{', '.join(dicabut)} sedang dicabut hak proyeknya, jadi belum bisa ikut menyetujui (Peraturan Kas Pasal 4 & 7)."
-        if len(data["setuju"]) < 3:
-            return f"Proyek perlu disetujui minimal 3 anggota termasuk pemilik proyek (Peraturan Kas Pasal 7). Baru {len(data['setuju'])}."
+    data["setuju"] = (lama or {}).get("setuju") or []   # aturan lama (3 persetujuan) dihapus; data lama dibiarkan
     if not (is_admin(r) or can("kas_edit", r)):
         data["dana_tambahan"] = (lama or {}).get("dana_tambahan") or 0
     batas = DANA_PROYEK_MAKS + int(data.get("dana_tambahan") or 0)
@@ -3832,7 +3829,7 @@ def pk_ringkas(pid, rows=None):
 def pk_sinkron_alokasi(x, r):
     """Dana kas MCI yang diminta proyek -> satu baris 'menunggu' sebesar (diminta - sudah cair). Bendahara yang mencairkan."""
     pid = x["id"]
-    if pk_ditutup(pid):
+    if pk_ditutup(pid) or proyek_tangguh(x):   # ditangguhkan: permintaan dana tidak dibuat/diubah dulu
         return
     rows = pk_rows(pid)
     cair = sum(y["masuk"] for y in rows if y["jenis"] == "alokasi" and y["status"] == "cair")
@@ -3847,6 +3844,15 @@ def pk_sinkron_alokasi(x, r):
     if perlu:
         inbox_kirim(penerima_invoice(), "proyek", f"💰 Pencairan dana proyek menunggu: {x.get('nama', '')}",
                     f"Proyek meminta {rp(perlu)} dari kas MCI. Buka halaman Proyek, lalu konfirmasi pencairan di bagian Kas proyek (Peraturan Kas Pasal 7).", pid)
+
+
+def proyek_tangguh(x, tg=None):
+    """Proyek ditangguhkan selama hak proyek pemiliknya dicabut (tunggakan kas >= 2 minggu). Otomatis pulih begitu lunas."""
+    tg = rk_tunggak() if tg is None else tg
+    return bool(x.get("pj")) and tg.get(x["pj"], 0) >= 2
+
+
+PESAN_TANGGUH = "Proyek ini sedang ditangguhkan karena hak proyek pemiliknya dicabut (tunggakan kas). Kas proyek aktif lagi setelah tunggakan dan denda lunas (Peraturan Kas Pasal 4)."
 
 
 def pk_boleh_catat(x, r):
@@ -3887,8 +3893,11 @@ def pk_hitung_tutup(x, rows=None):
 def pk_payload(x, r):
     rows = pk_rows(x["id"])
     rk = pk_ringkas(x["id"], rows)
+    tangguh = proyek_tangguh(x)
     out = {"rows": rows, "ringkas": rk, "catat": pk_boleh_catat(x, r) and not rk["ditutup"], "bendahara": is_admin(r) or can("kas_edit", r),
-           "jenis_masuk": PK_MASUK, "jenis_keluar": PK_KELUAR, "nota_min": PK_NOTA_MIN, "persen_kas": PK_BAGI_KAS, "status": x.get("status")}
+           "jenis_masuk": PK_MASUK, "jenis_keluar": PK_KELUAR, "nota_min": PK_NOTA_MIN, "persen_kas": PK_BAGI_KAS, "status": x.get("status"), "tangguh": tangguh,
+           "dana": int(x.get("dana") or 0), "batas": DANA_PROYEK_MAKS + int(x.get("dana_tambahan") or 0),
+           "bisa_minta": pk_boleh_catat(x, r) and not rk["ditutup"] and not x.get("lama") and not tangguh}
     if not rk["ditutup"] and out["bendahara"]:
         out["tutup"] = pk_hitung_tutup(x, rows)
     return out
@@ -3914,6 +3923,8 @@ def api_proyek_kas(pid):
             abort(403)
         if pk_ditutup(pid):
             return jsonify({"error": "Kas proyek sudah ditutup."}), 400
+        if proyek_tangguh(x):
+            return jsonify({"error": PESAN_TANGGUH}), 400
         d = request.get_json(silent=True) or {}
         jenis = str(d.get("jenis") or "")
         try:
@@ -3954,6 +3965,39 @@ def api_proyek_kas(pid):
     return jsonify(pk_payload(x, r))
 
 
+@app.route("/api/proyek/<int:pid>/kas/minta", methods=["POST"])
+def api_proyek_kas_minta(pid):
+    """Minta dana kas MCI langsung dari Kas proyek (tanpa mengedit proyek). Jumlah = total dana yang dibutuhkan proyek."""
+    r = role()
+    x = _pk_proyek(pid, r)
+    if not pk_boleh_catat(x, r):
+        abort(403)
+    if pk_ditutup(pid):
+        return jsonify({"error": "Kas proyek sudah ditutup."}), 400
+    if proyek_tangguh(x):
+        return jsonify({"error": PESAN_TANGGUH}), 400
+    if x.get("lama"):
+        return jsonify({"error": "Proyek lama / arsip tidak boleh meminta dana kas MCI."}), 400
+    try:
+        n = int(re.sub(r"[^\d]", "", str((request.get_json(silent=True) or {}).get("jumlah") or "")) or 0)
+    except ValueError:
+        n = 0
+    batas = DANA_PROYEK_MAKS + int(x.get("dana_tambahan") or 0)
+    cair = sum(y["masuk"] for y in pk_rows(pid) if y["jenis"] == "alokasi" and y["status"] == "cair")
+    if n > batas:
+        return jsonify({"error": f"Paling banyak {rp(batas)}. Untuk tambahan, minta Bendahara atau Pemilik MCI mengisi Tambahan dana (Peraturan Kas Pasal 7)."}), 400
+    if n < cair:
+        return jsonify({"error": f"Sudah cair {rp(cair)}, jadi totalnya tidak bisa kurang dari itu."}), 400
+    with db() as c:
+        row = sql(c, "SELECT data FROM rekord WHERE id=? AND jenis='proyek'", (pid,)).fetchone()
+        data = json.loads(row[0] or "{}")
+        data["dana"] = n
+        sql(c, "UPDATE rekord SET data=?, diubah=? WHERE id=? AND jenis='proyek'", (json.dumps(data, ensure_ascii=False), _now(), pid))
+    x = rk_get("proyek", pid)
+    pk_sinkron_alokasi(x, r)
+    return jsonify(pk_payload(x, r))
+
+
 @app.route("/api/proyek/<int:pid>/kas/<int:i>", methods=["DELETE"])
 def api_proyek_kas_hapus(pid, i):
     r = role()
@@ -3982,6 +4026,8 @@ def api_proyek_kas_cair(pid, i):
     x = _pk_proyek(pid, r)
     if not (is_admin(r) or can("kas_edit", r)):
         abort(403)
+    if proyek_tangguh(x):
+        return jsonify({"error": PESAN_TANGGUH}), 400
     t = next((y for y in pk_rows(pid) if y["id"] == i and y["status"] == "menunggu"), None)
     if not t:
         return jsonify({"error": "Permintaan pencairan tidak ditemukan"}), 404
@@ -4081,7 +4127,7 @@ ABSEN_SOAL_PER_HARI = 6
 ABSEN_INGAT_JAM = 19   # pengingat untuk yang belum absen (WIB)
 KUIS_CADANGAN = [   # dipakai kalau AI gagal membuat soal
     {"soal": "Berapa iuran kas biasa MCI per minggu?", "opsi": ["Rp10.000", "Rp25.000", "Rp50.000", "Rp5.000"], "benar": 1, "penjelasan": "Rp5.000 per hari kerja = Rp25.000 per minggu (Peraturan Kas Pasal 1).", "topik": "Aturan MCI"},
-    {"soal": "Proyek MCI sah jika disetujui paling sedikit berapa anggota?", "opsi": ["2", "3", "5", "Semua anggota"], "benar": 1, "penjelasan": "Minimal 3 anggota termasuk pengusul (Peraturan Kas Pasal 7).", "topik": "Aturan MCI"},
+    {"soal": "Apa yang terjadi pada proyek baru jika hak proyek pemiliknya sedang dicabut?", "opsi": ["Proyek ditolak", "Proyek tercatat tetapi ditangguhkan sampai tunggakan lunas", "Proyek langsung aktif penuh", "Proyek dihapus otomatis"], "benar": 1, "penjelasan": "Proyek tetap tercatat tanpa persetujuan, tetapi ditangguhkan: kas proyek dan dana dibekukan sampai tunggakan dan denda lunas (Peraturan Kas Pasal 4 & 7).", "topik": "Aturan MCI"},
     {"soal": "Batas dana kas MCI untuk satu proyek tanpa tambahan adalah…", "opsi": ["Rp50.000", "Rp75.000", "Rp100.000", "Tidak ada batas"], "benar": 1, "penjelasan": "Paling banyak Rp75.000 per proyek (Peraturan Kas Pasal 7).", "topik": "Aturan MCI"},
     {"soal": "Saat tutup buku proyek, berapa persen keuntungan yang masuk kas MCI?", "opsi": ["10%", "20%", "50%", "80%"], "benar": 1, "penjelasan": "20% ke kas MCI, 80% dibagi rata ke tim yang bekerja (Peraturan Kas Pasal 11).", "topik": "Aturan MCI"},
     {"soal": "Hari apa absen harian MCI libur?", "opsi": ["Sabtu", "Jumat", "Minggu", "Senin"], "benar": 2, "penjelasan": "Absen wajib Senin–Sabtu, Minggu libur (UU MCI Pasal 19).", "topik": "Aturan MCI"},
@@ -4805,6 +4851,8 @@ def api_ajuan(pid):
         abort(403)
     if pk_ditutup(pid) or x.get("status") == "selesai":
         return jsonify({"error": "Proyek sudah selesai, tidak bisa mengajukan dana lagi."}), 400
+    if proyek_tangguh(x):
+        return jsonify({"error": PESAN_TANGGUH}), 400
     d = request.get_json(silent=True) or {}
     barang = re.sub(r"\s+", " ", str(d.get("barang") or "")).strip()[:160]
     alasan = str(d.get("alasan") or "").strip()[:1000]

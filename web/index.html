@@ -2084,7 +2084,7 @@ const RK_INFO = {
   pengumuman: ["Kabar resmi", "Pengumuman", "Pengumuman resmi MCI: kas, jadwal, dan keputusan. Formatnya seragam sesuai Pasal 14, dan bisa langsung dikirim ke Inbox serta Telegram semua anggota.", "Tulis pengumuman"],
   agenda: ["Organisasi", "Agenda & Rapat", "Jadwal rapat, agenda yang dibahas, notulen, dan daftar hadir. Anggota divisi terkait mendapat undangan di Inbox.", "Jadwalkan rapat"],
   tugas: ["Organisasi", "Tugas", "Siapa mengerjakan apa, sampai kapan. Penerima tugas mendapat notifikasi dan bisa memperbarui statusnya sendiri.", "Beri tugas"],
-  proyek: ["Organisasi", "Proyek", "Semua anggota boleh mengusulkan proyek. Proyek sah jika disetujui minimal 3 anggota, dan dana kasnya paling banyak Rp75.000 kecuali ada tambahan dari Bendahara atau Pemilik MCI (Peraturan Kas Pasal 7). Dana kas dipindah ke Kas proyek setelah Bendahara mengonfirmasi; subsidi dan pinjaman mitra dicatat di sana juga. Saat tutup buku, keuntungan dibagi 20% ke kas MCI dan 80% rata ke tim yang bekerja (Pasal 11). Anggota yang menunggak 2 minggu tanpa izin dicabut hak proyeknya, dan pemilik proyek boleh langsung mengeluarkannya (Pasal 4 & 6).", "Usulkan proyek"],
+  proyek: ["Organisasi", "Proyek", "Semua anggota boleh langsung membuat proyek tanpa persetujuan. Dana kas MCI paling banyak Rp75.000 per proyek kecuali ada tambahan dari Bendahara atau Pemilik MCI (Peraturan Kas Pasal 7). Di Kas proyek, tekan Uang masuk, Uang keluar, atau Minta dana kas MCI; Bendahara yang mencairkan dana kas MCI. Saat tutup buku, keuntungan dibagi 20% ke kas MCI dan 80% rata ke tim yang bekerja (Pasal 11). Anggota yang menunggak 2 minggu tanpa izin dicabut hak proyeknya: proyek miliknya tetap boleh dibuat tetapi ditangguhkan sampai lunas, dan pemilik proyek boleh mengeluarkannya dari tim lain (Pasal 4 & 6).", "Buat proyek"],
   mitra: ["Organisasi", "Database Mitra", "Daftar toko, sponsor, pemberi pinjaman, dan kolaborator MCI. Total subsidi, pinjaman, dan sisa utang dihitung otomatis dari Kas proyek, jadi tulis nama mitra sama persis dengan di Kas proyek.", "Tambah mitra"],
   alat: ["Organisasi", "Peminjaman Alat", "Alat milik MCI: siapa yang sedang memegang, sampai kapan, dan kondisinya. Anggota bisa meminjam sendiri paling lama 14 hari. Yang terlambat diingatkan otomatis setiap hari.", "Tambah alat"],
   konten: ["Konten & karya", "Jadwal Konten", "Kalender posting Instagram dan TikTok: dari ide, draf, siap tayang, sampai hasil tayangnya.", "Tambah konten"],
@@ -2108,7 +2108,7 @@ function rkInput(d, f, v) {
   else if (f.tipe === "divisi") el = `<select id="${id}" data-rkf="${f.nama}"><option value="">Semua divisi</option>${d.divisi.map(o => `<option value="${esc(o[0])}" ${o[0] === val ? "selected" : ""}>${esc(o[1])}</option>`).join("")}</select>`;
   else if (f.tipe === "anggota") el = `<select id="${id}" data-rkf="${f.nama}"><option value="">Pilih anggota</option>${d.anggota.map(a => `<option value="${a.id}" ${a.id === val ? "selected" : ""}>${esc(a.nama)}</option>`).join("")}</select>`;
   else if (f.tipe === "pasal") el = `<select id="${id}" data-rkf="${f.nama}"><option value="">Tidak spesifik</option>${(d.pasal || []).map(o => `<option value="${o[0]}" ${o[0] === val ? "selected" : ""}>${esc(o[1])}</option>`).join("")}</select>`;
-  else if (f.tipe === "anggota_banyak") { const set = new Set(val || []); return `<div class="full"><div style="font-size:13px;color:var(--mute);font-weight:500;margin-bottom:6px">${esc(f.label)}</div><div class="mm" data-rkf="${f.nama}" data-multi="1">${d.anggota.map(a => `<label><input type="checkbox" value="${a.id}" ${set.has(a.id) ? "checked" : ""}> ${esc(a.nama)}</label>`).join("") || '<span class="mu">Belum ada anggota.</span>'}</div></div>`; }
+  else if (f.tipe === "anggota_banyak") { const set = new Set(val || []); return `<div class="full"><div style="font-size:13px;color:var(--mute);font-weight:500;margin-bottom:6px">${esc(f.label)}</div><div class="mm" data-rkf="${f.nama}" data-multi="1">${d.anggota.map(a => `<label><input type="checkbox" value="${a.id}" ${set.has(a.id) ? "checked" : ""}> ${esc(a.nama)}${(d.tunggak || {})[a.id] >= 2 ? ' <span class="ch r" style="font-size:11.5px;padding:1px 7px" title="Hak proyek dicabut karena tunggakan kas. Tetap boleh dimasukkan ke tim, tetapi berstatus ditangguhkan sampai lunas.">ditangguhkan sementara</span>' : ""}</label>`).join("") || '<span class="mu">Belum ada anggota.</span>'}</div>${f.nama === "tim" && Object.values(d.tunggak || {}).some(v => v >= 2) ? '<p class="mu" style="font-size:12.5px;margin:6px 0 0">Anggota bertanda <b>ditangguhkan sementara</b> tetap boleh masuk tim. Selama tunggakannya belum lunas, ia tidak ikut bagi hasil (Peraturan Kas Pasal 4).</p>' : ""}</div>`; }
   else el = `<input type="${f.tipe === "url" ? "url" : "text"}" id="${id}" data-rkf="${f.nama}" maxlength="${f.maks}" value="${esc(val)}">`;
   const full = ["area", "anggota_banyak"].includes(f.tipe) || f.nama === "judul" || f.nama === "nama";
   return `<label class="${full ? "full" : ""}" for="${id}">${esc(f.label)}${f.wajib ? " *" : ""}${el}${f.info ? `<span style="font-size:12px">${esc(f.info)}</span>` : ""}</label>`;
@@ -2205,18 +2205,19 @@ const RK_RENDER = {
   proyek(d, items, st) {
     const its = st.f ? items.filter(x => x.status === st.f) : items, tg = d.tunggak || {}, maks = d.dana_maks || 75000;
     const orang = (x, i) => { const cabut = (tg[i] || 0) >= 2;
-      return `<span class="ch ${cabut ? "r" : "n"}" title="${cabut ? `Menunggak kas ${tg[i]} minggu tanpa izin: hak proyek dicabut sampai lunas (Peraturan Kas Pasal 4)` : ""}">${esc(rkNama(d, i))}${i === x.pj ? " · pemilik" : ""}${cabut ? " · hak dicabut" : ""}</span>${cabut && rkBisa(x, "tim") && i !== x.pj ? `<button class="bt o" data-pkel="${x.id}:${i}" style="min-height:28px;padding:3px 9px;font-size:12px">Keluarkan</button>` : ""}`; };
+      return `<span class="ch ${cabut ? "r" : "n"}" title="${cabut ? `Menunggak kas ${tg[i]} minggu tanpa izin: ditangguhkan sampai lunas (Peraturan Kas Pasal 4)` : ""}">${esc(rkNama(d, i))}${i === x.pj ? " · pemilik" : ""}${cabut ? " · ditangguhkan sementara" : ""}</span>${cabut && rkBisa(x, "tim") && i !== x.pj ? `<button class="bt o" data-pkel="${x.id}:${i}" style="min-height:28px;padding:3px 9px;font-size:12px">Keluarkan</button>` : ""}`; };
     return `<div class="lst">${its.map(x => { const batas = maks + (x.dana_tambahan || 0), dana = x.dana || 0;
       return `<article class="it2"><div class="ey">${esc(rkOp(d, "status", x.status))}${x.lama ? " · Proyek lama" : ""}</div><h3>${esc(x.nama)}</h3>
       <div class="meta">${x.pj ? `<span>Pemilik: ${esc(rkNama(d, x.pj))}</span>` : ""}<span>Progres ${x.progres || 0}%</span>${x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">Tautan</a>` : ""}</div>
       <div class="prg"><i style="width:${Math.min(100, x.progres || 0)}%"></i></div>
+      ${x.pj && (tg[x.pj] || 0) >= 2 && x.status !== "selesai" ? `<p class="ch r" style="display:inline-block;margin:10px 0 0;white-space:normal">Ditangguhkan sementara: hak proyek ${esc(rkNama(d, x.pj))} dicabut sampai tunggakan kas lunas</p>` : ""}
       ${x.status === "ditunda" && x.alasan_freeze ? `<p class="ch y" style="display:inline-block;margin:10px 0 0">Dibekukan: ${esc(x.alasan_freeze)}</p>` : ""}
       ${(x.tim || []).length ? `<div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">${x.tim.map(i => orang(x, i)).join("")}</div>` : ""}
       ${x.deskripsi ? `<div class="bd">${esc(x.deskripsi)}</div>` : ""}
       ${d.saya != null || ADM() ? `<details class="pkd" data-rg="${x.id}" style="margin-top:10px"${RG_BUKA.has(x.id) ? " open" : ""}><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Ruang proyek: papan tugas, jurnal, pengajuan dana</summary><div class="pkb" id="rgb${x.id}"><p class="mu">Memuat…</p></div></details>` : ""}
       ${d.saya != null || ADM() ? `<details class="pkd" data-pkas="${x.id}" style="margin-top:10px"${PK_BUKA.has(x.id) ? " open" : ""}><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Kas proyek</summary><div class="pkb" id="pkb${x.id}"><p class="mu">Memuat…</p></div></details>` : ""}
-      <details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Rincian: persetujuan, dana, kebutuhan, riwayat</summary>
-      ${x.lama ? '<div class="meta" style="margin-top:10px"><span>Proyek lama / arsip: dicatat pengurus tanpa persetujuan 3 anggota, tanpa dana kas MCI.</span></div>' : (x.setuju || []).length ? `<div class="meta" style="margin-top:10px"><span>Disetujui ${x.setuju.length} anggota: ${x.setuju.map(i => esc(rkNama(d, i))).join(", ")}</span></div>` : ""}
+      <details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Rincian: dana, kebutuhan, riwayat</summary>
+      ${x.lama ? '<div class="meta" style="margin-top:10px"><span>Proyek lama / arsip: dicatat pengurus, tanpa dana kas MCI.</span></div>' : ""}
       ${x.lama ? "" : `<div class="meta" style="margin-top:6px"><span>Dana kas ${rp(dana)} dari batas ${rp(batas)}${x.dana_tambahan ? ` (termasuk tambahan ${rp(x.dana_tambahan)})` : ""}</span></div>
       <div class="prg"><i style="width:${Math.min(100, batas ? dana / batas * 100 : 0)}%;background:${dana > batas * 0.85 ? "#B4532A" : "var(--gold)"}"></i></div>`}
       ${x.tgl_mulai || x.tgl_selesai ? `<div class="meta" style="margin-top:6px"><span>${x.tgl_mulai ? "Mulai " + esc(tglID(x.tgl_mulai)) : ""}${x.tgl_mulai && x.tgl_selesai ? " · " : ""}${x.tgl_selesai ? "Selesai " + esc(tglID(x.tgl_selesai)) : ""}</span></div>` : ""}
@@ -2284,7 +2285,7 @@ const RK_RENDER = {
   },
 };
 /* ===== Kas proyek: amplop dana per proyek (Peraturan Kas Pasal 7 & 11) ===== */
-const PK_BUKA = new Set(), PKD = {};
+const PK_BUKA = new Set(), PKD = {}, PK_MODE = {}, PK_J = {};
 function pkRender(pid) {
   const d = PKD[pid], el = $("#pkb" + pid); if (!d || !el) return;
   const r = d.ringkas, s = r.sumber, hari = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
@@ -2297,18 +2298,29 @@ function pkRender(pid) {
   if (r.pinjaman.length) h += `<div style="margin:8px 0"><b style="font-size:13px">Pinjaman mitra</b>${r.pinjaman.map(p => `<div class="meta"><span>${esc(p.mitra)}: ${rp(p.jumlah)}, sisa <b>${rp(p.sisa)}</b></span><span class="ch ${!p.sisa ? "g" : p.jatuh_tempo < hari ? "r" : "y"}">${!p.sisa ? "Lunas" : "Jatuh tempo " + esc(tglID(p.jatuh_tempo))}</span></div>`).join("")}</div>`;
   const tx = d.rows.filter(x => x.status !== "menunggu" && x.jenis !== "tutup");
   h += tx.length ? `<div style="overflow-x:auto"><table class="tb" style="font-size:12.5px;margin-top:6px"><thead><tr><th>Tanggal</th><th>Jenis</th><th>Keterangan</th><th style="text-align:right">Masuk</th><th style="text-align:right">Keluar</th><th></th></tr></thead><tbody>${tx.map(x => `<tr><td>${esc(tglID(x.tanggal))}</td><td>${esc(x.label)}${x.mitra ? `<br><span class="mu">${esc(x.mitra)}</span>` : ""}</td><td>${esc(x.keterangan)}${x.bukti ? ` · <a href="${esc(x.bukti)}" target="_blank" rel="noopener">bukti</a>` : x.jenis === "pengeluaran" && x.keluar >= d.nota_min ? ' · <span class="er">tanpa bukti</span>' : ""}</td><td style="text-align:right">${x.masuk ? rp(x.masuk) : ""}</td><td style="text-align:right">${x.keluar ? rp(x.keluar) : ""}</td><td>${d.catat && (d.jenis_masuk[x.jenis] || d.jenis_keluar[x.jenis]) ? `<button class="bt o" data-pkdel="${pid}:${x.id}" style="min-height:26px;padding:2px 8px;font-size:11.5px" aria-label="Hapus transaksi">Hapus</button>` : ""}</td></tr>`).join("")}</tbody></table></div>` : '<p class="mu" style="font-size:13px">Belum ada transaksi.</p>';
-  if (d.catat) {
-    const op = (o, g) => `<optgroup label="${g}">${Object.entries(o).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</optgroup>`;
-    h += `<div class="cd fl" style="margin-top:10px;padding:12px" id="pkf${pid}"><b class="full">Catat transaksi</b>
-      <label>Jenis<select data-pkj>${op(d.jenis_masuk, "Uang masuk")}${op(d.jenis_keluar, "Uang keluar")}</select></label>
-      <label>Jumlah (Rp)<input type="number" min="1" data-pkn placeholder="50000"></label>
-      <label>Tanggal<input type="date" data-pkt value="${hari}"></label>
-      <label data-pkx="mitra">Nama mitra<input type="text" maxlength="80" data-pkm placeholder="Contoh: Toko Elektronik Jaya"></label>
-      <label data-pkx="jt">Jatuh tempo<input type="date" data-pkjt></label>
-      <label data-pkx="ref">Pinjaman yang dibayar<select data-pkr>${r.pinjaman.filter(p => p.sisa).map(p => `<option value="${p.id}">${esc(p.mitra)} · sisa ${rp(p.sisa)}</option>`).join("")}</select></label>
-      <label class="full">Keterangan<input type="text" maxlength="300" data-pkk placeholder="Untuk apa / dari mana"></label>
-      <label class="full" data-pkx="bukti">Link bukti / nota (wajib untuk pengeluaran ≥ ${rp(d.nota_min)}, boleh menyusul 7 hari)<input type="url" maxlength="400" data-pkb placeholder="https://…"></label>
-      <div class="bar full" style="margin:0"><button class="bt g" data-pksave="${pid}">Simpan</button><span class="mu" data-pkmsg></span></div></div>`;
+  if (d.tangguh) h += `<div class="cd" style="padding:12px 14px;margin:10px 0;background:#FBEDE6;border-color:#E8C2B0"><b>Proyek ditangguhkan</b><p class="mu" style="margin:6px 0 0;font-size:13.5px">Hak proyek pemiliknya sedang dicabut karena tunggakan kas. Kas proyek dibekukan sementara: belum bisa mencatat transaksi, meminta dana, atau mengajukan pembelian. Otomatis aktif lagi setelah tunggakan dan denda lunas.</p></div>`;
+  else if (d.catat) {
+    const m = PK_MODE[pid] || "", tbl = (k, v, on) => `<button type="button" class="bt ${on ? "g" : "o"}" ${k}>${v}</button>`;
+    h += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 0">${tbl(`data-pkmode="${pid}:masuk"`, "+ Uang masuk", m === "masuk")}${tbl(`data-pkmode="${pid}:keluar"`, "− Uang keluar", m === "keluar")}${d.bisa_minta ? tbl(`data-pkmode="${pid}:minta"`, "Minta dana kas MCI", m === "minta") : ""}</div>`;
+    if (m === "minta") h += `<div class="cd fl" style="margin-top:10px;padding:12px" id="pkf${pid}"><b class="full">Minta dana dari kas MCI</b>
+      <p class="mu full" style="margin:0;font-size:13px">Sekarang diminta ${rp(d.dana)} dari batas ${rp(d.batas)}. Isi <b>total</b> dana yang dibutuhkan proyek. Bendahara mendapat pesan dan yang mencairkan.</p>
+      <label class="full">Total dana dibutuhkan (Rp)<input type="number" min="0" step="1000" inputmode="numeric" data-pkn value="${d.dana || ""}" placeholder="50000"></label>
+      <div class="bar full" style="margin:0"><button class="bt g" data-pkminta="${pid}">Kirim ke Bendahara</button><button class="bt o" data-pkmode="${pid}:">Batal</button><span class="mu" data-pkmsg></span></div></div>`;
+    else if (m) {
+      const pil = m === "masuk" ? {patungan: "Patungan tim", pendapatan: "Hasil penjualan", subsidi: "Subsidi mitra", pinjaman: "Pinjaman mitra"} : {pengeluaran: "Belanja / biaya", ...(r.pinjaman.some(p => p.sisa) ? {bayar_pinjaman: "Bayar pinjaman"} : {})};
+      const jn = pil[PK_J[pid]] ? PK_J[pid] : Object.keys(pil)[0];
+      h += `<div class="cd fl" style="margin-top:10px;padding:12px" id="pkf${pid}" data-pkjv="${jn}">
+      <div class="full" style="display:flex;gap:6px;flex-wrap:wrap">${Object.entries(pil).map(([k, v]) => tbl(`data-pkpilih="${pid}:${k}" style="min-height:38px;padding:6px 12px;font-size:13.5px"`, esc(v), k === jn)).join("")}</div>
+      <label class="full">Jumlah (Rp)<input type="number" min="1" step="500" inputmode="numeric" data-pkn placeholder="50000"></label>
+      <div class="full" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:-4px">${[10000, 25000, 50000, 100000].map(v => `<button type="button" class="bt o" data-pkcepat="${v}" style="min-height:34px;padding:4px 10px;font-size:13px">${rp(v)}</button>`).join("")}</div>
+      ${["subsidi", "pinjaman"].includes(jn) ? `<label class="full">Nama mitra<input type="text" maxlength="80" data-pkm placeholder="Contoh: Toko Elektronik Jaya"></label>` : ""}
+      ${jn === "pinjaman" ? `<label class="full">Jatuh tempo pinjaman<input type="date" data-pkjt></label>` : ""}
+      ${jn === "bayar_pinjaman" ? `<label class="full">Pinjaman yang dibayar<select data-pkr>${r.pinjaman.filter(p => p.sisa).map(p => `<option value="${p.id}">${esc(p.mitra)} · sisa ${rp(p.sisa)}</option>`).join("")}</select></label>` : ""}
+      <label class="full">${m === "masuk" ? "Keterangan (boleh kosong)" : jn === "pengeluaran" ? "Untuk apa" : "Keterangan (boleh kosong)"}<input type="text" maxlength="300" data-pkk placeholder="${m === "masuk" ? "Contoh: patungan Raka dan Dewi" : "Contoh: beli 2 servo SG90"}"></label>
+      ${jn === "pengeluaran" ? `<label class="full">Link foto nota (boleh menyusul 7 hari; wajib untuk ≥ ${rp(d.nota_min)})<input type="url" maxlength="400" data-pkb placeholder="https://…"></label>` : ""}
+      <details class="full"><summary class="mu" style="cursor:pointer;font-size:13px">Tanggal lain (bawaan: hari ini)</summary><input type="date" data-pkt value="${hari}" style="margin-top:6px"></details>
+      <div class="bar full" style="margin:0"><button class="bt g" data-pksave="${pid}">Simpan</button><button class="bt o" data-pkmode="${pid}:">Batal</button><span class="mu" data-pkmsg></span></div></div>`;
+    }
   }
   if (d.tutup && !r.ditutup) {
     const t = d.tutup, nm = a => a.map(x => esc(x.nama)).join(", ") || "-";
@@ -2324,8 +2336,6 @@ function pkRender(pid) {
       ${d.status === "selesai" ? `<button class="bt g" data-pktutup="${pid}" style="margin-top:10px">Tutup buku sekarang</button>` : '<p class="mu" style="font-size:12.5px;margin:8px 0 0">Ubah status proyek menjadi Selesai dulu untuk menutup buku.</p>'}</details>`;
   }
   el.innerHTML = h;
-  const f = $("#pkf" + pid);
-  if (f) { const j = f.querySelector("[data-pkj]"), atur = () => { const v = j.value; f.querySelector('[data-pkx="mitra"]').hidden = !["subsidi", "pinjaman"].includes(v); f.querySelector('[data-pkx="jt"]').hidden = v !== "pinjaman"; f.querySelector('[data-pkx="ref"]').hidden = v !== "bayar_pinjaman"; f.querySelector('[data-pkx="bukti"]').hidden = v !== "pengeluaran"; }; j.onchange = atur; atur(); }
 }
 async function pkMuat(pid, url, opt) {
   const el = $("#pkb" + pid);
@@ -2339,10 +2349,18 @@ function pkBind(el) {
     const b = e.target.closest("button"); if (!b) return;
     if (b.dataset.pkcair) { const [pid, id] = b.dataset.pkcair.split(":"); if (!confirm("Pindahkan dana ini dari kas MCI ke kas proyek? Kas MCI akan tercatat keluar.")) return; b.disabled = true; await pkMuat(+pid, `/api/proyek/${pid}/kas/${id}/cair`, {method: "POST", json: {}}); }
     if (b.dataset.pkdel) { const [pid, id] = b.dataset.pkdel.split(":"); if (!confirm("Hapus transaksi ini?")) return; await pkMuat(+pid, `/api/proyek/${pid}/kas/${id}`, {method: "DELETE"}); }
-    if (b.dataset.pksave) { const pid = +b.dataset.pksave, f = $("#pkf" + pid), q = k => f.querySelector(k).value;
+    if (b.dataset.pkmode !== undefined) { const [pid, m] = b.dataset.pkmode.split(":"); PK_MODE[pid] = PK_MODE[pid] === m ? "" : m; pkRender(+pid); const n = $(`#pkf${pid} [data-pkn]`); if (n) n.focus(); return; }
+    if (b.dataset.pkpilih) { const [pid, j] = b.dataset.pkpilih.split(":"), f = $("#pkf" + pid), simpan = f ? [f.querySelector("[data-pkn]").value, f.querySelector("[data-pkk]").value] : null; PK_J[pid] = j; pkRender(+pid);
+      if (simpan) { const g = $("#pkf" + pid); g.querySelector("[data-pkn]").value = simpan[0]; g.querySelector("[data-pkk]").value = simpan[1]; } return; }
+    if (b.dataset.pkcepat) { const n = b.closest("[id^=pkf]").querySelector("[data-pkn]"); n.value = b.dataset.pkcepat; return; }
+    const gagal = pid => { const m = $("#pkb" + pid).querySelector(".er"), f = $("#pkf" + pid); if (m && f) { f.querySelector("[data-pkmsg]").textContent = m.textContent; m.remove(); } };
+    if (b.dataset.pkminta) { const pid = +b.dataset.pkminta; b.disabled = true;
+      if (await pkMuat(pid, `/api/proyek/${pid}/kas/minta`, {json: {jumlah: $(`#pkf${pid} [data-pkn]`).value}})) { PK_MODE[pid] = ""; pkRender(pid); pesan("Permintaan dana terkirim ke Bendahara"); try { RK.proyek = await api("/api/r/proyek"); renderRK("proyek"); } catch (e) {} }
+      else { b.disabled = false; gagal(pid); } return; }
+    if (b.dataset.pksave) { const pid = +b.dataset.pksave, f = $("#pkf" + pid), q = k => { const e = f.querySelector(k); return e ? e.value : ""; };
       b.disabled = true; f.querySelector("[data-pkmsg]").textContent = "";
-      const ok = await pkMuat(pid, `/api/proyek/${pid}/kas`, {json: {jenis: q("[data-pkj]"), jumlah: q("[data-pkn]"), tanggal: q("[data-pkt]"), mitra: q("[data-pkm]"), jatuh_tempo: q("[data-pkjt]"), ref: q("[data-pkr]"), keterangan: q("[data-pkk]"), bukti: q("[data-pkb]")}});
-      if (!ok) { b.disabled = false; const m = $("#pkb" + pid).querySelector(".er"); if (m && $("#pkf" + pid)) { $("#pkf" + pid).querySelector("[data-pkmsg]").textContent = m.textContent; m.remove(); } } }
+      const ok = await pkMuat(pid, `/api/proyek/${pid}/kas`, {json: {jenis: f.dataset.pkjv, jumlah: q("[data-pkn]"), tanggal: q("[data-pkt]"), mitra: q("[data-pkm]"), jatuh_tempo: q("[data-pkjt]"), ref: q("[data-pkr]"), keterangan: q("[data-pkk]"), bukti: q("[data-pkb]")}});
+      if (ok) { PK_MODE[pid] = ""; pkRender(pid); pesan("Tercatat di kas proyek"); } else { b.disabled = false; gagal(pid); } }
     if (b.dataset.pktutup) { const pid = +b.dataset.pktutup; if (!confirm("Tutup buku proyek ini? Uang dipindah ke kas MCI dan bagian anggota dicatat. Tidak bisa dibatalkan.")) return; b.disabled = true;
       if (await pkMuat(pid, `/api/proyek/${pid}/tutup`, {method: "POST", json: {}})) { try { RK.proyek = await api("/api/r/proyek"); renderRK("proyek"); } catch (e) {} } }
   };
