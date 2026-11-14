@@ -17,6 +17,7 @@ from types import SimpleNamespace
 from collections import deque, OrderedDict
 from datetime import datetime, date, timedelta, timezone
 from urllib.parse import quote
+import urllib.request
 from html import unescape as _unesc, escape as _esc_html
 from email.utils import parsedate_to_datetime
 import xml.etree.ElementTree as ET
@@ -89,6 +90,7 @@ MAIL_WEBHOOK = os.getenv("MAIL_WEBHOOK", "").strip()       # URL Google Apps Scr
 MAIL_SECRET = os.getenv("MAIL_SECRET", "").strip()
 MAIL_TO = os.getenv("MAIL_TO", "mci.corp.indonesia@gmail.com").strip()
 DATABASE_URL = os.getenv("DATABASE_URL", "")
+SITE_URL = os.getenv("SITE_URL", "https://mci-ai-hq.onrender.com").rstrip("/")   # alamat publik web (link di Telegram, SEO, sitemap)
 PG = bool(DATABASE_URL and psycopg2)
 DB_PATH = os.getenv("DB_PATH", "mci.db")
 ALLOWED = {int(x) for x in os.getenv("ALLOWED_USER_IDS", "").replace(" ", "").split(",") if x.isdigit()}
@@ -2320,6 +2322,7 @@ async def laporan_jadwal():
             await asyncio.to_thread(alat_cek_telat)
             await backup_jadwal_cek()
             await pagi_cek()
+            await asyncio.to_thread(indexnow_kirim)
         except Exception:
             log.exception("Cek alat / backup gagal")
         try:
@@ -2353,6 +2356,10 @@ def page_bytes():
     """index.html dibaca sekali lalu disimpan versi asli + gzip di memori."""
     if not _PAGE:
         raw = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "index.html"), "rb").read()
+        try:   # meta SEO + JSON-LD + verifikasi Google Search Console disisipkan sekali saat dibaca
+            raw = raw.replace(b"</head>", seo_head(f"{SEO['nama']} (MCI) | {SEO['slogan']}", SEO["deskripsi"], "/").encode() + b"</head>", 1)
+        except Exception:
+            log.exception("sisip SEO gagal")
         _PAGE.update(raw=raw, gz=gzip.compress(raw, 6), etag='"' + hashlib.md5(raw).hexdigest()[:16] + '"')
     return _PAGE
 
@@ -7987,6 +7994,170 @@ def halaman_produk():
     return Response(raw, mimetype="text/html", headers={"Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "same-origin"})
 
 
+# ---------- SEO & GEO: supaya MCI muncul di Google dan dikutip AI (ChatGPT, Gemini, AI Overview) ----------
+# Hanya data PUBLIK yang dibuka: profil, sejarah (dari Tentang Kami), katalog. Data internal tetap diblokir di robots.txt.
+SEO = {
+    "nama": "Mahardika Cakrawala Indonesia", "singkat": "MCI", "alternatif": ["MCI", "3 Serangkai Production"],
+    "slogan": "Engineering, Researching & Evolving", "berdiri": "2023-12", "berdiri_teks": "Desember 2023", "pendiri": "Alvaro",
+    "kota": "Cilegon", "provinsi": "Banten", "negara": "ID",
+    "deskripsi": ("Mahardika Cakrawala Indonesia (MCI) adalah organisasi riset dan pengembangan (R&D) teknologi yang berbasis di Cilegon, Banten. "
+                  "MCI bergerak di bidang roket, rekayasa elektronika, Internet of Things (IoT), robotika, dan kecerdasan buatan (AI)."),
+}
+GSC_META = os.getenv("GOOGLE_SITE_VERIFICATION", "").strip()          # kode verifikasi Google Search Console (meta tag)
+INDEXNOW_KEY = (os.getenv("INDEXNOW_KEY", "").strip() or hashlib.sha256(("mci-indexnow-" + (os.getenv("SECRET_KEY") or SITE_URL)).encode()).hexdigest()[:32])
+
+
+def seo_sosial():
+    k = kontak_mci()
+    out = []
+    if k.get("ig"):
+        out.append("https://www.instagram.com/" + _handle(k["ig"]).lstrip("@"))
+    if k.get("tt"):
+        out.append("https://www.tiktok.com/@" + _handle(k["tt"]).lstrip("@"))
+    return out
+
+
+def seo_faq():
+    t = tentang_get()
+    sej = sorted([x for x in t.get("sejarah") or [] if isinstance(x, dict)], key=lambda x: str(x.get("tahun", "")))
+    return [
+        ("Apa itu Mahardika Cakrawala Indonesia?", SEO["deskripsi"]),
+        ("Apa singkatan MCI?", "MCI adalah singkatan dari Mahardika Cakrawala Indonesia, organisasi R&D teknologi di Cilegon, Banten."),
+        ("Kapan MCI didirikan dan oleh siapa?", f"MCI didirikan pada {SEO['berdiri_teks']} oleh tiga pendiri, dipimpin oleh {SEO['pendiri']}. Awalnya MCI fokus pada riset roket, "
+                                                 "lalu berkembang ke elektronika, IoT, dan AI."),
+        ("Di mana lokasi MCI?", f"MCI berbasis di {SEO['kota']}, {SEO['provinsi']}, Indonesia."),
+        ("Apa slogan MCI?", f"Slogan MCI adalah \"{SEO['slogan']}\"."),
+        ("Apa saja bidang yang dikerjakan MCI?", "Roket dan dirgantara, rekayasa elektronika dan sistem tertanam (Arduino, ESP32), Internet of Things (IoT), robotika, "
+                                                  "dan pengembangan sistem kecerdasan buatan (AI)." + (f" Perjalanan MCI dimulai dari {sej[0].get('judul', '')} ({sej[0].get('tahun', '')})." if sej else "")),
+        ("Bagaimana cara menghubungi MCI?", "Lewat Instagram " + (kontak_mci().get("ig") or "@mci.corporation") + " atau TikTok " + (kontak_mci().get("tt") or "@mci.corp")
+                                             + f", atau melalui situs resmi {SITE_URL}/profil."),
+    ]
+
+
+def seo_jsonld(faq=True):
+    org = {"@context": "https://schema.org", "@type": "Organization", "@id": SITE_URL + "/#organisasi", "name": SEO["nama"], "alternateName": SEO["alternatif"],
+           "url": SITE_URL + "/profil", "logo": SITE_URL + "/aset/logo-mci-512.webp", "image": SITE_URL + "/aset/logo-mci-512.webp",
+           "slogan": SEO["slogan"], "description": SEO["deskripsi"], "foundingDate": SEO["berdiri"],
+           "founder": {"@type": "Person", "name": SEO["pendiri"]},
+           "address": {"@type": "PostalAddress", "addressLocality": SEO["kota"], "addressRegion": SEO["provinsi"], "addressCountry": SEO["negara"]},
+           "knowsAbout": ["Roket", "Rekayasa elektronika", "Internet of Things", "Robotika", "Kecerdasan buatan", "ESP32", "Arduino"],
+           "sameAs": seo_sosial()}
+    situs = {"@context": "https://schema.org", "@type": "WebSite", "name": SEO["nama"], "alternateName": "MCI", "url": SITE_URL + "/", "publisher": {"@id": SITE_URL + "/#organisasi"}}
+    data = [org, situs]
+    if faq:
+        data.append({"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in seo_faq()]})
+    aman = lambda d: json.dumps(d, ensure_ascii=False).replace("</", "<\\/")   # cegah </script> di dalam data
+    return "".join('<script type="application/ld+json">' + aman(d) + "</script>" for d in data)
+
+
+def seo_head(judul, desk, path, faq=False):
+    e = lambda s: str(s).replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
+    return (f'<meta name="description" content="{e(desk)}"><link rel="canonical" href="{SITE_URL}{path}">'
+            f'<meta property="og:type" content="website"><meta property="og:site_name" content="{e(SEO["nama"])}"><meta property="og:title" content="{e(judul)}">'
+            f'<meta property="og:description" content="{e(desk)}"><meta property="og:url" content="{SITE_URL}{path}"><meta property="og:image" content="{SITE_URL}/aset/app-512.png">'
+            f'<meta property="og:locale" content="id_ID"><meta name="twitter:card" content="summary">'
+            + (f'<meta name="google-site-verification" content="{e(GSC_META)}">' if GSC_META else "") + seo_jsonld(faq))
+
+
+@app.route("/profil")
+@app.route("/tentang-mci")
+def halaman_profil():
+    """Halaman publik yang isinya sudah jadi dari server: mudah dibaca Google & AI. Data otomatis dari Tentang Kami."""
+    if request.path != "/profil":
+        return redirect("/profil", 301)
+    t = tentang_get()
+    e = lambda s: _esc_html(str(s or ""))
+    sej = sorted([x for x in t.get("sejarah") or [] if isinstance(x, dict)], key=lambda x: str(x.get("tahun", "")))
+    judul = f"{SEO['nama']} (MCI) | {SEO['slogan']}"
+    sos = "".join(f'<a href="{e(u)}" rel="noopener me" target="_blank">{"Instagram" if "instagram" in u else "TikTok"}</a>' for u in seo_sosial())
+    body = f"""<header><img src="/aset/logo-mci-192.webp" width="72" height="72" alt="Logo Mahardika Cakrawala Indonesia (MCI)"><div><p class="ey">{e(SEO['slogan'])}</p>
+<h1>Mahardika Cakrawala Indonesia</h1><p class="sub">MCI · Organisasi R&amp;D teknologi · {e(SEO['kota'])}, {e(SEO['provinsi'])}</p></div></header>
+<main><section><h2>Tentang MCI</h2><p class="lead">{e(SEO['deskripsi'])}</p>
+<p>MCI didirikan pada {e(SEO['berdiri_teks'])} oleh tiga pendiri yang dipimpin {e(SEO['pendiri'])}. Berawal dari riset roket, MCI kini mengembangkan elektronika, perangkat IoT,
+robotika, dan sistem kecerdasan buatan, dengan semangat <b>{e(SEO['slogan'])}</b>.</p></section>
+<section><h2>Bidang yang dikerjakan</h2><ul class="bd"><li><b>Roket &amp; dirgantara</b>Desain dan uji prototipe roket.</li><li><b>Elektronika &amp; sistem tertanam</b>Arduino, ESP32, sensor, dan PCB.</li>
+<li><b>Internet of Things</b>Perangkat pemantau yang terhubung ke internet.</li><li><b>Robotika</b>Sistem gerak dan kendali otomatis.</li><li><b>Kecerdasan buatan</b>Agen AI dan alat bantu kerja berbasis AI.</li></ul></section>
+{('<section><h2>Perjalanan MCI</h2><ol class="tl">' + "".join(f"<li><span>{e(x.get('tahun'))}</span><div><b>{e(x.get('judul'))}</b><p>{e(x.get('isi'))}</p></div></li>" for x in sej) + "</ol></section>") if sej else ""}
+<section><h2>Pertanyaan yang sering ditanyakan</h2>{"".join(f"<details><summary>{e(q)}</summary><p>{e(a)}</p></details>" for q, a in seo_faq())}</section>
+<section><h2>Hubungi &amp; jelajahi</h2><p class="ln"><a href="/produk">Katalog produk MCI</a>{sos}<a href="/">Masuk MCI HQ</a></p></section></main>
+<footer>© {datetime.now(WIB).year} Mahardika Cakrawala Indonesia (MCI) · {e(SEO['kota'])}, {e(SEO['provinsi'])}, Indonesia</footer>"""
+    css = """:root{--n:#0F1E3A;--g:#D4AF5A;--t:#1D2939;--m:#5B6578;--bg:#F6F3EC}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:16px/1.65 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{background:var(--n);color:#F2EBDD;padding:40px 20px;display:flex;gap:18px;align-items:center;justify-content:center;text-align:left}header img{border-radius:50%;flex:none}
+h1{font:700 clamp(26px,5vw,40px)/1.15 Georgia,serif;margin:2px 0;color:#fff}.ey{margin:0;color:var(--g);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12.5px}.sub{margin:4px 0 0;color:#C9D7F5}
+main{max-width:820px;margin:0 auto;padding:12px 20px 40px}section{margin:28px 0}h2{font:700 22px/1.3 Georgia,serif;color:var(--n);margin:0 0 10px}.lead{font-size:18px}
+.bd{list-style:none;padding:0;display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}.bd li{background:#fff;border:1px solid #E6E0D2;border-radius:12px;padding:14px;color:var(--m);font-size:14.5px}.bd b{display:block;color:var(--t);margin-bottom:2px}
+.tl{list-style:none;padding:0;border-left:3px solid var(--g);margin-left:8px}.tl li{display:flex;gap:14px;padding:0 0 16px 16px;position:relative}.tl li:before{content:"";position:absolute;left:-9px;top:6px;width:14px;height:14px;border-radius:50%;background:var(--n);border:2px solid var(--g)}
+.tl span{font-weight:700;color:var(--n);min-width:44px}.tl p{margin:2px 0 0;color:var(--m)}
+details{background:#fff;border:1px solid #E6E0D2;border-radius:12px;padding:12px 16px;margin:8px 0}summary{cursor:pointer;font-weight:700;color:var(--n)}details p{margin:8px 0 0;color:var(--m)}
+.ln{display:flex;flex-wrap:wrap;gap:10px}.ln a{background:var(--n);color:#F1D58A;text-decoration:none;padding:10px 16px;border-radius:10px;font-weight:600}.ln a:hover{opacity:.9}
+footer{text-align:center;color:var(--m);font-size:13px;padding:20px;border-top:1px solid #E6E0D2}@media(max-width:560px){header{flex-direction:column;text-align:center}}"""
+    doc = (f'<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{e(judul)}</title>'
+           f'<meta name="robots" content="index,follow,max-image-preview:large"><link rel="icon" href="/aset/favicon.ico">'
+           + seo_head(judul, SEO["deskripsi"], "/profil", faq=True) + f"<style>{css}</style></head><body>{body}</body></html>")
+    return Response(doc, mimetype="text/html", headers={"Cache-Control": "public, max-age=600", "X-Content-Type-Options": "nosniff"})
+
+
+@app.route("/robots.txt")
+def robots_txt():
+    isi = ("User-agent: *\nAllow: /$\nAllow: /profil\nAllow: /produk\nAllow: /llms.txt\nAllow: /aset/\n"
+           "Disallow: /api/\nDisallow: /surat/\nDisallow: /login\nDisallow: /*?k=\nDisallow: /invoice/\n\n"
+           "# Bot AI (ChatGPT, Gemini, Claude, Perplexity) boleh membaca halaman publik yang sama\n"
+           "User-agent: GPTBot\nUser-agent: OAI-SearchBot\nUser-agent: ChatGPT-User\nUser-agent: Google-Extended\nUser-agent: ClaudeBot\nUser-agent: Claude-SearchBot\nUser-agent: PerplexityBot\n"
+           "Allow: /$\nAllow: /profil\nAllow: /produk\nAllow: /llms.txt\nDisallow: /api/\nDisallow: /surat/\nDisallow: /login\nDisallow: /invoice/\n\n"
+           f"Sitemap: {SITE_URL}/sitemap.xml\n")
+    return Response(isi, mimetype="text/plain", headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.route("/sitemap.xml")
+def sitemap_xml():
+    hi = today()
+    url = [("/profil", "1.0", "weekly"), ("/", "0.6", "weekly"), ("/produk", "0.7", "daily")]
+    isi = ('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+           + "".join(f"  <url><loc>{SITE_URL}{u}</loc><lastmod>{hi}</lastmod><changefreq>{f}</changefreq><priority>{p}</priority></url>\n" for u, p, f in url) + "</urlset>\n")
+    return Response(isi, mimetype="application/xml", headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.route("/llms.txt")
+def llms_txt():
+    """Ringkasan teks polos untuk AI (standar llms.txt): tanpa HTML/CSS supaya mudah dirangkum."""
+    t = tentang_get()
+    sej = sorted([x for x in t.get("sejarah") or [] if isinstance(x, dict)], key=lambda x: str(x.get("tahun", "")))
+    isi = [f"# {SEO['nama']} (MCI)", "", f"> {SEO['deskripsi']} Slogan: \"{SEO['slogan']}\".", "",
+           "## Fakta singkat", f"- Nama: {SEO['nama']} (singkatan: MCI; juga dikenal sebagai 3 Serangkai Production)",
+           f"- Berdiri: {SEO['berdiri_teks']}, oleh tiga pendiri yang dipimpin {SEO['pendiri']}", f"- Lokasi: {SEO['kota']}, {SEO['provinsi']}, Indonesia",
+           "- Bidang: roket, rekayasa elektronika & sistem tertanam (Arduino, ESP32), IoT, robotika, kecerdasan buatan", f"- Situs resmi: {SITE_URL}/profil"]
+    isi += [f"- Media sosial: {u}" for u in seo_sosial()]
+    if sej:
+        isi += ["", "## Perjalanan"] + [f"- {x.get('tahun', '')}: {x.get('judul', '')}. {x.get('isi', '')}".strip() for x in sej]
+    isi += ["", "## Tanya jawab"] + [f"- **{q}** {a}" for q, a in seo_faq()]
+    isi += ["", "## Halaman penting", f"- [Profil MCI]({SITE_URL}/profil): profil lengkap, sejarah, dan FAQ", f"- [Katalog produk]({SITE_URL}/produk): produk dan jasa yang dijual MCI", ""]
+    return Response("\n".join(isi), mimetype="text/plain", headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.route("/<kunci>.txt")
+def indexnow_kunci(kunci):
+    if kunci != INDEXNOW_KEY:
+        abort(404)
+    return Response(INDEXNOW_KEY, mimetype="text/plain")
+
+
+def indexnow_kirim():
+    """Kabari Bing (dipakai ChatGPT Search & Copilot), Yandex, dll. lewat IndexNow sekali sehari. Google belum memakai IndexNow."""
+    if SET.get("indexnow_terakhir") == today() or "onrender.com" not in SITE_URL and not os.getenv("INDEXNOW_PAKSA"):
+        return
+    host = SITE_URL.split("://", 1)[-1].split("/")[0]
+    body = json.dumps({"host": host, "key": INDEXNOW_KEY, "keyLocation": f"{SITE_URL}/{INDEXNOW_KEY}.txt",
+                       "urlList": [f"{SITE_URL}/profil", f"{SITE_URL}/", f"{SITE_URL}/produk", f"{SITE_URL}/llms.txt"]}).encode()
+    try:
+        req = urllib.request.Request("https://api.indexnow.org/indexnow", data=body, method="POST", headers={"Content-Type": "application/json; charset=utf-8"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            log.info("IndexNow terkirim: HTTP %s", r.status)
+        SET["indexnow_terakhir"] = today()
+        set_save()
+    except Exception as e:
+        log.warning("IndexNow gagal: %s", str(e)[:150])
+
+
 @app.route("/api/publik/produk")
 def api_publik_produk():
     ih = _ip_hash(client_ip())
@@ -9650,7 +9821,6 @@ def api_pagi():
 # ---------- JEMBATAN CHAT -> STUDIO: Apex (web) & bot Telegram bisa menyuruh bikin gambar / model 3D / buku panduan ----------
 # Pembuatan berjalan di latar belakang (tidak menahan chat); pemesan langsung diberi link halaman hasilnya.
 # Buku panduan tetap ikut SOP 2 tahap: dari chat hanya RENCANA yang dibuat, konfirmasinya di link.
-SITE_URL = os.getenv("SITE_URL", "https://mci-ai-hq.onrender.com").rstrip("/")
 _KERJA = re.compile(r"\b(buat|bikin|buatin|bikinin|buatkan|bikinkan|generate|gambarin|gambarkan|desain|desainin|rancang|rancangin|cetakin|tolong\s+(?:buat|bikin))\b", re.I)
 _NIAT_PANDUAN = re.compile(r"\b(buku\s+panduan|panduan\s+(?:me)?rakit|tutorial\s+(?:me)?rakit|cara\s+(?:me)?rakit|langkah\s+(?:me)?rakit)\b", re.I)
 _NIAT_RAKIT = re.compile(r"\b(rakit|merakit|rangkaian|arduino|esp32|nano|uno|sensor|elektronik|wiring)\b", re.I)
