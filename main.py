@@ -2746,16 +2746,30 @@ MANIFEST = {
                   {"name": "Tugas", "url": "/#tugas", "icons": [{"src": "/aset/app-192.png", "sizes": "192x192"}]},
                   {"name": "Bayar Kas", "url": "/#bayarkas", "icons": [{"src": "/aset/app-192.png", "sizes": "192x192"}]}],
 }
-PWA_VER = "mci-v1"
-SW_JS = """// Service worker MCI: hanya menyimpan logo/ikon dan halaman offline. Data & API TIDAK PERNAH disimpan di perangkat.
-const V = "%s", ASET = ["/offline", "/aset/logo-mci-192.webp", "/aset/app-192.png", "/aset/favicon.ico"];
+PWA_VER = "mci-v2"
+SW_JS = """// Service worker MCI v2 (mode offline).
+// - Tampilan aplikasi disimpan supaya web tetap terbuka tanpa sinyal.
+// - Hanya data ringan milik pemakai (beranda, tugas, agenda, pengumuman, catatan, absen, inbox) yang disimpan, dan HANYA dipakai saat offline.
+// - Data keuangan, anggota, aturan, dan berkas tidak pernah disimpan. Semua simpanan dihapus saat Keluar (Clear-Site-Data).
+const V = "%s", D = V + "-data", ASET = ["/offline", "/aset/logo-mci-192.webp", "/aset/app-192.png", "/aset/favicon.ico"];
+const DATA_OK = /^\\/api\\/(me|beranda|absen|inbox|inbox\\/jumlah|catatan|r\\/(tugas|agenda|pengumuman))$/;
 self.addEventListener("install", e => { e.waitUntil(caches.open(V).then(c => c.addAll(ASET)).then(() => self.skipWaiting())); });
-self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== V).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
+self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== V && k !== D).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
+const simpan = (nama, req, res) => { if (res && res.ok) { const k = res.clone(); caches.open(nama).then(c => c.put(req, k)); } return res; };
 self.addEventListener("fetch", e => {
   const r = e.request, u = new URL(r.url);
   if (r.method !== "GET" || u.origin !== location.origin) return;
-  if (r.mode === "navigate") { e.respondWith(fetch(r).catch(() => caches.match("/offline"))); return; }
-  if (u.pathname.startsWith("/aset/")) e.respondWith(caches.match(r).then(c => c || fetch(r).then(res => { if (res.ok) { const k = res.clone(); caches.open(V).then(x => x.put(r, k)); } return res; })));
+  if (r.mode === "navigate") {
+    if (u.pathname !== "/") { e.respondWith(fetch(r).catch(() => caches.match("/offline"))); return; }
+    e.respondWith(fetch(r).then(res => simpan(V, "/", res)).catch(() => caches.match("/").then(c => c || caches.match("/offline")))); return;
+  }
+  if (DATA_OK.test(u.pathname) && !u.search) {
+    e.respondWith(fetch(r).then(res => simpan(D, r, res)).catch(() => caches.open(D).then(c => c.match(r)).then(c => {
+      if (!c) return new Response(JSON.stringify({error: "Offline: data ini belum pernah dibuka saat online"}), {status: 503, headers: {"Content-Type": "application/json"}});
+      const h = new Headers(c.headers); h.set("X-Offline", "1"); return c.blob().then(b => new Response(b, {status: 200, headers: h}));
+    }))); return;
+  }
+  if (u.pathname.startsWith("/aset/")) e.respondWith(caches.match(r).then(c => c || fetch(r).then(res => simpan(V, r, res))));
 });
 """ % PWA_VER
 OFFLINE = """<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MCI · Offline</title><meta name="theme-color" content="#0F1E3A">
@@ -2792,6 +2806,7 @@ def favicon():
 def logout():
     """Hapus cookie admin/divisi lalu kembali sebagai viewer (link biasa = mode lihat saja)."""
     resp = make_response(redirect("/" if VIEW_TOKEN else "/login"))
+    resp.headers["Clear-Site-Data"] = '"cache", "storage"'   # hapus data offline di HP saat keluar
     resp.delete_cookie("mci_auth", samesite="Lax", secure=bool(os.getenv("RENDER")), httponly=True)
     return resp
 

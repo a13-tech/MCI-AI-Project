@@ -1551,11 +1551,41 @@ const MOCK = (() => {
 })();
 
 const APIC = {};   // respons API terakhir per path, dipakai fitur Ekspor
+/* Mode offline: absen & catatan baru disimpan di antrean HP lalu dikirim otomatis saat sinyal kembali */
+const ANTRE_OK = /^\/api\/(absen\/hadir|catatan)$/;
+const antreBaca = () => { try { return JSON.parse(localStorage.getItem("mci_antre") || "[]"); } catch (e) { return []; } };
+const antreTulis = a => { try { localStorage.setItem("mci_antre", JSON.stringify(a.slice(-30))); } catch (e) {} offBanner(); };
+let ANTRE_JALAN = false;
+async function antreKirim() {
+  if (ANTRE_JALAN) return;   // cegah terkirim dua kali kalau event "online" datang beruntun
+  const a = antreBaca(); if (!a.length || !navigator.onLine) return;
+  ANTRE_JALAN = true; antreTulis([]);   // kosongkan dulu; yang gagal dikembalikan
+  const sisa = [];
+  for (const x of a) { try { const r = await fetch(x.u, {method: "POST", headers: {"X-MCI": "1", "Content-Type": "application/json"}, body: x.b}); if (!r.ok && r.status >= 500) sisa.push(x); } catch (e) { sisa.push(x); } }
+  antreTulis([...sisa, ...antreBaca()]); ANTRE_JALAN = false;
+  if (a.length > sisa.length) { pesan(`${a.length - sisa.length} data offline sudah terkirim ✓`); if (!$("#p-catatan").hidden) loadCatatan(); }
+}
+function offBanner() {
+  let b = $("#offBar"); const n = antreBaca().length, off = !navigator.onLine;
+  if (!off && !n) { if (b) b.remove(); return; }
+  if (!b) { b = document.createElement("div"); b.id = "offBar"; b.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:76px;z-index:9997;background:#14213D;color:#F6F3EC;padding:8px 14px;border-radius:99px;font-size:13px;box-shadow:0 4px 14px #0004;max-width:92vw;text-align:center"; document.body.appendChild(b); }
+  b.textContent = off ? `📴 Offline · menampilkan data terakhir${n ? ` · ${n} menunggu dikirim` : ""}` : `⏳ Mengirim ${n} data offline…`;
+}
+addEventListener("online", () => { offBanner(); antreKirim(); }); addEventListener("offline", offBanner);
 async function api(u, o = {}) {
   if (DEMO) { if (o.json) { o.method = "POST"; o.body = JSON.stringify(o.json); } return MOCK(u, o); }
   o.headers = Object.assign({"X-MCI": "1"}, o.headers || {});
   if (o.json) { o.method = "POST"; o.headers["Content-Type"] = "application/json"; o.body = JSON.stringify(o.json); delete o.json; }
-  const r = await fetch(u, o);
+  let r;
+  try { r = await fetch(u, o); }
+  catch (err) {   // tidak ada sinyal
+    if (o.method === "POST" && ANTRE_OK.test(u) && typeof o.body === "string") {
+      const a = antreBaca(); a.push({u, b: o.body, t: Date.now()}); antreTulis(a);
+      throw new Error(u.includes("absen") ? "📴 Offline: absen disimpan di HP dan dikirim otomatis saat sinyal kembali (jam absen tercatat saat terkirim)." : "📴 Offline: catatan disimpan di HP dan dikirim otomatis saat sinyal kembali.");
+    }
+    throw new Error("📴 Tidak ada koneksi internet. Coba lagi saat sinyal kembali.");
+  }
+  if (r.headers.get("X-Offline")) offBanner();
   if (r.status === 401) { location = "/"; throw new Error("login"); }
   let d = {}; try { d = await r.json(); } catch (e) {}
   if (!r.ok) { const er = new Error(d.error || "Error " + r.status); if (d.kurang) er.kurang = d.kurang; throw er; }
@@ -6726,6 +6756,7 @@ $("#s3Go").onclick = async () => {
 let PASANG = null;
 const APP_MODE = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 if ("serviceWorker" in navigator && !DEMO) navigator.serviceWorker.register("/sw.js").catch(() => {});
+setTimeout(() => { offBanner(); antreKirim(); }, 2500);
 addEventListener("beforeinstallprompt", e => { e.preventDefault(); PASANG = e; if (!APP_MODE()) $("#pasangApp").hidden = false; });
 addEventListener("appinstalled", () => { PASANG = null; $("#pasangApp").hidden = true; });
 if (!APP_MODE() && /iPhone|iPad|iPod/i.test(navigator.userAgent)) $("#pasangApp").hidden = false;   // iPhone tidak punya prompt otomatis
