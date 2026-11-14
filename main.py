@@ -316,6 +316,7 @@ def db_init():
         sql(c, f"CREATE TABLE IF NOT EXISTS proyek_ajuan (id {pk}, proyek_id INTEGER NOT NULL, barang TEXT NOT NULL, harga {big} NOT NULL DEFAULT 0, alasan TEXT, bukti TEXT, "
                "status TEXT NOT NULL DEFAULT 'menunggu', oleh_id INTEGER, oleh TEXT, dibuat TEXT, diputus_oleh TEXT, diputus TEXT, catatan TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS model3d (id {pk}, judul TEXT NOT NULL, permintaan TEXT, resep TEXT NOT NULL, laporan TEXT, mesin TEXT, oleh_id INTEGER, oleh TEXT, dibuat TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS rapor (id {pk}, bulan TEXT NOT NULL, anggota_id INTEGER NOT NULL, data TEXT, saran TEXT, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS cetak (id {pk}, model_id INTEGER, judul TEXT NOT NULL, jumlah INTEGER NOT NULL DEFAULT 1, isi INTEGER NOT NULL DEFAULT 20, "
                "gram REAL, menit REAL, biaya INTEGER, harga INTEGER, pemesan TEXT, catatan TEXT, status TEXT NOT NULL DEFAULT 'antre', "
                "oleh_id INTEGER, oleh TEXT, dibuat TEXT, mulai TEXT, selesai TEXT)")
@@ -2341,6 +2342,7 @@ async def laporan_jadwal():
             await asyncio.to_thread(alat_cek_telat)
             await backup_jadwal_cek()
             await pagi_cek()
+            await asyncio.to_thread(rapor_cek)
             await asyncio.to_thread(indexnow_kirim)
         except Exception:
             log.exception("Cek alat / backup gagal")
@@ -4929,6 +4931,100 @@ def skor_semua():
     except Exception:
         log.exception("lencana gagal")
     return out
+
+
+# ---------- RAPOR BULANAN: tiap tanggal 1, tiap anggota dapat rapor bulan lalu + saran singkat dari AI ----------
+BULAN_ID = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
+
+
+class SaranRapor(BaseModel):
+    id: int
+    saran: str
+
+
+def _bulan_lalu():
+    d = datetime.now(WIB).date().replace(day=1) - timedelta(days=1)
+    return d.strftime("%Y-%m"), f"{BULAN_ID[d.month - 1]} {d.year}"
+
+
+def rapor_buat(bulan=None, kirim=True):
+    """Susun rapor semua anggota aktif untuk 'bulan' (YYYY-MM, bawaan bulan lalu). Satu panggilan Flash untuk semua saran (hemat)."""
+    kode, label = _bulan_lalu()
+    bulan = bulan or kode
+    label = f"{BULAN_ID[int(bulan[5:7]) - 1]} {bulan[:4]}"
+    skor = skor_semua()
+    proyek = rk_rows("proyek")
+    data = []
+    for x in skor:
+        ikut = [p.get("nama", "") for p in proyek if x["id"] in (p.get("tim") or []) and p.get("status") in ("berjalan", "selesai", "ditunda")]
+        data.append({**{k: x[k] for k in ("id", "nama", "skor", "komponen", "tugas_selesai")}, "lencana": [l["nama"] for l in x.get("lencana") or []], "proyek": ikut[:6],
+                     "peringkat": skor.index(x) + 1, "dari": len(skor)})
+    saran = {}
+    if data and LOOP:
+        ringkas = [{"id": d["id"], "nama": d["nama"].split()[0], "skor": d["skor"], "komponen": d["komponen"], "tugas_selesai": d["tugas_selesai"], "proyek": len(d["proyek"])} for d in data]
+        try:
+            raw = asyncio.run_coroutine_threadsafe(ask("scribe", json.dumps(ringkas, ensure_ascii=False), schema=list[SaranRapor], use_mcp=False, cache=False, act="Menulis rapor bulanan",
+                sistem=("Kamu mentor organisasi teknologi MCI. Untuk TIAP anggota tulis saran rapor bulanan: 2 kalimat, hangat tapi jujur, bahasa Indonesia santai. "
+                        "Kalimat 1 sebut hal yang sudah baik dari angkanya. Kalimat 2 satu langkah konkret untuk bulan depan (mis. absen, ambil tugas, bayar kas, ikut proyek). "
+                        "Komponen bernilai persen (absen, tugas, iuran, rapat, proyek); yang tidak ada berarti tidak dinilai. Jangan menyebut angka skor orang lain."),
+                model=MODEL), LOOP).result(120)
+            saran = {int(z["id"]): str(z["saran"])[:500] for z in json.loads(raw)}
+        except Exception:
+            log.exception("saran rapor AI gagal, rapor tetap dibuat tanpa saran")
+    with db() as c:
+        sql(c, "DELETE FROM rapor WHERE bulan=?", (bulan,))
+        for d in data:
+            sql(c, "INSERT INTO rapor (bulan,anggota_id,data,saran,dibuat) VALUES (?,?,?,?,?)", (bulan, d["id"], json.dumps(d, ensure_ascii=False), saran.get(d["id"], ""), _now()))
+    if kirim:
+        for d in data:
+            try:
+                inbox_kirim([d["id"]], "rapor", f"📋 Rapor {label}: skor {d['skor']}",
+                            f"Peringkat {d['peringkat']} dari {d['dari']}. " + " · ".join(f"{k} {v}%" for k, v in d["komponen"].items())
+                            + (f"\n\n{saran[d['id']]}" if saran.get(d["id"]) else "") + f"\n\nLengkapnya: {tautan('skor')}")
+            except Exception:
+                log.exception("kirim rapor gagal")
+    return {"bulan": bulan, "label": label, "jumlah": len(data)}
+
+
+def rapor_cek():
+    """Dipanggil berkala: tanggal 1 mulai jam 08.00, buat rapor bulan lalu sekali saja."""
+    now = datetime.now(WIB)
+    kode, _ = _bulan_lalu()
+    if now.day != 1 or now.hour < 8 or SET.get("rapor_terakhir") == kode:
+        return
+    SET["rapor_terakhir"] = kode
+    set_save()
+    rapor_buat(kode)
+
+
+@app.route("/api/rapor", methods=["GET", "POST"])
+def api_rapor():
+    r = role()
+    if not r:
+        abort(401)
+    me = mid_of(r)
+    if me is None:
+        abort(403)
+    if request.method == "POST":
+        need("admin")
+        return jsonify(rapor_buat(str((request.get_json(silent=True) or {}).get("bulan") or "")[:7] or None, kirim=bool((request.get_json(silent=True) or {}).get("kirim"))))
+    with db() as c:
+        if is_admin(r):
+            b = sql(c, "SELECT MAX(bulan) FROM rapor").fetchone()[0]
+            rows = sql(c, "SELECT bulan,anggota_id,data,saran FROM rapor WHERE bulan=?", (b,)).fetchall() if b else []
+        else:
+            rows = sql(c, "SELECT bulan,anggota_id,data,saran FROM rapor WHERE anggota_id=? ORDER BY bulan DESC LIMIT 6", (me,)).fetchall()
+    out = []
+    for bl, aid, dt, sr in rows:
+        try:
+            d = json.loads(dt or "{}")
+        except ValueError:
+            d = {}
+        out.append({"bulan": bl, "label": f"{BULAN_ID[int(bl[5:7]) - 1]} {bl[:4]}", "anggota_id": aid, "saran": sr or "", **d})
+    out.sort(key=lambda x: (x["bulan"], -x.get("skor", 0)), reverse=False if is_admin(r) else True)
+    if is_admin(r):
+        out.sort(key=lambda x: -x.get("skor", 0))
+    return jsonify({"items": out, "admin": is_admin(r)})
 
 
 @app.route("/api/skor")

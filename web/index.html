@@ -961,6 +961,7 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
  <section id="p-skor" class="pg" hidden>
   <div class="ey">Organisasi</div><h1>Skor &amp; Lencana</h1>
   <p class="mu" style="margin:6px 0 20px;max-width:760px">Nilai 0–100 dari 30 hari terakhir: absen harian 35%, tugas selesai 20%, iuran kas 20%, kehadiran rapat 15%, ikut proyek 10%. Komponen yang belum ada datanya (misalnya belum ada rapat) tidak dihitung, bobotnya dibagi ke komponen lain.</p>
+  <div class="cd" id="rpBox" hidden></div>
   <div id="skBox"><p class="mu">Memuat…</p></div>
  </section>
  <section id="p-riwayat" class="pg" hidden>
@@ -3453,7 +3454,22 @@ function rapatDariHash() { const m = (location.hash || "").match(/^#rapat=(\d+)\
 
 /* ===== Skor keaktifan ===== */
 let SK = null;
+async function rpMuat() {   // rapor bulanan (anggota: miliknya; Dev: semua anggota bulan terakhir)
+  const el = $("#rpBox"); if (!el) return;
+  try {
+    const d = await api("/api/rapor"), lbl = {absen: "Absen", tugas: "Tugas", iuran: "Iuran", rapat: "Rapat", proyek: "Proyek"};
+    const kartu = x => `<div class="it2" style="margin:8px 0"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><b>${d.admin ? esc(x.nama) : "Rapor " + esc(x.label)}</b><span class="ch ${x.skor >= 75 ? "g" : x.skor >= 50 ? "y" : "r"}">Skor ${x.skor}</span></div>
+      <div class="meta" style="margin-top:6px"><span>Peringkat ${x.peringkat}/${x.dari}</span>${Object.entries(lbl).map(([k, l]) => x.komponen && x.komponen[k] != null ? `<span>${l} ${x.komponen[k]}%</span>` : "").join("")}<span>${x.tugas_selesai || 0} tugas selesai</span>${(x.proyek || []).length ? `<span>Proyek: ${x.proyek.map(esc).join(", ")}</span>` : ""}</div>
+      ${x.saran ? `<p style="margin:8px 0 0;line-height:1.55">💬 ${esc(x.saran)}</p>` : ""}</div>`;
+    el.hidden = false;
+    el.innerHTML = `<div class="bar" style="margin:0;justify-content:space-between"><b>📋 Rapor bulanan${d.items[0] ? " · " + esc(d.items[0].label) : ""}</b>${d.admin ? `<span><button class="bt o" id="rpBuat">Buat rapor bulan lalu</button> <label class="mu" style="font-size:12.5px"><input type="checkbox" id="rpKirim"> kirim ke Inbox anggota</label></span>` : ""}</div>
+      <p class="mu" style="font-size:12.5px;margin:4px 0 0">Dibuat otomatis tiap tanggal 1 jam 08.00 dan dikirim ke Inbox. Saran ditulis AI dari angka keaktifan.</p>
+      ${d.items.length ? (d.admin ? d.items.map(kartu).join("") : kartu(d.items[0]) + (d.items.length > 1 ? `<details><summary class="mu" style="cursor:pointer">Rapor bulan sebelumnya</summary>${d.items.slice(1).map(kartu).join("")}</details>` : "")) : '<p class="mu">Belum ada rapor. Rapor pertama terbit tanggal 1 bulan depan.</p>'}`;
+    const b = $("#rpBuat"); if (b) b.onclick = async () => { b.disabled = true; b.textContent = "Menyusun…"; try { await api("/api/rapor", {json: {kirim: $("#rpKirim").checked}}); rpMuat(); } catch (e) { alert(e.message); b.disabled = false; } };
+  } catch (e) { el.hidden = true; }
+}
 async function skMuat() {
+  rpMuat();
   try { SK = await api("/api/skor"); } catch (e) { $("#skBox").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; return; }
   const lbl = {absen: "Absen", tugas: "Tugas", iuran: "Iuran", rapat: "Rapat", proyek: "Proyek"};
   $("#skBox").innerHTML = SK.items.length ? `<div class="lst">${SK.items.map((x, i) => `<div class="it2" style="${x.id === SK.saya ? "border-color:var(--gold)" : ""}"><div style="display:flex;align-items:center;gap:14px"><b style="font:700 26px var(--serif);color:var(--gold);min-width:34px">${i + 1}</b><div style="flex:1;min-width:0"><h3 style="margin:0">${esc(x.nama)}${x.id === SK.saya ? " · kamu" : ""}</h3>
