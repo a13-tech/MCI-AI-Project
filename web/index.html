@@ -1036,6 +1036,7 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
  <section id="p-inbox" class="pg" hidden>
   <h1>Inbox</h1>
   <p class="mu">Notifikasi untukmu: permintaan konfirmasi bayar kas, hasil konfirmasi, dan info dari Bendahara. Kalau akun Telegram kamu sudah terhubung, notifikasi juga dikirim lewat bot Ledger.</p>
+  <div class="cd" id="pushBox" style="background:#F3F0FF;border-color:#D9D0F5" hidden></div>
   <div class="bar"><button class="bt o" id="ibAll">Tandai semua dibaca</button><span class="mu" id="ibInfo"></span></div>
   <div id="ibList"></div>
  </section>
@@ -1627,7 +1628,7 @@ function show(p) {
   if (p === "laporan") loadLaporan();
   if (p === "stok") loadStok();
   if (p === "perpus") loadPerpus();
-  if (p === "inbox") loadInbox();
+  if (p === "inbox") { loadInbox(); pushKartu(); }
   if (p === "berita") loadBerita();
   if (p === "bayarkas") loadBayarKas();
   if (p === "produk") loadProduk();
@@ -6756,6 +6757,27 @@ $("#s3Go").onclick = async () => {
 let PASANG = null;
 const APP_MODE = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 if ("serviceWorker" in navigator && !DEMO) navigator.serviceWorker.register("/sw.js").catch(() => {});
+/* Notifikasi push: kabar Inbox muncul di HP/laptop walau web tertutup */
+const b64ke8 = s => { const p = "=".repeat((4 - s.length % 4) % 4), r = atob((s + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(r, c => c.charCodeAt(0)); };
+async function pushKartu() {
+  const el = $("#pushBox"); if (!el || DEMO || ME.role === "viewer") return;
+  const bisa = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  const ios = /iphone|ipad/i.test(navigator.userAgent), pasang = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  let sub = null; try { sub = bisa ? await (await navigator.serviceWorker.ready).pushManager.getSubscription() : null; } catch (e) {}
+  el.hidden = false;
+  if (!bisa) { el.innerHTML = `<b>🔔 Notifikasi di HP</b><p class="mu" style="font-size:13px;margin:6px 0 0">${ios && !pasang ? "Di iPhone, pasang dulu web ini ke Layar Utama (Safari → Bagikan → Tambahkan ke Layar Utama), lalu buka dari ikonnya untuk menyalakan notifikasi." : "Browser ini belum mendukung notifikasi push. Coba Chrome atau buka dari aplikasi yang sudah dipasang."}</p>`; return; }
+  if (Notification.permission === "denied") { el.innerHTML = `<b>🔕 Notifikasi diblokir</b><p class="mu" style="font-size:13px;margin:6px 0 0">Izinkan notifikasi untuk situs ini di pengaturan browser, lalu muat ulang halaman.</p>`; return; }
+  el.innerHTML = sub ? `<div class="bar" style="margin:0;justify-content:space-between"><b>🔔 Notifikasi aktif di perangkat ini</b><button class="bt o" id="pushOff">Matikan</button></div><p class="mu" style="font-size:12.5px;margin:4px 0 0">Kabar Inbox muncul walau web tertutup.</p>`
+    : `<div class="bar" style="margin:0;justify-content:space-between;flex-wrap:wrap"><b>🔔 Nyalakan notifikasi di perangkat ini?</b><button class="bt g" id="pushOn">Nyalakan</button></div><p class="mu" style="font-size:12.5px;margin:4px 0 0">Konfirmasi kas, tugas, SP, cetakan selesai, dan kabar Studio muncul seperti chat, tanpa perlu membuka Telegram.</p>`;
+  const on = $("#pushOn"), off = $("#pushOff");
+  if (on) on.onclick = async () => { on.disabled = true; on.textContent = "Menyalakan…";
+    try { if (await Notification.requestPermission() !== "granted") throw new Error("Izin notifikasi tidak diberikan");
+      const info = await api("/api/push"), reg = await navigator.serviceWorker.ready;
+      const s = await reg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: b64ke8(info.pub)});
+      await api("/api/push", {json: {langganan: s.toJSON(), uji: true}}); pesan("Notifikasi menyala. Cek notifikasi uji di HP-mu."); }
+    catch (e) { alert(e.message); } pushKartu(); };
+  if (off) off.onclick = async () => { try { await api("/api/push", {json: {langganan: sub.toJSON(), hapus: true}}); await sub.unsubscribe(); } catch (e) {} pushKartu(); };
+}
 setTimeout(() => { offBanner(); antreKirim(); }, 2500);
 addEventListener("beforeinstallprompt", e => { e.preventDefault(); PASANG = e; if (!APP_MODE()) $("#pasangApp").hidden = false; });
 addEventListener("appinstalled", () => { PASANG = null; $("#pasangApp").hidden = true; });

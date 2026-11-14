@@ -17,12 +17,16 @@ from types import SimpleNamespace
 from collections import deque, OrderedDict
 from datetime import datetime, date, timedelta, timezone
 from urllib.parse import quote
-import urllib.request
+import urllib.request, urllib.parse
 from html import unescape as _unesc, escape as _esc_html
 from email.utils import parsedate_to_datetime
 import xml.etree.ElementTree as ET
 
 import httpx, pytz, psutil
+try:   # notifikasi push (Web Push); tanpa pustaka cryptography fitur ini mati sendiri
+    import webpush
+except Exception:
+    webpush = None
 try:   # opsional: kalau Pillow belum terpasang, foto dikirim ukuran asli
     from PIL import Image, ImageOps
     Image.MAX_IMAGE_PIXELS = 40_000_000
@@ -316,6 +320,7 @@ def db_init():
         sql(c, f"CREATE TABLE IF NOT EXISTS proyek_ajuan (id {pk}, proyek_id INTEGER NOT NULL, barang TEXT NOT NULL, harga {big} NOT NULL DEFAULT 0, alasan TEXT, bukti TEXT, "
                "status TEXT NOT NULL DEFAULT 'menunggu', oleh_id INTEGER, oleh TEXT, dibuat TEXT, diputus_oleh TEXT, diputus TEXT, catatan TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS model3d (id {pk}, judul TEXT NOT NULL, permintaan TEXT, resep TEXT NOT NULL, laporan TEXT, mesin TEXT, oleh_id INTEGER, oleh TEXT, dibuat TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS push_langganan (id {pk}, anggota_id INTEGER NOT NULL, endpoint TEXT NOT NULL, p256dh TEXT NOT NULL, auth TEXT NOT NULL, ua TEXT, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS rapor (id {pk}, bulan TEXT NOT NULL, anggota_id INTEGER NOT NULL, data TEXT, saran TEXT, dibuat TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS cetak (id {pk}, model_id INTEGER, judul TEXT NOT NULL, jumlah INTEGER NOT NULL DEFAULT 1, isi INTEGER NOT NULL DEFAULT 20, "
                "gram REAL, menit REAL, biaya INTEGER, harga INTEGER, pemesan TEXT, catatan TEXT, status TEXT NOT NULL DEFAULT 'antre', "
@@ -2746,7 +2751,7 @@ MANIFEST = {
                   {"name": "Tugas", "url": "/#tugas", "icons": [{"src": "/aset/app-192.png", "sizes": "192x192"}]},
                   {"name": "Bayar Kas", "url": "/#bayarkas", "icons": [{"src": "/aset/app-192.png", "sizes": "192x192"}]}],
 }
-PWA_VER = "mci-v2"
+PWA_VER = "mci-v3"
 SW_JS = """// Service worker MCI v2 (mode offline).
 // - Tampilan aplikasi disimpan supaya web tetap terbuka tanpa sinyal.
 // - Hanya data ringan milik pemakai (beranda, tugas, agenda, pengumuman, catatan, absen, inbox) yang disimpan, dan HANYA dipakai saat offline.
@@ -2770,6 +2775,14 @@ self.addEventListener("fetch", e => {
     }))); return;
   }
   if (u.pathname.startsWith("/aset/")) e.respondWith(caches.match(r).then(c => c || fetch(r).then(res => simpan(V, r, res))));
+});
+self.addEventListener("push", e => {
+  let d = {}; try { d = e.data ? e.data.json() : {}; } catch (er) { d = {judul: "MCI", isi: e.data ? e.data.text() : ""}; }
+  e.waitUntil(self.registration.showNotification(d.judul || "MCI", {body: d.isi || "", icon: "/aset/app-192.png", badge: "/aset/app-192.png", data: {url: d.url || "/"}, tag: "mci-inbox", renotify: true}));
+});
+self.addEventListener("notificationclick", e => {
+  e.notification.close(); const url = (e.notification.data && e.notification.data.url) || "/";
+  e.waitUntil(self.clients.matchAll({type: "window", includeUncontrolled: true}).then(ws => { const w = ws.find(x => new URL(x.url).origin === location.origin); if (w) { w.navigate(url); return w.focus(); } return self.clients.openWindow(url); }));
 });
 """ % PWA_VER
 OFFLINE = """<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MCI · Offline</title><meta name="theme-color" content="#0F1E3A">
@@ -2849,7 +2862,7 @@ def _api_me_isi(r, m):
     return jsonify({"role": "admin" if is_admin(r) else ("anggota" if m else r), "nama_peran": nama_peran(r), "izin": sorted(perms_of(r)), "kuota": kuota_info(r),
                     "anggota": {"id": m["id"], "nama": m["nama"], "divisi": [DIVISI[x] for x in m["divisi"]], "jabatan": [JABATAN[x] for x in m["jabatan"]],
                                 "divisi_key": m["divisi"], "iuran": tingkat_of(m["id"]), "sp": sp_status().get(m["id"], 0)} if m else None, "daftar_divisi": DIVISI,
-                    **{k: v for k, v in SET.items() if k not in ("kuota", "tg_users", "tg_izin", "iuran", "berita_ringkas", "hp_ringan", "argon_anggaran", "argon_harga", "argon_kabar")}, "ringan": hp_ringan(r), "mcp_siap": bool(MCP_SERVERS and ClientSession), "db_permanen": PG, "lantai": LANTAI,
+                    **{k: v for k, v in SET.items() if k not in ("kuota", "tg_users", "tg_izin", "iuran", "berita_ringkas", "hp_ringan", "argon_anggaran", "argon_harga", "argon_kabar", "vapid")}, "ringan": hp_ringan(r), "mcp_siap": bool(MCP_SERVERS and ClientSession), "db_permanen": PG, "lantai": LANTAI,
                     "gambar": img_status()})
 
 
@@ -7660,6 +7673,76 @@ def inbox_kirim(untuk, jenis, judul, isi="", ref=None, tg=True, maks=2000):
             sql(c, "INSERT INTO inbox (untuk,jenis,judul,isi,ref,dibaca,dibuat) VALUES (?,?,?,?,?,0,?)", (u, jenis, judul[:200], isi[:maks], ref, now))
     if tg:
         _tg_ke_anggota(ids, f"📬 {judul}" + (f"\n{isi}" if isi else "") + "\n\nBuka web MCI → Inbox.")
+    push_kirim(ids, judul, isi, tautan("inbox"))
+
+
+# ---------- NOTIFIKASI PUSH: muncul di HP/laptop seperti WhatsApp, tanpa Telegram ----------
+def vapid():
+    v = SET.get("vapid")
+    if not (isinstance(v, dict) and v.get("priv") and v.get("pub")) and webpush:
+        priv, pub = webpush.vapid_buat()
+        v = SET["vapid"] = {"priv": priv, "pub": pub}
+        set_save()
+    return v if isinstance(v, dict) else {}
+
+
+def push_kirim(ids, judul, isi="", url=None):
+    """Kirim notifikasi ke semua perangkat milik anggota 'ids' di utas latar (tidak memperlambat permintaan)."""
+    if not webpush or not ids:
+        return
+    def kerja():
+        v = vapid()
+        if not v:
+            return
+        try:
+            with db() as c:
+                q = ",".join("?" * len(ids))
+                subs = sql(c, f"SELECT id,endpoint,p256dh,auth FROM push_langganan WHERE anggota_id IN ({q})", tuple(ids)).fetchall()
+        except Exception:
+            log.exception("baca langganan push gagal")
+            return
+        mati = []
+        for sid, ep, p, a in subs:
+            try:
+                kode = webpush.kirim({"endpoint": ep, "keys": {"p256dh": p, "auth": a}},
+                                     {"judul": str(judul)[:120], "isi": str(isi or "")[:240], "url": url or SITE_URL + "/"}, v["priv"], v["pub"], kontak="mailto:mci@" + (urllib.parse.urlparse(SITE_URL).hostname or "mci.local"))
+                if kode in (404, 410):
+                    mati.append(sid)
+            except Exception:
+                log.warning("push gagal ke %s", ep[:60])
+        if mati:
+            with db() as c:
+                for sid in mati:
+                    sql(c, "DELETE FROM push_langganan WHERE id=?", (sid,))
+    threading.Thread(target=kerja, daemon=True).start()
+
+
+@app.route("/api/push", methods=["GET", "POST"])
+def api_push():
+    r, mid = _mid_req()
+    if not webpush:
+        return jsonify({"aktif": False, "error": "Notifikasi push belum tersedia di server"}), 503
+    if request.method == "POST":
+        d = request.get_json(silent=True) or {}
+        sub = d.get("langganan") or {}
+        ep, keys = str(sub.get("endpoint") or ""), sub.get("keys") or {}
+        if not ep.startswith("https://") or len(ep) > 600:
+            return jsonify({"error": "Langganan tidak sah"}), 400
+        with db() as c:
+            sql(c, "DELETE FROM push_langganan WHERE endpoint=?", (ep,))
+            if not d.get("hapus"):
+                if not (keys.get("p256dh") and keys.get("auth")):
+                    return jsonify({"error": "Kunci langganan kosong"}), 400
+                n = int(sql(c, "SELECT COUNT(*) FROM push_langganan WHERE anggota_id=?", (mid,)).fetchone()[0])
+                if n >= 6:
+                    sql(c, "DELETE FROM push_langganan WHERE id=(SELECT MIN(id) FROM push_langganan WHERE anggota_id=?)", (mid,))
+                sql(c, "INSERT INTO push_langganan (anggota_id,endpoint,p256dh,auth,ua,dibuat) VALUES (?,?,?,?,?,?)",
+                    (mid, ep, str(keys["p256dh"])[:200], str(keys["auth"])[:100], request.headers.get("User-Agent", "")[:200], _now()))
+        if d.get("uji") and not d.get("hapus"):
+            push_kirim([mid], "🔔 Notifikasi MCI aktif", "Mulai sekarang kabar Inbox (kas, tugas, SP, Studio) muncul di perangkat ini.", tautan("inbox"))
+    with db() as c:
+        n = int(sql(c, "SELECT COUNT(*) FROM push_langganan WHERE anggota_id=?", (mid,)).fetchone()[0])
+    return jsonify({"aktif": True, "pub": vapid().get("pub"), "perangkat": n})
 
 
 def inbox_data(mid):

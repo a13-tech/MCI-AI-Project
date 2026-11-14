@@ -6,3 +6,4 @@ psutil
 pytz
 psycopg2-binary
 Pillow
+cryptography
