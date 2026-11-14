@@ -5447,7 +5447,7 @@ async def model3d_buat(permintaan, lama=None):
         teks, mesin = await kode_ai(SISTEM_3D, prompt, "Merancang model 3D", schema=Resep3D)
         try:
             resep = _resep_dari(teks)
-            polis, lap = await asyncio.to_thread(studio3d.bangun, resep)
+            polis, lap = await asyncio.to_thread(m3d_bangun, resep)
             galat = ""
         except (ValueError, KeyError, TypeError) as e:
             galat, polis = str(e)[:400], None
@@ -5936,7 +5936,7 @@ async def mesin_uji(prompt, ids, mode):
             o["detik"] = round(time.time() - t0, 1)
             if mode == "3d":
                 resep = _resep_dari(teks)
-                _, lap = await asyncio.to_thread(studio3d.bangun, resep)
+                _, lap = await asyncio.to_thread(m3d_bangun, resep)
                 o.update(ok=True, judul=str(resep.get("judul") or "")[:120], bagian=len(resep.get("bagian") or []), ukuran=lap.get("ukuran_mm"), volume=lap.get("volume_cm3"),
                          peringatan=[str(x)[:200] for x in (lap.get("peringatan") or [])][:8])
             else:
@@ -6054,6 +6054,32 @@ def api_studio():
     return jsonify({**_studio_payload(r), "baru": jenis})
 
 
+M3D_BATAS_DETIK = int(os.getenv("STUDIO3D_BATAS_DETIK", "600"))
+
+
+def m3d_bangun(resep):
+    """Hitung model 3D di PROSES TERPISAH berprioritas rendah (nice 19).
+    Dulu dihitung di dalam server: model rumit (kapal tanker 40 bagian) memakan CPU 100% belasan menit -> web lag & dianggap down."""
+    import pickle
+    import shutil
+    import subprocess
+    import sys
+    cmd = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "studio3d.py")]
+    if shutil.which("nice"):
+        cmd = ["nice", "-n", "19"] + cmd
+    try:
+        p = subprocess.run(cmd, input=json.dumps(resep).encode("utf-8"), capture_output=True, timeout=M3D_BATAS_DETIK)
+    except subprocess.TimeoutExpired:
+        raise ValueError(f"Model terlalu rumit: hitungannya lebih dari {M3D_BATAS_DETIK // 60} menit. Kurangi jumlah bagian atau detail kecil (pipa, baut, lubang).")
+    if p.returncode != 0 or not p.stdout:
+        log.error("pekerja studio3d gagal (kode %s): %s", p.returncode, p.stderr.decode("utf-8", "replace")[-600:])
+        raise ValueError("Mesin 3D gagal menghitung model ini (kemungkinan kehabisan memori). Coba sederhanakan modelnya.")
+    ok, a, b = pickle.loads(p.stdout)
+    if not ok:
+        raise ValueError(a)
+    return a, b
+
+
 M3D_CACHE = {}   # hasil hitung model terakhir, supaya unduh STL + pratinjau tidak menghitung ulang
 
 
@@ -6065,7 +6091,7 @@ def api_studio_3d(i, ext):
     polis = M3D_CACHE.get(kunci)
     if polis is None:
         try:
-            polis, _lap = studio3d.bangun(resep)
+            polis, _lap = m3d_bangun(resep)
         except ValueError:
             abort(410)
         if len(M3D_CACHE) >= 12:

@@ -413,16 +413,24 @@ def rapikan(resep):
     return out
 
 
+def _sisi_bulat(r, s, lo=12):
+    """Jumlah sisi lingkaran menurut ukurannya: tiap sisi +-0,9 mm (sudah halus untuk printer FDM), tidak melebihi permintaan.
+    Pipa kecil r=1 mm cukup 12 sisi, bukan 48: poligon jauh lebih sedikit sehingga hitungan 4-10x lebih cepat."""
+    n = int(math.ceil(2 * math.pi * max(float(r), 0.1) / 0.9))
+    n += n % 2   # genap, supaya simetris
+    return max(lo, min(max(lo, s), n))
+
+
 def _bentuk(x):
     s = x["sisi"]
     if x["bentuk"] == "kotak":
-        p = kotak(x["sx"], x["sy"], x["sz"], x["radius"], max(4, s // 6))
+        p = kotak(x["sx"], x["sy"], x["sz"], x["radius"], max(2, min(s // 6, _sisi_bulat(x["radius"], s, 4) // 4)))
     elif x["bentuk"] == "silinder":
-        p = kerucut(x["r"], x["r"], x["h"], max(12, s))
+        p = kerucut(x["r"], x["r"], x["h"], _sisi_bulat(x["r"], s))
     elif x["bentuk"] == "kerucut":
-        p = kerucut(x["r"], x["r2"], x["h"], max(12, s))
+        p = kerucut(x["r"], x["r2"], x["h"], _sisi_bulat(max(x["r"], x["r2"]), s))
     elif x["bentuk"] == "bola":
-        p = bola(x["r"], max(12, min(s, 48)))
+        p = bola(x["r"], _sisi_bulat(x["r"], min(s, 48)))
     else:
         p = prisma(x["titik"], x["h"])
     return _ubah(p, x["rot"], x["pos"])
@@ -862,13 +870,22 @@ def pratinjau(polis, lebar=520, tinggi=400):
     sk = min((lebar - 40) / max(1e-6, max(xs) - min(xs)), (tinggi - 40) / max(1e-6, max(ys) - min(ys)))
     ox, oy = (lebar - (max(xs) + min(xs)) * sk) / 2, (tinggi + (max(ys) + min(ys)) * sk) / 2
     muka.sort(key=lambda m: -m[0])
-    out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {lebar} {tinggi}" role="img" aria-label="Pratinjau model 3D"><rect width="{lebar}" height="{tinggi}" fill="#F4F1EA"/>']
-    for _d, ps, s in muka[:9000]:
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {lebar} {tinggi}" role="img" aria-label="Pratinjau model 3D"><rect width="{lebar}" height="{tinggi}" fill="#F4F1EA"/>'
+           '<g stroke-width="0.6" stroke-linejoin="round">']
+    n = 0
+    for _d, ps, s in muka:
+        q = [(round(ox + p[0] * sk, 1), round(oy - p[1] * sk, 1)) for p in ps]
+        luas = abs(sum(q[k][0] * q[k - 1][1] - q[k - 1][0] * q[k][1] for k in range(len(q)))) / 2
+        if luas < 0.3:   # lebih kecil dari sepertiga piksel: tidak kelihatan, buang supaya SVG ringan di HP
+            continue
         g = 0.38 + 0.62 * s
         warna = f"#{int(46 + 150 * g):02x}{int(74 + 140 * g):02x}{int(120 + 120 * g):02x}"
-        pts = " ".join(f"{ox + p[0] * sk:.1f},{oy - p[1] * sk:.1f}" for p in ps)
-        out.append(f'<polygon points="{pts}" fill="{warna}" stroke="{warna}" stroke-width="0.6" stroke-linejoin="round"/>')
-    out.append("</svg>")
+        pts = " ".join(f"{x:g},{y:g}" for x, y in q)
+        out.append(f'<polygon points="{pts}" fill="{warna}" stroke="{warna}"/>')
+        n += 1
+        if n >= 7000:
+            break
+    out.append("</g></svg>")
     return "".join(out)
 
 
@@ -928,3 +945,21 @@ def svg_bersih(teks, maks=300_000):
     ET.register_namespace("", SVG_NS)
     ET.register_namespace("xlink", XLINK)
     return ET.tostring(root, encoding="unicode"), None
+
+
+def _pekerja():
+    """Dijalankan sebagai proses terpisah (python studio3d.py): resep JSON dari stdin -> pickle (ok, poligon/galat, laporan) ke stdout.
+    Proses ini diberi prioritas rendah oleh main.py, jadi web dan bot tetap lancar walau model rumit sedang dihitung."""
+    import json
+    import pickle
+    import sys
+    try:
+        polis, lap = bangun(json.loads(sys.stdin.buffer.read().decode("utf-8")))
+        out = (True, polis, lap)
+    except (ValueError, KeyError, TypeError) as e:
+        out = (False, f"{type(e).__name__}: {e}"[:400], None)
+    sys.stdout.buffer.write(pickle.dumps(out, protocol=pickle.HIGHEST_PROTOCOL))
+
+
+if __name__ == "__main__":
+    _pekerja()
