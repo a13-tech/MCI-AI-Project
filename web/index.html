@@ -307,6 +307,21 @@ td{border-top:1px solid var(--line)}
 .it2 .meta{font-size:12.5px;color:var(--mute);margin-top:4px;display:flex;gap:6px 14px;flex-wrap:wrap}
 .it2 .bd{margin-top:10px;white-space:pre-wrap;line-height:1.6}
 .it2 .ac{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.ctAlat{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}.ctAlat .bt{padding:8px 12px;min-height:38px;font-size:13.5px}
+.ctAlat .bt.rek{background:#FDECEA;border-color:#F5B5AE;color:#B42318}
+.ctSaring{display:flex;flex-direction:column;gap:8px;margin:18px 0 10px}.ctSaring input{max-width:420px}
+.ctTags{display:flex;gap:6px;flex-wrap:wrap}.ctTags button{border:1px solid var(--line);background:#fff;border-radius:99px;padding:5px 11px;font-size:13px;cursor:pointer;color:var(--navy2)}.ctTags button.on{background:var(--navy2);color:#F1D58A;border-color:var(--navy2)}
+.ctIsi{font-size:13.5px;line-height:1.6}.ctIsi .cl{display:flex;gap:8px;align-items:flex-start;padding:2px 0}.ctIsi .cl input{width:18px;height:18px;margin-top:2px;flex:none}.ctIsi .cl.ok span{text-decoration:line-through;color:#8A94A8}
+.ctIsi .tg{color:#1570EF;font-weight:600}
+.ctSaranBox{background:#EEF3FF;border-radius:10px;padding:12px 14px;margin-top:12px;font-size:14px}.ctSaranBox .bt{padding:6px 10px;min-height:34px;font-size:13px;margin:6px 6px 0 0}
+.bjIt{display:flex;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}.bjIt:first-child{border-top:0}.bjIt .bjA{flex:1;min-width:0}.bjIt .bjB{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.bjIt .bt{padding:6px 10px;min-height:34px;font-size:13px}
+.bjIt input[type=checkbox]{width:22px;height:22px;flex:none}.bjIt.ok .bjA b{text-decoration:line-through;color:#8A94A8}
+#fabCatat{position:fixed;right:18px;bottom:22px;z-index:44;width:54px;height:54px;border-radius:50%;border:0;background:var(--navy2);color:#F1D58A;font-size:28px;line-height:1;box-shadow:0 8px 22px rgba(15,30,58,.35);cursor:pointer}
+#fabCatat:focus-visible{outline:3px solid #F1D58A;outline-offset:2px}
+@media (max-width:900px){#fabCatat{bottom:calc(84px + env(safe-area-inset-bottom));right:14px;width:50px;height:50px}.bjIt{flex-wrap:wrap}.bjIt .bjB{width:100%;justify-content:flex-start;padding-left:34px}}
+.pagiK{background:linear-gradient(135deg,#0F1E3A,#1B3A6B);color:#F2EBDD;border-radius:16px;padding:18px 18px 14px;margin:16px 0 4px}.pagiK h2{color:#F1D58A;margin:0 0 6px;font-size:18px}
+.pagiK pre{white-space:pre-wrap;font:14px/1.6 inherit;font-family:inherit;margin:8px 0 0;max-height:none}.pagiK.tutup pre{max-height:190px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent)}
+.pagiK .bt{padding:6px 12px;min-height:34px;font-size:13px;background:rgba(255,255,255,.1);color:#F2EBDD;border-color:rgba(255,255,255,.25)}
 /* ===== CARI HALAMAN (Ctrl K / tombol 🔍) ===== */
 #nvCari{display:none!important}
 #cariBuka{display:flex;align-items:center;gap:9px;width:calc(100% - 4px);box-sizing:border-box;margin:4px 2px 14px;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);color:#AFC2EA;font:inherit;font-size:14px;cursor:pointer;text-align:left}
@@ -565,6 +580,12 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
 <div class="tst" id="tst" hidden></div>
 <div id="cetak"></div>
 <nav id="hpNav" aria-label="Menu utama"></nav>
+<button id="fabCatat" type="button" aria-label="Catat cepat" hidden>＋</button>
+<div id="ccHal" class="cariHal" hidden role="dialog" aria-modal="true" aria-label="Catat cepat">
+ <div class="chBox" style="padding:14px"><div class="seg" id="ccSeg" style="background:#EFECE4;margin:0 0 10px"><button type="button" class="on" data-cc="catat">📝 Catatan</button><button type="button" data-cc="beli">🛒 Daftar Belanja</button></div>
+  <textarea id="ccIsi" rows="4" style="width:100%;box-sizing:border-box" placeholder="Tulis cepat…"></textarea>
+  <div class="bar" style="margin:10px 0 0;flex-wrap:wrap"><button class="bt g" id="ccSimpan" type="button">Simpan</button><button class="bt o" id="ccRekam" type="button">🎙️ Rekam</button><button class="bt o" id="ccTutup" type="button">Tutup</button><span class="mu" id="ccMsg" style="font-size:13px"></span></div></div>
+</div>
 <div id="cariHal" class="cariHal" hidden role="dialog" aria-modal="true" aria-label="Cari halaman">
  <div class="chBox"><div class="chIn"><span class="ci" aria-hidden="true"></span><input id="chQ" type="search" placeholder="Ketik nama halaman, mis. kas, absen, 3d…" autocomplete="off" enterkeyhint="go" role="combobox" aria-expanded="true" aria-controls="chList" aria-autocomplete="list"><button id="chX" type="button">Tutup</button></div>
  <ul id="chList" role="listbox" aria-label="Hasil pencarian"></ul><p class="chFoot">↑ ↓ pilih · Enter buka · Esc tutup</p></div>
@@ -816,14 +837,33 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
 
  <section id="p-catatan" class="pg" hidden>
   <h1>Catatan</h1>
-  <p class="mu">Catatan pribadi hanya bisa dibaca pemiliknya. Catatan bersama tampil untuk semua anggota; Sekretaris dan Dev bisa merapikan dan menyematkannya di atas.</p>
+  <div class="seg" id="ctTabs" role="tablist" style="margin:4px 0 14px;background:#EFECE4"><button type="button" role="tab" data-ctab="catat" class="on">📝 Catatan</button><button type="button" role="tab" data-ctab="belanja">🛒 Daftar Belanja <span class="nb" id="nbBelanja" hidden></span></button></div>
+  <div id="ctPanel">
+  <p class="mu">Catatan pribadi hanya bisa dibaca pemiliknya. Catatan bersama tampil untuk semua anggota; Sekretaris dan Dev bisa merapikan dan menyematkannya di atas. Tips: awali baris dengan <code>[ ]</code> untuk checklist, tulis <code>#tag</code> untuk mengelompokkan, atau kirim <b>catat: …</b> / voice note ke bot Telegram.</p>
   <div class="cd"><b id="ctTitle">Catatan baru</b>
-   <div class="fl" style="margin-top:12px"><label class="full">Judul<input type="text" id="ctJudul" maxlength="120"></label><label class="full">Isi<textarea id="ctIsi" rows="4"></textarea></label></div>
-   <div class="bar" style="margin:12px 0 0"><button class="bt g" id="ctSave">Simpan</button><button class="bt o" id="ctReset">Kosongkan</button>
+   <div class="ctAlat"><button class="bt o" id="ctRekam" type="button">🎙️ Rekam suara</button><button class="bt o" id="ctFotoB" type="button" hidden>📸 Foto jadi catatan</button><input type="file" id="ctFoto" accept="image/*" hidden><button class="bt o" id="ctRapi" type="button">✨ Rapikan dengan AI</button><span class="mu" id="ctAlatMsg" style="font-size:13px"></span></div>
+   <div class="fl" style="margin-top:12px"><label class="full">Judul<input type="text" id="ctJudul" maxlength="120"></label><label class="full">Isi<textarea id="ctIsi" rows="5" placeholder="Tulis bebas. Contoh:&#10;besok jam 9 kirim invoice ke mitra&#10;[ ] beli solder baru #belanja"></textarea></label>
+    <label>Ingatkan tanggal (muncul di Laporan Pagi Apex)<input type="date" id="ctTgl"></label></div>
+   <div id="ctSaran"></div>
+   <div class="bar" style="margin:12px 0 0;flex-wrap:wrap"><button class="bt g" id="ctSave">Simpan</button><button class="bt o" id="ctReset">Kosongkan</button>
     <label class="mu" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="ctBersama">Bagikan ke semua anggota</label>
     <label class="mu" id="ctSemW" hidden style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="ctSem">Sematkan</label><span id="ctMsg" class="mu"></span></div>
+   <label class="mu" id="ctFotoSetW" hidden style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:13px"><input type="checkbox" id="ctFotoSet"> Izinkan semua anggota memakai "Foto jadi catatan" (setelan khusus Dev)</label>
   </div>
+  <div class="ctSaring"><input type="search" id="ctCari" placeholder="Cari catatan…" aria-label="Cari catatan"><div id="ctTags" class="ctTags"></div></div>
   <div class="tm" id="ctList"></div>
+  </div>
+  <div id="bjPanel" hidden>
+  <p class="mu" style="max-width:760px">Bahan dan komponen yang harus dibeli. Semua anggota bisa menambah; Dev dan Bendahara menandai sudah dibeli. Barang yang sama otomatis digabung. Bisa juga lewat Telegram: kirim <b>beli: resistor 10k 20pcs, kabel jumper 1 pack</b>.</p>
+  <div class="cd"><div class="fl"><label class="full">Tambah cepat (pisahkan dengan koma)<input type="text" id="bjCepat" placeholder="Contoh: resistor 10k 20pcs, LED merah 10, kabel jumper 1 pack"></label></div>
+   <details style="margin-top:10px"><summary class="mu" style="cursor:pointer;font-size:13.5px">Isi lengkap (harga, catatan, prioritas)</summary>
+    <div class="fl" style="margin-top:10px"><label>Nama barang<input type="text" id="bjNama" maxlength="120"></label><label>Jumlah<input type="number" id="bjJml" min="1" value="1"></label>
+     <label>Satuan<input type="text" id="bjSat" maxlength="20" value="pcs"></label><label>Perkiraan harga per satuan (Rp)<input type="number" id="bjHrg" min="0"></label>
+     <label class="full">Catatan<input type="text" id="bjCat" maxlength="300" placeholder="Mis. untuk proyek JalaDhipa, merek tertentu"></label>
+     <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="bjPenting"> Penting / mendesak</label></div></details>
+   <div class="bar" style="margin:12px 0 0;flex-wrap:wrap"><button class="bt g" id="bjTambah" type="button">Tambah</button><span class="mu" id="bjMsg" style="font-size:13px"></span></div></div>
+  <div id="bjBox"><p class="mu">Memuat…</p></div>
+  </div>
  </section>
 
  <section id="p-polling" class="pg" hidden>
@@ -1545,7 +1585,7 @@ function show(p) {
   if (p === "apex") { apxRender(); apxMuat(); setTimeout(() => $("#apxIn").focus(), 50); }
   if (p === "hutang") loadHutang();
   if (p === "anggota") loadAnggota();
-  if (p === "catatan") loadCatatan();
+  if (p === "catatan") { loadCatatan(); ctTab(CT_TAB); }
   if (p === "blacklist") loadBlacklist();
   if (p === "sp") loadSP();
   if (p === "uu") loadUU();
@@ -1958,22 +1998,123 @@ $("#agSave").onclick = async () => {
   try { AGD = Object.assign(AGD, await api("/api/anggota", {json: body})); renderAnggota(); agForm(); $("#agMsg").textContent = "Tersimpan."; } catch (e) { $("#agMsg").textContent = e.message; }
 };
 
-/* Catatan (pribadi + bersama) */
-let CTD = null;
-function ctForm(x) { x = x || {}; $("#ctTitle").textContent = x.id ? "Ubah catatan" : "Catatan baru"; $("#ctJudul").value = x.judul || ""; $("#ctIsi").value = x.isi || ""; $("#ctBersama").checked = !!x.bersama; $("#ctSem").checked = !!x.sematkan; $("#ctJudul").dataset.id = x.id || ""; $("#ctMsg").textContent = ""; }
+/* Catatan (pribadi + bersama): checklist, #tag, tanggal, suara, foto, rapikan AI */
+let CTD = null, CT_TAG = "";
+function ctForm(x) { x = x || {}; $("#ctTitle").textContent = x.id ? "Ubah catatan" : "Catatan baru"; $("#ctJudul").value = x.judul || ""; $("#ctIsi").value = x.isi || ""; $("#ctTgl").value = x.tanggal || ""; $("#ctBersama").checked = !!x.bersama; $("#ctSem").checked = !!x.sematkan; $("#ctJudul").dataset.id = x.id || ""; $("#ctMsg").textContent = ""; $("#ctSaran").innerHTML = ""; }
+function ctIsiHtml(x) {   // [ ] jadi kotak centang (bisa diklik), #tag diwarnai
+  return String(x.isi || "").split("\n").map((l, i) => { const m = l.match(/^\s*(?:[-*]\s*)?\[( |x|X)\]\s?(.*)$/);
+    const isi = s => esc(s).replace(/(^|\s)#([\w-]{2,30})/g, '$1<span class="tg">#$2</span>');
+    return m ? `<label class="cl ${m[1].trim() ? "ok" : ""}"><input type="checkbox" data-ctc="${x.id}:${i}" ${m[1].trim() ? "checked" : ""} ${x.milik_saya || x.bersama ? "" : "disabled"}><span>${isi(m[2])}</span></label>` : `<div>${isi(l) || "&nbsp;"}</div>`; }).join("");
+}
 function renderCatatan() {
   $("#ctSemW").hidden = !CTD.kelola;
-  $("#ctList").innerHTML = CTD.items.map(x => `<div class="cd" style="margin:0">${x.sematkan ? '<span class="ch y">📌 Disematkan</span> ' : ""}<span class="ch ${x.bersama ? "g" : "n"}">${x.bersama ? "Bersama" : "Pribadi"}</span><div style="margin:8px 0 4px"><b>${esc(x.judul || "(tanpa judul)")}</b></div><div style="white-space:pre-wrap;font-size:13.5px">${esc(x.isi)}</div>
-    <div class="mu" style="font-size:12px;margin-top:8px">${esc(x.pemilik)} · ${esc(String(x.diubah || x.dibuat).slice(0, 16).replace("T", " "))}</div>${x.bisa_ubah ? `<div class="bar" style="margin:10px 0 0"><button class="bt o" data-cte="${x.id}" style="padding:5px 10px;min-height:34px">Ubah</button><button class="bt o" data-ctd="${x.id}" style="padding:5px 10px;min-height:34px">Hapus</button></div>` : ""}</div>`).join("") || '<p class="mu">Belum ada catatan.</p>';
+  const q = ($("#ctCari").value || "").toLowerCase().trim(), tags = [...new Set(CTD.items.flatMap(x => x.tag || []))].sort();
+  $("#ctTags").innerHTML = tags.length ? [`<button type="button" data-ctt="" class="${CT_TAG ? "" : "on"}">Semua</button>`, ...tags.map(t => `<button type="button" data-ctt="${esc(t)}" class="${CT_TAG === t ? "on" : ""}">#${esc(t)}</button>`)].join("") : "";
+  const its = CTD.items.filter(x => (!CT_TAG || (x.tag || []).includes(CT_TAG)) && (!q || (x.judul + " " + x.isi).toLowerCase().includes(q)));
+  const hi = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
+  $("#ctList").innerHTML = its.map(x => { const cl = (x.isi.match(/\[( |x|X)\]/g) || []), ok = cl.filter(c => /x/i.test(c)).length;
+    return `<div class="cd" style="margin:0">${x.sematkan ? '<span class="ch y">📌 Disematkan</span> ' : ""}<span class="ch ${x.bersama ? "g" : "n"}">${x.bersama ? "Bersama" : "Pribadi"}</span>${x.tanggal ? ` <span class="ch ${x.tanggal <= hi ? "y" : "n"}">⏰ ${esc(tglID(x.tanggal))}</span>` : ""}${cl.length ? ` <span class="ch n">☑ ${ok}/${cl.length}</span>` : ""}
+    <div style="margin:8px 0 4px"><b>${esc(x.judul || "(tanpa judul)")}</b></div><div class="ctIsi">${ctIsiHtml(x)}</div>
+    <div class="mu" style="font-size:12px;margin-top:8px">${esc(x.pemilik)} · ${esc(String(x.diubah || x.dibuat).slice(0, 16).replace("T", " "))}</div>${x.bisa_ubah ? `<div class="bar" style="margin:10px 0 0"><button class="bt o" data-cte="${x.id}" style="padding:5px 10px;min-height:34px">Ubah</button><button class="bt o" data-ctd="${x.id}" style="padding:5px 10px;min-height:34px">Hapus</button></div>` : ""}</div>`; }).join("")
+    || `<p class="mu">${CTD.items.length ? "Tidak ada catatan yang cocok." : "Belum ada catatan."}</p>`;
+  $$("[data-ctt]").forEach(b => b.onclick = () => { CT_TAG = b.dataset.ctt; renderCatatan(); });
+  $$("[data-ctc]").forEach(c => c.onchange = async () => { const [i, baris] = c.dataset.ctc.split(":"); try { CTD = await api(`/api/catatan/${i}/centang`, {json: {baris: +baris}}); renderCatatan(); } catch (e) { alert(e.message); c.checked = !c.checked; } });
   $$("[data-cte]").forEach(b => b.onclick = () => { ctForm(CTD.items.find(x => x.id == b.dataset.cte)); scrollTo({top: 0, behavior: "smooth"}); });
   $$("[data-ctd]").forEach(b => b.onclick = async () => { if (!confirm("Hapus catatan ini?")) return; try { CTD = await api("/api/catatan/" + b.dataset.ctd, {method: "DELETE"}); renderCatatan(); } catch (e) { alert(e.message); } });
 }
-async function loadCatatan() { try { CTD = await api("/api/catatan"); renderCatatan(); } catch (e) { $("#ctList").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; } }
+async function loadCatatan() {
+  try { CTD = await api("/api/catatan"); renderCatatan(); } catch (e) { $("#ctList").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; return; }
+  try { const f = await api("/api/catatan/foto"); $("#ctFotoB").hidden = !f.boleh; $("#ctFotoSetW").hidden = !f.admin; $("#ctFotoSet").checked = !!f.semua; } catch (e) {}
+  if (CT_BUKA) { const x = CTD.items.find(y => y.id === CT_BUKA); CT_BUKA = 0; if (x && x.bisa_ubah) ctForm(x); }
+  api("/api/belanja").then(d => { BL = d; const n = d.items.filter(x => x.status === "perlu").length, nb = $("#nbBelanja"); nb.textContent = n; nb.hidden = !n; }).catch(() => {});
+}
+let CT_BUKA = 0, CT_TAB = "catat";
+function ctTab(t) { CT_TAB = t === "belanja" ? "belanja" : "catat"; $$("#ctTabs [data-ctab]").forEach(b => { b.classList.toggle("on", b.dataset.ctab === CT_TAB); b.setAttribute("aria-selected", b.dataset.ctab === CT_TAB); });
+  $("#ctPanel").hidden = CT_TAB !== "catat"; $("#bjPanel").hidden = CT_TAB !== "belanja"; if (CT_TAB === "belanja") blMuat(); }
+$("#ctTabs").onclick = e => { const b = e.target.closest("[data-ctab]"); if (b) ctTab(b.dataset.ctab); };
+$("#ctCari").oninput = () => renderCatatan();
 $("#ctReset").onclick = () => ctForm();
 $("#ctSave").onclick = async () => {
-  try { CTD = await api("/api/catatan", {json: {id: $("#ctJudul").dataset.id || null, judul: $("#ctJudul").value, isi: $("#ctIsi").value, bersama: $("#ctBersama").checked, sematkan: $("#ctSem").checked}}); renderCatatan(); ctForm(); $("#ctMsg").textContent = "Tersimpan."; }
+  try { CTD = await api("/api/catatan", {json: {id: $("#ctJudul").dataset.id || null, judul: $("#ctJudul").value, isi: $("#ctIsi").value, tanggal: $("#ctTgl").value, bersama: $("#ctBersama").checked, sematkan: $("#ctSem").checked}}); renderCatatan(); ctForm(); $("#ctMsg").textContent = "Tersimpan."; }
   catch (e) { $("#ctMsg").textContent = e.message; }
 };
+$("#ctFotoSet").onchange = async e => { try { await api("/api/catatan/foto", {json: {semua: e.target.checked}}); pesan(e.target.checked ? "Semua anggota sekarang bisa memakai Foto jadi catatan" : "Foto jadi catatan kembali khusus Dev"); } catch (er) { alert(er.message); e.target.checked = !e.target.checked; } };
+$("#ctFotoB").onclick = () => $("#ctFoto").click();
+$("#ctFoto").onchange = async e => { const f = e.target.files[0]; if (!f) return; const m = $("#ctAlatMsg"); m.textContent = "AI membaca foto…";
+  try { const fd = new FormData(); fd.append("foto", f); const d = await api("/api/catatan/foto", {method: "POST", body: fd});
+    if (!$("#ctJudul").value) $("#ctJudul").value = d.judul; $("#ctIsi").value = ($("#ctIsi").value ? $("#ctIsi").value + "\n\n" : "") + d.isi; m.textContent = "Foto sudah jadi teks. Cek lalu Simpan."; }
+  catch (er) { m.textContent = er.message; } e.target.value = ""; };
+$("#ctRapi").onclick = async () => { const t = [$("#ctJudul").value, $("#ctIsi").value].filter(Boolean).join("\n"), m = $("#ctAlatMsg"), b = $("#ctRapi");
+  if (t.trim().length < 3) { m.textContent = "Tulis dulu catatannya."; return; }
+  const lama = {judul: $("#ctJudul").value, isi: $("#ctIsi").value, tgl: $("#ctTgl").value}; b.disabled = true; m.textContent = "AI merapikan…";
+  try { const d = await api("/api/catatan/rapikan", {json: {teks: t}});
+    $("#ctJudul").value = d.judul || lama.judul; $("#ctIsi").value = d.isi || lama.isi; if (d.tanggal && !lama.tgl) $("#ctTgl").value = d.tanggal;
+    m.innerHTML = 'Sudah dirapikan. <a href="#" id="ctUndo">Batalkan</a>'; $("#ctUndo").onclick = e => { e.preventDefault(); $("#ctJudul").value = lama.judul; $("#ctIsi").value = lama.isi; $("#ctTgl").value = lama.tgl; m.textContent = ""; $("#ctSaran").innerHTML = ""; };
+    const bisa = d.bisa_tugas && ME.anggota;
+    $("#ctSaran").innerHTML = (d.tugas || []).length ? `<div class="ctSaranBox"><b>AI menemukan ${d.tugas.length} hal yang bisa dijadikan tugas:</b><br>${d.tugas.map((t, i) => `<button class="bt o" type="button" data-ctjt="${i}" ${bisa ? "" : "disabled"}>${esc(t.judul)}${t.tenggat ? " · " + esc(tglID(t.tenggat)) : ""}${bisa ? " → jadikan tugas" : ""}</button>`).join("")}${bisa ? "" : '<div class="mu" style="font-size:12.5px;margin-top:6px">Jabatanmu belum bisa membuat tugas; tetap tersimpan sebagai checklist.</div>'}</div>` : "";
+    $$("[data-ctjt]").forEach(x => x.onclick = async () => { const t = d.tugas[+x.dataset.ctjt]; x.disabled = true;
+      try { await api("/api/r/tugas", {json: {judul: t.judul, pj: ME.anggota.id, tenggat: t.tenggat || "", status: "belum", prioritas: "normal", deskripsi: "Dari catatan: " + ($("#ctJudul").value || "")}}); x.textContent = "✓ " + t.judul + " (jadi tugas)"; }
+      catch (e) { x.disabled = false; alert(e.message); } }); }
+  catch (e) { m.textContent = e.message; } b.disabled = false; };
+/* Rekam suara (dipakai Catatan & Catat cepat): MediaRecorder -> AI menulis teksnya */
+const REKAM = {r: null, t: 0};
+async function rekamSuara(btn, msg, isi) {
+  if (REKAM.r) { REKAM.r.stop(); return; }
+  if (!navigator.mediaDevices || !window.MediaRecorder) { msg.textContent = "Browser ini belum bisa merekam suara. Coba voice note ke bot Telegram."; return; }
+  let st; try { st = await navigator.mediaDevices.getUserMedia({audio: true}); } catch (e) { msg.textContent = "Izin mikrofon ditolak. Nyalakan di pengaturan browser."; return; }
+  const tipe = ["audio/webm", "audio/mp4", "audio/ogg"].find(t => MediaRecorder.isTypeSupported(t)) || "", rec = new MediaRecorder(st, tipe ? {mimeType: tipe} : {}), bag = [], t0 = Date.now(), asli = btn.textContent;
+  REKAM.r = rec; btn.classList.add("rek"); rec.ondataavailable = e => e.data.size && bag.push(e.data);
+  REKAM.t = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); btn.textContent = `⏹ Berhenti (${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")})`; if (s >= 600) rec.stop(); }, 500);
+  rec.onstop = async () => { clearInterval(REKAM.t); REKAM.r = null; st.getTracks().forEach(t => t.stop()); btn.classList.remove("rek"); btn.textContent = asli;
+    const blob = new Blob(bag, {type: rec.mimeType || tipe || "audio/webm"}); if (blob.size < 800) { msg.textContent = "Rekaman terlalu pendek."; return; }
+    msg.textContent = "AI menulis rekamanmu…"; btn.disabled = true;
+    try { const fd = new FormData(); fd.append("audio", blob, "suara." + ((rec.mimeType || tipe).includes("mp4") ? "m4a" : "webm")); const d = await api("/api/catatan/suara", {method: "POST", body: fd});
+      isi.value = (isi.value ? isi.value + "\n" : "") + (d.teks || ""); msg.textContent = d.teks ? "Rekaman sudah jadi teks." : "Tidak terdengar ada ucapan."; }
+    catch (e) { msg.textContent = e.message; } btn.disabled = false; };
+  rec.start(1000); msg.textContent = "Merekam… tekan lagi untuk berhenti.";
+}
+$("#ctRekam").onclick = () => rekamSuara($("#ctRekam"), $("#ctAlatMsg"), $("#ctIsi"));
+
+/* Daftar Belanja */
+let BL = null;
+async function blMuat() { try { BL = await api("/api/belanja"); blRender(); } catch (e) { $("#bjBox").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; } }
+function blRender() {
+  { const n = BL.items.filter(x => x.status === "perlu").length, nb = $("#nbBelanja"); nb.textContent = n; nb.hidden = !n; }
+  const perlu = BL.items.filter(x => x.status === "perlu"), sudah = BL.items.filter(x => x.status === "dibeli");
+  const it = x => `<div class="bjIt ${x.status === "dibeli" ? "ok" : ""}">${BL.kelola ? `<input type="checkbox" data-blc="${x.id}" ${x.status === "dibeli" ? "checked" : ""} aria-label="Tandai ${esc(x.nama)} sudah dibeli">` : ""}
+    <div class="bjA"><b>${esc(x.nama)}</b> <span class="mu">× ${x.jumlah} ${esc(x.satuan || "")}</span>${x.prioritas === "penting" ? ' <span class="ch r">Penting</span>' : ""}
+     <div class="mu" style="font-size:12.5px">${x.harga ? rp(x.harga) + " / " + esc(x.satuan || "pcs") + " · " : ""}${x.catatan ? esc(x.catatan) + " · " : ""}${x.status === "dibeli" ? "dibeli " + esc(x.dibeli_oleh || "") + " " + esc(tglID((x.dibeli || "").slice(0, 10))) : "oleh " + esc(x.oleh || "")}</div></div>
+    <div class="bjB">${x.status === "perlu" ? `<a class="bt o" href="${esc(x.beli.tokopedia)}" target="_blank" rel="noopener">Tokopedia</a><a class="bt o" href="${esc(x.beli.shopee)}" target="_blank" rel="noopener">Shopee</a>` : ""}${BL.kelola || (x.oleh_id === BL.me && x.status === "perlu") ? `<button class="bt o" data-bld="${x.id}" type="button" aria-label="Hapus ${esc(x.nama)}">Hapus</button>` : ""}</div></div>`;
+  $("#bjBox").innerHTML = (BL.menipis.length ? `<div class="pdWarn"><b>${BL.menipis.length} stok menipis belum ada di daftar:</b> ${BL.menipis.slice(0, 6).map(s => esc(s.nama)).join(", ")}${BL.menipis.length > 6 ? "…" : ""} <button class="bt o" id="bjStok" type="button" style="margin-left:6px;padding:5px 10px;min-height:32px">Tambahkan semua</button></div>` : "")
+    + `<h2 class="pdH">Perlu dibeli · ${perlu.length} barang${BL.total ? " · perkiraan " + rp(BL.total) : ""}</h2><div class="cd">${perlu.map(it).join("") || '<p class="mu" style="margin:0">Tidak ada yang perlu dibeli. 🎉</p>'}</div>`
+    + (BL.kelola && BL.stok_edit ? `<label class="mu" style="display:flex;gap:8px;align-items:center;font-size:13px;margin:8px 2px"><input type="checkbox" id="bjKeStok" checked> Saat dicentang "sudah dibeli", tambahkan juga ke Stok Komponen</label>` : "")
+    + (sudah.length ? `<details class="cd"><summary style="cursor:pointer;font-weight:700">Sudah dibeli (30 hari terakhir) · ${sudah.length}</summary>${sudah.map(it).join("")}</details>` : "");
+  $$("[data-blc]").forEach(c => c.onchange = async () => { try { BL = await api("/api/belanja/" + c.dataset.blc, {json: {aksi: c.checked ? "dibeli" : "batal", masuk_stok: c.checked && !!($("#bjKeStok") || {}).checked}}); blRender(); if (c.checked) pesan("Ditandai sudah dibeli" + (($("#bjKeStok") || {}).checked ? " dan masuk stok" : "")); } catch (e) { alert(e.message); c.checked = !c.checked; } });
+  $$("[data-bld]").forEach(b => b.onclick = async () => { if (!confirm("Hapus dari daftar?")) return; try { BL = await api("/api/belanja/" + b.dataset.bld, {method: "DELETE"}); blRender(); } catch (e) { alert(e.message); } });
+  const bs = $("#bjStok"); if (bs) bs.onclick = async () => { try { BL = await api("/api/belanja", {json: {dari_stok: true, stok_ids: BL.menipis.map(s => s.id)}}); blRender(); pesan("Stok menipis masuk daftar belanja"); } catch (e) { alert(e.message); } };
+}
+$("#bjTambah").onclick = async () => { const m = $("#bjMsg"), cepat = $("#bjCepat").value.trim(), nama = $("#bjNama").value.trim();
+  if (!cepat && !nama) { m.textContent = "Tulis barangnya dulu."; return; }
+  try { BL = await api("/api/belanja", {json: cepat ? {teks: cepat} : {nama, jumlah: $("#bjJml").value, satuan: $("#bjSat").value, harga: $("#bjHrg").value, catatan: $("#bjCat").value, prioritas: $("#bjPenting").checked ? "penting" : "normal"}});
+    blRender(); ["#bjCepat", "#bjNama", "#bjHrg", "#bjCat"].forEach(q => $(q).value = ""); $("#bjJml").value = 1; $("#bjPenting").checked = false; m.textContent = "Ditambahkan."; }
+  catch (e) { m.textContent = e.message; } };
+$("#bjCepat").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); $("#bjTambah").click(); } };
+
+/* Catat cepat (tombol ＋ di semua halaman) */
+let CC_MODE = "catat";
+function ccBuka(mode, teks) { CC_MODE = mode || "catat"; $$("#ccSeg button").forEach(b => b.classList.toggle("on", b.dataset.cc === CC_MODE)); $("#ccIsi").placeholder = CC_MODE === "beli" ? "Contoh: resistor 10k 20pcs, kabel jumper 1 pack" : "Tulis cepat… (bisa #tag dan [ ] checklist)"; $("#ccIsi").value = teks || ""; $("#ccMsg").textContent = ""; $("#ccHal").hidden = false; setTimeout(() => $("#ccIsi").focus(), 30); }
+$("#fabCatat").onclick = () => ccBuka("catat");
+$("#ccTutup").onclick = () => { if (REKAM.r) REKAM.r.stop(); $("#ccHal").hidden = true; };
+$("#ccHal").onclick = e => { if (e.target.id === "ccHal") $("#ccTutup").click(); };
+$("#ccSeg").onclick = e => { const b = e.target.closest("[data-cc]"); if (b) ccBuka(b.dataset.cc, $("#ccIsi").value); };
+$("#ccRekam").onclick = () => rekamSuara($("#ccRekam"), $("#ccMsg"), $("#ccIsi"));
+async function ccSimpan(mode, teks) {
+  teks = String(teks || "").trim(); if (teks.length < 2) throw new Error("Tulis dulu isinya.");
+  if (mode === "beli") { BL = await api("/api/belanja", {json: {teks}}); if (!$("#p-catatan").hidden) blRender(); return "Masuk Daftar Belanja"; }
+  CTD = await api("/api/catatan", {json: {judul: teks.split(/[.\n!?]/)[0].slice(0, 60), isi: teks}}); if (!$("#p-catatan").hidden) renderCatatan(); return "Tersimpan di Catatan";
+}
+$("#ccSimpan").onclick = async () => { try { const ok = await ccSimpan(CC_MODE, $("#ccIsi").value); $("#ccHal").hidden = true; pesan(ok); } catch (e) { $("#ccMsg").textContent = e.message; } };
+$("#ccIsi").onkeydown = e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) $("#ccSimpan").click(); if (e.key === "Escape") $("#ccTutup").click(); };
 
 /* Voting / polling */
 let PLD = null;
@@ -5813,7 +5954,7 @@ const CH_KATA = {   // sinonim supaya "uang" ketemu Keuangan, "3d" ketemu Studio
   tugas: "task todo pekerjaan deadline", bayarkas: "iuran bayar kas mingguan transfer", info: "tanya ai chat publik faq", portofolio: "karya showcase hasil proyek",
   pengumuman: "info broadcast kabar", agenda: "rapat meeting jadwal kalender acara", arsip: "proyek selesai riwayat proyek", alat: "pinjam peminjaman tools barang",
   stok: "gudang komponen inventaris barang sparepart", mitra: "partner rekanan vendor supplier", anggota: "member orang personel tim", struktur: "divisi jabatan organisasi bagan",
-  surat: "penerimaan anggota baru welcome", polling: "voting suara pemilihan", skor: "poin lencana badge peringkat ranking", catatan: "notes memo",
+  surat: "penerimaan anggota baru welcome", polling: "voting suara pemilihan", skor: "poin lencana badge peringkat ranking", catatan: "notes memo checklist belanja beli daftar belanja bahan komponen shopee tokopedia",
   rekapkas: "rekap laporan kas uang", riwayat: "riwayat transaksi uang mutasi", kas: "kas uang keuangan saldo pemasukan pengeluaran ledger buku kas", hutang: "utang piutang pinjaman",
   invoice: "tagihan faktur nota", produk: "katalog jualan toko harga", jasa: "layanan pesan jasa website", backup: "cadangan unduh data ekspor",
   uu: "pasal undang aturan peraturan ad art", sidang: "pelanggaran hukuman sidang", putusan: "keputusan sidang vonis", sp: "surat peringatan teguran sanksi", blacklist: "daftar hitam banned",
@@ -5851,8 +5992,10 @@ function chTanda(nama, q) {   // tebalkan bagian nama yang cocok
   return h;
 }
 function chRender() {
-  const q = $("#chQ").value; CH_H = chCari(q); CH_I = Math.min(CH_I, Math.max(0, CH_H.length - 1));
-  $("#chList").innerHTML = CH_H.length ? CH_H.map((x, i) => `<li role="option" id="ch${i}" data-chp="${x.p}" class="${i === CH_I ? "on" : ""}" aria-selected="${i === CH_I}"><b>${chTanda(x.nama, q)}</b><small>${esc(x.grup)}</small></li>`).join("")
+  const q = $("#chQ").value, ak = q.match(/^\s*(catat|beli)\s+(.+)/i);   // "catat …" / "beli …" langsung disimpan dari kotak cari
+  CH_H = [...(ak && can("catatan") ? [{p: "_" + ak[1].toLowerCase(), nama: (ak[1].toLowerCase() === "beli" ? "🛒 Tambah ke Daftar Belanja: " : "📝 Simpan catatan: ") + ak[2].trim(), grup: "Enter untuk menyimpan", teks: ak[2]}] : []), ...chCari(q)];
+  CH_I = Math.min(CH_I, Math.max(0, CH_H.length - 1));
+  $("#chList").innerHTML = CH_H.length ? CH_H.map((x, i) => `<li role="option" id="ch${i}" data-chp="${x.p}" class="${i === CH_I ? "on" : ""}" aria-selected="${i === CH_I}"><b>${x.teks ? esc(x.nama) : chTanda(x.nama, q)}</b><small>${esc(x.grup)}</small></li>`).join("")
     : `<li class="chKosong">Tidak ada halaman yang cocok dengan “${esc(q)}”.</li>`;
   $("#chQ").setAttribute("aria-activedescendant", CH_H.length ? "ch" + CH_I : "");
   const on = $("#chList li.on"); if (on) on.scrollIntoView({block: "nearest"});
@@ -5860,6 +6003,7 @@ function chRender() {
 function chBuka() { if (ME && ME.role === "viewer") return; $("#cariHal").hidden = false; $("#chQ").value = ""; CH_I = 0; chRender(); setTimeout(() => $("#chQ").focus(), 30); }
 function chTutup() { $("#cariHal").hidden = true; }
 function chPilih(p) {
+  if (p[0] === "_") { const x = CH_H.find(y => y.p === p); chTutup(); ccSimpan(p === "_beli" ? "beli" : "catat", x ? x.teks : "").then(pesan).catch(e => alert(e.message)); return; }
   chTutup(); const nv = $(`#sd .nv[data-p="${p}"]`); if (!nv) return;
   try { const a = JSON.parse(localStorage.getItem("chAkhir") || "[]").filter(x => x !== p); a.unshift(p); localStorage.setItem("chAkhir", JSON.stringify(a.slice(0, 5))); } catch (e) {}
   nv.click(); if ($("#sd").classList.contains("bk")) $("#nvMenu").click(); window.scrollTo(0, 0);
@@ -6007,7 +6151,8 @@ function pdDetail() {
       <div class="pdKomA"><b>${esc(c.nama)}</b> <span class="mu">× ${Math.max(1, +c.jumlah || 1)}</span><div class="mu" style="font-size:13px">${esc(c.fungsi || "")}</div>
       <div class="meta" style="margin-top:4px"><span>${pdRp(c.harga_min, c.harga_max)} / buah</span>${c.stok ? `<span class="ch ${c.stok.jumlah > 0 ? "g" : "n"}">Stok MCI: ${esc(c.stok.nama)} (${c.stok.jumlah} ${esc(c.stok.satuan)})</span>` : ""}</div></div>
       <div class="pdBeli"><a class="bt o" href="${esc(c.beli.tokopedia)}" target="_blank" rel="noopener">Tokopedia</a><a class="bt o" href="${esc(c.beli.shopee)}" target="_blank" rel="noopener">Shopee</a></div></div>`).join("")}</div>`).join("")
-    + ((d.alat || []).length ? `<div class="cd"><b>Alat yang disiapkan:</b> ${d.alat.map(esc).join(" · ")}</div>` : "");
+    + ((d.alat || []).length ? `<div class="cd"><b>Alat yang disiapkan:</b> ${d.alat.map(esc).join(" · ")}</div>` : "")
+    + (can("catatan") ? `<div class="bar" style="margin:0 0 6px"><button class="bt o" id="pdBelanja" type="button">🛒 Masukkan semua komponen ke Daftar Belanja</button></div>` : "");
   h += `<h2 class="pdH">2 · Rakit langkah demi langkah</h2>
     <div class="cd pdStep"><div class="pdNav">${L.map((_, i) => `<button type="button" data-pdl="${i}" class="${i === PD_L ? "on" : ""} ${sudah.includes(i) ? "ok" : ""}" aria-label="Langkah ${i + 1}">${sudah.includes(i) ? "✓" : i + 1}</button>`).join("")}</div>
       <div class="ey" style="margin-top:12px">Langkah ${PD_L + 1} dari ${L.length}</div><h3 style="margin:2px 0 8px;font:700 20px/1.3 var(--serif);color:var(--navy2)">${esc(lg.judul || "")}</h3>
@@ -6047,6 +6192,7 @@ function pdPasang() {
     if (PD_L < x.data.langkah.length - 1) { PD_L++; pdDetail(); $(".pdStep").scrollIntoView({block: "start"}); } else { pdDetail(); pesan("Rangkaian selesai! Lanjut unggah kode di bagian 3."); } });
   on("#pdSalin", async () => { try { await navigator.clipboard.writeText(x.data.kode || ""); pesan("Kode disalin"); } catch (e) { pesan("Tidak bisa menyalin otomatis; blok kodenya lalu salin manual."); } });
   on("#pdCetak", pdCetak);
+  on("#pdBelanja", async () => { try { await api("/api/belanja", {json: {dari_panduan: x.id}}); pesan("Komponen masuk Daftar Belanja"); $("#pdBelanja").textContent = "✓ Sudah masuk Daftar Belanja"; $("#pdBelanja").disabled = true; } catch (e) { alert(e.message); } });
   on("#pdTautBuka", async () => { const w = $("#pdTaut"); w.innerHTML = '<p class="mu">Memuat proyek…</p>';
     try { const r = await api("/api/r/proyek"), its = (r.items || []).filter(p => !["selesai"].includes(p.status));
       w.innerHTML = `<div class="bar" style="margin:12px 0 0;flex-wrap:wrap"><select id="pdTautSel"><option value="0">Tidak ditautkan</option>${its.map(p => `<option value="${p.id}" ${x.proyek_id === p.id ? "selected" : ""}>${esc(p.nama)}</option>`).join("")}</select><button class="bt g" id="pdTautOk" type="button">Simpan</button><span class="mu" id="pdTMsg" style="font-size:13px"></span></div>`;
@@ -6159,12 +6305,16 @@ async function brMuat() {
   let d; try { delete APIC["/api/beranda"]; d = await api("/api/beranda"); } catch (e) { $("#brBox").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; return; }
   $("#brHari").textContent = d.hari; $("#brHalo").textContent = "Halo, " + d.nama.split(" ")[0];
   const baris = (x, i) => `<button data-brh="${esc(x.hal)}" class="${x.penting ? "pt" : ""}"><span><b>${esc(x.judul)}</b>${x.ket ? `<small>${esc(x.ket)}</small>` : ""}</span><i aria-hidden="true">›</i></button>`;
-  $("#brBox").innerHTML = `<h2 style="margin-top:18px">Perlu dikerjakan</h2>${d.perlu.length ? `<div class="hl">${d.perlu.map(baris).join("")}</div>` : '<p class="mu">Tidak ada yang mendesak. Semua beres.</p>'}
+  const pg = d.pagi ? `<div class="pagiK tutup" id="pagiK"><h2>☀️ Laporan Pagi Apex</h2><div style="font-size:12.5px;opacity:.8">${d.pagi.waktu ? "Dibuat " + esc(tglID(d.pagi.waktu.slice(0, 10))) + " pukul " + esc(d.pagi.waktu.slice(11, 16)) : "Belum ada laporan"} · otomatis tiap hari pukul ${String(d.pagi.jam).padStart(2, "0")}.00 ke Telegram &amp; Inbox</div>
+    ${d.pagi.isi ? `<pre>${esc(d.pagi.isi)}</pre>` : ""}<div class="bar" style="margin:10px 0 0;flex-wrap:wrap">${d.pagi.isi ? '<button class="bt o" id="pagiLebar" type="button">Lihat semua</button>' : ""}<button class="bt o" id="pagiBuat" type="button">Buat ulang sekarang</button><span id="pagiMsg" style="font-size:12.5px;opacity:.85"></span></div></div>` : "";
+  $("#brBox").innerHTML = pg + `<h2 style="margin-top:18px">Perlu dikerjakan</h2>${d.perlu.length ? `<div class="hl">${d.perlu.map(baris).join("")}</div>` : '<p class="mu">Tidak ada yang mendesak. Semua beres.</p>'}
     ${d.info.length ? `<h2>Akan datang</h2><div class="hl">${d.info.map(baris).join("")}</div>` : ""}
     ${(d.sorot || []).length ? `<h2>Proyek unggulan</h2>${sorotHtml(d.sorot)}` : ""}
     ${d.proyek.length ? `<h2>Proyek berjalan</h2><div class="hl">${d.proyek.map(x => `<button data-brh="proyek"><span style="flex:1"><b>${esc(x.nama)}</b><span class="prg" style="display:block;margin-top:8px"><i style="width:${x.progres}%"></i></span></span><small>${x.progres}%</small></button>`).join("")}</div>` : ""}
     ${d.pengumuman.length ? `<h2>Pengumuman terbaru</h2><div class="hl">${d.pengumuman.map(x => `<button data-brh="pengumuman"><span><b>${esc(x.judul)}</b><small>${esc(tglID(x.tanggal))}</small></span><i aria-hidden="true">›</i></button>`).join("")}</div>` : ""}`;
   $$("#brBox [data-brh]").forEach(b => b.onclick = () => show(b.dataset.brh));
+  const pl = $("#pagiLebar"); if (pl) pl.onclick = () => { const k = $("#pagiK").classList.toggle("tutup"); pl.textContent = k ? "Lihat semua" : "Ringkas"; };
+  const pb = $("#pagiBuat"); if (pb) pb.onclick = async () => { pb.disabled = true; $("#pagiMsg").textContent = "Apex menyusun laporan…"; try { await api("/api/pagi", {json: {buat: true, kirim: false}}); brMuat(); } catch (e) { $("#pagiMsg").textContent = e.message; pb.disabled = false; } };
 }
 
 /* ===== Ruang proyek: papan tugas, pengajuan dana, jurnal & catatan berjejak ===== */
@@ -6320,6 +6470,8 @@ function bukaHash() {   // pintasan aplikasi (#inbox, #tugas, …) + link hasil 
   if (!nv || nv.style.display === "none") return;
   if (p === "panduan" && /^\d+$/.test(a || "")) { PD_X = {id: +a}; PD_L = 0; }
   if (p === "studio" && (a === "3d" || a === "svg")) { S3_J = a; }
+  if (p === "catatan" && /^\d+$/.test(a || "")) { CT_BUKA = +a; CT_TAB = "catat"; }
+  if (p === "catatan" && a === "belanja") CT_TAB = "belanja";
   show(p);
   const id = p === "studio" ? b2 : a;
   if ((p === "gambar" || p === "studio") && /^\d+$/.test(id || "")) sorotItem(`[data-sorot="${p === "studio" ? (a || "3d") : "gambar"}:${id}"]`);
@@ -6363,6 +6515,7 @@ addEventListener("hashchange", bukaHash);
     acuan.after($("#pasangApp"));   // tombol Pasang aplikasi ikut di daftar datar, bukan di bawah judul "Lainnya"
     $("#sd").classList.add("vw");
   }
+  $("#fabCatat").hidden = ME.role === "viewer" || !can("catatan");   // tombol ＋ catat cepat
   navGrup();
   renderKuota();
   if (DEMO) $("#logout").onclick = e => { e.preventDefault(); alert("Tombol Keluar aktif di versi server."); };

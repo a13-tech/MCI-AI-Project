@@ -316,6 +316,8 @@ def db_init():
         sql(c, f"CREATE TABLE IF NOT EXISTS surat (id {pk}, token TEXT UNIQUE NOT NULL, nomor TEXT NOT NULL, urut INTEGER NOT NULL, tahun INTEGER NOT NULL, format TEXT NOT NULL DEFAULT 'a', "
                f"nama TEXT NOT NULL, jabatan TEXT, divisi TEXT, mulai TEXT, tanggal TEXT NOT NULL, pesan TEXT, wa TEXT, ttd_nama TEXT, ttd_jabatan TEXT, kode TEXT NOT NULL, "
                f"status TEXT NOT NULL DEFAULT 'aktif', oleh TEXT, dibuat TEXT, dilihat INTEGER NOT NULL DEFAULT 0)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS belanja (id {pk}, nama TEXT NOT NULL, jumlah INTEGER NOT NULL DEFAULT 1, satuan TEXT, harga {big} NOT NULL DEFAULT 0, catatan TEXT, "
+               f"sumber TEXT, ref INTEGER, prioritas TEXT NOT NULL DEFAULT 'normal', status TEXT NOT NULL DEFAULT 'perlu', oleh_id INTEGER, oleh TEXT, dibuat TEXT, dibeli TEXT, dibeli_oleh TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS panduan (id {pk}, oleh_id INTEGER, oleh TEXT, judul TEXT, papan TEXT, status TEXT NOT NULL DEFAULT 'rencana', permintaan TEXT NOT NULL, "
                f"jawaban TEXT, rencana TEXT, data TEXT, laporan TEXT, mesin TEXT, proyek_id INTEGER, dikonfirmasi TEXT, dibuat TEXT, diubah TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS chat_riwayat (id {pk}, ruang TEXT NOT NULL, role TEXT NOT NULL, teks TEXT NOT NULL, model TEXT, waktu TEXT)")
@@ -400,6 +402,11 @@ def db_init():
                 sql(c, f"ALTER TABLE jasa_pesan ADD COLUMN {kol}")
         except Exception:
             pass   # sudah ada
+    try:   # catatan: tanggal pengingat (ikut Laporan Pagi Apex)
+        with db() as c:
+            sql(c, "ALTER TABLE catatan ADD COLUMN tanggal TEXT")
+    except Exception:
+        pass   # sudah ada
     try:   # database lama: tanda izin khusus (dicatat Dev/Manager, tidak memakai jatah bulanan)
         with db() as c:
             sql(c, "ALTER TABLE absen_izin ADD COLUMN khusus INTEGER NOT NULL DEFAULT 0")
@@ -2312,6 +2319,7 @@ async def laporan_jadwal():
         try:
             await asyncio.to_thread(alat_cek_telat)
             await backup_jadwal_cek()
+            await pagi_cek()
         except Exception:
             log.exception("Cek alat / backup gagal")
         try:
@@ -3207,10 +3215,11 @@ def api_anggota_del(i):
 def catatan_list(r):
     me = mid_of(r)
     with db() as c:
-        rows = sql(c, "SELECT id,pemilik,judul,isi,bersama,sematkan,dibuat,diubah FROM catatan WHERE bersama=1 OR pemilik=? ORDER BY sematkan DESC, id DESC LIMIT 300", (me,)).fetchall()
+        rows = sql(c, "SELECT id,pemilik,judul,isi,bersama,sematkan,dibuat,diubah,tanggal FROM catatan WHERE bersama=1 OR pemilik=? ORDER BY sematkan DESC, id DESC LIMIT 300", (me,)).fetchall()
     nm = lambda i: "Dev" if i == 0 else (MEMBERS.get(i) or {}).get("nama", "?")
     return [{"id": int(i), "pemilik": nm(int(p)), "milik_saya": int(p) == me, "judul": j or "", "isi": s_ or "", "bersama": bool(b), "sematkan": bool(se),
-             "dibuat": d, "diubah": u, "bisa_ubah": int(p) == me or (bool(b) and can("catatan_kelola", r))} for i, p, j, s_, b, se, d, u in rows]
+             "dibuat": d, "diubah": u, "tanggal": tg or "", "tag": sorted(set(re.findall(r"#([\w-]{2,30})", f"{j or ''} {s_ or ''}"))),
+             "bisa_ubah": int(p) == me or (bool(b) and can("catatan_kelola", r))} for i, p, j, s_, b, se, d, u, tg in rows]
 
 
 @app.route("/api/catatan", methods=["GET", "POST"])
@@ -3219,6 +3228,7 @@ def api_catatan():
     if request.method == "POST":
         d = request.get_json(silent=True) or {}
         judul, isi = str(d.get("judul", "")).strip()[:120], str(d.get("isi", "")).strip()[:5000]
+        tgl = str(d.get("tanggal") or "")[:10] if re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(d.get("tanggal") or "")[:10]) else None
         if not (judul or isi):
             return jsonify({"error": "Catatan kosong"}), 400
         bersama, sem = 1 if d.get("bersama") else 0, 1 if d.get("sematkan") and can("catatan_kelola", r) else 0
@@ -3228,9 +3238,9 @@ def api_catatan():
                 row = sql(c, "SELECT pemilik, bersama FROM catatan WHERE id=?", (int(i),)).fetchone()
                 if not row or not (int(row[0]) == mid_of(r) or (row[1] and can("catatan_kelola", r))):
                     return jsonify({"error": "Tidak boleh mengubah catatan ini"}), 403
-                sql(c, "UPDATE catatan SET judul=?, isi=?, bersama=?, sematkan=?, diubah=? WHERE id=?", (judul, isi, bersama, sem, _now(), int(i)))
+                sql(c, "UPDATE catatan SET judul=?, isi=?, bersama=?, sematkan=?, tanggal=?, diubah=? WHERE id=?", (judul, isi, bersama, sem, tgl, _now(), int(i)))
             else:
-                sql(c, "INSERT INTO catatan (pemilik,judul,isi,bersama,sematkan,dibuat,diubah) VALUES (?,?,?,?,?,?,?)", (mid_of(r), judul, isi, bersama, sem, _now(), _now()))
+                sql(c, "INSERT INTO catatan (pemilik,judul,isi,bersama,sematkan,tanggal,dibuat,diubah) VALUES (?,?,?,?,?,?,?,?)", (mid_of(r), judul, isi, bersama, sem, tgl, _now(), _now()))
     return jsonify({"items": catatan_list(r), "kelola": can("catatan_kelola", r)})
 
 
@@ -5154,7 +5164,8 @@ def api_beranda():
               if x.get("status") in ("berjalan", "ide") and (me is None or me in (x.get("tim") or []) or x.get("pj") == me)][:6]
     umum = [{"judul": x.get("judul", ""), "tanggal": (x.get("dibuat") or "")[:10]} for x in sorted(rk_rows("pengumuman"), key=lambda x: (-bool(x.get("sematkan")), -x["id"]))[:3]]
     perlu.sort(key=lambda x: not x["penting"])
-    return jsonify({"nama": m["nama"] if m else nama_peran(r), "hari": tglid(hi), "perlu": perlu, "info": info, "proyek": proyek, "pengumuman": umum, "sorot": PROYEK_SOROT})
+    pagi = {"isi": SET.get("pagi_isi", ""), "waktu": SET.get("pagi_waktu", ""), "jam": PAGI_JAM} if is_admin(r) else None   # Laporan Pagi Apex khusus Dev
+    return jsonify({"nama": m["nama"] if m else nama_peran(r), "hari": tglid(hi), "perlu": perlu, "info": info, "proyek": proyek, "pengumuman": umum, "sorot": PROYEK_SOROT, "pagi": pagi})
 
 
 # ---------- MESIN KODE: Gemini sekarang; otomatis pindah ke Claude kalau ANTHROPIC_API_KEY dipasang di Render ----------
@@ -9168,6 +9179,474 @@ def cek_status_bot() -> dict:
     return {"bot": bots, "token_hari_ini": usage_today_total(), "batas_token_harian": DAILY_LIMIT or "tanpa batas"}
 
 
+# ---------- AI MURAH: Hydrogen (kunci gratis) dulu, kalau gagal model biasa ----------
+async def ai_murah(prompt, schema=None, parts=None, sistem=None, act="Membantu mencatat"):
+    try:
+        return await ask("scribe", prompt, parts=parts, schema=schema, model=HYDROGEN_MODEL, kunci=kunci_hydrogen(), act=act, use_mcp=False, cache=False, sistem=sistem)
+    except Exception as e:
+        log.warning("Hydrogen gagal (%s), pakai model biasa", str(e)[:120])
+        return await ask("scribe", prompt, parts=parts, schema=schema, model=MODEL, act=act, use_mcp=False, cache=False, sistem=sistem)
+
+
+# ---------- DAFTAR BELANJA: bahan/komponen yang harus dibeli ----------
+BELANJA_KOLOM = ["id", "nama", "jumlah", "satuan", "harga", "catatan", "sumber", "ref", "prioritas", "status", "oleh_id", "oleh", "dibuat", "dibeli", "dibeli_oleh"]
+
+
+def belanja_rows(semua=False):
+    with db() as c:
+        rows = sql(c, f"SELECT {','.join(BELANJA_KOLOM)} FROM belanja " + ("" if semua else "WHERE status='perlu' OR dibeli>=? ") + "ORDER BY status DESC, prioritas DESC, id DESC LIMIT 400",
+                   () if semua else ((datetime.now(WIB) - timedelta(days=30)).isoformat(timespec="seconds"),)).fetchall()
+    out = []
+    for r_ in rows:
+        x = dict(zip(BELANJA_KOLOM, r_))
+        q = quote(x["nama"])
+        x["beli"] = {t: u + q for t, u in TOKO_CARI.items()}
+        out.append(x)
+    return out
+
+
+def belanja_ubah_izin(r):
+    return is_admin(r) or can("kas_edit", r)
+
+
+def belanja_payload(r):
+    rows = belanja_rows()
+    perlu = [x for x in rows if x["status"] == "perlu"]
+    ada = {x["nama"].strip().lower() for x in perlu}
+    return {"items": rows, "kelola": belanja_ubah_izin(r), "stok_edit": is_admin(r), "me": mid_of(r),
+            "total": sum(int(x["harga"] or 0) * max(1, int(x["jumlah"] or 1)) for x in perlu),
+            "menipis": [{"id": s["id"], "nama": s["nama"], "jumlah": s["jumlah"], "minimum": s["minimum"], "satuan": s["satuan"]}
+                        for s in stok_menipis() if s["nama"].strip().lower() not in ada]}
+
+
+def belanja_tambah(r, nama, jumlah=1, satuan="pcs", harga=0, catatan="", sumber="manual", ref=None, prioritas="normal"):
+    nama = str(nama or "").strip()[:120]
+    if len(nama) < 2:
+        raise ValueError("Nama barang wajib diisi")
+    try:
+        jumlah, harga = max(1, min(100000, int(float(jumlah or 1)))), max(0, min(10**9, int(float(harga or 0))))
+    except (TypeError, ValueError):
+        raise ValueError("Jumlah dan harga harus angka")
+    with db() as c:
+        lama = sql(c, "SELECT id, jumlah FROM belanja WHERE status='perlu' AND LOWER(nama)=?", (nama.lower(),)).fetchone()
+        if lama:   # barang yang sama digabung, bukan dobel
+            sql(c, "UPDATE belanja SET jumlah=? WHERE id=?", (int(lama[1] or 0) + jumlah, lama[0]))
+            return int(lama[0])
+        q = "INSERT INTO belanja (nama,jumlah,satuan,harga,catatan,sumber,ref,prioritas,status,oleh_id,oleh,dibuat) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
+        p = (nama, jumlah, str(satuan or "pcs").strip()[:20] or "pcs", harga, str(catatan or "").strip()[:300], sumber, ref,
+             "penting" if prioritas == "penting" else "normal", "perlu", mid_of(r), nama_peran(r), _now())
+        return int(sql(c, q + " RETURNING id", p).fetchone()[0] if PG else sql(c, q, p).lastrowid)
+
+
+_SATUAN = r"(pcs|buah|biji|unit|meter|m|cm|roll|pack|set|lembar|batang|keping|kg|gram|g|liter|botol|box|dus)"
+
+
+def belanja_urai(teks):
+    """'resistor 10k 20pcs, kabel jumper 1 pack' -> [(nama, jumlah, satuan)]. Tanpa AI: cepat dan gratis."""
+    out = []
+    for bag in re.split(r"[,;\n]+|\s+dan\s+", str(teks or "")):
+        b = bag.strip(" .-•")
+        if len(b) < 2:
+            continue
+        m = re.search(rf"(?:^|\s)(\d+)\s*{_SATUAN}?\s*$", b, re.I) or re.search(rf"^(\d+)\s*{_SATUAN}?\s+", b, re.I)
+        if m and m.group(0).strip() != b.strip():
+            jumlah, satuan = int(m.group(1)), (m.group(2) or "pcs").lower()
+            nama = (b[:m.start()] + b[m.end():]).strip(" x-")
+        else:
+            jumlah, satuan, nama = 1, "pcs", b
+        if nama:
+            out.append((nama[:120], jumlah, satuan))
+    return out[:20]
+
+
+@app.route("/api/belanja", methods=["GET", "POST"])
+def api_belanja():
+    r = need_perm("catatan")
+    if mid_of(r) is None and not is_admin(r):
+        abort(403)
+    if request.method == "GET":
+        return jsonify(belanja_payload(r))
+    d = request.get_json(silent=True) or {}
+    try:
+        if d.get("dari_stok"):   # tambah semua stok menipis
+            n = 0
+            for s in stok_menipis():
+                if s["id"] in (d.get("stok_ids") or [s["id"]]):
+                    belanja_tambah(r, s["nama"], max(1, int(s["minimum"] or 1) * 2 - int(s["jumlah"] or 0)), s["satuan"], 0, "Stok menipis", "stok", s["id"])
+                    n += 1
+        elif d.get("dari_panduan"):
+            x = _pd_row(int(d["dari_panduan"]))
+            if not x or x["status"] != "jadi":
+                return jsonify({"error": "Panduan belum jadi"}), 400
+            for kt in (x.get("data") or {}).get("kantong") or []:
+                for k in kt.get("komponen") or []:
+                    belanja_tambah(r, k.get("nama"), k.get("jumlah") or 1, "pcs", k.get("harga_max") or k.get("harga_min") or 0,
+                                   f"Untuk panduan: {x.get('judul') or ''}"[:300], "panduan", x["id"])
+        elif d.get("teks"):
+            for nm, j, st in belanja_urai(d["teks"]):
+                belanja_tambah(r, nm, j, st, 0, "", "manual")
+        else:
+            belanja_tambah(r, d.get("nama"), d.get("jumlah"), d.get("satuan"), d.get("harga"), d.get("catatan"), "manual", None, d.get("prioritas"))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify(belanja_payload(r))
+
+
+@app.route("/api/belanja/<int:i>", methods=["POST", "DELETE"])
+def api_belanja_one(i):
+    r = need_perm("catatan")
+    with db() as c:
+        row = sql(c, f"SELECT {','.join(BELANJA_KOLOM)} FROM belanja WHERE id=?", (i,)).fetchone()
+    if not row:
+        return jsonify({"error": "Barang tidak ditemukan"}), 404
+    x = dict(zip(BELANJA_KOLOM, row))
+    milik = x["oleh_id"] is not None and x["oleh_id"] == mid_of(r)
+    if request.method == "DELETE":
+        if not (belanja_ubah_izin(r) or (milik and x["status"] == "perlu")):
+            abort(403)
+        with db() as c:
+            sql(c, "DELETE FROM belanja WHERE id=?", (i,))
+        return jsonify(belanja_payload(r))
+    d = request.get_json(silent=True) or {}
+    aksi = d.get("aksi")
+    if aksi in ("dibeli", "batal"):
+        if not belanja_ubah_izin(r):
+            return jsonify({"error": "Yang bisa menandai sudah dibeli: Dev dan Bendahara."}), 403
+        with db() as c:
+            if aksi == "dibeli":
+                sql(c, "UPDATE belanja SET status='dibeli', dibeli=?, dibeli_oleh=? WHERE id=?", (_now(), nama_peran(r), i))
+            else:
+                sql(c, "UPDATE belanja SET status='perlu', dibeli=NULL, dibeli_oleh=NULL WHERE id=?", (i,))
+        if aksi == "dibeli" and d.get("masuk_stok") and is_admin(r):   # sekalian tambah ke Stok Komponen
+            s = next((s for s in STOK if s["nama"].strip().lower() == x["nama"].strip().lower()), None)
+            if s:
+                stok_save({**s, "jumlah": int(s["jumlah"]) + int(x["jumlah"] or 1)})
+            else:
+                stok_save({"nama": x["nama"][:80], "jumlah": int(x["jumlah"] or 1), "satuan": x["satuan"], "kategori": "Komponen", "minimum": 0, "catatan": "Dari Daftar Belanja"})
+        return jsonify(belanja_payload(r))
+    if not (belanja_ubah_izin(r) or milik):
+        abort(403)
+    with db() as c:
+        sql(c, "UPDATE belanja SET jumlah=?, harga=?, catatan=?, prioritas=? WHERE id=?",
+            (max(1, int(float(d.get("jumlah") or x["jumlah"] or 1))), max(0, int(float(d.get("harga") or 0))), str(d.get("catatan") or "")[:300],
+             "penting" if d.get("prioritas") == "penting" else "normal", i))
+    return jsonify(belanja_payload(r))
+
+
+# ---------- CATATAN: rapikan AI, suara, foto ----------
+SET.setdefault("catatan_foto_semua", False)   # foto -> catatan: bawaan khusus Dev
+
+
+class CatatanRapi(BaseModel):
+    judul: str
+    isi: str
+    tanggal: str
+    tugas: list[str]
+    tenggat: list[str]
+
+
+SISTEM_CATATAN = ("Kamu asisten pencatat MCI. Rapikan catatan anggota TANPA menambah fakta baru. judul: maks 8 kata. isi: poin-poin singkat diawali '- '; "
+                  "hal yang perlu dikerjakan/dibeli tulis sebagai checklist '[ ] ...'. Pertahankan #tag yang ada. tanggal: kalau catatan menyebut kapan "
+                  "(hari ini/besok/lusa/Senin/tanggal), isi YYYY-MM-DD berdasarkan HARI INI yang diberikan, kalau tidak ada kosongkan. tugas: daftar pekerjaan "
+                  "yang jelas bisa dijadikan tugas (maks 5), tenggat: tanggal YYYY-MM-DD untuk tiap tugas (sejajar, kosong kalau tidak ada). Bahasa Indonesia. JSON saja.")
+
+
+def catatan_foto_boleh(r):
+    return is_admin(r) or (SET.get("catatan_foto_semua") and mid_of(r) is not None)
+
+
+@app.route("/api/catatan/rapikan", methods=["POST"])
+def api_catatan_rapikan():
+    r = need_perm("catatan")
+    teks = str((request.get_json(silent=True) or {}).get("teks") or "").strip()[:5000]
+    if len(teks) < 3:
+        return jsonify({"error": "Tulis dulu catatannya."}), 400
+    if not LOOP:
+        return jsonify({"error": "Mesin AI belum siap"}), 503
+    hari = datetime.now(WIB)
+    try:
+        raw = asyncio.run_coroutine_threadsafe(ai_murah(f"HARI INI: {HARI_ID[hari.weekday()]}, {hari.date().isoformat()}\n\nCATATAN:\n{teks}",
+                                                        schema=CatatanRapi, sistem=SISTEM_CATATAN, act="Merapikan catatan"), LOOP).result(60)
+        d = json.loads(raw)
+    except Exception:
+        log.exception("rapikan catatan gagal")
+        return jsonify({"error": "AI gagal merapikan, coba lagi."}), 502
+    tg = d.get("tanggal") if re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(d.get("tanggal") or "")) else ""
+    tugas = [{"judul": str(t)[:120], "tenggat": (d.get("tenggat") or [""] * 9)[k] if k < len(d.get("tenggat") or []) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", str((d.get("tenggat") or [])[k])) else ""}
+             for k, t in enumerate((d.get("tugas") or [])[:5]) if str(t).strip()]
+    return jsonify({"judul": str(d.get("judul") or "")[:120], "isi": str(d.get("isi") or "")[:5000], "tanggal": tg, "tugas": tugas,
+                    "bisa_tugas": can("tugas_kelola", r)})
+
+
+async def transkrip_async(data, mime):
+    raw = await ai_murah("Tuliskan kata per kata apa yang diucapkan di rekaman ini dalam bahasa Indonesia (tulisan biasa, beri tanda baca). "
+                         "Jangan menambah atau merangkum. Kalau tidak ada ucapan, balas kosong.",
+                         parts=[types.Part.from_bytes(data=data, mime_type=mime)], act="Menulis catatan suara")
+    return str(raw or "").strip()[:5000]
+
+
+def _transkrip(data, mime):
+    return asyncio.run_coroutine_threadsafe(transkrip_async(data, mime), LOOP).result(90)
+
+
+def catatan_simpan(r, judul, isi, tanggal=None):
+    with db() as c:
+        q = "INSERT INTO catatan (pemilik,judul,isi,bersama,sematkan,tanggal,dibuat,diubah) VALUES (?,?,?,?,?,?,?,?)"
+        p = (mid_of(r), str(judul or "")[:120], str(isi or "")[:5000], 0, 0, tanggal, _now(), _now())
+        return int(sql(c, q + " RETURNING id", p).fetchone()[0] if PG else sql(c, q, p).lastrowid)
+
+
+_CATAT = re.compile(r"^\s*(?:@\w+\s+)?(?:catat|catet|note|ingetin|ingatkan)\s*[:,-]?\s+", re.I)
+_BELI = re.compile(r"^\s*(?:@\w+\s+)?(?:beli|belanja|perlu beli)\s*[:,-]?\s+", re.I)
+
+
+async def tg_catat(m, r, teks, sumber="teks"):
+    """'catat: ...' / voice note -> Catatan pribadi; 'beli: ...' -> Daftar Belanja. Balas link."""
+    if not can("catatan", r):
+        await m.reply_text("Akunmu belum bisa memakai Catatan.")
+        return
+    if _BELI.match(teks):
+        isi = _BELI.sub("", teks, count=1)
+        brg = belanja_urai(isi)
+        if not brg:
+            await m.reply_text("Tulis barangnya, mis. beli: resistor 10k 20pcs, kabel jumper 1 pack")
+            return
+        for nm, j, st in brg:
+            await asyncio.to_thread(belanja_tambah, r, nm, j, st, 0, "", "telegram")
+        await m.reply_text("🛒 Masuk Daftar Belanja:\n" + "\n".join(f"• {nm} × {j} {st}" for nm, j, st in brg) + f"\n{tautan('catatan', 'belanja')}")
+        return
+    isi = re.sub(r"^\s*(?:catat|catet|note)\s*[:,-]?\s*$", "", _CATAT.sub("", teks, count=1), flags=re.I).strip()
+    if len(isi) < 2:
+        await m.reply_text("Tulis isinya, mis. catat: besok kirim invoice ke mitra jam 9")
+        return
+    judul = re.split(r"[.\n!?]", isi, 1)[0][:60]
+    i = await asyncio.to_thread(catatan_simpan, r, judul, isi)
+    await m.reply_text(("🎙️ Voice note dicatat:\n" if sumber == "suara" else "📝 Dicatat:\n") + isi[:600] + f"\n\nRapikan atau beri tanggal di web: {tautan('catatan', i)}")
+
+
+@app.route("/api/catatan/suara", methods=["POST"])
+def api_catatan_suara():
+    need_perm("catatan")
+    f = request.files.get("audio")
+    if not f:
+        return jsonify({"error": "Rekaman tidak terkirim"}), 400
+    data = f.read(12_000_001)
+    mime = (f.mimetype or "audio/webm").split(";")[0]
+    if len(data) > 12_000_000 or not mime.startswith(("audio/", "video/")):
+        return jsonify({"error": "Rekaman harus audio, maksimal 12 MB (sekitar 10 menit)"}), 400
+    if not LOOP:
+        return jsonify({"error": "Mesin AI belum siap"}), 503
+    try:
+        return jsonify({"teks": _transkrip(data, "audio/mp4" if mime == "video/mp4" else mime)})
+    except Exception:
+        log.exception("transkrip catatan gagal")
+        return jsonify({"error": "AI gagal menulis rekamannya, coba lagi."}), 502
+
+
+class CatatanFoto(BaseModel):
+    judul: str
+    isi: str
+
+
+@app.route("/api/catatan/foto", methods=["GET", "POST"])
+def api_catatan_foto():
+    r = need_perm("catatan")
+    if request.method == "GET":
+        return jsonify({"boleh": catatan_foto_boleh(r), "semua": bool(SET.get("catatan_foto_semua")), "admin": is_admin(r)})
+    if request.is_json:   # sakelar: buka untuk semua anggota (khusus Dev)
+        need("admin")
+        SET["catatan_foto_semua"] = bool((request.get_json(silent=True) or {}).get("semua"))
+        set_save()
+        return jsonify({"semua": SET["catatan_foto_semua"]})
+    if not catatan_foto_boleh(r):
+        return jsonify({"error": "Foto jadi catatan saat ini khusus Dev."}), 403
+    f = request.files.get("foto")
+    if not f:
+        return jsonify({"error": "Pilih fotonya dulu"}), 400
+    data, mime = f.read(6_000_001), f.mimetype or "image/jpeg"
+    if len(data) > 6_000_000 or not mime.startswith("image/"):
+        return jsonify({"error": "Foto harus gambar, maksimal 6 MB"}), 400
+    if not LOOP:
+        return jsonify({"error": "Mesin AI belum siap"}), 503
+    try:
+        raw = asyncio.run_coroutine_threadsafe(ai_murah("Ubah isi foto ini (papan tulis, kertas, layar, atau coretan) menjadi catatan teks. Salin tulisan apa adanya, "
+                                                        "rapikan jadi poin '- ' atau checklist '[ ] ' bila berupa daftar. judul maks 8 kata. Jangan mengarang isi yang tidak terlihat.",
+                                                        schema=CatatanFoto, parts=[types.Part.from_bytes(data=data, mime_type=mime)], act="Membaca foto catatan"), LOOP).result(90)
+        d = json.loads(raw)
+    except Exception:
+        log.exception("foto catatan gagal")
+        return jsonify({"error": "AI gagal membaca foto, coba foto yang lebih terang dan dekat."}), 502
+    return jsonify({"judul": str(d.get("judul") or "")[:120], "isi": str(d.get("isi") or "")[:5000]})
+
+
+@app.route("/api/catatan/<int:i>/centang", methods=["POST"])
+def api_catatan_centang(i):
+    """Centang/hapus centang satu baris checklist '[ ] ...' tanpa membuka form edit."""
+    r = need_perm("catatan")
+    baris = int((request.get_json(silent=True) or {}).get("baris", -1))
+    with db() as c:
+        row = sql(c, "SELECT pemilik, bersama, isi FROM catatan WHERE id=?", (i,)).fetchone()
+        if not row or not (int(row[0]) == mid_of(r) or row[1]):
+            return jsonify({"error": "Tidak boleh mengubah catatan ini"}), 403
+        ls = str(row[2] or "").split("\n")
+        if not 0 <= baris < len(ls) or not re.match(r"^\s*(?:[-*]\s*)?\[( |x|X)\]", ls[baris]):
+            return jsonify({"error": "Baris bukan checklist"}), 400
+        ls[baris] = re.sub(r"\[( |x|X)\]", lambda m: "[ ]" if m.group(1).lower() == "x" else "[x]", ls[baris], count=1)
+        sql(c, "UPDATE catatan SET isi=?, diubah=? WHERE id=?", ("\n".join(ls), _now(), i))
+    return jsonify({"items": catatan_list(r), "kelola": can("catatan_kelola", r)})
+
+
+# ---------- LAPORAN PAGI APEX (khusus Dev) ----------
+PAGI_JAM = max(0, min(20, int(os.getenv("LAPORAN_PAGI_JAM", "9"))))
+SET.setdefault("pagi_on", True)
+
+
+class NaskahPagi(BaseModel):
+    pembuka: str
+    prioritas: list[str]
+
+
+def _tgl(s):
+    return str(s or "")[:10]
+
+
+def pagi_data():
+    """Fakta dari database untuk laporan pagi. Semua angka asli; AI hanya merangkum."""
+    now = datetime.now(WIB)
+    hi, besok, kemarin = today(), (now + timedelta(days=1)).date().isoformat(), (now - timedelta(days=1)).date().isoformat()
+    lusa3 = (now + timedelta(days=3)).date().isoformat()
+    sejak = SET.get("pagi_terakhir_waktu") or (now - timedelta(days=1)).isoformat(timespec="seconds")
+    nm = lambda i: (MEMBERS.get(i) or {}).get("nama", "?")
+    d = {"tanggal": hi, "hari": tglid(hi)}
+    tugas = [x for x in rk_rows("tugas") if x.get("status") != "selesai" and x.get("tenggat") and x["tenggat"] <= besok]
+    d["deadline"] = [f"{'⚠️ LEWAT ' + tglid(x['tenggat']) if x['tenggat'] < hi else ('HARI INI' if x['tenggat'] == hi else 'besok')}: {x.get('judul', '')} ({nm(x.get('pj'))})"
+                     for x in sorted(tugas, key=lambda x: x["tenggat"])][:10]
+    for x in rk_rows("proyek"):
+        if x.get("status") == "berjalan" and x.get("tgl_selesai") and x["tgl_selesai"] <= lusa3:
+            d["deadline"].append(f"Proyek {x.get('nama', '')} target selesai {tglid(x['tgl_selesai'])}, progres {int(x.get('progres') or 0)}%")
+    with db() as c:
+        for kebutuhan, tenggat, st in sql(c, "SELECT kebutuhan, tenggat, status FROM jasa_pesan WHERE status NOT IN ('selesai','ditolak','batal') AND tenggat IS NOT NULL AND tenggat<>'' AND tenggat<=?", (besok,)).fetchall():
+            d["deadline"].append(f"Pesanan jasa ({st}) tenggat {tglid(tenggat)}: {str(kebutuhan)[:80]}")
+        d["agenda"] = [f"{(x.get('jam') or '').replace(':', '.')} {x.get('judul', '')}" + (f" · {x['tempat']}" if x.get("tempat") else "") for x in rk_rows("agenda") if x.get("tanggal") == hi]
+        baru = []
+        for jenis, label in (("pengumuman", "Pengumuman"), ("tugas", "Tugas baru"), ("proyek", "Proyek baru")):
+            for x in rk_rows(jenis):
+                if (x.get("dibuat") or "") >= sejak:
+                    baru.append(f"{label}: {x.get('judul') or x.get('nama') or ''} (oleh {x.get('oleh') or '?'})")
+        for kebutuhan, oleh in sql(c, "SELECT kebutuhan, oleh FROM jasa_pesan WHERE dibuat>=?", (sejak,)).fetchall():
+            baru.append(f"Pesanan jasa baru dari {oleh}: {str(kebutuhan)[:80]}")
+        n = int(sql(c, "SELECT COUNT(*) FROM absen_izin WHERE status='menunggu' AND tanggal>=?", (hi,)).fetchone()[0])
+        if n:
+            baru.append(f"{n} izin absen menunggu persetujuan")
+        for judul, st in sql(c, "SELECT judul, status FROM panduan WHERE diubah>=? AND status IN ('jadi','gagal')", (sejak,)).fetchall():
+            baru.append(f"Buku panduan {'jadi' if st == 'jadi' else 'GAGAL'}: {judul}")
+        n = int(sql(c, "SELECT COUNT(*) FROM model3d WHERE dibuat>=?", (sejak,)).fetchone()[0]) + int(sql(c, "SELECT COUNT(*) FROM gambar WHERE dibuat>=?", (sejak,)).fetchone()[0])
+        if n:
+            baru.append(f"{n} karya Studio baru (gambar/3D)")
+        d["baru"] = baru[:12]
+        m_, k_ = sql(c, "SELECT COALESCE(SUM(masuk),0), COALESCE(SUM(keluar),0) FROM kas WHERE tanggal=?", (kemarin,)).fetchone()
+        uang = []
+        if int(m_) or int(k_):
+            uang.append(f"Kas kemarin: masuk {rp(int(m_))}, keluar {rp(int(k_))}")
+        ivs = sql(c, "SELECT nomor, pembeli, total, jatuh_tempo FROM invoice WHERE status='terkirim'").fetchall()
+        if ivs:
+            telat = [v for v in ivs if v[3] and v[3] <= hi]
+            uang.append(f"{len(ivs)} invoice menunggu bayar ({rp(sum(int(v[2] or 0) for v in ivs))})" + (f", {len(telat)} sudah jatuh tempo" if telat else ""))
+        for nama, jml, jt in sql(c, "SELECT nama, jumlah, jatuh_tempo FROM hutang WHERE status<>'lunas' AND jatuh_tempo<=?", (lusa3,)).fetchall():
+            uang.append(f"Hutang {nama} {rp(int(jml))} jatuh tempo {tglid(jt)}")
+        tg = rk_tunggak()
+        if tg:
+            uang.append(f"{len(tg)} anggota menunggak iuran kas (" + ", ".join(f"{nm(a)} {w} mgg" for a, w in list(tg.items())[:5]) + ")")
+        d["uang"] = uang
+        d["stok"] = [f"{s['nama']}: sisa {s['jumlah']} {s['satuan']} (min {s['minimum']})" for s in stok_menipis()][:8]
+        bl = [x for x in belanja_rows() if x["status"] == "perlu"]
+        d["belanja"] = ([f"{len(bl)} barang perlu dibeli, perkiraan {rp(sum(int(x['harga'] or 0) * max(1, int(x['jumlah'] or 1)) for x in bl))}"
+                         + (" · penting: " + ", ".join(x["nama"] for x in bl if x["prioritas"] == "penting")[:150] if any(x["prioritas"] == "penting" for x in bl) else "")] if bl else [])
+        dev = [0] + [m["id"] for m in MEMBERS.values() if is_admin(f"m:{m['id']}")]
+        d["catatan"] = [f"{judul or str(isi or '')[:60]}" for judul, isi in sql(c, "SELECT judul, isi FROM catatan WHERE tanggal=? AND (bersama=1 OR pemilik IN ("
+                                                                                + ",".join("?" * len(dev or [0])) + "))", (hi, *(dev or [0]))).fetchall()][:8]
+        wajib = [m for m in MEMBERS.values() if m["aktif"]]
+        hadir = int(sql(c, "SELECT COUNT(DISTINCT anggota) FROM absen WHERE tanggal=? AND status='hadir'", (kemarin,)).fetchone()[0])
+        tok = sql(c, "SELECT COALESCE(SUM(masuk+keluar+pikir),0), COALESCE(SUM(panggilan),0) FROM pemakaian WHERE tanggal=?", (kemarin,)).fetchone()
+        gagal = int(sql(c, "SELECT COUNT(*) FROM panduan WHERE status='gagal' AND diubah>=?", (sejak,)).fetchone()[0])
+    d["sehat"] = [f"Absen kemarin: {hadir} dari {len(wajib)} anggota hadir", f"AI kemarin: {int(tok[1])} panggilan, {int(tok[0]):,} token".replace(",", ".")] + ([f"{gagal} pembuatan panduan gagal"] if gagal else [])
+    return d
+
+
+PAGI_BAGIAN = [("deadline", "⏰ DEADLINE"), ("agenda", "📅 AGENDA HARI INI"), ("baru", "🆕 BARU SEJAK KEMARIN"), ("uang", "💰 KEUANGAN"),
+               ("stok", "📦 STOK MENIPIS"), ("belanja", "🛒 DAFTAR BELANJA"), ("catatan", "📝 CATATAN HARI INI"), ("sehat", "🩺 KESEHATAN SISTEM")]
+
+
+def pagi_teks(d, naskah=None):
+    n = naskah or {}
+    t = [f"☀️ Laporan Pagi Apex · {d['hari']}", ""]
+    if n.get("pembuka"):
+        t += [n["pembuka"], ""]
+    if n.get("prioritas"):
+        t += ["🎯 3 PRIORITAS HARI INI"] + [f"{k}. {p}" for k, p in enumerate(n["prioritas"][:3], 1)] + [""]
+    for k, judul in PAGI_BAGIAN:
+        if d.get(k):
+            t += [judul] + [f"• {x}" for x in d[k]] + [""]
+    if not any(d.get(k) for k, _ in PAGI_BAGIAN[:-1]):
+        t += ["Tidak ada deadline atau hal mendesak. Hari yang tenang, waktunya ngoprek. 🔧", ""]
+    t.append(f"Buka web: {SITE_URL}")
+    return "\n".join(t).strip()
+
+
+async def pagi_buat(kirim=True, sumber="otomatis"):
+    d = await asyncio.to_thread(pagi_data)
+    naskah = {}
+    fakta = "\n".join(f"{judul}: " + " | ".join(d[k]) for k, judul in PAGI_BAGIAN if d.get(k))
+    if fakta:
+        try:
+            naskah = json.loads(await ai_murah(f"HARI INI {d['hari']}. Fakta organisasi MCI:\n{fakta}\n\npembuka: 1 kalimat sapaan semangat untuk Alvaro (Dev) yang menyebut hal "
+                                               "terpenting hari ini. prioritas: TEPAT 3 tindakan paling penting hari ini, urut dari yang paling mendesak, masing-masing maks 15 kata, "
+                                               "HANYA dari fakta di atas (jangan mengarang).", schema=NaskahPagi, act="Menyusun laporan pagi"))
+        except Exception:
+            log.exception("naskah laporan pagi gagal; tetap kirim dari data")
+    teks = pagi_teks(d, naskah)
+    SET["pagi_isi"], SET["pagi_waktu"] = teks, _now()
+    SET["pagi_terakhir_waktu"] = _now()
+    await asyncio.to_thread(set_save)
+    terkirim = 0
+    if kirim:
+        app_ = TG_APPS.get("apex")
+        for aid in (ALLOWED if app_ else []):
+            try:
+                for k in range(0, len(teks), 3900):
+                    await app_.bot.send_message(aid, teks[k:k + 3900])
+                terkirim += 1
+            except Exception:
+                log.exception("kirim laporan pagi ke %s gagal", aid)
+        await asyncio.to_thread(lambda: inbox_kirim(_dev_ids(), "pagi", f"☀️ Laporan Pagi · {d['hari']}", teks[:4000], None, False, maks=4000))
+    _log("apex", f"Laporan pagi {d['tanggal']} ({sumber})", "Selesai", "laporan")
+    return teks
+
+
+async def pagi_cek():
+    now = datetime.now(WIB)
+    if not SET.get("pagi_on", True) or now.hour < PAGI_JAM or now.hour >= 21 or SET.get("pagi_terakhir") == today():
+        return
+    SET["pagi_terakhir"] = today()   # tandai dulu supaya tidak dobel
+    await asyncio.to_thread(set_save)
+    await pagi_buat(True, "otomatis")
+
+
+@app.route("/api/pagi", methods=["GET", "POST"])
+def api_pagi():
+    need("admin")
+    if request.method == "POST":
+        d = request.get_json(silent=True) or {}
+        if "aktif" in d:
+            SET["pagi_on"] = bool(d["aktif"])
+            set_save()
+        elif d.get("buat"):
+            if not LOOP:
+                return jsonify({"error": "Mesin AI belum siap"}), 503
+            asyncio.run_coroutine_threadsafe(pagi_buat(bool(d.get("kirim")), "manual"), LOOP).result(120)
+    return jsonify({"isi": SET.get("pagi_isi", ""), "waktu": SET.get("pagi_waktu", ""), "aktif": SET.get("pagi_on", True), "jam": PAGI_JAM})
+
+
 # ---------- JEMBATAN CHAT -> STUDIO: Apex (web) & bot Telegram bisa menyuruh bikin gambar / model 3D / buku panduan ----------
 # Pembuatan berjalan di latar belakang (tidak menahan chat); pemesan langsung diberi link halaman hasilnya.
 # Buku panduan tetap ikut SOP 2 tahap: dari chat hanya RENCANA yang dibuat, konfirmasinya di link.
@@ -10027,6 +10506,28 @@ async def tg_gambar(m, c, prompt, foto_msg=None):
         await m.reply_text("⚠️ Gagal membuat gambar, coba lagi sebentar.")
 
 
+async def tg_suara(u, c):
+    m = u.message
+    if not m or m.chat.type != "private" or not _ok(u.effective_user):   # voice note hanya di chat pribadi
+        return
+    a = m.voice or m.audio
+    if not a or (a.duration or 0) > 600:
+        await m.reply_text("Voice note maksimal 10 menit.")
+        return
+    try:
+        await c.bot.send_chat_action(chat_id=m.chat_id, action="typing")
+        f = await a.get_file()
+        teks = await transkrip_async(bytes(await f.download_as_bytearray()), (getattr(a, "mime_type", None) or "audio/ogg").split(";")[0])
+    except Exception:
+        log.exception("transkrip voice telegram gagal")
+        await m.reply_text("⚠️ Gagal menulis voice note, coba lagi.")
+        return
+    if not teks:
+        await m.reply_text("Tidak terdengar ada ucapan di voice note itu.")
+        return
+    await tg_catat(m, tg_role(u.effective_user), teks if _BELI.match(teks) else "catat: " + teks, "suara")
+
+
 async def tg_studio(m, c, jenis, teks, r):
     """Permintaan gambar / model 3D / buku panduan dari chat Telegram: mulai di latar belakang, balas link sekarang dan kabar saat selesai."""
     nama = {"gambar": "🎨 Studio Gambar", "3d": "🧊 Studio 3D", "panduan": "🔧 Buku Panduan Rakit"}[jenis]
@@ -10069,7 +10570,8 @@ def make_handlers(key):
                     + ("/gambar <deskripsi>\n" if can("gambar_buat", r) else "") + ("Kirim catatan kas ke Ledger\n" if can("kas_edit", r) else "")
                     + f"Jatah hari ini: Boss {k['boss']['pakai']}/{k['boss']['batas']}" + (f", gambar {k['gambar']['pakai']}/{k['gambar']['batas']}" if "gambar" in k else ""))
         menu += ("\n\nBisa juga langsung minta (dapat link hasilnya):\n• bikinin gambar kucing astronot\n• buatin model 3d casing 60x40x25 mm\n"
-                 "• bikin buku panduan rakit lampu otomatis pakai Uno")
+                 "• bikin buku panduan rakit lampu otomatis pakai Uno\n\nCatat cepat:\n• catat: besok kirim invoice jam 9\n• beli: resistor 10k 20pcs, kabel jumper 1 pack\n"
+                 "• kirim voice note (chat pribadi) = otomatis jadi catatan\n• foto + caption 'catat' = foto jadi catatan")
         await u.message.reply_text(head + menu)
 
     async def myid(u, c):
@@ -10162,6 +10664,9 @@ def make_handlers(key):
             return
         if key == "ledger" and not can("kas_edit", tg_role(u.effective_user)):
             await m.reply_text("Catat kas khusus Bendahara dan admin. Buku kas bisa dilihat di web → Keuangan AI.")
+            return
+        if key != "ledger" and (_CATAT.match(text) or _BELI.match(text)):   # catat cepat & daftar belanja dari chat
+            await tg_catat(m, tg_role(u.effective_user), text)
             return
         niat = studio_niat(text) if key != "ledger" else None
         if niat:   # "bikinin gambar/model 3D/buku panduan ..." -> langsung ke Studio, balas link
@@ -10289,6 +10794,22 @@ def make_handlers(key):
                 return
             if await _gate(m, u.effective_user, "gambar_buat", "gambar"):
                 await tg_gambar(m, c, q, m)
+            return
+        if key != "ledger" and re.match(r"^\s*(catat|catet|note)\b", cap, re.I) and _ok(u.effective_user):   # foto + "catat" = foto jadi catatan
+            r_ = tg_role(u.effective_user)
+            if not catatan_foto_boleh(r_):
+                await m.reply_text("Foto jadi catatan saat ini khusus Dev.")
+                return
+            try:
+                f = await m.photo[-1].get_file()
+                raw = await ai_murah("Ubah isi foto ini menjadi catatan teks. Salin tulisan apa adanya, rapikan jadi poin '- ' atau checklist '[ ] '. judul maks 8 kata.",
+                                     schema=CatatanFoto, parts=[types.Part.from_bytes(data=bytes(await f.download_as_bytearray()), mime_type="image/jpeg")], act="Membaca foto catatan")
+                d_ = json.loads(raw)
+                i = await asyncio.to_thread(catatan_simpan, r_, d_.get("judul") or "Catatan foto", d_.get("isi") or "")
+                await m.reply_text(f"📸 Foto dicatat: {d_.get('judul') or ''}\n\n{str(d_.get('isi') or '')[:800]}\n\n{tautan('catatan', i)}")
+            except Exception:
+                log.exception("foto catatan telegram gagal")
+                await m.reply_text("⚠️ Gagal membaca foto, coba foto yang lebih terang.")
             return
         if key != "ledger":
             await foto_tanya(u, c)   # foto + pertanyaan biasa: Gemini ikut melihat fotonya
@@ -10418,6 +10939,8 @@ async def run_bots():
             for n, f in cmds.items():
                 tg.add_handler(CommandHandler(n, _group_cmd(key, f)))
             tg.add_handler(MessageHandler(filters.PHOTO, photo))
+            if key != "ledger":
+                tg.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, tg_suara))   # voice note -> catatan / daftar belanja
             tg.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
             tg.add_handler(CallbackQueryHandler(izin_klik, pattern=r"^izin:"))
             tg.add_error_handler(on_error)
