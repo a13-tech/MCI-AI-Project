@@ -9677,10 +9677,6 @@ class NaskahPagi(BaseModel):
     prioritas: list[str]
 
 
-def _tgl(s):
-    return str(s or "")[:10]
-
-
 def pagi_data():
     """Fakta dari database untuk laporan pagi. Semua angka asli; AI hanya merangkum."""
     now = datetime.now(WIB)
