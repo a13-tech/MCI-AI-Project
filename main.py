@@ -409,6 +409,12 @@ def db_init():
                 sql(c, f"ALTER TABLE jasa_pesan ADD COLUMN {kol}")
         except Exception:
             pass   # sudah ada
+    for kol in ("berkas_svg TEXT", "berkas_stl TEXT"):   # Studio 3D: pratinjau & STL disimpan sekali, tidak dihitung ulang tiap unduh/deploy
+        try:
+            with db() as c:
+                sql(c, f"ALTER TABLE model3d ADD COLUMN {kol}")
+        except Exception:
+            pass   # sudah ada
     try:   # catatan: tanggal pengingat (ikut Laporan Pagi Apex)
         with db() as c:
             sql(c, "ALTER TABLE catatan ADD COLUMN tanggal TEXT")
@@ -5461,6 +5467,9 @@ async def model3d_buat(permintaan, lama=None):
                   "Periksa ulang koordinat tiap bagian, perbaiki masalah di atas, lalu keluarkan resep lengkap yang benar.")
     if polis is None:
         raise RuntimeError(f"AI belum berhasil membuat model yang sah ({galat}). Coba jelaskan ukurannya lebih rinci.")
+    M3D_BARU[_m3d_sidik(resep)] = polis   # dipakai saat pratinjau pertama dibuka -> langsung disimpan, tidak dihitung ulang
+    while len(M3D_BARU) > 4:
+        M3D_BARU.pop(next(iter(M3D_BARU)))
     return resep, lap, mesin
 
 
@@ -6080,28 +6089,58 @@ def m3d_bangun(resep):
     return a, b
 
 
-M3D_CACHE = {}   # hasil hitung model terakhir, supaya unduh STL + pratinjau tidak menghitung ulang
+M3D_BARU = {}            # poligon model yang baru dibuat (sidik resep -> poligon), sebelum berkasnya disimpan
+_M3D_KUNCI, _M3D_KL = {}, threading.Lock()
+
+
+def _m3d_sidik(resep):
+    return hashlib.sha1(json.dumps(resep, sort_keys=True).encode()).hexdigest()
+
+
+def m3d_berkas(i, judul, resep):
+    """(svg, stl) model i. Dihitung SEKALI lalu disimpan di database; permintaan bersamaan menunggu satu hitungan saja."""
+    def ambil():
+        with db() as c:
+            a = sql(c, "SELECT berkas_svg, berkas_stl FROM model3d WHERE id=?", (i,)).fetchone()
+        if a and a[0] and a[1]:
+            return gzip.decompress(base64.b64decode(a[0])).decode("utf-8"), gzip.decompress(base64.b64decode(a[1]))
+        return None
+    ada = ambil()
+    if ada:
+        return ada
+    with _M3D_KL:
+        kunci = _M3D_KUNCI.setdefault(i, threading.Lock())
+    with kunci:   # yang datang belakangan menunggu di sini, lalu tinggal mengambil hasil yang sudah disimpan
+        ada = ambil()
+        if ada:
+            return ada
+        polis = M3D_BARU.pop(_m3d_sidik(resep), None)
+        if polis is None:
+            polis, _lap = m3d_bangun(resep)
+        svg, stl = studio3d.pratinjau(polis), studio3d.stl(polis, judul)
+        z = lambda b: base64.b64encode(gzip.compress(b, 6)).decode("ascii")
+        with db() as c:
+            sql(c, "UPDATE model3d SET berkas_svg=?, berkas_stl=? WHERE id=?", (z(svg.encode("utf-8")), z(stl), i))
+        return svg, stl
 
 
 @app.route("/api/studio/3d/<int:i>.<ext>", methods=["GET"])
 def api_studio_3d(i, ext):
     _studio_izin()
     judul, resep = _m3d_get(i)
-    kunci = (i, hash(json.dumps(resep, sort_keys=True)))
-    polis = M3D_CACHE.get(kunci)
-    if polis is None:
-        try:
-            polis, _lap = m3d_bangun(resep)
-        except ValueError:
-            abort(410)
-        if len(M3D_CACHE) >= 12:
-            M3D_CACHE.pop(next(iter(M3D_CACHE)))
-        M3D_CACHE[kunci] = polis
+    if ext == "json":
+        return jsonify(resep)
+    if ext not in ("stl", "svg"):
+        abort(404)
+    try:
+        svg, stl = m3d_berkas(i, judul, resep)
+    except ValueError:
+        abort(410)
     if ext == "stl":
         nama = re.sub(r"[^A-Za-z0-9]+", "-", judul).strip("-")[:50] or "model"
-        return Response(studio3d.stl(polis, judul), mimetype="model/stl", headers={"Content-Disposition": f"attachment; filename=mci-{i}-{nama}.stl"})
+        return Response(stl, mimetype="model/stl", headers={"Content-Disposition": f"attachment; filename=mci-{i}-{nama}.stl"})
     if ext == "svg":
-        return Response(studio3d.pratinjau(polis), mimetype="image/svg+xml", headers={"Cache-Control": "private, max-age=86400", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'"})
+        return Response(svg, mimetype="image/svg+xml", headers={"Cache-Control": "private, max-age=86400", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'"})
     if ext == "json":
         return jsonify(resep)
     abort(404)
