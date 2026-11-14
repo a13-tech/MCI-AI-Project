@@ -957,7 +957,7 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
  <section id="p-tugas" class="pg" hidden><div id="rk-tugas"></div></section>
  <section id="p-proyek" class="pg" hidden><div id="rk-proyek"></div></section>
  <section id="p-mitra" class="pg" hidden><div id="rk-mitra"></div></section>
- <section id="p-alat" class="pg" hidden><div id="rk-alat"></div></section>
+ <section id="p-alat" class="pg" hidden><div id="rk-alat"></div><div class="bar" style="margin:14px 0 0"><button class="bt o" data-stiker="alat">🏷️ Cetak stiker QR alat</button><span class="mu" style="font-size:12.5px">Tempel di alat; scan pakai kamera HP untuk pinjam / kembalikan.</span></div></section>
  <section id="p-skor" class="pg" hidden>
   <div class="ey">Organisasi</div><h1>Skor &amp; Lencana</h1>
   <p class="mu" style="margin:6px 0 20px;max-width:760px">Nilai 0–100 dari 30 hari terakhir: absen harian 35%, tugas selesai 20%, iuran kas 20%, kehadiran rapat 15%, ikut proyek 10%. Komponen yang belum ada datanya (misalnya belum ada rapat) tidak dihitung, bobotnya dibagi ke komponen lain.</p>
@@ -1235,6 +1235,7 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
  <section id="p-stok" class="pg" hidden>
   <h1>Stok Komponen</h1>
   <p class="mu">Persediaan barang MCI, dijaga <b>MCI.Nexus</b> di ruang <b>Storage Barang</b> (LT 3, sayap barat). Foto barang ikut ditempel di kardusnya di kantor 3D. Halaman ini untuk semua anggota; yang bisa mengubah hanya Dev (bisa langsung dari foto, dihitung AI). Viewer cuma bisa melihat kardusnya di ruang Storage 3D.</p>
+  <div class="bar" style="margin:0 0 12px"><button class="bt o" data-stiker="stok">🏷️ Cetak stiker QR laci</button><span class="mu" style="font-size:12.5px">Tempel di laci/kotak; scan pakai kamera HP untuk mengambil komponen ke proyek.</span></div>
   <div class="cd" id="stPinjam" hidden style="background:#F3F5F9"><b>Status kamu: Peminjam.</b> Kamu tidak ikut iuran kas, jadi barang dan komponen MCI bukan hak milikmu; kamu hanya boleh meminjam (minta izin dulu).</div>
   <div class="gr">
    <div class="cd"><div class="k">Jenis barang</div><div class="v" id="st1">-</div></div>
@@ -6650,9 +6651,68 @@ $("#pasangApp").onclick = async () => {
   if (PASANG) { PASANG.prompt(); const r = await PASANG.userChoice; if (r.outcome === "accepted") $("#pasangApp").hidden = true; PASANG = null; return; }
   alert("Pasang MCI di iPhone/iPad:\n1. Buka web ini di Safari\n2. Ketuk tombol Bagikan (kotak dengan panah ke atas)\n3. Pilih 'Tambahkan ke Layar Utama'\n4. Ketuk 'Tambah'");
 };
+/* ===== Stiker QR: tempel di alat & laci komponen; scan pakai kamera HP -> panel aksi ===== */
+async function qrDataUrl(teks) { await qrLib(); const q = qrcode(0, "M"); q.addData(teks); q.make(); return q.createSvgTag({cellSize: 4, margin: 1}); }
+async function cetakStiker(jenis) {
+  try {
+    const items = jenis === "alat" ? (await api("/api/r/alat")).items : (await api("/api/stok")).items;
+    if (!items.length) return alert("Belum ada " + (jenis === "alat" ? "alat" : "barang stok") + ".");
+    const sel = prompt(`Cetak stiker untuk ${items.length} ${jenis === "alat" ? "alat" : "barang"}?\nKetik nomor urut tertentu (mis. 1,3,5) atau kosongkan untuk semua.`, "");
+    if (sel === null) return;
+    const pilih = sel.trim() ? sel.split(/[ ,]+/).map(x => items[+x - 1]).filter(Boolean) : items;
+    const kartu = await Promise.all(pilih.map(async x => `<div class="s"><div class="q">${await qrDataUrl(location.origin + "/#qr/" + jenis + "/" + x.id)}</div><div class="t"><b>${esc(x.nama || "")}</b>
+      <span>${jenis === "alat" ? esc(x.kode || "Alat MCI") + (x.lokasi ? " · " + esc(x.lokasi) : "") : esc(x.kategori || "") + " · " + esc(x.satuan || "")}</span><i>MCI · scan untuk ${jenis === "alat" ? "pinjam / kembalikan" : "ambil stok"}</i></div></div>`));
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Stiker QR ${jenis}</title><style>@page{size:A4;margin:8mm}body{font-family:Arial,sans-serif;margin:0}
+      .g{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm}.s{display:flex;gap:2mm;align-items:center;border:1px dashed #999;border-radius:2mm;padding:2mm;height:26mm;box-sizing:border-box;break-inside:avoid}
+      .q svg{width:22mm;height:22mm;display:block}.t{display:flex;flex-direction:column;gap:1mm;min-width:0}.t b{font-size:10pt;line-height:1.15;overflow:hidden;max-height:2.3em}.t span{font-size:7.5pt;color:#444}.t i{font-size:6.5pt;color:#8A6A1F}</style></head>
+      <body><div class="g">${kartu.join("")}</div><script>onload=()=>setTimeout(()=>print(),500)<\/script></body></html>`;
+    window.open(URL.createObjectURL(new Blob([html], {type: "text/html"})), "_blank");
+  } catch (e) { alert(e.message); }
+}
+document.addEventListener("click", e => { const b = e.target.closest("[data-stiker]"); if (b) cetakStiker(b.dataset.stiker); });
+async function qrPanel(jenis, id) {
+  const ov = document.createElement("div");
+  ov.style.cssText = "position:fixed;inset:0;z-index:9998;background:rgba(15,30,58,.55);display:flex;align-items:flex-end;justify-content:center";
+  ov.innerHTML = `<div class="cd" style="width:min(520px,100%);margin:0;border-radius:18px 18px 0 0;max-height:90vh;overflow:auto" id="qrIsi"><p class="mu">Memuat…</p></div>`;
+  ov.onclick = e => { if (e.target === ov) ov.remove(); }; document.body.appendChild(ov);
+  const isi = $("#qrIsi"), tutup = `<button class="bt o" id="qrX" style="margin-top:12px;width:100%">Tutup</button>`;
+  const ikat = () => { const x = $("#qrX"); if (x) x.onclick = () => ov.remove(); };
+  try {
+    if (jenis === "alat") {
+      const d = await api("/api/r/alat"), x = d.items.find(v => v.id === id); if (!x) throw new Error("Alat tidak ditemukan (mungkin sudah dihapus).");
+      const nm = i => (AGD && AGD.items || []).find(m => m.id === i)?.nama || (i === ME.anggota?.id ? "kamu" : "anggota #" + i);
+      const besok = new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10), maks = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10);
+      isi.innerHTML = `<div class="ey">🔧 Alat MCI${x.kode ? " · " + esc(x.kode) : ""}</div><h2 style="margin:4px 0 6px">${esc(x.nama)}</h2>
+        <p class="mu" style="margin:0 0 12px">${x.lokasi ? "Disimpan di " + esc(x.lokasi) + " · " : ""}Kondisi: <b>${esc((x.kondisi || "baik").replace("_", " "))}</b></p>
+        ${x.peminjam ? `<div class="cd" style="margin:0 0 12px;background:#FFF6E0">Sedang dipinjam <b>${esc(nm(x.peminjam))}</b> sampai <b>${esc(tglID(x.tenggat))}</b>${x.tenggat < new Date().toISOString().slice(0, 10) ? ' <span class="ch r">TERLAMBAT</span>' : ""}</div>
+          <button class="bt g" id="qrKembali" style="width:100%">↩️ Kembalikan alat ini</button>`
+        : `<label style="display:block">Kembalikan paling lambat<input type="date" id="qrTg" value="${besok}" min="${new Date().toISOString().slice(0, 10)}" max="${maks}"></label><button class="bt g" id="qrPinjam" style="width:100%;margin-top:10px">📦 Pinjam alat ini</button>`}
+        <p class="mu" id="qrMsg" style="font-size:13px"></p>${tutup}`;
+      const ok = m => { isi.innerHTML = `<h2 style="margin:0 0 8px">✅ ${m}</h2><p class="mu">${esc(x.nama)}</p>${tutup}`; ikat(); };
+      if ($("#qrPinjam")) $("#qrPinjam").onclick = async () => { try { await api(`/api/alat/${id}/pinjam`, {json: {tenggat: $("#qrTg").value}}); ok("Tercatat dipinjam sampai " + tglID($("#qrTg").value)); } catch (e) { $("#qrMsg").textContent = e.message; } };
+      if ($("#qrKembali")) $("#qrKembali").onclick = async () => { try { await api(`/api/alat/${id}/kembali`, {json: {}}); ok("Alat sudah dikembalikan"); } catch (e) { $("#qrMsg").textContent = e.message; } };
+    } else {
+      const d = await api("/api/stok"), x = d.items.find(v => v.id === id); if (!x) throw new Error("Barang tidak ditemukan (mungkin sudah dihapus).");
+      let pr = []; try { pr = (await api("/api/r/proyek")).items.filter(p => p.status !== "selesai"); } catch (e) {}
+      isi.innerHTML = `<div class="ey">📦 Stok komponen · ${esc(x.kategori)}</div><div style="display:flex;gap:12px;align-items:center;margin:6px 0 12px">${x.foto ? `<img src="/api/stok/${x.id}/gambar?v=${x.v}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:10px">` : ""}
+        <div><h2 style="margin:0">${esc(x.nama)}</h2><p class="mu" style="margin:2px 0 0">Sisa <b>${x.jumlah} ${esc(x.satuan)}</b>${x.minimum && x.jumlah <= x.minimum ? ' <span class="ch r">menipis</span>' : ""}</p></div></div>
+        ${x.jumlah > 0 && pr.length ? `<div class="fl"><label>Dipakai untuk proyek<select id="qrPr">${pr.map(p => `<option value="${p.id}">${esc(p.nama || "Proyek #" + p.id)}</option>`).join("")}</select></label>
+          <label>Jumlah (${esc(x.satuan)})<input type="number" id="qrN" value="1" min="1" max="${x.jumlah}"></label></div><button class="bt g" id="qrAmbil" style="width:100%;margin-top:10px">Ambil dari stok</button>`
+        : `<p class="mu">${x.jumlah > 0 ? "Belum ada proyek berjalan yang bisa dicatat. Buat atau bergabung ke proyek dulu." : "Stok habis. Kabari Bendahara untuk dibelikan."}</p>`}
+        <p class="mu" id="qrMsg" style="font-size:13px"></p>${tutup}`;
+      if ($("#qrAmbil")) $("#qrAmbil").onclick = async () => { try { const r = await api(`/api/stok/${id}/pakai`, {json: {proyek: $("#qrPr").value, jumlah: +$("#qrN").value}});
+        isi.innerHTML = `<h2 style="margin:0 0 8px">✅ Tercatat</h2><p class="mu">${esc(x.nama)}: diambil ${+$("#qrN").value || ""} ${esc(x.satuan)}, sisa ${r.sisa}. Masuk jurnal proyek otomatis.</p>${tutup}`; ikat(); } catch (e) { $("#qrMsg").textContent = e.message; } };
+    }
+  } catch (e) { isi.innerHTML = `<p class="er">${esc(e.message)}</p>${tutup}`; }
+  ikat();
+}
 function bukaHash() {   // pintasan aplikasi (#inbox, #tugas, …) + link hasil Studio dari chat (#gambar/12, #studio/3d/5, #panduan/7)
   if (rapatDariHash()) return;
   const [p, a, b2] = decodeURIComponent((location.hash || "").slice(1)).split("/"), nv = p && document.querySelector(`.nv[data-p="${p}"]`);
+  if (p === "qr" && (a === "alat" || a === "stok") && /^\d+$/.test(b2 || "")) {   // dari stiker QR
+    if (ME.role === "viewer") return;
+    show(a); history.replaceState(null, "", "#" + a); qrPanel(a, +b2); return;
+  }
   if (!nv || nv.style.display === "none") return;
   if (p === "panduan" && /^\d+$/.test(a || "")) { PD_X = {id: +a}; PD_L = 0; }
   if (p === "studio" && (a === "3d" || a === "svg")) { S3_J = a; }
