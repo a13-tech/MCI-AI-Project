@@ -5945,6 +5945,22 @@ def api_panduan():
     return jsonify({"panduan": panduan_tampil(_pd_row(i), r), **panduan_payload(r)})
 
 
+@app.route("/api/panduan/<int:i>/wokwi")
+def api_panduan_wokwi(i):
+    r = _pd_izin()
+    x = _pd_row(i)
+    if not x:
+        return jsonify({"error": "Panduan tidak ditemukan"}), 404
+    if x["status"] != "jadi" and not _pd_milik(x, r):
+        abort(403)
+    if not x.get("data"):
+        return jsonify({"error": "Panduan belum jadi"}), 400
+    try:
+        return jsonify(rakit.wokwi(x["data"]))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
 @app.route("/api/panduan/<int:i>", methods=["GET", "DELETE"])
 def api_panduan_one(i):
     r = _pd_izin()

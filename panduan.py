@@ -409,3 +409,124 @@ def lengkapi(data):
     out["diagram_lengkap"] = diagram(data)
     out["papan_nama"] = PAPAN.get(str(data.get("papan") or "").lower(), {}).get("nama", data.get("papan"))
     return out
+
+
+# ---------- EKSPOR KE WOKWI: uji rangkaian di browser sebelum membeli komponen ----------
+_WK_PAPAN = {"esp32": ("board-esp32-devkit-c-v4", "esp", "esp32"), "uno": ("wokwi-arduino-uno", "uno", "arduino-uno"), "nano": ("wokwi-arduino-nano", "nano", "arduino-nano")}
+_WK_WARNA = {"merah": "red", "hitam": "black", "hijau": "green", "biru": "blue", "kuning": "gold", "oranye": "orange", "jingga": "orange", "ungu": "purple",
+             "putih": "white", "abu": "gray", "abu-abu": "gray", "coklat": "brown", "cokelat": "brown", "pink": "pink", "merah muda": "pink"}
+# (pola nama komponen, tipe Wokwi, peta nama pin -> pin Wokwi, catatan pengganti)
+_WK_KOMPONEN = [
+    (r"ws2812|neopixel", "wokwi-neopixel", {"VCC": "VDD", "5V": "VDD", "VDD": "VDD", "DIN": "DIN", "DI": "DIN", "DATA": "DIN", "SIG": "DIN", "GND": "VSS", "VSS": "VSS"}, ""),
+    (r"hc-?sr ?04|ultrason", "wokwi-hc-sr04", {"VCC": "VCC", "5V": "VCC", "TRIG": "TRIG", "ECHO": "ECHO", "GND": "GND"}, ""),
+    (r"servo|sg ?90|mg ?996", "wokwi-servo", {"SIG": "PWM", "PWM": "PWM", "SINYAL": "PWM", "DATA": "PWM", "VCC": "V+", "V+": "V+", "5V": "V+", "GND": "GND"}, ""),
+    (r"lcd.*(20 ?x ?4|2004)|(20 ?x ?4|2004).*lcd", "wokwi-lcd2004", {"GND": "GND", "VCC": "VCC", "5V": "VCC", "SDA": "SDA", "SCL": "SCL"}, ""),
+    (r"lcd", "wokwi-lcd1602", {"GND": "GND", "VCC": "VCC", "5V": "VCC", "SDA": "SDA", "SCL": "SCL"}, ""),
+    (r"oled|ssd ?1306", "wokwi-ssd1306", {"GND": "GND", "VCC": "VCC", "3V3": "VCC", "SCL": "SCL", "SCK": "SCL", "SDA": "SDA"}, ""),
+    (r"dht", "wokwi-dht22", {"VCC": "VCC", "+": "VCC", "DATA": "SDA", "OUT": "SDA", "SIG": "SDA", "SDA": "SDA", "GND": "GND", "-": "GND"}, ""),
+    (r"ds18b20", "wokwi-ds18b20", {"VCC": "VCC", "DQ": "DQ", "DATA": "DQ", "OUT": "DQ", "GND": "GND"}, ""),
+    (r"\bpir\b|hc-?sr ?501", "wokwi-pir-motion-sensor", {"VCC": "VCC", "OUT": "OUT", "SIG": "OUT", "DATA": "OUT", "GND": "GND"}, ""),
+    (r"relay|relai", "wokwi-relay-module", {"VCC": "VCC", "5V": "VCC", "GND": "GND", "IN": "IN", "IN1": "IN", "SIG": "IN", "NO": "NO", "COM": "COM", "NC": "NC",
+                                             "IN2": "@2:IN", "IN3": "@3:IN", "IN4": "@4:IN"}, ""),
+    (r"\bldr\b|photoresistor|sensor cahaya", "wokwi-photoresistor-sensor", {"VCC": "VCC", "GND": "GND", "DO": "DO", "AO": "AO", "A0": "AO", "OUT": "AO", "SIG": "AO"}, ""),
+    (r"soil|tanah|kelembab|kelembap|moisture|water ?level|level air|hujan|rain|gas|mq-?\d|flame|api",
+     "wokwi-potentiometer", {"VCC": "VCC", "5V": "VCC", "AO": "SIG", "A0": "SIG", "OUT": "SIG", "SIG": "SIG", "DO": "SIG", "GND": "GND"}, "disimulasikan dengan potensiometer (putar untuk mengubah nilai sensor)"),
+    (r"potensio|potentio|\bpot\b|trimpot", "wokwi-potentiometer", {"VCC": "VCC", "SIG": "SIG", "OUT": "SIG", "WIPER": "SIG", "W": "SIG", "GND": "GND"}, ""),
+    (r"buzzer", "wokwi-buzzer", {"+": "2", "POSITIF": "2", "VCC": "2", "SIG": "2", "IO": "2", "I/O": "2", "-": "1", "NEGATIF": "1", "GND": "1"}, ""),
+    (r"push ?button|tombol|tactile|\bbutton\b|saklar tekan", "wokwi-pushbutton", {"1": "1.l", "2": "2.l", "A": "1.l", "B": "2.l", "KAKI1": "1.l", "KAKI2": "2.l", "SIG": "1.l", "GND": "2.l"}, ""),
+    (r"switch|saklar|toggle|spdt", "wokwi-slide-switch", {"1": "2", "COM": "2", "SIG": "2", "2": "1", "GND": "1", "3": "3"}, "digeser untuk ON/OFF"),
+    (r"resistor|\bohm\b|Ω", "wokwi-resistor", {"1": "1", "2": "2", "A": "1", "B": "2", "KAKI1": "1", "KAKI2": "2"}, ""),
+    (r"\bled\b", "wokwi-led", {"A": "A", "ANODA": "A", "ANODE": "A", "+": "A", "POSITIF": "A", "K": "C", "C": "C", "KATODA": "C", "CATHODE": "C", "-": "C", "NEGATIF": "C"}, ""),
+]
+
+
+def _wk_papan_pin(pid, pin, gnd):
+    awal = _WK_PAPAN[pid][1]
+    p = normal_pin(pid, pin)
+    if p == "GND":
+        gnd[0] = gnd[0] % 2 + 1
+        return f"{awal}:GND.{gnd[0]}"
+    if pid == "esp32":
+        m = re.fullmatch(r"GPIO(\d+)", p)
+        return f"{awal}:{m.group(1)}" if m else f"{awal}:{ {'3V3': '3V3', '5V': '5V', 'EN': 'EN'}.get(p, p) }"
+    m = re.fullmatch(r"D(\d+)", p)
+    if m:
+        return f"{awal}:{m.group(1)}"
+    return f"{awal}:{ {'3V3': '3.3V', '5V': '5V', 'VIN': 'VIN', 'RST': 'RESET'}.get(p, p) }"
+
+
+def _wk_nilai_ohm(nama):
+    m = re.search(r"(\d+(?:[.,]\d+)?)\s*([kKmM])?\s*(?:ohm|Ω|\b)", str(nama))
+    if not m:
+        return "220"
+    v = float(m.group(1).replace(",", "."))
+    v *= {"k": 1e3, "K": 1e3, "m": 1e6, "M": 1e6}.get(m.group(2) or "", 1)
+    return str(int(v))
+
+
+def wokwi(data):
+    """Data panduan -> {diagram (dict diagram.json), sketch, libraries, catatan, url}. Komponen tak dikenal dicatat, kabelnya dilewati."""
+    pid = str(data.get("papan") or "").lower()
+    if pid not in _WK_PAPAN:
+        raise ValueError(f"Papan '{data.get('papan')}' belum didukung ekspor Wokwi")
+    tipe_papan, awal, url = _WK_PAPAN[pid]
+    parts = [{"type": tipe_papan, "id": awal, "top": 0, "left": 0, "attrs": {}}]
+    peta, catatan, gnd, tambahan = {}, [], [0], []
+    for n, (kid, k) in enumerate(semua_komponen(data).items()):
+        nama = str(k.get("nama") or kid)
+        cocok = next((c for c in _WK_KOMPONEN if re.search(c[0], nama, re.I)), None)
+        if not cocok:
+            catatan.append(f"{nama}: belum ada di Wokwi, kabelnya tidak ikut digambar")
+            continue
+        _pola, tipe, pinmap, ganti = cocok
+        attrs = {}
+        if tipe == "wokwi-led":
+            w = next((v for kk, v in {"merah": "red", "red": "red", "hijau": "green", "green": "green", "kuning": "yellow", "yellow": "yellow", "biru": "blue", "blue": "blue", "putih": "white", "white": "white"}.items() if kk in nama.lower()), "red")
+            attrs["color"] = w
+        elif tipe == "wokwi-resistor":
+            attrs["value"] = _wk_nilai_ohm(nama)
+        elif tipe == "wokwi-lcd1602":
+            attrs["pins"] = "i2c"
+        elif tipe == "wokwi-pushbutton":
+            attrs["color"] = "green"
+        wid = re.sub(r"[^A-Za-z0-9_]", "_", kid)[:20] or f"k{n}"
+        kolom, baris = len(parts) % 4, (len(parts) - 1) // 4
+        parts.append({"type": tipe, "id": wid, "top": -220 - baris * 170, "left": -60 + kolom * 150, "attrs": attrs})
+        peta[kid] = (wid, pinmap)
+        if tipe == "wokwi-relay-module":   # modul relay 2/4 kanal = beberapa relay tunggal di Wokwi, daya disambung bersama
+            m = re.search(r"(\d)\s*(?:ch|channel|kanal)", nama, re.I)
+            kanal = int(m.group(1)) if m else 1
+            for j in range(2, min(kanal, 4) + 1):
+                parts.append({"type": tipe, "id": f"{wid}_{j}", "top": -220 - ((len(parts) - 1) // 4) * 170, "left": -60 + (len(parts) % 4) * 150, "attrs": {}})
+                tambahan.extend([[f"{wid}:VCC", f"{wid}_{j}:VCC", "red", []], [f"{wid}:GND", f"{wid}_{j}:GND", "black", []]])
+        if ganti:
+            catatan.append(f"{nama}: {ganti}")
+    conns, lewat = [], 0
+    def ujung(u):
+        kiri, _, kanan = str(u or "").partition(":")
+        kiri, kanan = kiri.strip(), kanan.strip()
+        if kiri.upper() == "PAPAN":
+            return _wk_papan_pin(pid, kanan, gnd)
+        if kiri not in peta:
+            return None
+        wid, pinmap = peta[kiri]
+        kunci = kanan.upper().replace(" ", "")
+        t = pinmap.get(kunci, kanan)
+        if t.startswith("@"):   # pin milik relay kanal ke-n
+            j, _, pin = t[1:].partition(":")
+            return f"{wid}_{j}:{pin}" if any(p["id"] == f"{wid}_{j}" for p in parts) else None
+        return f"{wid}:{t}"
+    for lg in data.get("langkah") or []:
+        for s in lg.get("sambungan") or []:
+            a, b = ujung(s.get("dari")), ujung(s.get("ke"))
+            if not a or not b:
+                lewat += 1
+                continue
+            conns.append([a, b, _WK_WARNA.get(str(s.get("warna") or "").lower().strip(), "green"), []])
+    conns.extend(tambahan)
+    if lewat:
+        catatan.append(f"{lewat} kabel dilewati karena komponennya belum ada di Wokwi")
+    diagram = {"version": 1, "author": "MCI HQ · Buku Panduan Rakit", "editor": "wokwi", "parts": parts, "connections": conns, "dependencies": {}}
+    pustaka = [str(p).strip() for p in data.get("pustaka") or [] if str(p).strip() and not str(p).strip().lower().startswith(("wire", "spi", "wifi", "eeprom"))]
+    return {"diagram": diagram, "sketch": str(data.get("kode") or "// Kode belum ada\nvoid setup() {}\nvoid loop() {}\n"), "libraries": "\n".join(pustaka),
+            "catatan": catatan, "url": f"https://wokwi.com/projects/new/{url}", "kabel": len(conns), "komponen": len(parts) - 1}

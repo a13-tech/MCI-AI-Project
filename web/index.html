@@ -6257,12 +6257,29 @@ function pdDetail() {
     ${x.papan === "esp32" ? '<p class="mu" style="font-size:13px;margin:0 0 8px">Pilih board "ESP32 Dev Module" di Arduino IDE (pasang dulu paket board ESP32 dari Boards Manager).</p>' : `<p class="mu" style="font-size:13px;margin:0 0 8px">Pilih board "${x.papan === "nano" ? "Arduino Nano" : "Arduino Uno"}" di Arduino IDE.${x.papan === "nano" ? " Kalau gagal unggah, coba Processor: ATmega328P (Old Bootloader)." : ""}</p>`}
     <div class="pdKode"><button class="bt o" id="pdSalin" type="button">Salin kode</button><pre><code>${esc(d.kode || "")}</code></pre></div>
     ${d.penjelasan_kode ? `<p style="white-space:pre-wrap;line-height:1.6;margin:12px 0 0">${esc(d.penjelasan_kode)}</p>` : ""}</div>`;
+  h += `<div class="cd" style="background:#EEF6EE;border-color:#B9DDB9"><b>🧪 Uji dulu di Wokwi (simulator gratis)</b>
+    <p class="mu" style="font-size:13px;margin:6px 0 10px">Coba rangkaian dan kodenya di browser sebelum membeli komponen. Buka Wokwi, lalu tempel <b>diagram.json</b> di tab <i>diagram.json</i> dan kode di tab <i>sketch.ino</i>, terakhir tekan ▶.</p>
+    <div class="bar" style="margin:0;flex-wrap:wrap"><button class="bt g" id="wkBuka" type="button">1 · Buka Wokwi</button><button class="bt o" id="wkDiag" type="button">2 · Salin diagram.json</button><button class="bt o" id="wkKode" type="button">3 · Salin kode</button><button class="bt o" id="wkZip" type="button">⬇ Unduh ZIP</button></div>
+    <div class="mu" id="wkInfo" style="font-size:12.5px;margin-top:8px"></div></div>`;
   if ((d.uji || []).length) h += `<h2 class="pdH">4 · Kalau belum jalan</h2><div class="cd">${d.uji.map(u => `<details class="pdUji"><summary><b>${esc(u.masalah)}</b></summary><p><b>Penyebab:</b> ${esc(u.penyebab)}</p><p><b>Solusi:</b> ${esc(u.solusi)}</p></details>`).join("")}</div>`;
   h += `<p class="mu" style="font-size:12px">Harga dan link toko adalah perkiraan dan hasil pencarian, bukan rekomendasi penjual tertentu. Panduan ditulis AI dan diperiksa mesin MCI; tetap cek ulang sambungan sebelum menyalakan.</p>`;
   $("#pdBox").innerHTML = h; pdPasang();
 }
+let WK = null;
+async function wkData(id) { if (WK && WK._id === id) return WK; WK = await api(`/api/panduan/${id}/wokwi`); WK._id = id;
+  const i = $("#wkInfo"); if (i) i.innerHTML = `${WK.komponen} komponen, ${WK.kabel} kabel` + (WK.libraries ? ` · library: ${esc(WK.libraries.split("\n").join(", "))} (tambahkan lewat tab Library Manager Wokwi)` : "") + (WK.catatan.length ? "<br>⚠️ " + WK.catatan.map(esc).join("<br>⚠️ ") : "");
+  return WK; }
+async function wkSalin(teks, tombol, label) { try { await navigator.clipboard.writeText(teks); tombol.textContent = "✓ Tersalin"; } catch (e) { prompt("Salin manual:", teks); } setTimeout(() => tombol.textContent = label, 2500); }
 function pdPasang() {
   const x = PD_X, on = (q, f) => { const e = $(q); if (e) e.onclick = f; };
+  if ($("#wkBuka") && x) { wkData(x.id).catch(e => { $("#wkInfo").textContent = e.message; });
+    on("#wkBuka", async () => { const w = await wkData(x.id); window.open(w.url, "_blank", "noopener"); });
+    on("#wkDiag", async () => { const w = await wkData(x.id); wkSalin(JSON.stringify(w.diagram, null, 2), $("#wkDiag"), "2 · Salin diagram.json"); });
+    on("#wkKode", async () => { const w = await wkData(x.id); wkSalin(w.sketch, $("#wkKode"), "3 · Salin kode"); });
+    on("#wkZip", async () => { const w = await wkData(x.id), f = [["diagram.json", JSON.stringify(w.diagram, null, 2)], ["sketch.ino", w.sketch]];
+      if (w.libraries) f.push(["libraries.txt", w.libraries]);
+      f.push(["CARA-PAKAI.txt", "1. Buka " + w.url + "\n2. Ganti isi tab diagram.json dan sketch.ino dengan file di ZIP ini\n3. Tambahkan library di libraries.txt lewat Library Manager\n4. Tekan tombol Play hijau\n" + (w.catatan.length ? "\nCatatan:\n- " + w.catatan.join("\n- ") : "")]);
+      const a = document.createElement("a"); a.href = URL.createObjectURL(zipStored(f)); a.download = `wokwi-panduan-${x.id}.zip`; a.click(); }); }
   on("#pdKembali", () => { clearTimeout(PD_T); PD_X = null; pdMuat(); window.scrollTo({top: 0}); });
   on("#pdHapus", async () => { if (!confirm("Hapus panduan ini?")) return; try { await api("/api/panduan/" + x.id, {method: "DELETE"}); PD_X = null; pdMuat(); } catch (e) { alert(e.message); } });
   on("#pdUbahBuka", () => { PD_UBAH = true; pdDetail(); const t = $("#pdUbahIsi"); if (t) t.focus(); });
