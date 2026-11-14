@@ -409,6 +409,7 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
 }
 /* ===== HP: teks terbaca, tombol nyaman ditekan, tabel jadi kartu, menu di bawah ===== */
 #hpNav,#nvCari,#hpJudul{display:none}
+#sd button.ng[hidden],#sd.vw button.ng,#sd.vw #nvCari,#sd.vw .cv{display:none!important}
 @media(max-width:860px){
  html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
  body{font-size:15.5px;line-height:1.55}
@@ -5711,7 +5712,7 @@ const OFFICE = (() => {
 })();
 
 function navGrup() {   // judul kelompok menu disembunyikan kalau semua menu di bawahnya tersembunyi
-  $$("#sd .ng").forEach(g => { let n = g.nextElementSibling, ada = false; while (n && n.classList.contains("nv")) { if (n.style.display !== "none") ada = true; n = n.nextElementSibling; } if (g.textContent) g.hidden = !ada; });
+  $$("#sd .ng").forEach(g => { let n = g.nextElementSibling, ada = false; while (n && n.classList.contains("nv")) { if (n.style.display !== "none" && !n.hidden) ada = true; n = n.nextElementSibling; } if (g.textContent) g.hidden = !ada; });
 }
 /* ================= PENAMPIL FOTO/FILE DI DALAM APLIKASI (ada tombol Kembali; tombol back HP juga menutup) ================= */
 const VW_POLA = /^\/api\/(iuran\/\d+\/foto|invoice\/\d+\/bukti|stok\/\d+\/gambar|produk\/\d+\/foto|perpus\/\d+\/(file|sampul)|gambar\/\d+|dokumentasi\/\d+)(\?.*)?$/;
@@ -6229,6 +6230,14 @@ function bukaHash() { if (rapatDariHash()) return; const p = (location.hash || "
   if (!can("kas_edit")) { $("#kCatat").hidden = true; }
   if (!can("gambar_buat")) { $("#gBuat").hidden = true; }
   if (!ADM()) { $("#skForm").hidden = true; ["#mt", "#mx"].forEach(q => { const e = $(q); if (e) (e.closest("label") || e).style.display = "none"; }); }
+  if (ME.role === "viewer") {   // view only: menunya sedikit, jadi dijajarkan langsung tanpa judul kelompok (AI & Lab, Karya, dst.)
+    const URUT = ["info", "portofolio", "office", "produk", "perpus", "berita", "tentang"], ix = b => { const i = URUT.indexOf(b.dataset.p); return i < 0 ? 99 : i; };
+    let acuan = $("#nvCari");
+    $$("#sd .nv[data-p]").filter(b => b.style.display !== "none" && !b.hidden).sort((a, b) => ix(a) - ix(b))
+      .forEach(b => { b.classList.add("ut"); acuan.after(b); acuan = b; });
+    acuan.after($("#pasangApp"));   // tombol Pasang aplikasi ikut di daftar datar, bukan di bawah judul "Lainnya"
+    $("#sd").classList.add("vw");
+  }
   navGrup();
   renderKuota();
   if (DEMO) $("#logout").onclick = e => { e.preventDefault(); alert("Tombol Keluar aktif di versi server."); };
