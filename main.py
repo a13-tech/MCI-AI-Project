@@ -5346,15 +5346,18 @@ def _claude(sistem, prompt, maks=8000):
     return "".join(b.get("text", "") for b in d.get("content", []) if b.get("type") == "text").strip()
 
 
-async def kode_ai(sistem, prompt, act, schema=None):
-    """Kembalikan teks mentah dari mesin kode. Urutan: mesin pilihan (AI_KODE) -> Claude kalau kuncinya ada -> Gemini. Yang gagal dilewati."""
+async def kode_ai(sistem, prompt, act, schema=None, parts=None):
+    """Kembalikan teks mentah dari mesin kode. Urutan: mesin pilihan (AI_KODE) -> Claude kalau kuncinya ada -> Gemini. Yang gagal dilewati.
+    parts = lampiran gambar; hanya keluarga Gemini (Argon/Hydrogen/Flash) yang bisa melihatnya, mesin lain dilewati."""
     pilih = mesin_kode()
     if pilih in ("argon", "hydrogen"):
         try:
-            return await ask("canvas", prompt, sistem=sistem, schema=schema, use_mcp=False, cache=False, act=f"{act} ({pilih.title()})",
+            return await ask("canvas", prompt, parts=parts, sistem=sistem, schema=schema, use_mcp=False, cache=False, act=f"{act} ({pilih.title()})",
                              model=ARGON_MODEL if pilih == "argon" else HYDROGEN_MODEL, kunci=kunci_argon() if pilih == "argon" else kunci_hydrogen()), pilih
         except Exception:
             log.exception("Gemini 4 %s gagal (billing / kuota / nama model?), pakai mesin cadangan", pilih)
+    if parts:
+        return await ask("canvas", prompt, parts=parts, sistem=sistem, schema=schema, use_mcp=False, cache=False, act=act, model=MODEL), "gemini"
     if pilih in MESIN_LAIN:
         try:
             return await asyncio.to_thread(_kompatibel, pilih, sistem, prompt, 8000, schema is not None), pilih
@@ -5376,6 +5379,11 @@ def _json_dari(teks):
     return json.loads(t[a:b + 1])
 
 
+class Irisan3D(BaseModel):
+    x: float
+    titik: list[float]
+
+
 class Bagian3D(BaseModel):
     nama: str
     bentuk: str
@@ -5394,6 +5402,7 @@ class Bagian3D(BaseModel):
     h: float
     radius: float
     titik: list[float]
+    irisan: list[Irisan3D]
 
 
 class Resep3D(BaseModel):
@@ -5407,13 +5416,19 @@ SISTEM_3D = """Kamu insinyur mekanik MCI yang merancang benda untuk dicetak 3D (
 FORMAT (JSON saja, tanpa teks lain):
 {"judul": "...", "penjelasan": "1-3 kalimat: cara kerja desain dan saran cetak", "bagian": [ ... ]}
 
-Tiap bagian: {"nama", "bentuk", "operasi", "x","y","z", "rx","ry","rz", "sx","sy","sz", "r","r2","h", "radius", "titik"}. Isi 0 (atau [] untuk titik) pada field yang tidak dipakai.
+Tiap bagian: {"nama", "bentuk", "operasi", "x","y","z", "rx","ry","rz", "sx","sy","sz", "r","r2","h", "radius", "titik", "irisan"}. Isi 0 (atau [] untuk titik/irisan) pada field yang tidak dipakai.
 - Semua ukuran MILIMETER. x,y,z = posisi TITIK PUSAT bentuk. rx,ry,rz = rotasi derajat (urutan X lalu Y lalu Z).
 - bentuk "kotak": sx,sy,sz = panjang X, lebar Y, tinggi Z. radius = pembulatan sudut tegak (0 = siku).
 - bentuk "silinder": r = jari-jari, h = tinggi; sumbu tegak (Z). Untuk lubang mendatar putar rx=90 (sumbu jadi Y) atau ry=90 (sumbu jadi X).
 - bentuk "kerucut": r = jari-jari bawah, r2 = jari-jari atas (0 = lancip), h = tinggi.
 - bentuk "bola": r.
 - bentuk "prisma": titik = [x1,y1,x2,y2,...] poligon tampak atas (berlawanan arah jarum jam, tidak saling silang), h = tebal. Titik relatif terhadap x,y bagian.
+- bentuk "lambung" (BADAN MELENGKUNG): irisan = [{"x": posisi sepanjang sumbu X, "titik": [y1,z1,y2,z2,...] penampang melintang}, ...] minimal 2 irisan.
+  Mesin menyambung irisan berurutan menjadi permukaan mulus. Irisan berisi 1 titik [y,z] = ujung lancip (haluan kapal, hidung pesawat).
+  Penampang digambar seperti melihat dari depan (Y kanan, Z atas), berlawanan arah jarum jam, mulai dari titik paling bawah. Beri SEMUA irisan jumlah titik yang SAMA supaya sambungannya rapi.
+  Pakai untuk: lambung kapal, badan mobil/pesawat/roket, gagang, sayap. Posisi irisan relatif terhadap x,y,z bagian.
+- bentuk "putar" (BENDA BUBUT): titik = [r1,z1,r2,z2,...] profil setengah penampang (r = jarak dari sumbu, >= 0; z = tinggi), diputar penuh mengelilingi sumbu Z.
+  Untuk: botol, vas, cerobong, kubah, tiang, roda, mangkuk, baling-baling hub. Profil harus tertutup; titik dengan r = 0 berada di sumbu.
 - operasi "tambah" = menambah bahan; "potong" = melubangi/mengurangi semua bahan yang SUDAH ada sebelumnya. Urutan penting. Bagian pertama harus "tambah".
 
 ATURAN DESAIN (wajib):
@@ -5424,7 +5439,13 @@ ATURAN DESAIN (wajib):
 5. Rongga wadah: buat kotak luar, lalu "potong" kotak dalam yang pusat z-nya dinaikkan setebal alas.
 6. Pakai ukuran nyata komponen kalau disebut (Arduino Uno 68.6 x 53.4, ESP32 DevKit 55 x 28, HC-SR04 45 x 20 dengan dua mata r 8 berjarak 26, breadboard mini 47 x 35, baterai 18650 r 9.2 h 65, servo SG90 23 x 12.5 x 22.5).
 7. Hindari bagian menggantung tanpa penyangga kalau bisa. Maksimal 40 bagian. Benda muat di alas 220 x 220 mm.
-Mesin akan otomatis menaruh benda di alas cetak (z terendah = 0)."""
+8. BENTUK DULU, DETAIL KEMUDIAN: bangun siluet besar yang langsung dikenali (badan utama dengan 'lambung'/'putar'), baru tambah 5-15 detail yang paling khas.
+   Jangan menghabiskan bagian untuk detail kecil yang tidak terlihat (< 1.5 mm) atau mengulang benda kecil puluhan kali. Proporsi benda nyata lebih penting dari jumlah detail.
+9. Benda nyata (kapal, mobil, gedung, hewan) TIDAK berbentuk kotak polos. Badan utamanya hampir selalu 'lambung' atau 'putar'.
+Mesin akan otomatis menaruh benda di alas cetak (z terendah = 0).
+
+CONTOH RESEP YANG BAIK (kapal kargo; tiru polanya, bukan ukurannya):
+{"judul":"Contoh: kapal kargo 160 mm","penjelasan":"Lambung melengkung dari 5 irisan, anjungan di buritan, cerobong bubut. Alas rata, cetak tanpa penyangga.","bagian":[{"nama":"Lambung","bentuk":"lambung","operasi":"tambah","x":0,"y":0,"z":0,"irisan":[{"x":-80,"titik":[-9,6,9,6,12,9,13,16,-13,16,-12,9]},{"x":-60,"titik":[-8,0,8,0,13,3,14,16,-14,16,-13,3]},{"x":35,"titik":[-8,0,8,0,13,3,14,16,-14,16,-13,3]},{"x":65,"titik":[-2,1,2,1,7,5,10,16,-10,16,-7,5]},{"x":82,"titik":[0,13]}]},{"nama":"Dek_cekung","bentuk":"prisma","operasi":"potong","x":0,"y":0,"z":16,"h":2,"titik":[-58,-12,33,-12,60,-7,60,7,33,12,-58,12]},{"nama":"Anjungan","bentuk":"kotak","operasi":"tambah","x":-62,"y":0,"z":21,"sx":16,"sy":22,"sz":10,"radius":1.5},{"nama":"Kabin_navigasi","bentuk":"kotak","operasi":"tambah","x":-60,"y":0,"z":28,"sx":9,"sy":28,"sz":4,"radius":1},{"nama":"Cerobong","bentuk":"putar","operasi":"tambah","x":-72,"y":0,"z":25,"titik":[0,0,3.5,0,3,9,3.8,10,0,10]},{"nama":"Peti_kemas","bentuk":"kotak","operasi":"tambah","x":-5,"y":0,"z":19,"sx":70,"sy":20,"sz":8,"radius":0}]}"""
 
 SISTEM_SVG = """Kamu ilustrator vektor MCI. Gambarlah dengan KODE SVG yang rapi dan presisi, bukan asal-asalan.
 Keluarkan HANYA satu dokumen <svg> lengkap (tanpa penjelasan, tanpa markdown).
@@ -5443,17 +5464,51 @@ def _resep_dari(teks):
     return d
 
 
-async def model3d_buat(permintaan, lama=None):
-    """AI menulis resep -> mesin menghitung & mengukur -> kalau salah/ada peringatan, AI memperbaiki (maks 2 putaran)."""
-    prompt = f"PERMINTAAN:\n{permintaan}"
+M3D_TINJAU = os.getenv("STUDIO3D_TINJAU", "1").strip().lower() not in ("0", "false", "tidak")
+
+
+async def _m3d_tinjau(permintaan, resep, lap, gbr, sketsa=None):
+    """Kirim gambar 3 arah ke AI -> resep perbaikan. Kembalikan (resep, poligon, laporan, mesin) atau None kalau tidak lebih baik."""
+    prompt = (f"PERMINTAAN:\n{permintaan}\n\nRESEP SAAT INI:\n{json.dumps(resep, ensure_ascii=False)}\n\n"
+              f"HASIL UKUR MESIN: {json.dumps({k: lap[k] for k in ('ukuran_mm', 'volume_cm3')}, ensure_ascii=False)}\n"
+              f"PERINGATAN MESIN: {'; '.join(lap.get('peringatan') or []) or 'tidak ada'}\n\n"
+              + ("GAMBAR PERTAMA = SKETSA ACUAN dari anggota. GAMBAR KEDUA = hasil nyata resep di atas. Bandingkan keduanya.\n" if sketsa else "") +
+              "GAMBAR HASIL = dari 3 arah: KIRI tampak atas, TENGAH tampak samping, KANAN tampak miring 3D.\n"
+              "Periksa seperti desainer produk: apakah benda ini langsung dikenali sebagai yang diminta? Cek proporsi, bagian yang hilang, "
+              "bagian melayang atau menembus keluar, bentuk kaku yang seharusnya melengkung (gunakan 'lambung' atau 'putar'), dan detail yang terlalu kecil untuk dicetak.\n"
+              "Lalu keluarkan RESEP LENGKAP yang sudah diperbaiki. Kalau sudah bagus, keluarkan resep yang sama persis.")
+    lampir = ([types.Part.from_bytes(data=sketsa[0], mime_type=sketsa[1])] if sketsa else []) + [types.Part.from_bytes(data=gbr, mime_type="image/png")]
+    teks, mesin = await kode_ai(SISTEM_3D, prompt, "Memeriksa gambar model 3D", schema=Resep3D, parts=lampir)
+    baru = _resep_dari(teks)
+    if json.dumps(baru, sort_keys=True) == json.dumps(resep, sort_keys=True):
+        return None
+    try:
+        polis, lap2 = await asyncio.to_thread(m3d_bangun, baru)
+    except (ValueError, KeyError, TypeError):
+        return None   # perbaikan malah rusak -> tetap pakai versi sebelumnya
+    if len(lap2.get("peringatan") or []) > len(lap.get("peringatan") or []) + 1:
+        return None
+    return baru, polis, lap2, mesin
+
+
+SKETSA_PETUNJUK = ("SKETSA TERLAMPIR (gambar pertama): ini acuan bentuk dari anggota, boleh coretan tangan, foto benda, atau gambar teknik. "
+                   "Tafsirkan bentuk dan proporsinya, abaikan noda/garis bantu. Kalau ukuran tidak tertulis, perkirakan ukuran wajar dan sebutkan di 'penjelasan'. "
+                   "Bentuk lengkung pada sketsa buat dengan 'lambung' atau 'putar', jangan diganti kotak kaku.\n\n")
+
+
+async def model3d_buat(permintaan, lama=None, sketsa=None):
+    """AI menulis resep -> mesin menghitung & mengukur -> kalau salah/ada peringatan, AI memperbaiki (maks 2 putaran).
+    sketsa = (bytes, mime) gambar 2D acuan (opsional)."""
+    lampir = [types.Part.from_bytes(data=sketsa[0], mime_type=sketsa[1])] if sketsa else None
+    prompt = (SKETSA_PETUNJUK if sketsa else "") + f"PERMINTAAN:\n{permintaan}"
     if lama:
         prompt = f"RESEP SEBELUMNYA:\n{json.dumps(lama, ensure_ascii=False)}\n\nPERUBAHAN YANG DIMINTA:\n{permintaan}\n\nKeluarkan resep lengkap yang sudah diperbaiki."
     galat, resep, polis, lap, mesin = "", None, None, None, "gemini"
     for putaran in range(3):
-        teks, mesin = await kode_ai(SISTEM_3D, prompt, "Merancang model 3D", schema=Resep3D)
+        teks, mesin = await kode_ai(SISTEM_3D, prompt, "Merancang model 3D" + (" dari sketsa" if sketsa else ""), schema=Resep3D, parts=lampir)
         try:
             resep = _resep_dari(teks)
-            polis, lap = await asyncio.to_thread(m3d_bangun, resep)
+            polis, lap, gbr = await asyncio.to_thread(m3d_bangun, resep, True)
             galat = ""
         except (ValueError, KeyError, TypeError) as e:
             galat, polis = str(e)[:400], None
@@ -5467,6 +5522,13 @@ async def model3d_buat(permintaan, lama=None):
                   "Periksa ulang koordinat tiap bagian, perbaiki masalah di atas, lalu keluarkan resep lengkap yang benar.")
     if polis is None:
         raise RuntimeError(f"AI belum berhasil membuat model yang sah ({galat}). Coba jelaskan ukurannya lebih rinci.")
+    if M3D_TINJAU and gbr:   # AI melihat hasilnya sendiri (3 arah) lalu memperbaiki sekali, seperti desainer mengecek render
+        try:
+            hasil = await _m3d_tinjau(permintaan, resep, lap, gbr, sketsa)
+            if hasil:
+                resep, polis, lap, mesin = hasil
+        except Exception:
+            log.exception("tinjauan visual 3D gagal, pakai hasil sebelumnya")
     M3D_BARU[_m3d_sidik(resep)] = polis   # dipakai saat pratinjau pertama dibuka -> langsung disimpan, tidak dihitung ulang
     while len(M3D_BARU) > 4:
         M3D_BARU.pop(next(iter(M3D_BARU)))
@@ -6029,10 +6091,18 @@ def api_studio():
         return jsonify(_studio_payload(r))
     if not (is_admin(r) or boleh(r, "studio_buat")):
         return jsonify({"error": "Jabatan atau divisimu belum diberi izin membuat di Studio 3D."}), 403
-    d = request.get_json(silent=True) or {}
+    d = request.get_json(silent=True) or request.form.to_dict() or {}
     jenis, minta = str(d.get("jenis") or "3d"), str(d.get("permintaan") or "").strip()[:2000]
     if jenis not in ("3d", "svg"):
         return jsonify({"error": "Jenis tidak dikenal"}), 400
+    sketsa = None
+    f = request.files.get("sketsa")
+    if f and jenis == "3d":
+        raw = f.read(8_000_001)
+        if len(raw) > 8_000_000 or not (f.mimetype or "").startswith("image/"):
+            return jsonify({"error": "Sketsa harus gambar, maksimal 8 MB"}), 400
+        sketsa = (raw, f.mimetype)
+        minta = minta or "Buat model 3D sesuai sketsa ini."
     if len(minta) < 8:
         return jsonify({"error": "Jelaskan lebih rinci apa yang mau dibuat (bentuk dan ukurannya)."}), 400
     if not kuota_pakai(r, "studio", cek_saja=True):
@@ -6042,7 +6112,7 @@ def api_studio():
     try:
         if jenis == "3d":
             lama = _m3d_get(int(d["dari"]))[1] if str(d.get("dari") or "").isdigit() else None
-            resep, lap, mesin = asyncio.run_coroutine_threadsafe(model3d_buat(minta, lama), LOOP).result(240)
+            resep, lap, mesin = asyncio.run_coroutine_threadsafe(model3d_buat(minta, lama, sketsa), LOOP).result(600)
             with db() as c:
                 sql(c, "INSERT INTO model3d (judul,permintaan,resep,laporan,mesin,oleh_id,oleh,dibuat) VALUES (?,?,?,?,?,?,?,?)",
                     (str(resep.get("judul") or minta)[:120], minta, json.dumps(resep, ensure_ascii=False), json.dumps({**lap, "penjelasan": str(resep.get("penjelasan") or "")[:800]}, ensure_ascii=False),
@@ -6066,7 +6136,7 @@ def api_studio():
 M3D_BATAS_DETIK = int(os.getenv("STUDIO3D_BATAS_DETIK", "600"))
 
 
-def m3d_bangun(resep):
+def m3d_bangun(resep, png=False):
     """Hitung model 3D di PROSES TERPISAH berprioritas rendah (nice 19).
     Dulu dihitung di dalam server: model rumit (kapal tanker 40 bagian) memakan CPU 100% belasan menit -> web lag & dianggap down."""
     import pickle
@@ -6077,16 +6147,16 @@ def m3d_bangun(resep):
     if shutil.which("nice"):
         cmd = ["nice", "-n", "19"] + cmd
     try:
-        p = subprocess.run(cmd, input=json.dumps(resep).encode("utf-8"), capture_output=True, timeout=M3D_BATAS_DETIK)
+        p = subprocess.run(cmd, input=json.dumps({"resep": resep, "png": png}).encode("utf-8"), capture_output=True, timeout=M3D_BATAS_DETIK)
     except subprocess.TimeoutExpired:
         raise ValueError(f"Model terlalu rumit: hitungannya lebih dari {M3D_BATAS_DETIK // 60} menit. Kurangi jumlah bagian atau detail kecil (pipa, baut, lubang).")
     if p.returncode != 0 or not p.stdout:
         log.error("pekerja studio3d gagal (kode %s): %s", p.returncode, p.stderr.decode("utf-8", "replace")[-600:])
         raise ValueError("Mesin 3D gagal menghitung model ini (kemungkinan kehabisan memori). Coba sederhanakan modelnya.")
-    ok, a, b = pickle.loads(p.stdout)
+    ok, a, b, gbr = pickle.loads(p.stdout)
     if not ok:
         raise ValueError(a)
-    return a, b
+    return (a, b, gbr) if png else (a, b)
 
 
 M3D_BARU = {}            # poligon model yang baru dibuat (sidik resep -> poligon), sebelum berkasnya disimpan
@@ -10011,8 +10081,8 @@ async def _kerja_gambar(teks, r, sumber):
     return {"jenis": "gambar", "id": g["id"], "link": link, "judul": g["prompt"][:120], "data": g["data"]}
 
 
-async def _kerja_3d(teks, r):
-    resep, lap, mesin = await model3d_buat(teks, None)
+async def _kerja_3d(teks, r, sketsa=None):
+    resep, lap, mesin = await model3d_buat(teks, None, sketsa)
     judul = str(resep.get("judul") or teks)[:120]
     q = "INSERT INTO model3d (judul,permintaan,resep,laporan,mesin,oleh_id,oleh,dibuat) VALUES (?,?,?,?,?,?,?,?)"
     p = (judul, teks, json.dumps(resep, ensure_ascii=False), json.dumps({**lap, "penjelasan": str(resep.get("penjelasan") or "")[:800]}, ensure_ascii=False),
@@ -10048,12 +10118,14 @@ def _pd_set(i, **kol):
         sql(c, f"UPDATE panduan SET {', '.join(k + '=?' for k in kol)} WHERE id=?", (*kol.values(), i))
 
 
-def studio_mulai(jenis, teks, r, sumber="apex", selesai=None):
+def studio_mulai(jenis, teks, r, sumber="apex", selesai=None, sketsa=None):
     """Mulai pembuatan di latar belakang. Balik dict langsung: {ok, pesan, link?}. selesai(hasil|Exception) dipanggil (async) setelah jadi.
     Aman dipanggil dari utas mana pun, termasuk dari dalam LOOP (alat Apex): tidak pernah menunggu hasilnya."""
     teks = str(teks or "").strip()[:1500]
     if not LOOP:
         return {"ok": False, "pesan": "Mesin AI belum siap, coba lagi sebentar."}
+    if sketsa and jenis == "3d" and len(teks) < 6:
+        teks = "Buat model 3D sesuai sketsa ini."
     if len(teks) < 6:
         return {"ok": False, "pesan": "Jelaskan dulu apa yang mau dibuat."}
     if jenis == "gambar":
@@ -10067,7 +10139,7 @@ def studio_mulai(jenis, teks, r, sumber="apex", selesai=None):
             return {"ok": False, "pesan": "Jabatan/divisimu belum boleh membuat di Studio 3D."}
         if not kuota_pakai(r, "studio", cek_saja=True):
             return {"ok": False, "pesan": f"Jatah Studio hari ini sudah habis ({KUOTA['studio']}x). Reset jam 00.00 WIB."}
-        coro, link, kata = _kerja_3d(teks, r), tautan("studio", "3d"), "Model 3D sedang dirancang dan diperiksa mesin (biasanya 30-90 detik)."
+        coro, link, kata = _kerja_3d(teks, r, sketsa), tautan("studio", "3d"), "Model 3D sedang dirancang, dihitung, lalu dicek ulang AI lewat gambarnya (biasanya 1-3 menit)."
     elif jenis == "panduan":
         if mid_of(r) is None and not is_admin(r):
             return {"ok": False, "pesan": "Buku Panduan Rakit khusus anggota MCI."}
@@ -10836,7 +10908,7 @@ async def tg_suara(u, c):
     await tg_catat(m, tg_role(u.effective_user), teks if _BELI.match(teks) else "catat: " + teks, "suara")
 
 
-async def tg_studio(m, c, jenis, teks, r):
+async def tg_studio(m, c, jenis, teks, r, sketsa=None):
     """Permintaan gambar / model 3D / buku panduan dari chat Telegram: mulai di latar belakang, balas link sekarang dan kabar saat selesai."""
     nama = {"gambar": "🎨 Studio Gambar", "3d": "🧊 Studio 3D", "panduan": "🔧 Buku Panduan Rakit"}[jenis]
 
@@ -10854,7 +10926,7 @@ async def tg_studio(m, c, jenis, teks, r):
                 await m.reply_text(f"{nama}: \"{h['judul']}\" selesai.\n{h['link']}")
         except Exception:
             log.exception("balas studio telegram gagal")
-    hasil = studio_mulai(jenis, _bersih_perintah(teks, jenis), r, "telegram", selesai)
+    hasil = studio_mulai(jenis, _bersih_perintah(teks, jenis), r, "telegram", selesai, sketsa)
     if not hasil["ok"]:
         await m.reply_text(f"{nama}: {hasil['pesan']}")
         return
@@ -11102,6 +11174,15 @@ def make_handlers(key):
                 return
             if await _gate(m, u.effective_user, "gambar_buat", "gambar"):
                 await tg_gambar(m, c, q, m)
+            return
+        if key != "ledger" and re.search(r"\b(3\s?d|tiga dimensi|stl)\b", cap, re.I) and _ok(u.effective_user):   # foto sketsa + "3d" = model 3D dari sketsa
+            try:
+                f = await m.photo[-1].get_file()
+                sk = (bytes(await f.download_as_bytearray()), "image/jpeg")
+            except Exception:
+                await m.reply_text("⚠️ Gagal mengambil foto sketsa, coba kirim ulang.")
+                return
+            await tg_studio(m, c, "3d", cap, tg_role(u.effective_user), sk)
             return
         if key != "ledger" and re.match(r"^\s*(catat|catet|note)\b", cap, re.I) and _ok(u.effective_user):   # foto + "catat" = foto jadi catatan
             r_ = tg_role(u.effective_user)

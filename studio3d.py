@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET
 EPS = 1e-5
 MAKS_BAGIAN = 40
 MAKS_UKURAN = 500.0     # mm
-BENTUK = ("kotak", "silinder", "kerucut", "bola", "prisma")
+BENTUK = ("kotak", "silinder", "kerucut", "bola", "prisma", "lambung", "putar")
 OPERASI = ("tambah", "potong")
 
 
@@ -335,6 +335,93 @@ def bola(r, sisi=32):
     return polis
 
 
+def _keluar(polis):
+    """Pastikan semua sisi menghadap ke luar (volume positif); kalau terbalik, balik semuanya."""
+    return [_balik(p) for p in polis] if volume(polis) < 0 else polis
+
+
+def _tambah_muka(polis, vs):
+    """Tambahkan segitiga/segi-empat; buang yang luasnya nol (titik kembar di ujung lancip)."""
+    vs = [v for k, v in enumerate(vs) if v != vs[k - 1]]
+    if len(vs) < 3:
+        return
+    n = _cross(_sub(vs[1], vs[0]), _sub(vs[2], vs[0]))
+    if len(vs) == 3 and _dot(n, n) < 1e-14:
+        return
+    if len(vs) == 4:   # segi-empat bisa tidak datar -> pecah jadi dua segitiga
+        _tambah_muka(polis, vs[:3])
+        _tambah_muka(polis, [vs[0], vs[2], vs[3]])
+        return
+    polis.append(_poli(vs))
+
+
+def _sampel_ulang(pts, n):
+    """Poligon 2D -> n titik berjarak sama sepanjang kelilingnya, mulai dari titik paling bawah-tengah (lunas kapal)."""
+    m = len(pts)
+    cy = sum(p[0] for p in pts) / m
+    mulai = min(range(m), key=lambda k: (pts[k][1], abs(pts[k][0] - cy)))
+    pts = pts[mulai:] + pts[:mulai]
+    seg = [math.dist(pts[k], pts[(k + 1) % m]) for k in range(m)]
+    total = sum(seg) or 1.0
+    out, k, acc = [], 0, 0.0
+    for j in range(n):
+        target = total * j / n
+        while k < m - 1 and acc + seg[k] < target:
+            acc += seg[k]
+            k += 1
+        t = (target - acc) / seg[k] if seg[k] > 1e-12 else 0.0
+        a, b = pts[k], pts[(k + 1) % m]
+        out.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
+    return out
+
+
+def lambung(irisan):
+    """Badan melengkung dari beberapa irisan (penampang Y-Z) yang berjajar sepanjang sumbu X, disambung mulus.
+    Cocok untuk lambung kapal, badan mobil/pesawat, gagang. Irisan berisi 1 titik = ujung lancip (haluan)."""
+    irisan = sorted(irisan, key=lambda t: t[0])
+    banyak = [len(p) for _x, p in irisan if len(p) >= 3]
+    n = banyak[0] if banyak and all(b == banyak[0] for b in banyak) else min(48, max(16, 2 * max(banyak)))
+    cincin = []
+    for x, p in irisan:
+        if len(p) == 1:
+            cincin.append([(x, p[0][0], p[0][1])] * n)
+            continue
+        q = list(p) if _luas2(p) > 0 else [p[0]] + list(p[:0:-1])   # dibalik tapi titik pertama tetap, supaya pasangan antar-irisan tidak bergeser
+        if len(q) != n:
+            q = _sampel_ulang(q, n)
+        elif not (banyak and all(b == banyak[0] for b in banyak)):
+            q = _sampel_ulang(q, n)
+        cincin.append([(x, y, z) for y, z in q])
+    polis = []
+    for a, b in zip(cincin, cincin[1:]):
+        for k in range(n):
+            _tambah_muka(polis, [a[k], a[(k + 1) % n], b[(k + 1) % n], b[k]])
+    for c, balik in ((cincin[0], True), (cincin[-1], False)):
+        if len({v for v in c}) < 3:
+            continue   # ujung lancip: tidak perlu tutup
+        pts = [(v[1], v[2]) for v in c]
+        for t in ([pts] if _cembung(pts) else _telinga(pts)):
+            vs = [(c[0][0], y, z) for y, z in t]
+            _tambah_muka(polis, vs[::-1] if balik else vs)
+    return _keluar(polis)
+
+
+def putar(profil, sisi=48):
+    """Benda putar (bubut): profil [r, z] diputar penuh mengelilingi sumbu Z. Untuk botol, vas, tiang, kubah, baling-baling hub."""
+    pts = [(max(0.0, r), z) for r, z in profil]
+    m = len(pts)
+    ling = [(math.cos(2 * math.pi * k / sisi), math.sin(2 * math.pi * k / sisi)) for k in range(sisi)]
+    polis = []
+    for i in range(m):
+        (r1, z1), (r2, z2) = pts[i], pts[(i + 1) % m]
+        if r1 < 1e-9 and r2 < 1e-9:
+            continue
+        for k in range(sisi):
+            a, b = ling[k], ling[(k + 1) % sisi]
+            _tambah_muka(polis, [(a[0] * r1, a[1] * r1, z1), (b[0] * r1, b[1] * r1, z1), (b[0] * r2, b[1] * r2, z2), (a[0] * r2, a[1] * r2, z2)])
+    return _keluar(polis)
+
+
 def _ubah(polis, rot, pos):
     rx, ry, rz = (math.radians(float(a or 0)) for a in rot)
     cx, sx, cy, sy, cz, sz = math.cos(rx), math.sin(rx), math.cos(ry), math.sin(ry), math.cos(rz), math.sin(rz)
@@ -360,6 +447,22 @@ def _angka(d, k, bawaan=0.0, lo=None, hi=None):
     if hi is not None and v > hi:
         raise ValueError(f"'{k}' maksimal {hi:g}")
     return v
+
+
+def _pasangan(t, nama, lo, hi):
+    """Daftar titik 2D: terima [[a,b],...] atau daftar rata [a1,b1,a2,b2,...]."""
+    if isinstance(t, list) and t and not isinstance(t[0], (list, tuple)):
+        if len(t) % 2:
+            raise ValueError(f"{nama}: jumlah angka harus genap (pasangan)")
+        t = [[t[k], t[k + 1]] for k in range(0, len(t), 2)]
+    if not isinstance(t, list) or not lo <= len(t) <= hi:
+        raise ValueError(f"{nama} perlu {lo}-{hi} pasangan titik")
+    out = []
+    for p in t:
+        if not isinstance(p, (list, tuple)) or len(p) != 2:
+            raise ValueError(f"tiap titik {nama} harus pasangan [a, b]")
+        out.append((_angka({"v": p[0]}, "v", 0, -MAKS_UKURAN, MAKS_UKURAN), _angka({"v": p[1]}, "v", 0, -MAKS_UKURAN, MAKS_UKURAN)))
+    return out
 
 
 def rapikan(resep):
@@ -393,15 +496,35 @@ def rapikan(resep):
                     raise ValueError("kerucut perlu r atau r2 lebih dari 0")
             elif bt == "bola":
                 x.update(r=_angka(b, "r", 0, 0.05, MAKS_UKURAN))
+            elif bt == "lambung":
+                irs = b.get("irisan")
+                if not isinstance(irs, list) or not 2 <= len(irs) <= 30:
+                    raise ValueError("lambung perlu 'irisan' berisi 2-30 penampang {x, titik}")
+                bersih = []
+                for k, ir in enumerate(irs, 1):
+                    if not isinstance(ir, dict):
+                        raise ValueError(f"irisan {k} harus objek {{x, titik}}")
+                    pts = _pasangan(ir.get("titik"), f"titik irisan {k}", 1, 64)
+                    if len(pts) == 2:
+                        raise ValueError(f"irisan {k} perlu 1 titik (ujung lancip) atau minimal 3 titik")
+                    if len(pts) >= 3 and abs(_luas2(pts)) < 1e-6:
+                        raise ValueError(f"titik irisan {k} tidak membentuk bidang")
+                    bersih.append((_angka(ir, "x", 0, -MAKS_UKURAN, MAKS_UKURAN), pts))
+                xs = sorted(t[0] for t in bersih)
+                if any(xs[k + 1] - xs[k] < 0.05 for k in range(len(xs) - 1)):
+                    raise ValueError("posisi x tiap irisan harus berbeda (berjarak minimal 0.05 mm)")
+                if sum(len(p) >= 3 for _x, p in bersih) < 1:
+                    raise ValueError("minimal satu irisan harus berupa bidang (3 titik atau lebih)")
+                x.update(irisan=bersih)
+            elif bt == "putar":
+                pts = _pasangan(b.get("titik"), "profil putar", 3, 120)
+                if max(r for r, _z in pts) <= 0.05 or abs(_luas2([(max(0.0, r), z) for r, z in pts])) < 1e-6:
+                    raise ValueError("profil putar harus berupa bidang dengan r (jarak dari sumbu) lebih dari 0")
+                if min(r for r, _z in pts) < -0.01:
+                    raise ValueError("r pada profil putar tidak boleh negatif (sumbu putar ada di r = 0)")
+                x.update(titik=pts)
             else:
-                t = b.get("titik")
-                if not isinstance(t, list) or not 3 <= len(t) <= 200:
-                    raise ValueError("prisma perlu 'titik' berisi 3-200 pasangan [x, y]")
-                pts = []
-                for p in t:
-                    if not isinstance(p, (list, tuple)) or len(p) != 2:
-                        raise ValueError("tiap titik prisma harus [x, y]")
-                    pts.append((_angka({"v": p[0]}, "v", 0, -MAKS_UKURAN, MAKS_UKURAN), _angka({"v": p[1]}, "v", 0, -MAKS_UKURAN, MAKS_UKURAN)))
+                pts = _pasangan(b.get("titik"), "titik prisma", 3, 200)
                 if abs(_luas2(pts)) < 1e-6:
                     raise ValueError("titik prisma tidak membentuk bidang")
                 x.update(titik=pts, h=_angka(b, "h", 0, 0.1, MAKS_UKURAN))
@@ -431,6 +554,10 @@ def _bentuk(x):
         p = kerucut(x["r"], x["r2"], x["h"], _sisi_bulat(max(x["r"], x["r2"]), s))
     elif x["bentuk"] == "bola":
         p = bola(x["r"], _sisi_bulat(x["r"], min(s, 48)))
+    elif x["bentuk"] == "lambung":
+        p = lambung(x["irisan"])
+    elif x["bentuk"] == "putar":
+        p = putar(x["titik"], _sisi_bulat(max(r for r, _z in x["titik"]), s))
     else:
         p = prisma(x["titik"], x["h"])
     return _ubah(p, x["rot"], x["pos"])
@@ -889,6 +1016,52 @@ def pratinjau(polis, lebar=520, tinggi=400):
     return "".join(out)
 
 
+def gambar_png(polis, lebar=1260, tinggi=460):
+    """Gambar 3 arah dalam satu PNG (atas | samping | miring) untuk diperiksa AI. Butuh Pillow; tanpa Pillow -> None."""
+    try:
+        from PIL import Image, ImageDraw
+    except Exception:
+        return None
+    az, el = math.radians(35), math.radians(28)
+    ca, sa, ce, se = math.cos(az), math.sin(az), math.cos(el), math.sin(el)
+    def miring(v):
+        x, y = v[0] * ca + v[1] * sa, -v[0] * sa + v[1] * ca
+        return (x, y * se + v[2] * ce, y * ce - v[2] * se)
+    arah = [("TAMPAK ATAS (X kanan, Y atas)", lambda v: (v[0], v[1], -v[2])),
+            ("TAMPAK SAMPING (X kanan, Z atas)", lambda v: (v[0], v[2], v[1])),
+            ("TAMPAK MIRING 3D", miring)]
+    cahaya = _unit((0.35, -0.5, 0.8))
+    img = Image.new("RGB", (lebar, tinggi), (244, 241, 234))
+    dr = ImageDraw.Draw(img)
+    pw = lebar // 3
+    for k, (judul, pr) in enumerate(arah):
+        muka = []
+        for vs, (n, _w) in polis:
+            ps = [pr(v) for v in vs]
+            if pr(n)[2] - pr((0, 0, 0))[2] > 0.02:   # membelakangi kamera
+                continue
+            muka.append((sum(p[2] for p in ps) / len(ps), ps, max(0.0, _dot(n, cahaya))))
+        if not muka:
+            continue
+        xs = [p[0] for _d, ps, _s in muka for p in ps]
+        ys = [p[1] for _d, ps, _s in muka for p in ps]
+        sk = min((pw - 40) / max(1e-6, max(xs) - min(xs)), (tinggi - 70) / max(1e-6, max(ys) - min(ys)))
+        ox = k * pw + (pw - (max(xs) + min(xs)) * sk) / 2
+        oy = 30 + (tinggi - 30 + (max(ys) + min(ys)) * sk) / 2
+        muka.sort(key=lambda m: -m[0])
+        for _d, ps, sh in muka:
+            g = 0.38 + 0.62 * sh
+            warna = (int(46 + 150 * g), int(74 + 140 * g), int(120 + 120 * g))
+            dr.polygon([(ox + p[0] * sk, oy - p[1] * sk) for p in ps], fill=warna, outline=warna)
+        dr.text((k * pw + 12, 10), judul, fill=(20, 33, 61))
+        if k:
+            dr.line([(k * pw, 0), (k * pw, tinggi)], fill=(200, 190, 170), width=2)
+    import io
+    out = io.BytesIO()
+    img.save(out, "PNG", optimize=True)
+    return out.getvalue()
+
+
 # ---------- SVG dari AI: saring dulu ----------
 SVG_TAG = {"svg", "g", "defs", "title", "desc", "path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "text", "tspan", "textPath",
            "linearGradient", "radialGradient", "stop", "clipPath", "mask", "pattern", "symbol", "use", "marker", "filter", "feGaussianBlur", "feOffset",
@@ -953,11 +1126,20 @@ def _pekerja():
     import json
     import pickle
     import sys
+    masuk = json.loads(sys.stdin.buffer.read().decode("utf-8"))
+    mau_png = isinstance(masuk, dict) and "resep" in masuk and bool(masuk.get("png"))
+    resep = masuk["resep"] if isinstance(masuk, dict) and "resep" in masuk else masuk
     try:
-        polis, lap = bangun(json.loads(sys.stdin.buffer.read().decode("utf-8")))
-        out = (True, polis, lap)
+        polis, lap = bangun(resep)
+        png = None
+        if mau_png:
+            try:
+                png = gambar_png(polis)
+            except Exception:
+                png = None
+        out = (True, polis, lap, png)
     except (ValueError, KeyError, TypeError) as e:
-        out = (False, f"{type(e).__name__}: {e}"[:400], None)
+        out = (False, f"{type(e).__name__}: {e}"[:400], None, None)
     sys.stdout.buffer.write(pickle.dumps(out, protocol=pickle.HIGHEST_PROTOCOL))
 
 

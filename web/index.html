@@ -633,6 +633,11 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
   <details class="cara"><summary>Cara kerjanya</summary><p class="mu">AI tidak menebak bentuk. AI menulis resep berisi ukuran dalam milimeter, lalu mesin hitung MCI membangun bendanya, mengukur ulang, dan menyuruh AI memperbaiki kalau ada lubang yang meleset atau bagian yang melayang. Hasilnya file STL siap cetak 3D. Untuk gambar, AI menulis kode SVG yang tajam di ukuran berapa pun. Semakin rinci ukuran yang kamu tulis, semakin tepat hasilnya.</p></details>
   <div class="cd" id="s3Buat"><div class="seg" style="margin:0 0 12px;background:#EFECE4" id="s3Seg"><button class="on" data-s3="3d">Model 3D (STL)</button><button data-s3="svg">Gambar (SVG)</button></div>
    <textarea id="s3Minta" rows="4" maxlength="2000" aria-label="Permintaan"></textarea>
+   <div id="s3SkBox" style="margin-top:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <label class="bt o" style="cursor:pointer;margin:0">✏️ Pakai sketsa / foto<input type="file" id="s3Sk" accept="image/*" hidden></label>
+    <img id="s3SkImg" alt="Sketsa terpilih" hidden style="height:64px;border-radius:8px;border:1px solid var(--line,#ddd)">
+    <a href="#" id="s3SkX" hidden>Hapus sketsa</a>
+    <span class="mu" style="font-size:12.5px">Coretan tangan, foto benda, atau gambar teknik. Tulis ukurannya di kolom atas kalau tahu.</span></div>
    <div id="s3Rev" class="mu" hidden style="margin-top:8px;font-size:13px"></div>
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="s3Go">Buat</button><span class="mu" id="s3Msg"></span></div></div>
   <div id="s3Box"><p class="mu">Memuat…</p></div>
@@ -5917,11 +5922,15 @@ const OFFICE_BUAT = () => {
   };
 };
 /* Mesin 3D (three.js ±600 KB) baru diunduh saat Virtual Office dibuka. HP Ringan: tidak pernah diunduh. */
-const OFFICE = (() => {
-  let real = null, vis = false, muat = null; const simpan = {};
+let TIGA_P = null;
+function muatTiga() {   // three.js + OrbitControls, diunduh sekali saat pertama dibutuhkan (Virtual Office / pratinjau 3D Studio)
   const skrip = src => new Promise((ok, no) => { const e = document.createElement("script"); e.src = src; e.onload = ok; e.onerror = () => no(new Error("gagal memuat " + src)); document.head.appendChild(e); });
-  const tiga = () => muat || (muat = skrip("https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js")
-    .then(() => skrip("https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js")).catch(e => { muat = null; throw e; }));
+  return TIGA_P || (TIGA_P = (window.THREE ? Promise.resolve() : skrip("https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"))
+    .then(() => THREE.OrbitControls ? 0 : skrip("https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js")).catch(e => { TIGA_P = null; throw e; }));
+}
+const OFFICE = (() => {
+  let real = null, vis = false; const simpan = {};
+  const tiga = muatTiga;
   return {
     ensure(list) {
       if (real) return real.ensure(list);
@@ -6459,7 +6468,19 @@ addEventListener("afterprint", () => document.body.classList.remove("ctk"));
 /* ===== Studio 3D & gambar dari kode ===== */
 let S3 = null, S3_J = "3d", S3_DARI = null, S3_T = null;
 const S3_PH = {"3d": "Contoh: casing ESP32 DevKit ukuran dalam 56 x 29 x 18 mm, dinding 2 mm, lubang kabel USB 12 x 7 mm di sisi pendek, 4 tiang baut M3 di sudut", svg: "Contoh: poster persegi lomba robot MCI, judul besar di tengah, ikon roda gigi dan petir, warna biru tua dan emas"};
-function s3Mode() { $$("#s3Seg button").forEach(b => b.classList.toggle("on", b.dataset.s3 === S3_J)); $("#s3Minta").placeholder = S3_DARI ? "Tulis perubahan yang kamu mau, mis. lubangnya dibesarkan jadi 14 mm" : S3_PH[S3_J]; $("#s3Go").textContent = S3_DARI ? "Buat revisi" : S3_J === "3d" ? "Buat model 3D" : "Buat gambar";
+let S3_SK = null;   // sketsa 2D terpilih (Blob JPEG yang sudah diperkecil)
+function s3SketsaKecil(file, MAX = 1280) {   // perkecil di browser, rasio sisi TETAP (proporsi sketsa penting)
+  return new Promise((ok, no) => { const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => { const k = Math.min(1, MAX / Math.max(img.width, img.height)), c = document.createElement("canvas");
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); c.toBlob(b => b ? ok(b) : no(new Error("Sketsa tidak bisa dibaca")), "image/jpeg", .88); };
+    img.onerror = () => { URL.revokeObjectURL(url); no(new Error("File bukan gambar")); }; img.src = url; });
+}
+$("#s3Sk").onchange = async e => { const f = e.target.files[0]; if (!f) return;
+  try { S3_SK = await s3SketsaKecil(f); $("#s3SkImg").src = URL.createObjectURL(S3_SK); $("#s3SkImg").hidden = $("#s3SkX").hidden = false; }
+  catch (er) { $("#s3Msg").textContent = er.message; } e.target.value = ""; };
+$("#s3SkX").onclick = e => { e.preventDefault(); S3_SK = null; $("#s3SkImg").hidden = $("#s3SkX").hidden = true; };
+function s3Mode() { $("#s3SkBox").hidden = S3_J !== "3d" || !!S3_DARI; $$("#s3Seg button").forEach(b => b.classList.toggle("on", b.dataset.s3 === S3_J)); $("#s3Minta").placeholder = S3_DARI ? "Tulis perubahan yang kamu mau, mis. lubangnya dibesarkan jadi 14 mm" : S3_PH[S3_J]; $("#s3Go").textContent = S3_DARI ? "Buat revisi" : S3_J === "3d" ? "Buat model 3D" : "Buat gambar";
   $("#s3Rev").hidden = !S3_DARI; if (S3_DARI) $("#s3Rev").innerHTML = `Merevisi model <b>${esc((S3.model.find(m => m.id === S3_DARI) || {}).judul || "")}</b>. <a href="#" id="s3RevX">Batal revisi</a>`; const x = $("#s3RevX"); if (x) x.onclick = e => { e.preventDefault(); S3_DARI = null; s3Mode(); }; }
 $$("#s3Seg button").forEach(b => b.onclick = () => { S3_J = b.dataset.s3; S3_DARI = null; s3Mode(); s3Render(); });
 function s3Render() {
@@ -6472,9 +6493,10 @@ function s3Render() {
     ${w.length ? `<div class="bd" style="font-size:13px;color:#8E2A1E"><b>Perlu dicek sebelum cetak</b>\n${w.map(esc).join("\n")}</div>` : '<p class="ch g" style="display:inline-block;margin:8px 0 0">Lolos pemeriksaan mesin</p>'}
     ${m.laporan.penjelasan ? `<div class="bd" style="font-size:13.5px">${esc(m.laporan.penjelasan)}</div>` : ""}
     <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Permintaan &amp; bagian</summary><div class="bd" style="font-size:13px">${esc(m.permintaan)}\n\n${(m.laporan.bagian || []).map(b => `${b.no}. ${esc(b.nama)} (${esc(b.bentuk)}, ${esc(b.operasi)})`).join("\n")}</div></details>
-    <div class="ac"><a class="bt g" href="/api/studio/3d/${m.id}.stl" download onclick="const b=this;b.textContent='Menyiapkan STL…';setTimeout(()=>b.textContent='Unduh STL',8000)">Unduh STL</a>${d.buat ? `<button class="bt o" data-s3r="${m.id}">Revisi</button>` : ""}${d.admin ? `<button class="bt o" data-s3d="3d:${m.id}">Hapus</button>` : ""}</div></article>`; }).join("")}</div>` : '<p class="mu">Belum ada model.</p>');
+    <div class="ac">${RINGAN ? "" : `<button class="bt o" data-s3v="${m.id}" data-judul="${esc(m.judul)}">🔄 Putar 3D</button>`}<a class="bt g" href="/api/studio/3d/${m.id}.stl" download onclick="const b=this;b.textContent='Menyiapkan STL…';setTimeout(()=>b.textContent='Unduh STL',8000)">Unduh STL</a>${d.buat ? `<button class="bt o" data-s3r="${m.id}">Revisi</button>` : ""}${d.admin ? `<button class="bt o" data-s3d="3d:${m.id}">Hapus</button>` : ""}</div></article>`; }).join("")}</div>` : '<p class="mu">Belum ada model.</p>');
   else $("#s3Box").innerHTML = info + (d.gambar.length ? `<div class="s3g">${d.gambar.map(g => `<article class="it2" data-sorot="svg:${g.id}"><img src="/api/studio/svg/${g.id}" alt="${esc(g.prompt)}" loading="lazy" data-s3i="${g.id}"><div class="meta" style="margin-top:8px"><span>${esc(g.oleh)} · ${esc(tglID(g.dibuat))}</span></div><div class="bd" style="font-size:13px">${esc(g.prompt)}</div>
     <div class="ac"><a class="bt g" href="/api/studio/svg/${g.id}?unduh=1" download>Unduh SVG</a><button class="bt o" data-s3png="${g.id}">Unduh PNG</button>${d.admin ? `<button class="bt o" data-s3d="svg:${g.id}">Hapus</button>` : ""}</div></article>`).join("")}</div>` : '<p class="mu">Belum ada gambar.</p>');
+  $$("[data-s3v]").forEach(b => b.onclick = () => s3Putar(+b.dataset.s3v, b.dataset.judul));
   $$("[data-s3r]").forEach(b => b.onclick = () => { S3_DARI = +b.dataset.s3r; s3Mode(); $("#s3Minta").value = ""; $("#s3Minta").focus(); $("#s3Buat").scrollIntoView({behavior: "smooth", block: "start"}); });
   $$("[data-s3d]").forEach(b => b.onclick = async () => { if (!confirm("Hapus permanen?")) return; const [j, i] = b.dataset.s3d.split(":"); try { S3 = await api(`/api/studio/${j}/${i}`, {method: "DELETE"}); s3Render(); } catch (e) { alert(e.message); } });
   $$("[data-s3png]").forEach(b => b.onclick = () => { const im = $(`[data-s3i="${b.dataset.s3png}"]`), r = (im.naturalHeight || 1) / (im.naturalWidth || 1), c = document.createElement("canvas"); c.width = 2160; c.height = Math.round(2160 * r);
@@ -6501,11 +6523,53 @@ $("#labGo").onclick = async () => {
   } catch (e) { $("#labMsg").textContent = e.message; }
   clearInterval(LAB_T); b.disabled = false;
 };
+/* Pratinjau 3D interaktif: file STL dari server digambar three.js, bisa diputar (seret) dan di-zoom (cubit / scroll) */
+function stlBaca(buf) {   // STL biner -> posisi & normal
+  const dv = new DataView(buf), n = dv.getUint32(80, true);
+  if (84 + n * 50 > buf.byteLength) throw new Error("File STL rusak");
+  const pos = new Float32Array(n * 9), nor = new Float32Array(n * 9);
+  for (let i = 0; i < n; i++) { const o = 84 + i * 50, nx = dv.getFloat32(o, true), ny = dv.getFloat32(o + 4, true), nz = dv.getFloat32(o + 8, true);
+    for (let v = 0; v < 3; v++) { const k = i * 9 + v * 3; for (let a = 0; a < 3; a++) pos[k + a] = dv.getFloat32(o + 12 + v * 12 + a * 4, true); nor[k] = nx; nor[k + 1] = ny; nor[k + 2] = nz; } }
+  return {pos, nor, n};
+}
+async function s3Putar(id, judul) {
+  const ov = document.createElement("div");
+  ov.style.cssText = "position:fixed;inset:0;z-index:9999;background:#0F1E3A;display:flex;flex-direction:column";
+  ov.innerHTML = `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;color:#F6F3EC"><b style="flex:1;font-size:15px">${esc(judul || "Model 3D")}</b>
+    <span class="mu" style="color:#C3CDE0;font-size:12.5px" id="s3vInfo">Memuat model…</span><button class="bt o" id="s3vX" style="min-height:36px">✕ Tutup</button></div><div id="s3vStage" style="flex:1;position:relative;touch-action:none"></div>`;
+  document.body.appendChild(ov);
+  let raf = 0, R = null, hidup = true;
+  const tutup = () => { hidup = false; cancelAnimationFrame(raf); if (R) { R.dispose(); R.forceContextLoss && R.forceContextLoss(); } ov.remove(); removeEventListener("keydown", esc_); };
+  const esc_ = e => { if (e.key === "Escape") tutup(); };
+  addEventListener("keydown", esc_); $("#s3vX").onclick = tutup;
+  try {
+    const [, buf] = await Promise.all([muatTiga(), fetch(`/api/studio/3d/${id}.stl`, {headers: {"X-MCI": "1"}}).then(r => { if (!r.ok) throw new Error("Model belum bisa dimuat (" + r.status + ")"); return r.arrayBuffer(); })]);
+    if (!hidup) return;
+    const st = $("#s3vStage"), w = st.clientWidth, h = st.clientHeight, d = stlBaca(buf);
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(d.pos, 3)); g.setAttribute("normal", new THREE.BufferAttribute(d.nor, 3));
+    g.rotateX(-Math.PI / 2); g.computeBoundingBox(); const bb = g.boundingBox, c = new THREE.Vector3(); bb.getCenter(c); g.translate(-c.x, -bb.min.y, -c.z);
+    g.computeBoundingSphere(); const rad = g.boundingSphere.radius || 50;
+    const sc = new THREE.Scene(); sc.background = new THREE.Color(0x0F1E3A);
+    sc.add(new THREE.HemisphereLight(0xffffff, 0x334466, .85)); const dl = new THREE.DirectionalLight(0xffffff, .9); dl.position.set(rad * 2, rad * 3, rad * 1.5); sc.add(dl);
+    const dl2 = new THREE.DirectionalLight(0xD4AF5A, .35); dl2.position.set(-rad * 2, rad, -rad * 2); sc.add(dl2);
+    sc.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({color: 0xE9E3D3, roughness: .55, metalness: .08})));
+    const grid = new THREE.GridHelper(Math.ceil(rad * 3 / 10) * 10, Math.ceil(rad * 3 / 10), 0xD4AF5A, 0x2A4170); grid.material.opacity = .45; grid.material.transparent = true; sc.add(grid);
+    const cam = new THREE.PerspectiveCamera(40, w / h, rad / 50, rad * 40); cam.position.set(rad * 1.6, rad * 1.1, rad * 1.9);
+    R = new THREE.WebGLRenderer({antialias: true}); R.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); R.setSize(w, h); st.appendChild(R.domElement);
+    const ctl = new THREE.OrbitControls(cam, R.domElement); ctl.target.set(0, (bb.max.y - bb.min.y) / 2, 0); ctl.enableDamping = true; ctl.update();
+    $("#s3vInfo").textContent = `${num(d.n)} segitiga · seret untuk memutar, cubit/scroll untuk zoom · kotak grid = 1 cm`;
+    new ResizeObserver(() => { if (!hidup) return; const W = st.clientWidth, H = st.clientHeight; if (W && H) { R.setSize(W, H); cam.aspect = W / H; cam.updateProjectionMatrix(); } }).observe(st);
+    const loop = () => { if (!hidup) return; raf = requestAnimationFrame(loop); ctl.update(); R.render(sc, cam); }; loop();
+  } catch (e) { const i = $("#s3vInfo"); if (i) i.textContent = e.message; }
+}
 async function s3Muat() { s3Mode(); try { delete APIC["/api/studio"]; S3 = await api("/api/studio"); s3Mode(); s3Render(); } catch (e) { $("#s3Box").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; } }
 $("#s3Go").onclick = async () => {
   const b = $("#s3Go"), t0 = Date.now(); b.disabled = true; clearInterval(S3_T);
-  S3_T = setInterval(() => { $("#s3Msg").textContent = `AI merancang, mesin menghitung… ${Math.round((Date.now() - t0) / 1000)} detik (biasanya 20–90 detik)`; }, 1000);
-  try { S3 = await api("/api/studio", {json: {jenis: S3_J, permintaan: $("#s3Minta").value, dari: S3_DARI}}); $("#s3Minta").value = ""; S3_DARI = null; $("#s3Msg").textContent = "Selesai."; s3Mode(); s3Render(); }
+  S3_T = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); $("#s3Msg").textContent = S3_J === "3d" ? `${s < 60 ? "AI merancang" + (S3_SK ? " dari sketsa" : "") : s < 120 ? "Mesin menghitung bentuk" : "AI mengecek gambar hasilnya"}… ${s} detik (biasanya 1–3 menit)` : `AI menggambar… ${s} detik`; }, 1000);
+  try {
+    let opsi = {json: {jenis: S3_J, permintaan: $("#s3Minta").value, dari: S3_DARI}};
+    if (S3_SK && S3_J === "3d" && !S3_DARI) { const fd = new FormData(); fd.append("jenis", "3d"); fd.append("permintaan", $("#s3Minta").value); fd.append("sketsa", S3_SK, "sketsa.jpg"); opsi = {method: "POST", body: fd}; }
+    S3 = await api("/api/studio", opsi); $("#s3Minta").value = ""; S3_DARI = null; S3_SK = null; $("#s3SkImg").hidden = $("#s3SkX").hidden = true; $("#s3Msg").textContent = "Selesai."; s3Mode(); s3Render(); }
   catch (e) { $("#s3Msg").textContent = e.message; }
   clearInterval(S3_T); b.disabled = false;
 };
