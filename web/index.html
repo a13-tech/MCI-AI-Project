@@ -329,6 +329,7 @@ td{border-top:1px solid var(--line)}
 #cariBuka .ct{flex:1}#cariBuka kbd{font:600 11px/1 system-ui,sans-serif;padding:4px 6px;border-radius:6px;border:1px solid rgba(255,255,255,.22);color:#C9D7F5}
 .ci{width:15px;height:15px;flex:none;border:2px solid currentColor;border-radius:50%;position:relative;box-sizing:border-box}.ci::after{content:"";position:absolute;width:2px;height:7px;background:currentColor;right:-4px;bottom:-6px;transform:rotate(-45deg);border-radius:1px}
 #sd.vw #cariBuka{display:none!important}
+html.ringan *,html.ringan *::before,html.ringan *::after{animation:none!important;transition:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 .cariHal{position:fixed;inset:0;z-index:90;background:rgba(9,18,36,.55);display:flex;justify-content:center;align-items:flex-start;padding:10vh 16px 16px;backdrop-filter:blur(2px)}
 .cariHal[hidden]{display:none}
 .chBox{width:100%;max-width:560px;background:#fff;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden;display:flex;flex-direction:column;max-height:76vh}
@@ -824,6 +825,9 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="agSave">Simpan</button><button class="bt o" id="agReset">Kosongkan</button><label class="mu" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="agAktif" checked>Aktif</label><span id="agMsg" class="mu"></span></div>
   </div>
   <div class="cd" style="padding:0"><div class="tb"><table><thead><tr><th>Nama</th><th>Divisi</th><th>Jabatan</th><th>Token pribadi</th><th></th></tr></thead><tbody id="agList"></tbody></table></div></div>
+  <div class="cd" id="hrCard" style="margin-top:18px"><b>📱 HP Ringan (untuk HP lemot / RAM kecil)</b>
+   <p class="mu" style="margin:6px 0 10px;font-size:13px">Centang anggota yang HP-nya sering lemot atau keluar sendiri saat buka web. Untuk mereka: gedung 3D dimatikan, foto dikirim versi kecil, animasi mati, dan cek data lebih jarang. Berlaku saat mereka membuka ulang web. HP dengan RAM 2 GB ke bawah otomatis ikut mode ini.</p>
+   <div class="picks" id="hrList"></div><span id="hrMsg" class="mu" style="font-size:12.5px"></span></div>
   <details style="margin-top:18px"><summary style="cursor:pointer;font-weight:800;font-size:17px">Atur Divisi &amp; Jabatan (lanjutan)</summary>
   <p class="mu">Tambah divisi atau jabatan baru, lalu centang izinnya. Izin seseorang = gabungan semua jabatan + divisinya. Yang bawaan tidak bisa dihapus tapi izinnya bisa diubah; Admin/Dev selalu bisa semua. Sidang Dewan, Lab IoT, dan menu Anggota tetap khusus Dev.</p>
   <div class="cd" id="sxForm"><b id="sxTitle">Tambah divisi / jabatan</b>
@@ -1330,8 +1334,6 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
 </main>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script type="text/plain" id="espTpl">/*
   MCI HQ · Lab IoT — kirim data sensor ESP32 ke web MCI HQ
   -------------------------------------------------------------
@@ -1559,6 +1561,7 @@ function renderKuota() {
   $("#bq").textContent = k.boss ? `Jatah Boss kamu: ${kuotaTxt(k.boss)} (reset 00.00 WIB)` : "";
   $("#bq").hidden = !k.boss;
 }
+let RINGAN = false;   // HP Ringan: ditandai Dev di halaman Anggota, atau otomatis di HP ber-RAM <= 2 GB
 let ME = {}, DATA = [], LOG = [], KAS = null, PV = [], USE = null, MODE = "boss", SKL = {skills: [], bots: []};
 function show(p) {
   if (p !== "office" && typeof voKeluar === "function") voKeluar(false);
@@ -1673,7 +1676,7 @@ async function loadUsage() {
   } catch (e) {}
 }
 let POLL_T = 0;
-const jedaPoll = () => (!$("#p-office").hidden || !$("#p-cmd").hidden) ? (ME.role === "admin" ? 2000 : 4000) : 20000;
+const jedaPoll = () => (!$("#p-office").hidden || !$("#p-cmd").hidden) ? (RINGAN ? 6000 : ME.role === "admin" ? 2000 : 4000) : (RINGAN ? 45000 : 20000);
 function pollMulai() {   // jadwal ulang dari sekarang (dipanggil saat pindah halaman supaya langsung ikut ritme baru)
   clearTimeout(POLL_T);
   POLL_T = setTimeout(async () => { if (!document.hidden) await poll(); pollMulai(); }, jedaPoll());
@@ -1964,7 +1967,22 @@ function renderAnggota() {
 async function loadAnggota() {
   if (!ADM()) return;
   try { AGD = await api("/api/anggota"); agForm(); renderAnggota(); } catch (e) { $("#agList").innerHTML = '<tr><td colspan="5" class="er">' + esc(e.message) + "</td></tr>"; }
+  loadHpRingan();
   try { SXD = await api("/api/struktur"); sxForm(); renderSx(); } catch (e) { $("#sxList").innerHTML = '<tr><td colspan="5" class="er">' + esc(e.message) + "</td></tr>"; }
+}
+
+/* HP Ringan (khusus Dev): tandai anggota yang HP-nya lemot */
+async function loadHpRingan() {
+  const box = $("#hrList"); if (!box || !AGD) return;
+  try {
+    const d = await api("/api/hp-ringan"), on = new Set(d.ids);
+    box.innerHTML = AGD.items.filter(m => m.aktif).map(m => `<label><input type="checkbox" data-hr="${m.id}" ${on.has(m.id) ? "checked" : ""}>${esc(m.nama)}</label>`).join("") || '<span class="mu">Belum ada anggota.</span>';
+    $$("[data-hr]").forEach(c => c.onchange = async () => {
+      $("#hrMsg").textContent = "Menyimpan…";
+      try { await api("/api/hp-ringan", {json: {id: +c.dataset.hr, aktif: c.checked}}); $("#hrMsg").textContent = "Tersimpan. Berlaku saat " + c.parentElement.textContent.trim() + " membuka ulang web."; }
+      catch (e) { c.checked = !c.checked; $("#hrMsg").textContent = e.message; }
+    });
+  } catch (e) { box.innerHTML = '<span class="er">' + esc(e.message) + "</span>"; }
 }
 
 /* Divisi & jabatan (khusus Dev) */
@@ -2157,11 +2175,13 @@ $("#plSave").onclick = async () => {
 /* Dokumentasi: album foto kegiatan */
 let DKD = null;
 const dkImg = id => "/api/dokumentasi/" + id;
+const fotoKecil = (u, w) => u + (u.includes("?") ? "&" : "?") + "w=" + (RINGAN ? Math.min(w, 320) : w);   // galeri: versi kecil dari server
+const fotoBesar = u => RINGAN ? u + (u.includes("?") ? "&" : "?") + "w=1080" : u;   // layar penuh: HP Ringan cukup 1080 px
 function renderDok() {
   $("#dkForm").hidden = !DKD.kelola;
-  $("#dkList").innerHTML = DKD.items.map(x => `<figure><img src="${dkImg(x.id)}" alt="${esc(x.judul)}" loading="lazy" data-dkz="${x.id}"><figcaption title="${esc(x.keterangan)}"><b>${esc(x.judul)}</b> · ${esc(x.tanggal)}${x.keterangan ? "<br>" + esc(x.keterangan) : ""}</figcaption>
+  $("#dkList").innerHTML = DKD.items.map(x => `<figure><img src="${fotoKecil(dkImg(x.id), 480)}" alt="${esc(x.judul)}" loading="lazy" decoding="async" data-dkz="${x.id}"><figcaption title="${esc(x.keterangan)}"><b>${esc(x.judul)}</b> · ${esc(x.tanggal)}${x.keterangan ? "<br>" + esc(x.keterangan) : ""}</figcaption>
     <div class="bar"><a class="bt o" href="${dkImg(x.id)}?unduh=1" download>Unduh</a>${DKD.kelola ? `<button class="bt o" data-dkd="${x.id}">Hapus</button>` : ""}</div></figure>`).join("") || '<div class="mu">Belum ada foto kegiatan.</div>';
-  $$("[data-dkz]").forEach(i => i.onclick = () => vwBuka(i.src, i.alt || "Foto"));
+  $$("[data-dkz]").forEach(i => i.onclick = () => vwBuka(fotoBesar(dkImg(i.dataset.dkz)), i.alt || "Foto"));
   $$("[data-dkd]").forEach(b => b.onclick = async () => { if (!confirm("Hapus foto ini?")) return; DKD = await api("/api/dokumentasi/" + b.dataset.dkd, {method: "DELETE"}); renderDok(); });
 }
 async function loadDok() { if (!$("#dkTgl").value) $("#dkTgl").value = new Date().toISOString().slice(0, 10); try { DKD = await api("/api/dokumentasi"); renderDok(); } catch (e) { $("#dkList").innerHTML = '<div class="er">' + esc(e.message) + "</div>"; } }
@@ -3837,8 +3857,8 @@ async function loadGambar() {
   if (!can("gambar_lihat")) return;
   try {
     const d = await api("/api/gambar"); gQuota(d);
-    $("#gg").innerHTML = d.items.map(g => `<figure data-sorot="gambar:${g.id}"><img src="${gImg(g.id)}" alt="${esc(g.prompt)}" loading="lazy" data-zoom="${g.id}"><figcaption title="${esc(g.prompt)}">${esc(g.prompt)}</figcaption><div class="bar"><a class="bt o" href="${gImg(g.id)}${DEMO ? "" : "?unduh=1"}" download="mci-gambar-${g.id}">Unduh</a>${ADM() ? `<button class="bt o" data-gd="${g.id}" aria-label="Hapus gambar ${g.id}">Hapus</button>` : ""}</div></figure>`).join("") || '<div class="mu">Belum ada gambar. Coba buat yang pertama!</div>';
-    $$("[data-zoom]").forEach(i => i.onclick = () => vwBuka(i.src, i.alt || "Foto"));
+    $("#gg").innerHTML = d.items.map(g => `<figure data-sorot="gambar:${g.id}"><img src="${DEMO ? gImg(g.id) : fotoKecil(gImg(g.id), 480)}" alt="${esc(g.prompt)}" loading="lazy" decoding="async" data-zoom="${g.id}"><figcaption title="${esc(g.prompt)}">${esc(g.prompt)}</figcaption><div class="bar"><a class="bt o" href="${gImg(g.id)}${DEMO ? "" : "?unduh=1"}" download="mci-gambar-${g.id}">Unduh</a>${ADM() ? `<button class="bt o" data-gd="${g.id}" aria-label="Hapus gambar ${g.id}">Hapus</button>` : ""}</div></figure>`).join("") || '<div class="mu">Belum ada gambar. Coba buat yang pertama!</div>';
+    $$("[data-zoom]").forEach(i => i.onclick = () => vwBuka(DEMO ? i.src : fotoBesar(gImg(i.dataset.zoom)), i.alt || "Foto"));
     $$("[data-gd]").forEach(b => b.onclick = async () => { if (confirm("Hapus gambar ini?")) { await api("/api/gambar/" + b.dataset.gd, {method: "DELETE"}); loadGambar(); } });
   } catch (e) { $("#gg").innerHTML = '<div class="er">' + esc(e.message) + "</div>"; }
 }
@@ -3928,7 +3948,7 @@ $("#skSave").onclick = async () => {
    GEDUNG MCI 3D · 4 LANTAI
    Semua bentuk dari bola, kapsul, silinder, torus, dan panel bersudut bulat.
    ====================================================================== */
-const OFFICE = (() => {
+const OFFICE_BUAT = () => {
   const PI = Math.PI, TOP = .68, FH = 4.4, FY = [0, 4.4, 8.8, 13.2], WH = 4.05, LIFT = [10.6, -5.4];
   let R, sc, cam, ctl, topCam, stage, chipsEl, pipEl, ready = false, visible = false, clock, CUR;
   let AG = [], ANI = [], CAST = false, pipOn = true, pipF = 0, follow = null, fly = null, last = {}, BALL = null, PPM = null;
@@ -5895,6 +5915,32 @@ const OFFICE = (() => {
     galeri(ids) { if (ready) galeriSet(ids); },
     stok(list) { STOKD = list; if (ready) stokSet(list); },
   };
+};
+/* Mesin 3D (three.js ±600 KB) baru diunduh saat Virtual Office dibuka. HP Ringan: tidak pernah diunduh. */
+const OFFICE = (() => {
+  let real = null, vis = false, muat = null; const simpan = {};
+  const skrip = src => new Promise((ok, no) => { const e = document.createElement("script"); e.src = src; e.onload = ok; e.onerror = () => no(new Error("gagal memuat " + src)); document.head.appendChild(e); });
+  const tiga = () => muat || (muat = skrip("https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js")
+    .then(() => skrip("https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js")).catch(e => { muat = null; throw e; }));
+  return {
+    ensure(list) {
+      if (real) return real.ensure(list);
+      if (!vis || RINGAN) return;
+      tiga().then(() => {
+        if (real) return; real = OFFICE_BUAT(); real.setVisible(vis);
+        if (simpan.iot) real.iot(simpan.iot); if (simpan.stok) real.stok(simpan.stok);
+        real.ensure(DATA); if (simpan.galeri) real.galeri(simpan.galeri); real.sync(DATA);
+      }).catch(() => { const s = $("#stage"); if (s) s.insertAdjacentHTML("afterbegin", '<p class="er" style="position:relative;z-index:2;padding:12px">Gedung 3D gagal dimuat. Cek internet lalu buka lagi.</p>'); });
+    },
+    setVisible(v) { vis = v; if (real) real.setVisible(v); },
+    sync(list) { if (real) real.sync(list); },
+    states() { return real ? real.states() : {}; },
+    _demo() { return real ? real._demo() : null; },
+    iot(list) { simpan.iot = list; if (real) real.iot(list); },
+    follow(k) { if (real) real.follow(k); },
+    galeri(ids) { simpan.galeri = ids; if (real) real.galeri(ids); },
+    stok(list) { simpan.stok = list; if (real) real.stok(list); },
+  };
 })();
 
 function navGrup() {   // judul kelompok menu disembunyikan kalau semua menu di bawahnya tersembunyi
@@ -6498,6 +6544,9 @@ addEventListener("hashchange", bukaHash);
 (async () => {
   if (DEMO) { $("#demoBanner").hidden = false; $("#csv").removeAttribute("href"); $("#csv").onclick = e => { e.preventDefault(); alert("Ekspor CSV aktif di versi server."); }; }
   try { ME = await api("/api/me"); if (ME.lantai) LANTAI = ME.lantai; } catch (e) { return; }
+  RINGAN = !!ME.ringan || (navigator.deviceMemory > 0 && navigator.deviceMemory <= 2);
+  document.documentElement.classList.toggle("ringan", RINGAN);
+  if (RINGAN) { const vw = $("#voWrap"); if (vw) vw.hidden = true; const sl = $("#sl"); if (sl) sl.insertAdjacentHTML("beforebegin", '<p class="cd mu" id="voRingan" style="margin:0 0 12px">📱 <b>Mode HP Ringan</b> aktif: gedung 3D dimatikan supaya HP tidak berat. Status semua bot tetap tampil di bawah.</p>'); }
   $$(".nv").forEach(b => { const p = PAGE_PERM[b.dataset.p]; if (p && !can(p)) b.style.display = "none"; });
   if (!PUNYA_INBOX()) ["inbox", "bayarkas"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // viewer tidak punya inbox & iuran
   if (ME.role !== "viewer") api("/api/absen").then(d => { AB = d; const nb = $("#nbAbsen"); if (nb) nb.hidden = !(d.status === "belum"); }).catch(() => {});   // tanda "!" kalau belum absen

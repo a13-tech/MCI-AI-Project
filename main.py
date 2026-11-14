@@ -23,6 +23,11 @@ from email.utils import parsedate_to_datetime
 import xml.etree.ElementTree as ET
 
 import httpx, pytz, psutil
+try:   # opsional: kalau Pillow belum terpasang, foto dikirim ukuran asli
+    from PIL import Image, ImageOps
+    Image.MAX_IMAGE_PIXELS = 40_000_000
+except Exception:
+    Image = None
 from flask import Flask, jsonify, abort, request, has_request_context, send_from_directory, make_response, redirect, Response
 from pydantic import BaseModel
 from google import genai
@@ -2813,8 +2818,80 @@ def _api_me_isi(r, m):
     return jsonify({"role": "admin" if is_admin(r) else ("anggota" if m else r), "nama_peran": nama_peran(r), "izin": sorted(perms_of(r)), "kuota": kuota_info(r),
                     "anggota": {"id": m["id"], "nama": m["nama"], "divisi": [DIVISI[x] for x in m["divisi"]], "jabatan": [JABATAN[x] for x in m["jabatan"]],
                                 "divisi_key": m["divisi"], "iuran": tingkat_of(m["id"]), "sp": sp_status().get(m["id"], 0)} if m else None, "daftar_divisi": DIVISI,
-                    **{k: v for k, v in SET.items() if k not in ("kuota", "tg_users", "tg_izin", "iuran", "berita_ringkas")}, "mcp_siap": bool(MCP_SERVERS and ClientSession), "db_permanen": PG, "lantai": LANTAI,
+                    **{k: v for k, v in SET.items() if k not in ("kuota", "tg_users", "tg_izin", "iuran", "berita_ringkas", "hp_ringan")}, "ringan": hp_ringan(r), "mcp_siap": bool(MCP_SERVERS and ClientSession), "db_permanen": PG, "lantai": LANTAI,
                     "gambar": img_status()})
+
+
+# ---------- HP RINGAN: anggota ber-HP lemot dapat tampilan hemat RAM (tanpa 3D, foto kecil, jarang polling) ----------
+SET.setdefault("hp_ringan", [])
+
+
+def hp_ringan(r):
+    m = mid_of(r)
+    return bool(m) and m in SET.get("hp_ringan", [])
+
+
+@app.route("/api/hp-ringan", methods=["GET", "POST"])
+def api_hp_ringan():
+    need("admin")
+    if request.method == "POST":
+        d = request.get_json(silent=True) or {}
+        try:
+            i = int(d.get("id"))
+        except (TypeError, ValueError):
+            return jsonify({"error": "id anggota tidak valid"}), 400
+        daftar = [x for x in SET.get("hp_ringan", []) if x != i]
+        if d.get("aktif"):
+            daftar.append(i)
+        SET["hp_ringan"] = sorted(set(daftar))
+        set_save()
+    return jsonify({"ids": SET.get("hp_ringan", [])})
+
+
+_FOTO_KECIL, _FOTO_LOCK = OrderedDict(), threading.Lock()
+
+
+def foto_kirim(data, mime, headers, kunci):
+    """Kirim foto. ?w=480 -> versi kecil JPEG (dibuat sekali lalu disimpan di memori) supaya galeri ringan di HP."""
+    try:
+        w = int(request.args.get("w") or 0)
+    except ValueError:
+        w = 0
+    mime = mime or "application/octet-stream"
+    if not w or Image is None or request.args.get("unduh") or not mime.startswith("image/") or mime in ("image/svg+xml", "image/gif"):
+        return Response(data, mimetype=mime, headers=headers)
+    w = min(max(w, 160), 1600)
+    k = (kunci, w)
+    with _FOTO_LOCK:
+        b = _FOTO_KECIL.get(k)
+        if b is not None:
+            _FOTO_KECIL.move_to_end(k)
+    if b is None:
+        try:
+            im = Image.open(io.BytesIO(data))
+            im.draft("RGB", (w, w))   # JPEG: decode langsung di ukuran kecil, hemat CPU server
+            im = ImageOps.exif_transpose(im)
+            if im.mode in ("RGBA", "LA", "P"):
+                im = im.convert("RGBA")
+                bg = Image.new("RGB", im.size, (255, 255, 255))
+                bg.paste(im, mask=im.split()[-1])
+                im = bg
+            elif im.mode != "RGB":
+                im = im.convert("RGB")
+            im.thumbnail((w, w))
+            out = io.BytesIO()
+            im.save(out, "JPEG", quality=72, optimize=True, progressive=True)
+            b = out.getvalue()
+        except Exception:
+            log.warning("foto kecil gagal dibuat untuk %s", kunci)
+            b = b""
+        with _FOTO_LOCK:
+            _FOTO_KECIL[k] = b
+            while len(_FOTO_KECIL) > 300:
+                _FOTO_KECIL.popitem(last=False)
+    if not b or len(b) >= len(data):
+        return Response(data, mimetype=mime, headers=headers)
+    return Response(b, mimetype="image/jpeg", headers=headers)
 
 
 @app.route("/api/office")
@@ -3024,7 +3101,7 @@ def api_gambar_one(i):
     h = {"Cache-Control": "private, max-age=86400"}
     if request.args.get("unduh"):
         h["Content-Disposition"] = f"attachment; filename=mci-gambar-{i}.{ext}"
-    return Response(g[1], mimetype=g[0], headers=h)
+    return foto_kirim(g[1], g[0], h, ("gambar", i))
 
 
 @app.route("/api/memori", methods=["GET", "DELETE"])
@@ -6976,7 +7053,7 @@ def api_dok_one(i):
     h = {"Cache-Control": "private, max-age=86400"}
     if request.args.get("unduh"):
         h["Content-Disposition"] = f"attachment; filename=mci-dokumentasi-{i}.jpg"
-    return Response(base64.b64decode(row[1]), mimetype=row[0], headers=h)
+    return foto_kirim(base64.b64decode(row[1]), row[0], h, ("dok", i))
 
 
 @app.route("/api/hutang", methods=["GET", "POST"])
