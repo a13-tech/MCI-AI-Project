@@ -330,6 +330,9 @@ td{border-top:1px solid var(--line)}
 .ci{width:15px;height:15px;flex:none;border:2px solid currentColor;border-radius:50%;position:relative;box-sizing:border-box}.ci::after{content:"";position:absolute;width:2px;height:7px;background:currentColor;right:-4px;bottom:-6px;transform:rotate(-45deg);border-radius:1px}
 #sd.vw #cariBuka{display:none!important}
 .ctk3{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;padding:8px 10px;border-radius:10px;background:#F6F1E4;font-size:13px}.ctk3 b:first-child{width:100%}
+.kpWrap{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(220px,1fr);gap:12px;margin-top:10px}#kpPeta{min-height:340px;border-radius:12px;overflow:hidden;background:#E9E3D3}
+#kpPanel{display:flex;flex-direction:column;gap:8px}.kpG{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:9px 12px;border-radius:10px;background:#F6F1E4}.kpG span{color:var(--mu,#5B6578);font-size:13px}.kpG b{font-size:18px}.kpG small{font-size:12px;font-weight:600;color:#5B6578}
+@media(max-width:760px){.kpWrap{grid-template-columns:1fr}#kpPeta{min-height:260px}}html.ringan #kpPeta{display:none}
 html.ringan *,html.ringan *::before,html.ringan *::after{animation:none!important;transition:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 .cariHal{position:fixed;inset:0;z-index:90;background:rgba(9,18,36,.55);display:flex;justify-content:center;align-items:flex-start;padding:10vh 16px 16px;backdrop-filter:blur(2px)}
 .cariHal[hidden]{display:none}
@@ -791,6 +794,7 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
   <h1>Lab IoT</h1>
   <p class="mu">Data sensor ESP32 secara langsung. Nilai terbaru juga tampil di dinding layar Lab Komputer (LT 2) kantor 3D, dan Aegis mengirim alarm Telegram kalau ada aturan yang terlewati.</p>
   <div id="iotWarn"></div>
+  <div class="cd" id="kpBox" hidden></div>
   <div class="iotg" id="iotDev"></div>
   <div class="cd">
    <div class="bar" style="justify-content:space-between;margin:0 0 6px"><b>Aturan alarm (Aegis)</b><span class="mu" style="font-size:12px">Jeda 10 menit per aturan supaya tidak spam</span></div>
@@ -1749,6 +1753,7 @@ async function loadIot(first) {
     ${Object.entries(d.data).map(([k, v], i) => `<div class="iotm"><span class="k">${esc(k)}</span><span class="v">${typeof v === "number" ? v.toLocaleString("id-ID", {maximumFractionDigits: 2}) : esc(String(v))}</span>${typeof v === "number" ? spark((d.hist || {})[k], cols[i % 4]) : ""}</div>`).join("")}
     <div class="bar" style="margin:10px 0 0"><button class="bt o" style="min-height:34px;padding:6px 12px;font-size:12px" data-idel="${esc(d.perangkat)}">Hapus data perangkat</button></div></div>`).join("") ||
     '<div class="cd"><b>Belum ada perangkat.</b><div class="mu" style="margin-top:6px">Upload kode ESP32 di bawah. Setelah ESP32 tersambung WiFi, kartunya muncul di sini dalam 5 detik.</div></div>';
+  $("#kpBox").hidden = false; kpRender();
   $$("[data-idel]").forEach(b => b.onclick = async () => { if (confirm("Hapus semua data " + b.dataset.idel + "?")) { await api("/api/iot/" + encodeURIComponent(b.dataset.idel), {method: "DELETE"}); loadIot(); } });
   if (first) {
     $("#iotRules").innerHTML = (IOTA.rules || []).map(ruleRow).join(""); bindRules();
@@ -1756,6 +1761,50 @@ async function loadIot(first) {
     $("#iotKey").textContent = IOTA.key ? (iotKeyOn ? IOTA.key : "•".repeat(Math.min(24, IOTA.key.length))) : "(belum diisi di Render)";
     $("#iotCode").textContent = espCode().replace(IOTA.key || "\u0000", "•••• (tekan Salin kode)");
   }
+}
+/* ===== Dashboard kapal (JalaDhipa-1 dkk): muncul otomatis kalau ada perangkat yang mengirim lat & lon ===== */
+let KP = {peta: null, penanda: null, jejak: null, dev: null, muat: null};
+const kpCari = (d, ...k) => { for (const x of k) { const f = Object.keys(d).find(n => n === x || n.startsWith(x)); if (f != null && d[f] !== undefined) return d[f]; } return undefined; };
+function kpLeaflet() {
+  if (window.L) return Promise.resolve();
+  return KP.muat || (KP.muat = new Promise((ok, no) => { const c = document.createElement("link"); c.rel = "stylesheet"; c.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"; document.head.appendChild(c);
+    const sc = document.createElement("script"); sc.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"; sc.onload = ok; sc.onerror = () => { KP.muat = null; no(new Error("Peta gagal dimuat")); }; document.head.appendChild(sc); }));
+}
+function kpRender() {
+  const el = $("#kpBox"); if (!el || !IOTA) return;
+  const kapal = IOTA.devices.filter(d => kpCari(d.data, "lat") !== undefined && kpCari(d.data, "lon", "lng") !== undefined);
+  if (!kapal.length) { el.hidden = true; return; }
+  if (!KP.dev || !kapal.some(d => d.perangkat === KP.dev)) KP.dev = kapal[0].perangkat;
+  const d = kapal.find(x => x.perangkat === KP.dev), v = d.data;
+  const lat = +kpCari(v, "lat"), lon = +kpCari(v, "lon", "lng"), spd = kpCari(v, "kecepatan", "speed", "knot", "kmh"), hdg = kpCari(v, "arah", "heading", "hdg", "kompas");
+  const bat = kpCari(v, "baterai", "battery", "batt", "volt"), rssi = kpCari(v, "rssi", "sinyal"), suhu = kpCari(v, "suhu", "temp"), jarak = kpCari(v, "jarak", "dist", "ultra");
+  const bendera = [["api", kpCari(v, "api", "flame")], ["gerak", kpCari(v, "pir", "gerak", "motion")]].filter(([, x]) => x !== undefined);
+  const kotak = (ikon, label, nilai, satuan = "", warna = "") => nilai === undefined ? "" : `<div class="kpG"><span>${ikon} ${label}</span><b style="${warna}">${typeof nilai === "number" ? nilai.toLocaleString("id-ID", {maximumFractionDigits: 2}) : esc(String(nilai))}<small> ${satuan}</small></b></div>`;
+  if (!el.dataset.siap || el.dataset.siap !== KP.dev) {
+    el.dataset.siap = KP.dev; KP.peta = null;
+    el.innerHTML = `<div class="bar" style="margin:0;justify-content:space-between;flex-wrap:wrap"><b>🚢 Dashboard kapal</b>${kapal.length > 1 ? `<select id="kpPilih" style="width:auto">${kapal.map(k => `<option ${k.perangkat === KP.dev ? "selected" : ""}>${esc(k.perangkat)}</option>`).join("")}</select>` : `<span class="ch n">${esc(KP.dev)}</span>`}</div>
+      <div class="kpWrap"><div id="kpPeta">${RINGAN ? "" : '<p class="mu" style="padding:12px">Memuat peta…</p>'}</div><div id="kpPanel"></div></div>
+      <p class="mu" style="font-size:12px;margin:8px 0 0">Kirim dari ESP32 (atau Home Station yang menerima LoRa lalu meneruskan lewat WiFi): <code>lat</code>, <code>lon</code>, <code>kecepatan</code>, <code>arah</code>, <code>baterai</code>, <code>rssi</code>, <code>suhu</code>, <code>jarak</code>, <code>api</code>, <code>pir</code>. Lokasi hanya terlihat oleh Dev.</p>`;
+    const pl = $("#kpPilih"); if (pl) pl.onchange = e => { KP.dev = e.target.value; kpRender(); };
+  }
+  $("#kpPanel").innerHTML = `<div class="kpG kpS"><span>${d.online ? "🟢 Online" : "⚪ Offline"}</span><b style="font-size:15px">${ago(d.ts)}</b></div>`
+    + kotak("📍", "Posisi", `${lat.toFixed(5)}, ${lon.toFixed(5)}`) + kotak("⚡", "Kecepatan", spd, "knot") + kotak("🧭", "Arah", hdg, "°")
+    + kotak("🔋", "Baterai", bat, typeof bat === "number" && bat <= 15 ? "V" : "%", typeof bat === "number" && bat < (bat <= 15 ? 3.4 : 20) ? "color:#C0392B" : "")
+    + kotak("📶", "Sinyal LoRa", rssi, "dBm") + kotak("🌡️", "Suhu", suhu, "°C") + kotak("📏", "Jarak depan", jarak, "cm", typeof jarak === "number" && jarak < 50 ? "color:#C0392B" : "")
+    + bendera.map(([n, x]) => kotak(n === "api" ? "🔥" : "👀", n === "api" ? "Api" : "Gerakan", x ? "TERDETEKSI" : "aman", "", x ? "color:#C0392B" : "color:#2E8B57")).join("")
+    + `<a class="bt o" style="margin-top:6px" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${lat},${lon}">Buka di Google Maps ↗</a>`;
+  if (RINGAN || !isFinite(lat) || !isFinite(lon)) return;
+  const hl = (d.hist && (d.hist[Object.keys(d.hist).find(k => k.startsWith("lat"))] || [])) || [], hn = (d.hist && (d.hist[Object.keys(d.hist).find(k => k.startsWith("lon") || k.startsWith("lng"))] || [])) || [];
+  const jejak = hl.map((p, i) => hn[i] ? [p[1], hn[i][1]] : null).filter(Boolean);
+  kpLeaflet().then(() => {
+    const ikon = L.divIcon({className: "", html: `<div style="font-size:26px;transform:rotate(${(+hdg || 0) - 90}deg);filter:drop-shadow(0 2px 2px #0006)">🚢</div>`, iconSize: [30, 30], iconAnchor: [15, 15]});
+    if (!KP.peta) {
+      $("#kpPeta").innerHTML = ""; KP.peta = L.map("kpPeta", {zoomControl: true}).setView([lat, lon], 15);
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 19, attribution: "© OpenStreetMap"}).addTo(KP.peta);
+      KP.jejak = L.polyline(jejak, {color: "#D4AF5A", weight: 4, opacity: .85}).addTo(KP.peta); KP.penanda = L.marker([lat, lon], {icon: ikon}).addTo(KP.peta);
+    } else { KP.jejak.setLatLngs(jejak); KP.penanda.setLatLng([lat, lon]).setIcon(ikon); }
+  }).catch(e => { $("#kpPeta").innerHTML = `<p class="er" style="padding:12px">${esc(e.message)}</p>`; });
+  el.hidden = false;
 }
 $("#iotAdd").onclick = () => { $("#iotRules").insertAdjacentHTML("beforeend", ruleRow()); bindRules(); };
 $("#iotSave").onclick = async () => {
