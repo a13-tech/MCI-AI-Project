@@ -1568,6 +1568,10 @@ function show(p) {
   if (p === "office" && DATA.length) OFFICE.ensure(DATA);
   if (p === "kas") loadKas();
   if (p === "tim") { renderTim(); loadUsage(); }
+  if (p === "cmd") renderCmd();
+  if (p === "office" || p === "cmd") poll();
+  if (ME.role) pollMulai();
+  tabelHp();
   if (p === "skills") loadSkills();
   if (p === "gambar") loadGambar();
   if (p === "memori") loadMemori();
@@ -1612,6 +1616,7 @@ $$(".nv[data-p]").forEach(b => b.onclick = () => { $("#sd").classList.remove("bk
 
 const JAL = {skill: ["Skill", "g"], langsung: ["Langsung", "g"], boss: ["Boss", ""], dewan: ["Dewan", "y"]};
 function renderCmd() {
+  if ($("#p-cmd").hidden) return;   // jangan gambar ulang halaman yang tidak dilihat (bikin lag)
   const w = DATA.filter(d => d.status === "WORKING").length;
   $("#k2").textContent = w + " dari " + DATA.length;
   if (KAS) $("#k1").textContent = rp(KAS.ringkas.saldo);
@@ -1666,6 +1671,12 @@ async function loadUsage() {
     const rows = Object.entries(USE.model).map(([m, v]) => `<tr><td>${esc(m)}</td><td class="rt">${num(v.panggilan)}</td><td class="rt">${num(v.masuk)}</td><td class="rt">${num(v.keluar)}</td><td class="rt">${num(v.pikir)}</td></tr>`).join("") || '<tr><td colspan="5" class="mu">Belum ada pemakaian hari ini.</td></tr>';
     $("#usage").innerHTML = `<b>Pemakaian token ${esc(USE.tanggal)}</b><div class="mu" style="margin:4px 0 12px">Total ${num(USE.total)}${USE.batas ? " dari batas " + num(USE.batas) : ""} · RPM ${USE.rpm} · ${num(USE.router_hemat)} pesan tanpa Boss · ${num(USE.cache_hit)} dari cache · Boss dipanggil ${num(USE.boss_dipanggil)}x</div><div class="tb"><table><thead><tr><th>Model</th><th class="rt">Panggilan</th><th class="rt">Token masuk</th><th class="rt">Token keluar</th><th class="rt">Thinking</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   } catch (e) {}
+}
+let POLL_T = 0;
+const jedaPoll = () => (!$("#p-office").hidden || !$("#p-cmd").hidden) ? (ME.role === "admin" ? 2000 : 4000) : 20000;
+function pollMulai() {   // jadwal ulang dari sekarang (dipanggil saat pindah halaman supaya langsung ikut ritme baru)
+  clearTimeout(POLL_T);
+  POLL_T = setTimeout(async () => { if (!document.hidden) await poll(); pollMulai(); }, jedaPoll());
 }
 async function poll() {
   try {
@@ -5774,8 +5785,8 @@ const OFFICE = (() => {
   function frame() {
     requestAnimationFrame(frame);
     const dt = Math.min(clock.getDelta(), .1), t = clock.elapsedTime;
+    if (!visible || document.hidden) return;   // Office tidak dilihat: jangan hitung apa pun (hemat CPU HP/laptop)
     AG.forEach(a => step(a, dt, t)); liftTick(dt); forkTick(dt);
-    if (!visible || document.hidden) return;
     ANI.forEach(o => {
       if (o.k === "spin") o.o.rotation.y += dt * (o.s || 1);
       else if (o.k === "scroll") o.o.offset.y += dt * .05;
@@ -6287,7 +6298,7 @@ $("#nvCari").oninput = e => { const q = e.target.value.trim().toLowerCase(); $("
 $("#nvMenu").addEventListener("click", () => { const c = $("#nvCari"); if (c.value) { c.value = ""; c.oninput({target: c}); } });
 { let tunda = 0; new MutationObserver(() => { if (!tunda) tunda = requestAnimationFrame(() => { tunda = 0; hpNavBangun(); }); }).observe($("#sd"), {attributes: true, subtree: true, attributeFilter: ["class", "style", "hidden"], childList: true, characterData: true}); }
 function tabelHp() {   // beri label kolom ke tiap sel supaya di HP tabel tampil sebagai kartu (CSS table.tk)
-  $$("main table").forEach(t => {
+  $$("main .pg:not([hidden]) table").forEach(t => {   // halaman tersembunyi dilabel saat dibuka (lewat show)
     const th = [...t.querySelectorAll(":scope > thead th")]; if (th.length < 3) return;
     let ok = true;
     t.querySelectorAll(":scope > tbody > tr").forEach(tr => { const td = tr.children;
@@ -6525,8 +6536,8 @@ addEventListener("hashchange", bukaHash);
   show(DEMO ? "office" : ME.role === "viewer" ? "info" : "beranda");
   bukaHash();   // pintasan aplikasi: /#tugas, /#inbox, /#bayarkas
   OFFICE.ensure(DATA); OFFICE.sync(DATA);
-  // admin 1 detik, viewer 3 detik; berhenti saat tab tidak dilihat (hemat server & kuota bandwidth)
-  setInterval(() => { if (!document.hidden) poll(); }, ME.role === "admin" ? 1000 : 3000);
+  // Office / Command Center terbuka: admin 2 detik, lainnya 4 detik. Halaman lain: 20 detik. Tab tidak dilihat: berhenti.
+  pollMulai();
   document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
   setInterval(() => { if (!$("#p-office").hidden) renderList(); }, 1000);
   setInterval(() => { if (can("tim")) loadUsage(); }, 15000);

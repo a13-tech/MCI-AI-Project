@@ -2825,7 +2825,7 @@ def api_office():
     luar = r_ == "viewer"   # viewer = orang luar: tanpa data stok & sensor
     ck = "adm" if adm else ("luar" if luar else "agt")
     c = _OFFICE_CACHE.get(ck)
-    if c and time.time() - c[0] < 0.8:   # banyak viewer = satu hitungan per 0,8 detik
+    if c and time.time() - c[0] < 1.5:   # banyak viewer = satu hitungan per 1,5 detik
         return Response(c[1], mimetype="application/json")
     ags = [{"key": k, "name": a["nama"], "peran": a["peran"], "boss": a["boss"], "lantai": a["lantai"], "divisi": a["divisi"],
             "status": o[0], "activity": o[1], "mode": o[2], "model": model_for(k),
