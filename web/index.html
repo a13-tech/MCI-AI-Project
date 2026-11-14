@@ -307,6 +307,33 @@ td{border-top:1px solid var(--line)}
 .it2 .meta{font-size:12.5px;color:var(--mute);margin-top:4px;display:flex;gap:6px 14px;flex-wrap:wrap}
 .it2 .bd{margin-top:10px;white-space:pre-wrap;line-height:1.6}
 .it2 .ac{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+/* ===== CARI HALAMAN (Ctrl K / tombol 🔍) ===== */
+#nvCari{display:none!important}
+#cariBuka{display:flex;align-items:center;gap:9px;width:calc(100% - 4px);box-sizing:border-box;margin:4px 2px 14px;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);color:#AFC2EA;font:inherit;font-size:14px;cursor:pointer;text-align:left}
+#cariBuka:hover{background:rgba(255,255,255,.12);color:#fff}#cariBuka:focus-visible{outline:2px solid #F1D58A}
+#cariBuka .ct{flex:1}#cariBuka kbd{font:600 11px/1 system-ui,sans-serif;padding:4px 6px;border-radius:6px;border:1px solid rgba(255,255,255,.22);color:#C9D7F5}
+.ci{width:15px;height:15px;flex:none;border:2px solid currentColor;border-radius:50%;position:relative;box-sizing:border-box}.ci::after{content:"";position:absolute;width:2px;height:7px;background:currentColor;right:-4px;bottom:-6px;transform:rotate(-45deg);border-radius:1px}
+#sd.vw #cariBuka{display:none!important}
+.cariHal{position:fixed;inset:0;z-index:90;background:rgba(9,18,36,.55);display:flex;justify-content:center;align-items:flex-start;padding:10vh 16px 16px;backdrop-filter:blur(2px)}
+.cariHal[hidden]{display:none}
+.chBox{width:100%;max-width:560px;background:#fff;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden;display:flex;flex-direction:column;max-height:76vh}
+.chIn{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #EAE6DC;color:#6B7A99}
+.chIn input{flex:1;border:0;outline:0;font-size:17px;padding:8px 2px;background:transparent;color:var(--navy2);min-width:0}
+.chIn button{border:1px solid #E1DCCF;background:#F7F5EF;border-radius:8px;padding:6px 9px;font:600 12px system-ui,sans-serif;color:#6B7A99;cursor:pointer}
+#chList{list-style:none;margin:0;padding:6px;overflow:auto}
+#chList li{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:10px;cursor:pointer}
+#chList li b{font-size:15px;color:var(--navy2)}#chList li small{font-size:12.5px;color:#6B7A99}
+#chList li mark{background:#F6E7B8;color:inherit;border-radius:3px;padding:0 1px}
+#chList li.on{background:#EEF2FB}#chList li.on b{color:#13306B}
+#chList .chKosong{cursor:default;color:#6B7A99;font-size:14px}
+.chFoot{margin:0;padding:8px 14px;border-top:1px solid #EAE6DC;font-size:12px;color:#8A94A8}
+@media (max-width:900px){
+ #sd:not(.bk) #cariBuka{display:grid;place-items:center;width:42px;height:42px;margin:0 0 0 6px;padding:0;flex:none;border-radius:10px;color:#F2EBDD}
+ #sd:not(.bk) #cariBuka .ct,#sd:not(.bk) #cariBuka kbd,#sd.bk #cariBuka kbd{display:none}
+ #sd.bk #cariBuka{margin:10px 0 8px;min-height:46px;font-size:15px}
+ .cariHal{padding:max(10px,env(safe-area-inset-top)) 10px 10px}.chBox{max-height:calc(100vh - 20px);max-height:calc(100dvh - 20px)}
+ .chFoot{display:none}
+}
 .sorot{outline:3px solid #D4AF5A;outline-offset:3px;border-radius:12px;transition:outline-color .4s}
 .pdG{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));margin-bottom:18px}.pdK{cursor:pointer}.pdK:hover{border-color:var(--gold,#D4AF5A)}
 .pdH{font:700 19px/1.3 var(--serif);color:var(--navy2);margin:22px 0 10px}
@@ -467,6 +494,7 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
 <aside id="sd">
  <div class="brand"><img src="/aset/logo-mci-64.webp" srcset="/aset/logo-mci-64.webp 1x, /aset/logo-mci-192.webp 3x" width="52" height="52" alt="Logo MCI"><div><b>MCI</b><small>Mahardika Cakrawala Indonesia</small></div></div>
  <span id="hpJudul" aria-hidden="true"></span>
+ <button id="cariBuka" type="button" aria-label="Cari halaman" aria-haspopup="dialog"><span class="ci" aria-hidden="true"></span><span class="ct">Cari halaman…</span><kbd>Ctrl K</kbd></button>
  <button class="nv ut" id="nvMenu" type="button" aria-expanded="false">☰ Menu</button>
  <input id="nvCari" type="search" placeholder="Cari menu…" aria-label="Cari menu" autocomplete="off">
  <button class="nv ut on" data-p="beranda">Beranda</button>
@@ -537,6 +565,10 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
 <div class="tst" id="tst" hidden></div>
 <div id="cetak"></div>
 <nav id="hpNav" aria-label="Menu utama"></nav>
+<div id="cariHal" class="cariHal" hidden role="dialog" aria-modal="true" aria-label="Cari halaman">
+ <div class="chBox"><div class="chIn"><span class="ci" aria-hidden="true"></span><input id="chQ" type="search" placeholder="Ketik nama halaman, mis. kas, absen, 3d…" autocomplete="off" enterkeyhint="go" role="combobox" aria-expanded="true" aria-controls="chList" aria-autocomplete="list"><button id="chX" type="button">Tutup</button></div>
+ <ul id="chList" role="listbox" aria-label="Hasil pencarian"></ul><p class="chFoot">↑ ↓ pilih · Enter buka · Esc tutup</p></div>
+</div>
 <main>
  <div class="demo" id="demoBanner" hidden>DEMO: semua data contoh. Tanpa server dan tanpa AI sungguhan.</div>
 
@@ -5775,6 +5807,81 @@ function navBuka(p) { $$("#sd button.ng").forEach(g => g.classList.toggle("bk", 
 $$("#sd button.ng").forEach(g => g.onclick = () => { g.classList.toggle("bk"); navAtur(); });
 $("#nvMenu").onclick = () => { const bk = $("#sd").classList.toggle("bk"); $("#nvMenu").textContent = bk ? "✕ Tutup" : "☰ Menu"; $("#nvMenu").setAttribute("aria-expanded", bk); if (bk) $("#sd").scrollTop = 0; };
 new MutationObserver(() => { if (!$("#sd").classList.contains("bk")) $("#nvMenu").textContent = "☰ Menu"; }).observe($("#sd"), {attributes: true, attributeFilter: ["class"]});
+/* ================= CARI HALAMAN ================= */
+const CH_KATA = {   // sinonim supaya "uang" ketemu Keuangan, "3d" ketemu Studio, dst.
+  beranda: "home awal dashboard utama", inbox: "pesan notifikasi kotak masuk surat masuk", absen: "hadir kehadiran presensi izin cuti", proyek: "project kerjaan tim",
+  tugas: "task todo pekerjaan deadline", bayarkas: "iuran bayar kas mingguan transfer", info: "tanya ai chat publik faq", portofolio: "karya showcase hasil proyek",
+  pengumuman: "info broadcast kabar", agenda: "rapat meeting jadwal kalender acara", arsip: "proyek selesai riwayat proyek", alat: "pinjam peminjaman tools barang",
+  stok: "gudang komponen inventaris barang sparepart", mitra: "partner rekanan vendor supplier", anggota: "member orang personel tim", struktur: "divisi jabatan organisasi bagan",
+  surat: "penerimaan anggota baru welcome", polling: "voting suara pemilihan", skor: "poin lencana badge peringkat ranking", catatan: "notes memo",
+  rekapkas: "rekap laporan kas uang", riwayat: "riwayat transaksi uang mutasi", kas: "kas uang keuangan saldo pemasukan pengeluaran ledger buku kas", hutang: "utang piutang pinjaman",
+  invoice: "tagihan faktur nota", produk: "katalog jualan toko harga", jasa: "layanan pesan jasa website", backup: "cadangan unduh data ekspor",
+  uu: "pasal undang aturan peraturan ad art", sidang: "pelanggaran hukuman sidang", putusan: "keputusan sidang vonis", sp: "surat peringatan teguran sanksi", blacklist: "daftar hitam banned",
+  studio: "3d stl model cetak print svg kode desain casing", gambar: "foto ilustrasi poster logo canvas ai gambar", konten: "jadwal posting instagram tiktok sosmed", dokumentasi: "foto kegiatan dokumentasi",
+  perpus: "buku pdf perpustakaan bacaan ebook", cmd: "command center perintah bot", apex: "ai chat boss tanya argon hydrogen", office: "kantor virtual 3d bot ai",
+  iot: "sensor esp32 perangkat iot monitor", panduan: "rakit tutorial elektronika arduino esp32 manual", laporan: "laporan mingguan report", memori: "ingatan memory ai",
+  skills: "skill kemampuan bot", tim: "token pemakaian bot ai kuota", berita: "news kabar berita hari ini", tentang: "about kontak profil mci"
+};
+const chNorm = t => String(t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/&/g, " ").replace(/\s+/g, " ").trim();
+let CH_I = 0, CH_H = [];
+const chSub = (w, t) => { let i = 0; for (const c of t) if (c === w[i]) i++; return i === w.length && t[0] === w[0]; };
+function chIndeks() {   // hanya halaman yang tampil untuk akun ini
+  let grup = "";
+  return $$("#sd > *").flatMap(e => {
+    if (e.matches("button.ng")) { grup = e.textContent.trim(); return []; }
+    if (!e.matches(".nv[data-p]") || e.style.display === "none" || e.hidden) return [];
+    const nama = (e.childNodes[0] || {}).textContent ? e.childNodes[0].textContent.trim() : e.textContent.trim();
+    return [{p: e.dataset.p, nama, grup: grup || "Utama", n: chNorm(nama), k: chNorm(CH_KATA[e.dataset.p] || "")}];
+  });
+}
+function chCari(q) {
+  const idx = chIndeks(), t = chNorm(q).split(" ").filter(Boolean);
+  if (!t.length) { let akhir = []; try { akhir = JSON.parse(localStorage.getItem("chAkhir") || "[]"); } catch (e) {}
+    const urut = akhir.map(p => idx.find(x => x.p === p)).filter(Boolean); return [...urut, ...idx.filter(x => !akhir.includes(x.p))].slice(0, 12); }
+  return idx.map(x => { let skor = 0;
+      for (const w of t) { const di = x.n.indexOf(w), kata = (" " + x.n).indexOf(" " + w) >= 0;
+        if (x.n.startsWith(w)) skor += 6; else if (kata) skor += 4; else if (di >= 0) skor += 2;
+        else if ((" " + x.k).indexOf(" " + w) >= 0) skor += 1.5; else if ((" " + chNorm(x.grup)).indexOf(" " + w) >= 0) skor += .8;
+        else if (w.length >= 3 && chSub(w, x.n)) skor += .5; else return null; }   // "tgs" -> Tugas (huruf berurutan)
+      return {...x, skor}; })
+    .filter(Boolean).sort((a, b) => b.skor - a.skor || a.nama.localeCompare(b.nama)).slice(0, 12);
+}
+function chTanda(nama, q) {   // tebalkan bagian nama yang cocok
+  let h = esc(nama); chNorm(q).split(" ").filter(w => w.length > 0).forEach(w => { const i = chNorm(nama).indexOf(w); if (i >= 0 && nama.length === chNorm(nama).length) h = esc(nama.slice(0, i)) + "<mark>" + esc(nama.slice(i, i + w.length)) + "</mark>" + esc(nama.slice(i + w.length)); });
+  return h;
+}
+function chRender() {
+  const q = $("#chQ").value; CH_H = chCari(q); CH_I = Math.min(CH_I, Math.max(0, CH_H.length - 1));
+  $("#chList").innerHTML = CH_H.length ? CH_H.map((x, i) => `<li role="option" id="ch${i}" data-chp="${x.p}" class="${i === CH_I ? "on" : ""}" aria-selected="${i === CH_I}"><b>${chTanda(x.nama, q)}</b><small>${esc(x.grup)}</small></li>`).join("")
+    : `<li class="chKosong">Tidak ada halaman yang cocok dengan “${esc(q)}”.</li>`;
+  $("#chQ").setAttribute("aria-activedescendant", CH_H.length ? "ch" + CH_I : "");
+  const on = $("#chList li.on"); if (on) on.scrollIntoView({block: "nearest"});
+}
+function chBuka() { if (ME && ME.role === "viewer") return; $("#cariHal").hidden = false; $("#chQ").value = ""; CH_I = 0; chRender(); setTimeout(() => $("#chQ").focus(), 30); }
+function chTutup() { $("#cariHal").hidden = true; }
+function chPilih(p) {
+  chTutup(); const nv = $(`#sd .nv[data-p="${p}"]`); if (!nv) return;
+  try { const a = JSON.parse(localStorage.getItem("chAkhir") || "[]").filter(x => x !== p); a.unshift(p); localStorage.setItem("chAkhir", JSON.stringify(a.slice(0, 5))); } catch (e) {}
+  nv.click(); if ($("#sd").classList.contains("bk")) $("#nvMenu").click(); window.scrollTo(0, 0);
+}
+$("#cariBuka").onclick = chBuka;
+$("#chX").onclick = chTutup;
+$("#cariHal").onclick = e => { if (e.target.id === "cariHal") chTutup(); };
+$("#chQ").oninput = () => { CH_I = 0; chRender(); };
+$("#chQ").onkeydown = e => {
+  if (e.key === "ArrowDown") { e.preventDefault(); CH_I = Math.min(CH_I + 1, CH_H.length - 1); chRender(); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); CH_I = Math.max(CH_I - 1, 0); chRender(); }
+  else if (e.key === "Enter") { e.preventDefault(); if (CH_H[CH_I]) chPilih(CH_H[CH_I].p); }
+  else if (e.key === "Escape") { e.preventDefault(); chTutup(); }
+};
+$("#chList").onclick = e => { const li = e.target.closest("[data-chp]"); if (li) chPilih(li.dataset.chp); };
+addEventListener("keydown", e => {
+  const ketik = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target || {}).tagName || "") || (e.target || {}).isContentEditable;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); $("#cariHal").hidden ? chBuka() : chTutup(); }
+  else if (e.key === "/" && !ketik && $("#cariHal").hidden) { e.preventDefault(); chBuka(); }
+  else if (e.key === "Escape" && !$("#cariHal").hidden) chTutup();
+});
+if (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) $("#cariBuka kbd").textContent = "⌘ K";
 /* ================= SURAT PENERIMAAN (khusus Dev) ================= */
 let SR = null, SR_F = "a";
 const srLink = x => location.origin + "/surat/" + x.token;
