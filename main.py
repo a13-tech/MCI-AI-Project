@@ -620,6 +620,11 @@ def usage_add(model, masuk, keluar, pikir):
                 (today(), model, masuk, keluar, pikir))
     except Exception:
         log.exception("Gagal menyimpan pemakaian token")
+    if "argon" in str(model).lower():
+        try:
+            threading.Thread(target=argon_cek_peringatan, daemon=True).start()
+        except Exception:
+            pass
 
 
 def gaya_model(model):
@@ -2824,8 +2829,29 @@ def _api_me_isi(r, m):
     return jsonify({"role": "admin" if is_admin(r) else ("anggota" if m else r), "nama_peran": nama_peran(r), "izin": sorted(perms_of(r)), "kuota": kuota_info(r),
                     "anggota": {"id": m["id"], "nama": m["nama"], "divisi": [DIVISI[x] for x in m["divisi"]], "jabatan": [JABATAN[x] for x in m["jabatan"]],
                                 "divisi_key": m["divisi"], "iuran": tingkat_of(m["id"]), "sp": sp_status().get(m["id"], 0)} if m else None, "daftar_divisi": DIVISI,
-                    **{k: v for k, v in SET.items() if k not in ("kuota", "tg_users", "tg_izin", "iuran", "berita_ringkas", "hp_ringan")}, "ringan": hp_ringan(r), "mcp_siap": bool(MCP_SERVERS and ClientSession), "db_permanen": PG, "lantai": LANTAI,
+                    **{k: v for k, v in SET.items() if k not in ("kuota", "tg_users", "tg_izin", "iuran", "berita_ringkas", "hp_ringan", "argon_anggaran", "argon_harga", "argon_kabar")}, "ringan": hp_ringan(r), "mcp_siap": bool(MCP_SERVERS and ClientSession), "db_permanen": PG, "lantai": LANTAI,
                     "gambar": img_status()})
+
+
+@app.route("/api/argon-anggaran", methods=["GET", "POST"])
+def api_argon_anggaran():
+    need("admin")
+    if request.method == "POST":
+        d = request.get_json(silent=True) or {}
+        try:
+            if "anggaran" in d:
+                SET["argon_anggaran"] = max(0, int(float(d["anggaran"])))
+            if "kurs" in d:
+                SET["kurs_usd"] = max(1000, int(float(d["kurs"])))
+            if "harga_masuk" in d or "harga_keluar" in d:
+                hm, hk = SET.get("argon_harga") or [2, 10]
+                SET["argon_harga"] = [max(0.0, float(d.get("harga_masuk", hm))), max(0.0, float(d.get("harga_keluar", hk)))]
+        except (TypeError, ValueError):
+            return jsonify({"error": "Isi dengan angka"}), 400
+        set_save()
+    rp = argon_biaya_bulan(True)
+    return jsonify({"terpakai": round(rp), "anggaran": int(SET.get("argon_anggaran") or 0), "kurs": SET.get("kurs_usd"), "harga": SET.get("argon_harga"),
+                    "habis": argon_habis(), "bulan": today()[:7], "kunci": bool(KUNCI_TIER1)})
 
 
 # ---------- HP RINGAN: anggota ber-HP lemot dapat tampilan hemat RAM (tanpa 3D, foto kecil, jarang polling) ----------
@@ -5287,7 +5313,60 @@ HYDROGEN_MODEL = os.getenv("HYDROGEN_MODEL", "gemini-4-hydrogen")
 
 
 def kunci_argon():
+    """Kunci Argon. Kosong kalau anggaran bulan ini habis -> semua fitur otomatis memakai mesin biasa (Flash)."""
+    if argon_habis():
+        return ""
     return KUNCI_TIER1 or gkey("canvas")
+
+
+# ---------- ANGGARAN ARGON: tagihan Argon per bulan tidak boleh lewat batas ----------
+SET.setdefault("argon_anggaran", int(os.getenv("ARGON_ANGGARAN_RP", "40000")))   # rupiah per bulan; 0 = tanpa batas
+SET.setdefault("kurs_usd", int(os.getenv("KURS_USD", "16500")))
+SET.setdefault("argon_harga", [float(os.getenv("ARGON_HARGA_MASUK", "2")), float(os.getenv("ARGON_HARGA_KELUAR", "10"))])   # USD per 1 juta token (promo)
+_ARGON_BIAYA = [0.0, 0.0]   # (waktu hitung, rupiah)
+
+
+def argon_biaya_bulan(segar=False):
+    """Perkiraan tagihan Argon bulan ini (rupiah) dari catatan token. Disimpan 60 detik supaya tidak query terus."""
+    if not segar and time.time() - _ARGON_BIAYA[0] < 60:
+        return _ARGON_BIAYA[1]
+    hm, hk = SET.get("argon_harga") or [2, 10]
+    try:
+        with db() as c:
+            r = sql(c, "SELECT COALESCE(SUM(masuk),0), COALESCE(SUM(keluar),0), COALESCE(SUM(pikir),0) FROM pemakaian WHERE tanggal>=? AND model LIKE ?",
+                    (today()[:8] + "01", "%argon%")).fetchone()
+        rp = ((float(r[0]) * hm + (float(r[1]) + float(r[2])) * hk) / 1e6) * float(SET.get("kurs_usd") or 16500)
+    except Exception:
+        log.exception("hitung biaya argon gagal")
+        rp = _ARGON_BIAYA[1]
+    _ARGON_BIAYA[0], _ARGON_BIAYA[1] = time.time(), rp
+    return rp
+
+
+def argon_habis():
+    batas = int(SET.get("argon_anggaran") or 0)
+    return bool(batas) and argon_biaya_bulan() >= batas
+
+
+def argon_cek_peringatan():
+    """Kabari Dev sekali saat tagihan Argon bulan ini mencapai 80% dan 100% anggaran."""
+    batas = int(SET.get("argon_anggaran") or 0)
+    if not batas:
+        return
+    rp, bln = argon_biaya_bulan(True), today()[:7]
+    for tingkat, judul in ((100, "Anggaran Argon bulan ini HABIS"), (80, "Anggaran Argon bulan ini sudah 80%")):
+        if rp >= batas * tingkat / 100:
+            k = f"{bln}:{tingkat}"
+            if SET.get("argon_kabar") != k and not (tingkat == 80 and str(SET.get("argon_kabar", "")).endswith(":100") and str(SET.get("argon_kabar", "")).startswith(bln)):
+                SET["argon_kabar"] = k
+                set_save()
+                isi = (f"Perkiraan tagihan Argon {bln}: Rp{rp:,.0f} dari batas Rp{batas:,.0f}.".replace(",", ".") +
+                       (" Semua fitur sekarang otomatis memakai Gemini Flash sampai bulan depan. Batas bisa dinaikkan di halaman Tim & Token." if tingkat == 100 else ""))
+                try:
+                    inbox_kirim(_dev_ids(), "sistem", judul, isi)
+                except Exception:
+                    log.exception("kabar anggaran argon gagal")
+            return
 
 
 def kunci_hydrogen():
