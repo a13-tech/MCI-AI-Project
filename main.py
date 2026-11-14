@@ -12,7 +12,7 @@ Studio Gambar: Cloudflare Workers AI (FLUX schnell + img2img), gratis 10.000 neu
 """
 import studio3d
 import panduan as rakit
-import os, io, csv, json, re, time, gzip, random, base64, asyncio, secrets, logging, sqlite3, threading, contextlib, hashlib, zipfile, queue
+import os, io, csv, json, re, time, math, gzip, random, base64, asyncio, secrets, logging, sqlite3, threading, contextlib, hashlib, zipfile, queue
 from types import SimpleNamespace
 from collections import deque, OrderedDict
 from datetime import datetime, date, timedelta, timezone
@@ -316,6 +316,9 @@ def db_init():
         sql(c, f"CREATE TABLE IF NOT EXISTS proyek_ajuan (id {pk}, proyek_id INTEGER NOT NULL, barang TEXT NOT NULL, harga {big} NOT NULL DEFAULT 0, alasan TEXT, bukti TEXT, "
                "status TEXT NOT NULL DEFAULT 'menunggu', oleh_id INTEGER, oleh TEXT, dibuat TEXT, diputus_oleh TEXT, diputus TEXT, catatan TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS model3d (id {pk}, judul TEXT NOT NULL, permintaan TEXT, resep TEXT NOT NULL, laporan TEXT, mesin TEXT, oleh_id INTEGER, oleh TEXT, dibuat TEXT)")
+        sql(c, f"CREATE TABLE IF NOT EXISTS cetak (id {pk}, model_id INTEGER, judul TEXT NOT NULL, jumlah INTEGER NOT NULL DEFAULT 1, isi INTEGER NOT NULL DEFAULT 20, "
+               "gram REAL, menit REAL, biaya INTEGER, harga INTEGER, pemesan TEXT, catatan TEXT, status TEXT NOT NULL DEFAULT 'antre', "
+               "oleh_id INTEGER, oleh TEXT, dibuat TEXT, mulai TEXT, selesai TEXT)")
         sql(c, f"CREATE TABLE IF NOT EXISTS jasa (id {pk}, nama TEXT NOT NULL, deskripsi TEXT, harga TEXT, pengerja INTEGER, status TEXT NOT NULL DEFAULT 'menunggu', "
                f"oleh_id INTEGER, oleh TEXT, dibuat TEXT, diputus_oleh TEXT, diputus TEXT, catatan TEXT, publik INTEGER NOT NULL DEFAULT 0)")
         sql(c, f"CREATE TABLE IF NOT EXISTS jasa_pesan (id {pk}, jasa_id INTEGER NOT NULL, kebutuhan TEXT NOT NULL, tenggat TEXT, status TEXT NOT NULL DEFAULT 'menunggu', "
@@ -6145,12 +6148,123 @@ def _m3d_get(i):
     return a[0], json.loads(a[1])
 
 
+# ---------- KALKULATOR CETAK 3D + ANTREAN PRINTER ----------
+CETAK_BAWAAN = {"harga_gram": 250, "densitas": 1.24, "isi": 20, "laju": 6.0, "watt": 120, "kwh": 1500, "setup": 5000, "margin": 40}
+SET.setdefault("cetak", dict(CETAK_BAWAAN))
+
+
+def cetak_atur():
+    return {**CETAK_BAWAAN, **(SET.get("cetak") or {})}
+
+
+def cetak_hitung(volume_cm3, isi=None, jumlah=1):
+    """Perkiraan cetak FDM. Rumus sama persis dengan di halaman web (cetakHitung) supaya angka selalu cocok.
+    faktor bahan = dinding/atap (+-30%) + isi dalam; waktu = volume bahan / laju ekstrusi + 10 menit pemanasan per buah."""
+    a = cetak_atur()
+    isi = max(0, min(100, float(a["isi"] if isi is None else isi)))
+    jumlah = max(1, int(jumlah or 1))
+    faktor = min(1.0, 0.3 + 0.7 * isi / 100)
+    gram = max(0.0, float(volume_cm3 or 0)) * float(a["densitas"]) * faktor * jumlah
+    menit = (gram / float(a["densitas"]) * 1000 / max(0.5, float(a["laju"]))) / 60 + 10 * jumlah
+    biaya = gram * float(a["harga_gram"]) + float(a["watt"]) / 1000 * menit / 60 * float(a["kwh"]) + float(a["setup"])
+    harga = math.ceil(biaya * (1 + float(a["margin"]) / 100) / 500) * 500
+    return {"gram": round(gram, 1), "menit": round(menit), "biaya": round(biaya), "harga": int(harga), "isi": isi, "jumlah": jumlah}
+
+
+CETAK_KOLOM = ["id", "model_id", "judul", "jumlah", "isi", "gram", "menit", "biaya", "harga", "pemesan", "catatan", "status", "oleh_id", "oleh", "dibuat", "mulai", "selesai"]
+
+
+def cetak_rows():
+    with db() as c:
+        rows = sql(c, f"SELECT {','.join(CETAK_KOLOM)} FROM cetak WHERE status IN ('antre','mencetak') OR dibuat>=? ORDER BY "
+                      "CASE status WHEN 'mencetak' THEN 0 WHEN 'antre' THEN 1 ELSE 2 END, id", ((datetime.now(WIB) - timedelta(days=14)).isoformat(timespec="seconds"),)).fetchall()
+    return [dict(zip(CETAK_KOLOM, x)) for x in rows]
+
+
+def _cetak_payload(r):
+    return {"atur": cetak_atur(), "antrean": cetak_rows(), "kelola": is_admin(r), "boleh": is_admin(r) or boleh(r, "studio_buat"), "saya": mid_of(r)}
+
+
+@app.route("/api/cetak", methods=["GET", "POST"])
+def api_cetak():
+    r = _studio_izin()
+    if request.method == "POST":
+        if not (is_admin(r) or boleh(r, "studio_buat")):
+            return jsonify({"error": "Jabatan atau divisimu belum diberi izin memakai printer."}), 403
+        d = request.get_json(silent=True) or {}
+        try:
+            mid = int(d.get("model_id"))
+        except (TypeError, ValueError):
+            return jsonify({"error": "Pilih model dulu"}), 400
+        with db() as c:
+            a = sql(c, "SELECT judul, laporan FROM model3d WHERE id=?", (mid,)).fetchone()
+            if not a:
+                return jsonify({"error": "Model tidak ditemukan"}), 404
+            n = int(sql(c, "SELECT COUNT(*) FROM cetak WHERE status='antre'").fetchone()[0])
+            if n >= 50:
+                return jsonify({"error": "Antrean penuh (50). Selesaikan yang ada dulu."}), 400
+            vol = (json.loads(a[1] or "{}") or {}).get("volume_cm3") or 0
+            try:
+                h = cetak_hitung(vol, d.get("isi"), min(50, int(d.get("jumlah") or 1)))
+            except (TypeError, ValueError):
+                return jsonify({"error": "Jumlah dan isi harus angka"}), 400
+            sql(c, "INSERT INTO cetak (model_id,judul,jumlah,isi,gram,menit,biaya,harga,pemesan,catatan,status,oleh_id,oleh,dibuat) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (mid, a[0], h["jumlah"], int(h["isi"]), h["gram"], h["menit"], h["biaya"], h["harga"], str(d.get("pemesan") or "Internal MCI")[:80],
+                 str(d.get("catatan") or "")[:300], "antre", mid_of(r), nama_peran(r), _now()))
+        audit("cetak", "antre", a[0][:80], oleh=nama_peran(r))
+    return jsonify(_cetak_payload(r))
+
+
+@app.route("/api/cetak/<int:i>", methods=["POST"])
+def api_cetak_aksi(i):
+    r = _studio_izin()
+    aksi = str((request.get_json(silent=True) or {}).get("aksi") or "")
+    with db() as c:
+        x = sql(c, "SELECT oleh_id, status, judul FROM cetak WHERE id=?", (i,)).fetchone()
+        if not x:
+            abort(404)
+        milik = x[0] is not None and x[0] == mid_of(r)
+        if aksi == "batal" and (is_admin(r) or milik) and x[1] in ("antre", "mencetak"):
+            sql(c, "UPDATE cetak SET status='batal', selesai=? WHERE id=?", (_now(), i))
+        elif aksi == "mulai" and is_admin(r) and x[1] == "antre":
+            sql(c, "UPDATE cetak SET status='mencetak', mulai=? WHERE id=?", (_now(), i))
+        elif aksi == "selesai" and is_admin(r) and x[1] in ("antre", "mencetak"):
+            sql(c, "UPDATE cetak SET status='selesai', selesai=? WHERE id=?", (_now(), i))
+            if x[0]:
+                try:
+                    inbox_kirim([x[0]], "studio", "Cetakan 3D selesai", f"\"{x[2]}\" sudah selesai dicetak. Ambil di basecamp ya.", ref=i)
+                except Exception:
+                    log.exception("kabar cetak selesai gagal")
+        elif aksi == "hapus" and is_admin(r):
+            sql(c, "DELETE FROM cetak WHERE id=?", (i,))
+        else:
+            return jsonify({"error": "Aksi tidak diizinkan"}), 403
+    return jsonify(_cetak_payload(r))
+
+
+@app.route("/api/cetak/atur", methods=["POST"])
+def api_cetak_atur():
+    need("admin")
+    d = request.get_json(silent=True) or {}
+    a = cetak_atur()
+    try:
+        for k in CETAK_BAWAAN:
+            if k in d and str(d[k]).strip() != "":
+                a[k] = max(0.0, float(str(d[k]).replace(",", ".")))
+    except ValueError:
+        return jsonify({"error": "Isi dengan angka"}), 400
+    a["densitas"] = max(0.5, a["densitas"]); a["laju"] = max(0.5, a["laju"]); a["isi"] = min(100.0, a["isi"])
+    SET["cetak"] = a
+    set_save()
+    return jsonify(_cetak_payload(role()))
+
+
 def _studio_payload(r):
     with db() as c:
         g = sql(c, "SELECT id,prompt,mesin,oleh,dibuat FROM gambar_kode ORDER BY id DESC LIMIT 60").fetchall()
     k = SET.get("kuota", {})
     return {"model": m3d_rows(), "gambar": [{"id": int(a[0]), "prompt": a[1], "mesin": a[2] or "", "oleh": a[3] or "", "dibuat": a[4] or ""} for a in g],
-            "buat": is_admin(r) or boleh(r, "studio_buat"), "admin": is_admin(r), "mesin": mesin_kode(),
+            "buat": is_admin(r) or boleh(r, "studio_buat"), "admin": is_admin(r), "mesin": mesin_kode(), "cetak": cetak_atur(),
             "kuota": None if is_admin(r) else {"pakai": k.get(f"{r}:studio", 0) if k.get("tgl") == today() else 0, "batas": KUOTA["studio"]}}
 
 

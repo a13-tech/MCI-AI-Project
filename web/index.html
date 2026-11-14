@@ -329,6 +329,7 @@ td{border-top:1px solid var(--line)}
 #cariBuka .ct{flex:1}#cariBuka kbd{font:600 11px/1 system-ui,sans-serif;padding:4px 6px;border-radius:6px;border:1px solid rgba(255,255,255,.22);color:#C9D7F5}
 .ci{width:15px;height:15px;flex:none;border:2px solid currentColor;border-radius:50%;position:relative;box-sizing:border-box}.ci::after{content:"";position:absolute;width:2px;height:7px;background:currentColor;right:-4px;bottom:-6px;transform:rotate(-45deg);border-radius:1px}
 #sd.vw #cariBuka{display:none!important}
+.ctk3{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;padding:8px 10px;border-radius:10px;background:#F6F1E4;font-size:13px}.ctk3 b:first-child{width:100%}
 html.ringan *,html.ringan *::before,html.ringan *::after{animation:none!important;transition:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 .cariHal{position:fixed;inset:0;z-index:90;background:rgba(9,18,36,.55);display:flex;justify-content:center;align-items:flex-start;padding:10vh 16px 16px;backdrop-filter:blur(2px)}
 .cariHal[hidden]{display:none}
@@ -640,7 +641,9 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
     <span class="mu" style="font-size:12.5px">Coretan tangan, foto benda, atau gambar teknik. Tulis ukurannya di kolom atas kalau tahu.</span></div>
    <div id="s3Rev" class="mu" hidden style="margin-top:8px;font-size:13px"></div>
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="s3Go">Buat</button><span class="mu" id="s3Msg"></span></div></div>
+  <div class="bar" id="ctIsiBar" style="margin:0 0 10px;gap:8px"><span class="mu" style="font-size:13px">Isi cetakan (infill):</span><select id="ctIsi" style="width:auto"><option value="10">10% ringan</option><option value="20" selected>20% normal</option><option value="40">40% kuat</option><option value="100">100% padat</option></select></div>
   <div id="s3Box"><p class="mu">Memuat…</p></div>
+  <div class="cd" id="ctBox" style="margin-top:14px"></div>
   <details class="cd" id="labMesin" hidden style="margin-top:18px"><summary style="cursor:pointer;font-weight:700">Lab Mesin AI (khusus Dev)</summary>
    <p class="mu" style="font-size:13.5px">Kirim satu perintah yang sama ke beberapa mesin AI, lalu bandingkan jawaban dan kecepatannya. Mode "Resep 3D" menguji apakah resep tiap mesin lolos mesin hitung MCI. Mesin tanpa kunci tidak bisa dipilih: isi kuncinya di environment Render.</p>
    <div id="labDaftar" class="picks" style="margin:10px 0"></div>
@@ -6499,7 +6502,7 @@ $("#s3Sk").onchange = async e => { const f = e.target.files[0]; if (!f) return;
   try { S3_SK = await s3SketsaKecil(f); $("#s3SkImg").src = URL.createObjectURL(S3_SK); $("#s3SkImg").hidden = $("#s3SkX").hidden = false; }
   catch (er) { $("#s3Msg").textContent = er.message; } e.target.value = ""; };
 $("#s3SkX").onclick = e => { e.preventDefault(); S3_SK = null; $("#s3SkImg").hidden = $("#s3SkX").hidden = true; };
-function s3Mode() { $("#s3SkBox").hidden = S3_J !== "3d" || !!S3_DARI; $$("#s3Seg button").forEach(b => b.classList.toggle("on", b.dataset.s3 === S3_J)); $("#s3Minta").placeholder = S3_DARI ? "Tulis perubahan yang kamu mau, mis. lubangnya dibesarkan jadi 14 mm" : S3_PH[S3_J]; $("#s3Go").textContent = S3_DARI ? "Buat revisi" : S3_J === "3d" ? "Buat model 3D" : "Buat gambar";
+function s3Mode() { $("#s3SkBox").hidden = S3_J !== "3d" || !!S3_DARI; $("#ctIsiBar").hidden = $("#ctBox").hidden = S3_J !== "3d"; $$("#s3Seg button").forEach(b => b.classList.toggle("on", b.dataset.s3 === S3_J)); $("#s3Minta").placeholder = S3_DARI ? "Tulis perubahan yang kamu mau, mis. lubangnya dibesarkan jadi 14 mm" : S3_PH[S3_J]; $("#s3Go").textContent = S3_DARI ? "Buat revisi" : S3_J === "3d" ? "Buat model 3D" : "Buat gambar";
   $("#s3Rev").hidden = !S3_DARI; if (S3_DARI) $("#s3Rev").innerHTML = `Merevisi model <b>${esc((S3.model.find(m => m.id === S3_DARI) || {}).judul || "")}</b>. <a href="#" id="s3RevX">Batal revisi</a>`; const x = $("#s3RevX"); if (x) x.onclick = e => { e.preventDefault(); S3_DARI = null; s3Mode(); }; }
 $$("#s3Seg button").forEach(b => b.onclick = () => { S3_J = b.dataset.s3; S3_DARI = null; s3Mode(); s3Render(); });
 function s3Render() {
@@ -6509,6 +6512,8 @@ function s3Render() {
   if (S3_J === "3d") $("#s3Box").innerHTML = info + (d.model.length ? `<div class="s3g">${d.model.map(m => { const u = (m.laporan.ukuran_mm || {}), w = m.laporan.peringatan || [];
     return `<article class="it2" data-sorot="3d:${m.id}"><img src="/api/studio/3d/${m.id}.svg" alt="Pratinjau ${esc(m.judul)}" loading="lazy" width="520" height="400"><h3 style="margin-top:10px">${esc(m.judul)}</h3>
     <div class="meta"><span>${u.panjang_x} × ${u.lebar_y} × ${u.tinggi_z} mm</span><span>${m.laporan.volume_cm3} cm³</span><span>${esc(m.oleh)} · ${esc(tglID(m.dibuat))}</span></div>
+    ${m.laporan.volume_cm3 ? (() => { const h = cetakHitung(m.laporan.volume_cm3, CETAK_ISI); return `<div class="ctk3"><b>🖨️ Perkiraan cetak (isi ${CETAK_ISI}%)</b><span>${num(h.gram)} g filamen</span><span>${jamMenit(h.menit)}</span><span>biaya ${rp(h.biaya)}</span><span><b>harga jual ${rp(h.harga)}</b></span></div>
+      ${d.buat ? `<div class="ac" style="margin-top:6px"><button class="bt o" data-ctq="${m.id}">＋ Masuk antrean cetak</button>${d.admin ? `<button class="bt o" data-ctinv="${m.id}" data-judul="${esc(m.judul)}" data-harga="${h.harga}" data-gram="${h.gram}">🧾 Buat invoice</button>` : ""}</div>` : ""}`; })() : ""}
     ${w.length ? `<div class="bd" style="font-size:13px;color:#8E2A1E"><b>Perlu dicek sebelum cetak</b>\n${w.map(esc).join("\n")}</div>` : '<p class="ch g" style="display:inline-block;margin:8px 0 0">Lolos pemeriksaan mesin</p>'}
     ${m.laporan.penjelasan ? `<div class="bd" style="font-size:13.5px">${esc(m.laporan.penjelasan)}</div>` : ""}
     <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Permintaan &amp; bagian</summary><div class="bd" style="font-size:13px">${esc(m.permintaan)}\n\n${(m.laporan.bagian || []).map(b => `${b.no}. ${esc(b.nama)} (${esc(b.bentuk)}, ${esc(b.operasi)})`).join("\n")}</div></details>
@@ -6516,6 +6521,8 @@ function s3Render() {
   else $("#s3Box").innerHTML = info + (d.gambar.length ? `<div class="s3g">${d.gambar.map(g => `<article class="it2" data-sorot="svg:${g.id}"><img src="/api/studio/svg/${g.id}" alt="${esc(g.prompt)}" loading="lazy" data-s3i="${g.id}"><div class="meta" style="margin-top:8px"><span>${esc(g.oleh)} · ${esc(tglID(g.dibuat))}</span></div><div class="bd" style="font-size:13px">${esc(g.prompt)}</div>
     <div class="ac"><a class="bt g" href="/api/studio/svg/${g.id}?unduh=1" download>Unduh SVG</a><button class="bt o" data-s3png="${g.id}">Unduh PNG</button>${d.admin ? `<button class="bt o" data-s3d="svg:${g.id}">Hapus</button>` : ""}</div></article>`).join("")}</div>` : '<p class="mu">Belum ada gambar.</p>');
   $$("[data-s3v]").forEach(b => b.onclick = () => s3Putar(+b.dataset.s3v, b.dataset.judul));
+  $$("[data-ctq]").forEach(b => b.onclick = () => cetakAntre(+b.dataset.ctq));
+  $$("[data-ctinv]").forEach(b => b.onclick = () => cetakInvoice(b.dataset.judul, +b.dataset.harga, +b.dataset.gram));
   $$("[data-s3r]").forEach(b => b.onclick = () => { S3_DARI = +b.dataset.s3r; s3Mode(); $("#s3Minta").value = ""; $("#s3Minta").focus(); $("#s3Buat").scrollIntoView({behavior: "smooth", block: "start"}); });
   $$("[data-s3d]").forEach(b => b.onclick = async () => { if (!confirm("Hapus permanen?")) return; const [j, i] = b.dataset.s3d.split(":"); try { S3 = await api(`/api/studio/${j}/${i}`, {method: "DELETE"}); s3Render(); } catch (e) { alert(e.message); } });
   $$("[data-s3png]").forEach(b => b.onclick = () => { const im = $(`[data-s3i="${b.dataset.s3png}"]`), r = (im.naturalHeight || 1) / (im.naturalWidth || 1), c = document.createElement("canvas"); c.width = 2160; c.height = Math.round(2160 * r);
@@ -6542,6 +6549,44 @@ $("#labGo").onclick = async () => {
   } catch (e) { $("#labMsg").textContent = e.message; }
   clearInterval(LAB_T); b.disabled = false;
 };
+/* Kalkulator cetak 3D + antrean printer. Rumus = cetak_hitung() di server. */
+let CETAK = null, CETAK_ISI = 20;
+function cetakHitung(vol, isi, jumlah = 1) {
+  const a = (S3 && S3.cetak) || {harga_gram: 250, densitas: 1.24, isi: 20, laju: 6, watt: 120, kwh: 1500, setup: 5000, margin: 40};
+  isi = Math.max(0, Math.min(100, isi == null ? a.isi : +isi)); jumlah = Math.max(1, Math.round(jumlah || 1));
+  const faktor = Math.min(1, .3 + .7 * isi / 100), gram = Math.max(0, +vol || 0) * a.densitas * faktor * jumlah;
+  const menit = (gram / a.densitas * 1000 / Math.max(.5, a.laju)) / 60 + 10 * jumlah;
+  const biaya = gram * a.harga_gram + a.watt / 1000 * menit / 60 * a.kwh + a.setup;
+  return {gram: Math.round(gram * 10) / 10, menit: Math.round(menit), biaya: Math.round(biaya), harga: Math.ceil(biaya * (1 + a.margin / 100) / 500) * 500};
+}
+const jamMenit = m => (m >= 60 ? Math.floor(m / 60) + " j " : "") + (m % 60) + " m";
+async function cetakMuat() { try { CETAK = await api("/api/cetak"); cetakRender(); } catch (e) { const el = $("#ctBox"); if (el) el.innerHTML = '<p class="er">' + esc(e.message) + "</p>"; } }
+function cetakRender() {
+  const el = $("#ctBox"); if (!el || !CETAK) return; const d = CETAK, a = d.atur;
+  const st = {antre: ["Antre", "y"], mencetak: ["Mencetak", "b"], selesai: ["Selesai", "g"], batal: ["Batal", "r"]};
+  const aktif = d.antrean.filter(x => x.status === "antre" || x.status === "mencetak"), totM = aktif.reduce((s, x) => s + (x.menit || 0), 0);
+  el.innerHTML = `<div class="bar" style="margin:0;justify-content:space-between"><b>🖨️ Antrean printer</b><span class="mu" style="font-size:13px">${aktif.length} pekerjaan · total ±${jamMenit(Math.round(totM))}</span></div>
+    <div class="tb" style="margin-top:10px"><table><thead><tr><th>#</th><th>Model</th><th>Pemesan</th><th class="rt">Jml</th><th class="rt">Filamen</th><th class="rt">Waktu</th><th class="rt">Harga</th><th>Status</th><th></th></tr></thead><tbody>
+    ${d.antrean.map((x, i) => `<tr><td>${i + 1}</td><td><b>${esc(x.judul)}</b>${x.catatan ? `<div class="mu" style="font-size:12px">${esc(x.catatan)}</div>` : ""}<div class="mu" style="font-size:12px">oleh ${esc(x.oleh || "")} · isi ${x.isi}%</div></td><td>${esc(x.pemesan || "")}</td>
+      <td class="rt">${x.jumlah}</td><td class="rt">${num(x.gram)} g</td><td class="rt">${jamMenit(Math.round(x.menit || 0))}</td><td class="rt">${rp(x.harga)}</td><td><span class="ch ${(st[x.status] || ["", ""])[1]}">${(st[x.status] || [x.status])[0]}</span></td>
+      <td class="rt" style="white-space:nowrap">${d.kelola && x.status === "antre" ? `<button class="bt o" data-cta="mulai:${x.id}">Mulai</button>` : ""}${d.kelola && (x.status === "antre" || x.status === "mencetak") ? `<button class="bt g" data-cta="selesai:${x.id}">Selesai</button>` : ""}${(d.kelola || x.oleh_id === d.saya) && (x.status === "antre" || x.status === "mencetak") ? `<button class="bt o" data-cta="batal:${x.id}">Batal</button>` : ""}${d.kelola && (x.status === "selesai" || x.status === "batal") ? `<button class="bt o" data-cta="hapus:${x.id}">Hapus</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="9" class="mu">Antrean kosong. Tekan "Masuk antrean cetak" di kartu model.</td></tr>'}</tbody></table></div>
+    ${d.kelola ? `<details style="margin-top:12px"><summary class="mu" style="cursor:pointer">Atur harga & printer (khusus Dev)</summary><div class="fl" style="margin-top:8px">
+      ${[["harga_gram", "Harga filamen (Rp/gram)"], ["densitas", "Massa jenis (g/cm³, PLA 1.24)"], ["isi", "Isi bawaan (%)"], ["laju", "Laju cetak (mm³/detik)"], ["watt", "Daya printer (watt)"], ["kwh", "Tarif listrik (Rp/kWh)"], ["setup", "Biaya tetap per pesanan (Rp)"], ["margin", "Keuntungan (%)"]].map(([k, l]) => `<label>${l}<input type="text" inputmode="decimal" data-cts="${k}" value="${a[k]}"></label>`).join("")}
+      </div><div class="bar" style="margin:10px 0 0"><button class="bt g" id="ctSimpan">Simpan</button><span class="mu" id="ctMsg"></span></div></details>` : ""}`;
+  $$("[data-cta]").forEach(b => b.onclick = async () => { const [aksi, id] = b.dataset.cta.split(":"); if (aksi === "hapus" && !confirm("Hapus dari daftar?")) return; try { CETAK = await api("/api/cetak/" + id, {json: {aksi}}); cetakRender(); } catch (e) { alert(e.message); } });
+  const sv = $("#ctSimpan"); if (sv) sv.onclick = async () => { const o = {}; $$("[data-cts]").forEach(i => o[i.dataset.cts] = i.value); try { CETAK = await api("/api/cetak/atur", {json: o}); if (S3) S3.cetak = CETAK.atur; CETAK_ISI = Math.round(CETAK.atur.isi); s3Render(); cetakRender(); } catch (e) { $("#ctMsg").textContent = e.message; } };
+}
+async function cetakAntre(id) {
+  const jumlah = prompt("Berapa buah yang dicetak?", "1"); if (jumlah === null) return;
+  const pemesan = prompt("Untuk siapa? (nama klien, atau kosongkan untuk internal MCI)", "") ?? "";
+  try { CETAK = await api("/api/cetak", {json: {model_id: id, jumlah: +jumlah || 1, isi: CETAK_ISI, pemesan: pemesan || "Internal MCI"}}); cetakRender(); $("#ctBox").scrollIntoView({behavior: "smooth", block: "start"}); } catch (e) { alert(e.message); }
+}
+function cetakInvoice(judul, harga, gram) {   // buka halaman Invoice dengan item jasa cetak sudah terisi
+  const n = $('#sd .nv[data-p="invoice"]'); if (n) n.click(); else show("invoice");
+  setTimeout(() => { IVI.push({sumber: "manual", produk_id: null, stok_id: null, nama: `Jasa cetak 3D: ${judul} (±${gram} g PLA, isi ${CETAK_ISI}%)`.slice(0, 120), satuan: "pcs", jumlah: 1, harga});
+    ivRenderItems(); $("#ivForm").scrollIntoView({behavior: "smooth", block: "start"}); }, 700);
+}
+
 /* Pratinjau 3D interaktif: file STL dari server digambar three.js, bisa diputar (seret) dan di-zoom (cubit / scroll) */
 function stlBaca(buf) {   // STL biner -> posisi & normal
   const dv = new DataView(buf), n = dv.getUint32(80, true);
@@ -6581,7 +6626,8 @@ async function s3Putar(id, judul) {
     const loop = () => { if (!hidup) return; raf = requestAnimationFrame(loop); ctl.update(); R.render(sc, cam); }; loop();
   } catch (e) { const i = $("#s3vInfo"); if (i) i.textContent = e.message; }
 }
-async function s3Muat() { s3Mode(); try { delete APIC["/api/studio"]; S3 = await api("/api/studio"); s3Mode(); s3Render(); } catch (e) { $("#s3Box").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; } }
+$("#ctIsi").onchange = e => { CETAK_ISI = +e.target.value; s3Render(); };
+async function s3Muat() { cetakMuat(); s3Mode(); try { delete APIC["/api/studio"]; S3 = await api("/api/studio"); s3Mode(); s3Render(); } catch (e) { $("#s3Box").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; } }
 $("#s3Go").onclick = async () => {
   const b = $("#s3Go"), t0 = Date.now(); b.disabled = true; clearInterval(S3_T);
   S3_T = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); $("#s3Msg").textContent = S3_J === "3d" ? `${s < 60 ? "AI merancang" + (S3_SK ? " dari sketsa" : "") : s < 120 ? "Mesin menghitung bentuk" : "AI mengecek gambar hasilnya"}… ${s} detik (biasanya 1–3 menit)` : `AI menggambar… ${s} detik`; }, 1000);
