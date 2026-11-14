@@ -8480,6 +8480,18 @@ def seo_head(judul, desk, path, faq=False):
             + (f'<meta name="google-site-verification" content="{e(GSC_META)}">' if GSC_META else "") + seo_jsonld(faq))
 
 
+CSS_PUBLIK = """:root{--n:#0F1E3A;--g:#D4AF5A;--t:#1D2939;--m:#5B6578;--bg:#F6F3EC}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:16px/1.65 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{background:var(--n);color:#F2EBDD;padding:40px 20px;display:flex;gap:18px;align-items:center;justify-content:center;text-align:left}header img{border-radius:50%;flex:none}
+h1{font:700 clamp(26px,5vw,40px)/1.15 Georgia,serif;margin:2px 0;color:#fff}.ey{margin:0;color:var(--g);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12.5px}.sub{margin:4px 0 0;color:#C9D7F5}
+main{max-width:820px;margin:0 auto;padding:12px 20px 40px}section{margin:28px 0}h2{font:700 22px/1.3 Georgia,serif;color:var(--n);margin:0 0 10px}.lead{font-size:18px}
+.bd{list-style:none;padding:0;display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}.bd li{background:#fff;border:1px solid #E6E0D2;border-radius:12px;padding:14px;color:var(--m);font-size:14.5px}.bd b{display:block;color:var(--t);margin-bottom:2px}
+.tl{list-style:none;padding:0;border-left:3px solid var(--g);margin-left:8px}.tl li{display:flex;gap:14px;padding:0 0 16px 16px;position:relative}.tl li:before{content:"";position:absolute;left:-9px;top:6px;width:14px;height:14px;border-radius:50%;background:var(--n);border:2px solid var(--g)}
+.tl span{font-weight:700;color:var(--n);min-width:44px}.tl p{margin:2px 0 0;color:var(--m)}
+details{background:#fff;border:1px solid #E6E0D2;border-radius:12px;padding:12px 16px;margin:8px 0}summary{cursor:pointer;font-weight:700;color:var(--n)}details p{margin:8px 0 0;color:var(--m)}
+.ln{display:flex;flex-wrap:wrap;gap:10px}.ln a{background:var(--n);color:#F1D58A;text-decoration:none;padding:10px 16px;border-radius:10px;font-weight:600}.ln a:hover{opacity:.9}
+footer{text-align:center;color:var(--m);font-size:13px;padding:20px;border-top:1px solid #E6E0D2}@media(max-width:560px){header{flex-direction:column;text-align:center}}"""
+
+
 @app.route("/profil")
 @app.route("/tentang-mci")
 def halaman_profil():
@@ -8500,31 +8512,112 @@ robotika, dan sistem kecerdasan buatan, dengan semangat <b>{e(SEO['slogan'])}</b
 <li><b>Internet of Things</b>Perangkat pemantau yang terhubung ke internet.</li><li><b>Robotika</b>Sistem gerak dan kendali otomatis.</li><li><b>Kecerdasan buatan</b>Agen AI dan alat bantu kerja berbasis AI.</li></ul></section>
 {('<section><h2>Perjalanan MCI</h2><ol class="tl">' + "".join(f"<li><span>{e(x.get('tahun'))}</span><div><b>{e(x.get('judul'))}</b><p>{e(x.get('isi'))}</p></div></li>" for x in sej) + "</ol></section>") if sej else ""}
 <section><h2>Pertanyaan yang sering ditanyakan</h2>{"".join(f"<details><summary>{e(q)}</summary><p>{e(a)}</p></details>" for q, a in seo_faq())}</section>
-<section><h2>Hubungi &amp; jelajahi</h2><p class="ln"><a href="/produk">Katalog produk MCI</a>{sos}<a href="/">Masuk MCI HQ</a></p></section></main>
+<section><h2>Hubungi &amp; jelajahi</h2><p class="ln"><a href="/portofolio">Portofolio proyek</a><a href="/produk">Katalog produk MCI</a>{sos}<a href="/">Masuk MCI HQ</a></p></section></main>
 <footer>© {datetime.now(WIB).year} Mahardika Cakrawala Indonesia (MCI) · {e(SEO['kota'])}, {e(SEO['provinsi'])}, Indonesia</footer>"""
-    css = """:root{--n:#0F1E3A;--g:#D4AF5A;--t:#1D2939;--m:#5B6578;--bg:#F6F3EC}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:16px/1.65 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-header{background:var(--n);color:#F2EBDD;padding:40px 20px;display:flex;gap:18px;align-items:center;justify-content:center;text-align:left}header img{border-radius:50%;flex:none}
-h1{font:700 clamp(26px,5vw,40px)/1.15 Georgia,serif;margin:2px 0;color:#fff}.ey{margin:0;color:var(--g);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12.5px}.sub{margin:4px 0 0;color:#C9D7F5}
-main{max-width:820px;margin:0 auto;padding:12px 20px 40px}section{margin:28px 0}h2{font:700 22px/1.3 Georgia,serif;color:var(--n);margin:0 0 10px}.lead{font-size:18px}
-.bd{list-style:none;padding:0;display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}.bd li{background:#fff;border:1px solid #E6E0D2;border-radius:12px;padding:14px;color:var(--m);font-size:14.5px}.bd b{display:block;color:var(--t);margin-bottom:2px}
-.tl{list-style:none;padding:0;border-left:3px solid var(--g);margin-left:8px}.tl li{display:flex;gap:14px;padding:0 0 16px 16px;position:relative}.tl li:before{content:"";position:absolute;left:-9px;top:6px;width:14px;height:14px;border-radius:50%;background:var(--n);border:2px solid var(--g)}
-.tl span{font-weight:700;color:var(--n);min-width:44px}.tl p{margin:2px 0 0;color:var(--m)}
-details{background:#fff;border:1px solid #E6E0D2;border-radius:12px;padding:12px 16px;margin:8px 0}summary{cursor:pointer;font-weight:700;color:var(--n)}details p{margin:8px 0 0;color:var(--m)}
-.ln{display:flex;flex-wrap:wrap;gap:10px}.ln a{background:var(--n);color:#F1D58A;text-decoration:none;padding:10px 16px;border-radius:10px;font-weight:600}.ln a:hover{opacity:.9}
-footer{text-align:center;color:var(--m);font-size:13px;padding:20px;border-top:1px solid #E6E0D2}@media(max-width:560px){header{flex-direction:column;text-align:center}}"""
+    css = CSS_PUBLIK
     doc = (f'<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{e(judul)}</title>'
            f'<meta name="robots" content="index,follow,max-image-preview:large"><link rel="icon" href="/aset/favicon.ico">'
            + seo_head(judul, SEO["deskripsi"], "/profil", faq=True) + f"<style>{css}</style></head><body>{body}</body></html>")
     return Response(doc, mimetype="text/html", headers={"Cache-Control": "public, max-age=600", "X-Content-Type-Options": "nosniff"})
 
 
+# ---------- PORTOFOLIO PUBLIK: proyek selesai yang ditandai publik otomatis punya halaman sendiri di Google ----------
+_PF_TULIS = set()
+
+
+def _pf_ringkasan_ai(x):
+    """Ringkasan publik belum ditulis -> Flash menulisnya sekali dari deskripsi & laporan akhir (tanpa data internal), lalu disimpan."""
+    if x["id"] in _PF_TULIS or not LOOP:
+        return
+    _PF_TULIS.add(x["id"])
+    sumber = "\n".join(str(x.get(k) or "")[:2500] for k in ("deskripsi", "laporan_akhir", "hasil"))
+    if len(sumber.strip()) < 30:
+        return
+    async def kerja():
+        t = await ask("scribe", f"Nama proyek: {x.get('nama', '')}\n\nCatatan internal:\n{sumber}", use_mcp=False, cache=False, act="Menulis ringkasan portofolio",
+                      sistem=("Tulis ringkasan portofolio untuk ORANG LUAR (calon klien, sponsor, Google) dalam bahasa Indonesia, 2-4 kalimat, maks 600 karakter: "
+                              "apa yang dibuat, teknologi utamanya, dan hasilnya. DILARANG menulis nominal uang, nama mitra/pemodal, nama anggota, masalah tim, atau data internal. "
+                              "Teks polos tanpa markdown."))
+        t = re.sub(r"(?i)rp\s?[\d.,]+", "", str(t or "")).strip()[:900]
+        if len(t) > 40:
+            y = rk_get("proyek", x["id"])
+            if y and not y.get("ringkasan_publik"):
+                d = _rk_data(y)
+                d["ringkasan_publik"] = t
+                _rk_tulis("proyek", x["id"], d)
+    asyncio.run_coroutine_threadsafe(kerja(), LOOP)
+
+
+def _pf_halaman(judul, desk, path, isi, ld):
+    e = lambda v: _esc_html(str(v or ""))
+    aman = json.dumps(ld, ensure_ascii=False).replace("</", "<\\/") if ld else ""
+    doc = (f'<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{e(judul)}</title>'
+           f'<meta name="robots" content="index,follow,max-image-preview:large"><link rel="icon" href="/aset/favicon.ico">' + seo_head(judul, desk, path, faq=False)
+           + (f'<script type="application/ld+json">{aman}</script>' if ld else "")
+           + f"<style>{CSS_PUBLIK}.pf{{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));padding:0;list-style:none;align-items:start}}"
+             ".pf li{background:#fff;border:1px solid #E6E0D2;border-radius:14px;overflow:hidden}.pf a{color:inherit;text-decoration:none;display:block}.pf img{width:100%;aspect-ratio:16/10;object-fit:cover;background:#E9E3D3;display:block}"
+             ".pf div{padding:12px 14px}.pf b{display:block;color:var(--n);font-size:17px}.pf span{color:var(--m);font-size:13.5px}.hero{width:100%;border-radius:14px;margin:6px 0 14px;max-height:420px;object-fit:cover}"
+             ".bc{font-size:13.5px;color:var(--m)}.bc a{color:var(--n)}</style></head><body>"
+           f'<header><img src="/aset/logo-mci-192.webp" width="56" height="56" alt="Logo MCI"><div><p class="ey">Portofolio</p><h1>{e(judul.split(" | ")[0])}</h1>'
+           f'<p class="sub">Mahardika Cakrawala Indonesia · {e(SEO["kota"])}, {e(SEO["provinsi"])}</p></div></header><main>{isi}'
+           f'<section><p class="ln"><a href="/profil">Profil MCI</a><a href="/portofolio">Semua proyek</a><a href="/produk">Katalog produk</a></p></section></main>'
+           f'<footer>© {datetime.now(WIB).year} Mahardika Cakrawala Indonesia (MCI)</footer></body></html>')
+    return Response(doc, mimetype="text/html", headers={"Cache-Control": "public, max-age=600", "X-Content-Type-Options": "nosniff"})
+
+
+def _pf_foto(u):
+    u = str(u or "").strip()
+    return u if re.match(r"^(https://|/aset/)", u) else ""
+
+
+@app.route("/portofolio")
+def halaman_portofolio():
+    e = lambda v: _esc_html(str(v or ""))
+    pf = portofolio()
+    sorot = "".join(f'<li><img src="{e(x["gambar"])}" alt="{e(x["nama"])}" loading="lazy"><div><b>{e(x["nama"])}</b><span>{e(x.get("sub", ""))} · {e(x.get("status", ""))}</span></div></li>' for x in PROYEK_SOROT)
+    isi = "".join(f'<li><a href="/portofolio/{x["id"]}">' + (f'<img src="{e(_pf_foto(x["foto"]))}" alt="{e(x["nama"])}" loading="lazy">' if _pf_foto(x["foto"]) else "")
+                  + f'<div><b>{e(x["nama"])}</b><span>{e(x["tahun"])}{" · " + e((x["ringkasan"] or "")[:110]) + "…" if x["ringkasan"] else ""}</span></div></a></li>' for x in pf)
+    for x in pf:
+        if not x["ringkasan"]:
+            y = rk_get("proyek", x["id"])
+            if y:
+                _pf_ringkasan_ai(y)
+    body = (f'<section><p class="lead">Proyek riset dan rekayasa yang dikerjakan tim MCI: roket, elektronika, IoT, robotika, dan kecerdasan buatan.</p></section>'
+            + (f'<section><h2>Sedang dikerjakan</h2><ul class="pf">{sorot}</ul></section>' if sorot else "")
+            + f'<section><h2>Proyek selesai</h2>' + (f'<ul class="pf">{isi}</ul>' if isi else '<p class="bc">Belum ada proyek selesai yang dipublikasikan.</p>') + "</section>")
+    ld = {"@context": "https://schema.org", "@type": "CollectionPage", "name": "Portofolio Mahardika Cakrawala Indonesia", "url": SITE_URL + "/portofolio",
+          "isPartOf": {"@id": SITE_URL + "/#organisasi"},
+          "hasPart": [{"@type": "CreativeWork", "name": x["nama"], "url": f"{SITE_URL}/portofolio/{x['id']}"} for x in pf]}
+    return _pf_halaman("Portofolio Proyek MCI | Mahardika Cakrawala Indonesia", "Daftar proyek riset dan rekayasa Mahardika Cakrawala Indonesia (MCI): roket, elektronika, IoT, robotika, dan AI.",
+                       "/portofolio", body, ld)
+
+
+@app.route("/portofolio/<int:i>")
+def halaman_portofolio_satu(i):
+    e = lambda v: _esc_html(str(v or ""))
+    x = next((p for p in portofolio() if p["id"] == i), None)
+    if not x:
+        return redirect("/portofolio", 302)
+    y = rk_get("proyek", i) or {}
+    ring = x["ringkasan"]   # deskripsi internal TIDAK pernah ditampilkan langsung (bisa berisi dana/mitra); tunggu ringkasan publik
+    if not x["ringkasan"]:
+        _pf_ringkasan_ai(y)
+    foto = _pf_foto(x["foto"])
+    body = (f'<p class="bc"><a href="/portofolio">Portofolio</a> › {e(x["nama"])}</p>' + (f'<img class="hero" src="{e(foto)}" alt="{e(x["nama"])}">' if foto else "")
+            + f'<section><h2>Tentang proyek ini</h2><p class="lead">{e(ring) or "Proyek riset dan rekayasa tim MCI. Ringkasan lengkap sedang disiapkan."}</p>'
+            + f'<p class="bc">Tahun {e(x["tahun"])} · dikerjakan tim MCI ({x["tim"]} orang)</p></section>')
+    ld = {"@context": "https://schema.org", "@type": "CreativeWork", "name": x["nama"], "description": ring[:500], "url": f"{SITE_URL}/portofolio/{i}",
+          "dateCreated": x["tahun"], "creator": {"@id": SITE_URL + "/#organisasi"}, **({"image": (SITE_URL + foto) if foto.startswith("/") else foto} if foto else {})}
+    return _pf_halaman(f"{x['nama']} | Portofolio MCI", (ring or f"Proyek {x['nama']} oleh Mahardika Cakrawala Indonesia.")[:155], f"/portofolio/{i}", body, ld)
+
+
 @app.route("/robots.txt")
 def robots_txt():
-    isi = ("User-agent: *\nAllow: /$\nAllow: /profil\nAllow: /produk\nAllow: /llms.txt\nAllow: /aset/\n"
+    isi = ("User-agent: *\nAllow: /$\nAllow: /profil\nAllow: /portofolio\nAllow: /produk\nAllow: /llms.txt\nAllow: /aset/\n"
            "Disallow: /api/\nDisallow: /surat/\nDisallow: /login\nDisallow: /*?k=\nDisallow: /invoice/\n\n"
            "# Bot AI (ChatGPT, Gemini, Claude, Perplexity) boleh membaca halaman publik yang sama\n"
            "User-agent: GPTBot\nUser-agent: OAI-SearchBot\nUser-agent: ChatGPT-User\nUser-agent: Google-Extended\nUser-agent: ClaudeBot\nUser-agent: Claude-SearchBot\nUser-agent: PerplexityBot\n"
-           "Allow: /$\nAllow: /profil\nAllow: /produk\nAllow: /llms.txt\nDisallow: /api/\nDisallow: /surat/\nDisallow: /login\nDisallow: /invoice/\n\n"
+           "Allow: /$\nAllow: /profil\nAllow: /portofolio\nAllow: /produk\nAllow: /llms.txt\nDisallow: /api/\nDisallow: /surat/\nDisallow: /login\nDisallow: /invoice/\n\n"
            f"Sitemap: {SITE_URL}/sitemap.xml\n")
     return Response(isi, mimetype="text/plain", headers={"Cache-Control": "public, max-age=3600"})
 
@@ -8532,7 +8625,8 @@ def robots_txt():
 @app.route("/sitemap.xml")
 def sitemap_xml():
     hi = today()
-    url = [("/profil", "1.0", "weekly"), ("/", "0.6", "weekly"), ("/produk", "0.7", "daily")]
+    url = [("/profil", "1.0", "weekly"), ("/portofolio", "0.8", "weekly"), ("/", "0.6", "weekly"), ("/produk", "0.7", "daily")]
+    url += [(f"/portofolio/{x['id']}", "0.7", "monthly") for x in portofolio()]
     isi = ('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
            + "".join(f"  <url><loc>{SITE_URL}{u}</loc><lastmod>{hi}</lastmod><changefreq>{f}</changefreq><priority>{p}</priority></url>\n" for u, p, f in url) + "</urlset>\n")
     return Response(isi, mimetype="application/xml", headers={"Cache-Control": "public, max-age=3600"})
@@ -8551,7 +8645,11 @@ def llms_txt():
     if sej:
         isi += ["", "## Perjalanan"] + [f"- {x.get('tahun', '')}: {x.get('judul', '')}. {x.get('isi', '')}".strip() for x in sej]
     isi += ["", "## Tanya jawab"] + [f"- **{q}** {a}" for q, a in seo_faq()]
-    isi += ["", "## Halaman penting", f"- [Profil MCI]({SITE_URL}/profil): profil lengkap, sejarah, dan FAQ", f"- [Katalog produk]({SITE_URL}/produk): produk dan jasa yang dijual MCI", ""]
+    pf = portofolio()
+    if pf:
+        isi += ["", "## Portofolio proyek"] + [f"- [{x['nama']}]({SITE_URL}/portofolio/{x['id']}) ({x['tahun']}): {(x['ringkasan'] or '')[:200]}" for x in pf]
+    isi += ["", "## Halaman penting", f"- [Profil MCI]({SITE_URL}/profil): profil lengkap, sejarah, dan FAQ", f"- [Portofolio]({SITE_URL}/portofolio): proyek yang sudah dikerjakan MCI",
+            f"- [Katalog produk]({SITE_URL}/produk): produk dan jasa yang dijual MCI", ""]
     return Response("\n".join(isi), mimetype="text/plain", headers={"Cache-Control": "public, max-age=3600"})
 
 
