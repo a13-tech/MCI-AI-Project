@@ -307,6 +307,7 @@ td{border-top:1px solid var(--line)}
 .it2 .meta{font-size:12.5px;color:var(--mute);margin-top:4px;display:flex;gap:6px 14px;flex-wrap:wrap}
 .it2 .bd{margin-top:10px;white-space:pre-wrap;line-height:1.6}
 .it2 .ac{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.sorot{outline:3px solid #D4AF5A;outline-offset:3px;border-radius:12px;transition:outline-color .4s}
 .pdG{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));margin-bottom:18px}.pdK{cursor:pointer}.pdK:hover{border-color:var(--gold,#D4AF5A)}
 .pdH{font:700 19px/1.3 var(--serif);color:var(--navy2);margin:22px 0 10px}
 .pdKonf{margin-top:16px;padding-top:14px;border-top:1px dashed var(--line)}.pdQ{display:block;font-weight:600;font-size:14px;margin:0 0 10px}.pdQ input,.pdQ textarea{display:block;width:100%;margin-top:6px}
@@ -3146,12 +3147,13 @@ $("#prSave").onclick = async () => {
 };
 
 /* ===== Tanya Apex: chat khusus Dev; Apex memanggil alat baca-saja di server dan menjawab dari data asli ===== */
-const APX_LABEL = {cek_stok: "📦 Stok gudang", cek_produk: "🛒 Katalog produk", cek_kas: "💰 Buku kas", cek_invoice: "🧾 Invoice", cek_hutang: "📒 Hutang", cek_iuran: "💸 Iuran kas", cek_anggota: "👥 Anggota",
+const APX_LABEL = {buat_gambar: "🎨 Bikin gambar", buat_model_3d: "🧊 Bikin model 3D", buat_panduan_rakit: "🔧 Bikin panduan rakit", cek_stok: "📦 Stok gudang", cek_produk: "🛒 Katalog produk", cek_kas: "💰 Buku kas", cek_invoice: "🧾 Invoice", cek_hutang: "📒 Hutang", cek_iuran: "💸 Iuran kas", cek_anggota: "👥 Anggota",
   cek_blacklist: "⛔ Blacklist", cek_catatan: "📝 Catatan", cek_perpustakaan: "📚 Perpustakaan", cek_dokumentasi_dan_voting: "🗳️ Dokumentasi & voting", cek_iot: "📡 Sensor IoT", cek_status_bot: "🤖 Status bot"};
 const APX_SARAN = ["LED sisa berapa?", "Barang apa yang perlu restock?", "Saldo kas sekarang berapa?", "Siapa yang belum bayar kas minggu ini?", "Invoice mana yang belum lunas?", "Siapa yang hutangnya telat?", "Bot mana yang lagi kerja?"];
 let APX = [], APX_BUSY = false, APX_MODEL = [], APX_PILIH = "gemini", APX_MUAT = false;
 try { APX_PILIH = localStorage.getItem("apxModel") || "gemini"; } catch (e) {}
-const apxMd = t => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/^\s*[*\-] /gm, "• ");
+const apxMd = t => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/^\s*[*\-] /gm, "• ")
+  .replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]])/g, u => `<a href="${u}" ${u.startsWith(location.origin) ? "" : 'target="_blank" rel="noopener"'} style="color:var(--navy);text-decoration:underline;word-break:break-all">${u}</a>`);   // link hasil Studio bisa diklik
 const apxNamaModel = id => (APX_MODEL.find(m => m.id === id) || {}).nama || "";
 function apxRender() {
   const lg = $("#apxLog");
@@ -3651,7 +3653,7 @@ async function loadGambar() {
   if (!can("gambar_lihat")) return;
   try {
     const d = await api("/api/gambar"); gQuota(d);
-    $("#gg").innerHTML = d.items.map(g => `<figure><img src="${gImg(g.id)}" alt="${esc(g.prompt)}" loading="lazy" data-zoom="${g.id}"><figcaption title="${esc(g.prompt)}">${esc(g.prompt)}</figcaption><div class="bar"><a class="bt o" href="${gImg(g.id)}${DEMO ? "" : "?unduh=1"}" download="mci-gambar-${g.id}">Unduh</a>${ADM() ? `<button class="bt o" data-gd="${g.id}" aria-label="Hapus gambar ${g.id}">Hapus</button>` : ""}</div></figure>`).join("") || '<div class="mu">Belum ada gambar. Coba buat yang pertama!</div>';
+    $("#gg").innerHTML = d.items.map(g => `<figure data-sorot="gambar:${g.id}"><img src="${gImg(g.id)}" alt="${esc(g.prompt)}" loading="lazy" data-zoom="${g.id}"><figcaption title="${esc(g.prompt)}">${esc(g.prompt)}</figcaption><div class="bar"><a class="bt o" href="${gImg(g.id)}${DEMO ? "" : "?unduh=1"}" download="mci-gambar-${g.id}">Unduh</a>${ADM() ? `<button class="bt o" data-gd="${g.id}" aria-label="Hapus gambar ${g.id}">Hapus</button>` : ""}</div></figure>`).join("") || '<div class="mu">Belum ada gambar. Coba buat yang pertama!</div>';
     $$("[data-zoom]").forEach(i => i.onclick = () => vwBuka(i.src, i.alt || "Foto"));
     $$("[data-gd]").forEach(b => b.onclick = async () => { if (confirm("Hapus gambar ini?")) { await api("/api/gambar/" + b.dataset.gd, {method: "DELETE"}); loadGambar(); } });
   } catch (e) { $("#gg").innerHTML = '<div class="er">' + esc(e.message) + "</div>"; }
@@ -5819,7 +5821,7 @@ const JS_ST = {menunggu: ["y", "Menunggu Dev"], aktif: ["g", "Aktif"], ditolak: 
 const jsCh = st => `<span class="ch ${(JS_ST[st] || ["n"])[0]}">${(JS_ST[st] || ["", st])[1]}</span>`;
 /* ================= BUKU PANDUAN RAKIT ================= */
 var PD = null, PD_X = null, PD_T = 0, PD_L = 0, PD_UBAH = false;   // var: show() menyentuh PD_T sebelum baris ini dijalankan
-const PD_ST = {rencana: ["Menunggu konfirmasi", "y"], proses: ["Sedang dibuat", ""], jadi: ["Siap dirakit", "g"], gagal: ["Gagal dibuat", "r"], ditolak: ["Ditolak (keamanan)", "r"]};
+const PD_ST = {menyusun: ["Menyusun rencana", ""], rencana: ["Menunggu konfirmasi", "y"], proses: ["Sedang dibuat", ""], jadi: ["Siap dirakit", "g"], gagal: ["Gagal dibuat", "r"], ditolak: ["Ditolak (keamanan)", "r"]};
 const pdCh = s => `<span class="ch ${(PD_ST[s] || ["", "n"])[1]}">${esc((PD_ST[s] || [s])[0])}</span>`;
 const pdSudah = id => { try { return JSON.parse(localStorage.getItem("pdSudah" + id) || "[]"); } catch (e) { return []; } };
 const pdSimpanSudah = (id, a) => { try { localStorage.setItem("pdSudah" + id, JSON.stringify(a)); } catch (e) {} };
@@ -5850,7 +5852,7 @@ async function pdBuka(id) {
   try { const d = await api("/api/panduan/" + id); if (!PD_X || PD_X.id !== id) { PD_L = 0; PD_UBAH = false; } PD_X = d.panduan; }
   catch (e) { alert(e.message); PD_X = null; return pdDaftar(); }
   $("#pdAtas").hidden = true; pdDetail(); window.scrollTo({top: 0});
-  if (PD_X.status === "proses") PD_T = setTimeout(() => { if (PD_X && $("#p-panduan") && !$("#p-panduan").hidden) pdBuka(id).then(() => { if (PD_X && PD_X.status !== "proses") pdMuat(id); }); }, 5000);
+  if (["proses", "menyusun"].includes(PD_X.status)) PD_T = setTimeout(() => { if (PD_X && $("#p-panduan") && !$("#p-panduan").hidden) pdBuka(id).then(() => { if (PD_X && !["proses", "menyusun"].includes(PD_X.status)) pdMuat(id); }); }, 5000);
 }
 function pdUjung(s, d) {
   const [a, b] = String(s || "").split(":");
@@ -5861,7 +5863,7 @@ function pdUjung(s, d) {
 const PD_W = {merah: "#D92D20", hitam: "#1D2939", kuning: "#E7B008", hijau: "#12A150", biru: "#1570EF", oranye: "#F97316", jingga: "#F97316", ungu: "#7A5AF8", putih: "#98A2B3", coklat: "#8B5E34", cokelat: "#8B5E34", abu: "#667085", pink: "#EE46BC", cyan: "#06AED4"};
 function pdDetail() {
   const x = PD_X, rc = x.rencana || {}, kembali = `<button class="bt o" id="pdKembali" type="button">← Semua panduan</button>`;
-  let h = `<div class="bar" style="margin:0 0 14px">${kembali}${x.milik && x.status !== "proses" ? `<button class="bt o" id="pdHapus" type="button">Hapus</button>` : ""}</div>`;
+  let h = `<div class="bar" style="margin:0 0 14px">${kembali}${x.milik && !["proses", "menyusun"].includes(x.status) ? `<button class="bt o" id="pdHapus" type="button">Hapus</button>` : ""}</div>`;
   const chips = `<div class="meta">${pdCh(x.status)}<span class="ch">${esc(x.papan_nama || rc.papan || "-")}</span>${rc.kesulitan ? `<span>Tingkat: ${esc(rc.kesulitan)}</span>` : ""}${rc.waktu ? `<span>Waktu: ${esc(rc.waktu)}</span>` : ""}<span>Oleh ${esc(x.oleh)}</span></div>`;
   if (x.status !== "jadi") {
     h += `<article class="it2"><div class="ey">Rencana · tahap 1 dari 2</div><h3>${esc(rc.judul || "Rencana")}</h3>${chips}
@@ -5871,6 +5873,7 @@ function pdDetail() {
       ${(rc.komponen_kira || []).length ? `<p class="mu" style="margin:10px 0 4px;font-weight:600">Komponen utama</p><div class="meta" style="gap:6px">${rc.komponen_kira.map(k => `<span class="ch n">${esc(k)}</span>`).join("")}</div>` : ""}
       ${x.status === "ditolak" ? `<div class="pdWarn r" style="margin-top:14px"><b>Tidak dibuatkan panduan:</b> ${esc(rc.alasan_tolak || "permintaan ini berbahaya.")} Ubah permintaannya ke rangkaian tegangan rendah yang aman.</div>` : ""}
       ${x.status === "gagal" ? `<div class="pdWarn r" style="margin-top:14px"><b>Panduan gagal dibuat.</b> ${esc(((x.laporan || {}).galat || []).join(" "))} Jatahmu tidak terpakai.</div>` : ""}
+      ${x.status === "menyusun" ? `<div class="pdProses" style="margin-top:14px"><span class="pdSpin" aria-hidden="true"></span><div><b>AI sedang menyusun rencana dari permintaanmu di chat.</b><br><span class="mu">Biasanya 10–30 detik. Halaman ini memperbarui sendiri.</span></div></div>` : ""}
       ${x.status === "proses" ? `<div class="pdProses" style="margin-top:14px"><span class="pdSpin" aria-hidden="true"></span><div><b>AI sedang menulis panduan dan mesin MCI sedang memeriksa setiap sambungan.</b><br><span class="mu">Biasanya 1–3 menit. Halaman ini memperbarui sendiri; boleh ditinggal, kabarnya masuk Inbox.</span></div></div>` : ""}
       ${x.milik && ["rencana", "gagal"].includes(x.status) ? `<div class="pdKonf">
         ${(rc.pertanyaan || []).length ? `<p style="font-weight:700;margin:0 0 8px">Jawab dulu supaya panduannya pas:</p>${rc.pertanyaan.map((q, i) => `<label class="pdQ">${esc(q)}<input type="text" data-pdq="${i}" maxlength="300" placeholder="Jawabanmu (boleh kosong, AI pakai pilihan paling aman)"></label>`).join("")}` : ""}
@@ -6150,13 +6153,13 @@ function s3Render() {
   $("#s3Buat").hidden = !d.buat; $("#labMesin").hidden = !d.admin;
   const info = `<p class="mu" style="font-size:12.5px">Mesin: ${esc({claude: "Claude", gemini: "Gemini", argon: "Gemini 4 Argon", hydrogen: "Gemini 4 Hydrogen", groq: "Groq", cerebras: "Cerebras", openrouter: "OpenRouter", mistral: "Mistral"}[d.mesin] || d.mesin)}${d.kuota ? ` · jatah hari ini ${d.kuota.pakai} dari ${d.kuota.batas}` : ""}${d.buat ? "" : " · jabatan atau divisimu hanya bisa melihat dan mengunduh"}</p>`;
   if (S3_J === "3d") $("#s3Box").innerHTML = info + (d.model.length ? `<div class="s3g">${d.model.map(m => { const u = (m.laporan.ukuran_mm || {}), w = m.laporan.peringatan || [];
-    return `<article class="it2"><img src="/api/studio/3d/${m.id}.svg" alt="Pratinjau ${esc(m.judul)}" loading="lazy" width="520" height="400"><h3 style="margin-top:10px">${esc(m.judul)}</h3>
+    return `<article class="it2" data-sorot="3d:${m.id}"><img src="/api/studio/3d/${m.id}.svg" alt="Pratinjau ${esc(m.judul)}" loading="lazy" width="520" height="400"><h3 style="margin-top:10px">${esc(m.judul)}</h3>
     <div class="meta"><span>${u.panjang_x} × ${u.lebar_y} × ${u.tinggi_z} mm</span><span>${m.laporan.volume_cm3} cm³</span><span>${esc(m.oleh)} · ${esc(tglID(m.dibuat))}</span></div>
     ${w.length ? `<div class="bd" style="font-size:13px;color:#8E2A1E"><b>Perlu dicek sebelum cetak</b>\n${w.map(esc).join("\n")}</div>` : '<p class="ch g" style="display:inline-block;margin:8px 0 0">Lolos pemeriksaan mesin</p>'}
     ${m.laporan.penjelasan ? `<div class="bd" style="font-size:13.5px">${esc(m.laporan.penjelasan)}</div>` : ""}
     <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Permintaan &amp; bagian</summary><div class="bd" style="font-size:13px">${esc(m.permintaan)}\n\n${(m.laporan.bagian || []).map(b => `${b.no}. ${esc(b.nama)} (${esc(b.bentuk)}, ${esc(b.operasi)})`).join("\n")}</div></details>
     <div class="ac"><a class="bt g" href="/api/studio/3d/${m.id}.stl" download>Unduh STL</a>${d.buat ? `<button class="bt o" data-s3r="${m.id}">Revisi</button>` : ""}${d.admin ? `<button class="bt o" data-s3d="3d:${m.id}">Hapus</button>` : ""}</div></article>`; }).join("")}</div>` : '<p class="mu">Belum ada model.</p>');
-  else $("#s3Box").innerHTML = info + (d.gambar.length ? `<div class="s3g">${d.gambar.map(g => `<article class="it2"><img src="/api/studio/svg/${g.id}" alt="${esc(g.prompt)}" loading="lazy" data-s3i="${g.id}"><div class="meta" style="margin-top:8px"><span>${esc(g.oleh)} · ${esc(tglID(g.dibuat))}</span></div><div class="bd" style="font-size:13px">${esc(g.prompt)}</div>
+  else $("#s3Box").innerHTML = info + (d.gambar.length ? `<div class="s3g">${d.gambar.map(g => `<article class="it2" data-sorot="svg:${g.id}"><img src="/api/studio/svg/${g.id}" alt="${esc(g.prompt)}" loading="lazy" data-s3i="${g.id}"><div class="meta" style="margin-top:8px"><span>${esc(g.oleh)} · ${esc(tglID(g.dibuat))}</span></div><div class="bd" style="font-size:13px">${esc(g.prompt)}</div>
     <div class="ac"><a class="bt g" href="/api/studio/svg/${g.id}?unduh=1" download>Unduh SVG</a><button class="bt o" data-s3png="${g.id}">Unduh PNG</button>${d.admin ? `<button class="bt o" data-s3d="svg:${g.id}">Hapus</button>` : ""}</div></article>`).join("")}</div>` : '<p class="mu">Belum ada gambar.</p>');
   $$("[data-s3r]").forEach(b => b.onclick = () => { S3_DARI = +b.dataset.s3r; s3Mode(); $("#s3Minta").value = ""; $("#s3Minta").focus(); $("#s3Buat").scrollIntoView({behavior: "smooth", block: "start"}); });
   $$("[data-s3d]").forEach(b => b.onclick = async () => { if (!confirm("Hapus permanen?")) return; const [j, i] = b.dataset.s3d.split(":"); try { S3 = await api(`/api/studio/${j}/${i}`, {method: "DELETE"}); s3Render(); } catch (e) { alert(e.message); } });
@@ -6204,7 +6207,22 @@ $("#pasangApp").onclick = async () => {
   if (PASANG) { PASANG.prompt(); const r = await PASANG.userChoice; if (r.outcome === "accepted") $("#pasangApp").hidden = true; PASANG = null; return; }
   alert("Pasang MCI di iPhone/iPad:\n1. Buka web ini di Safari\n2. Ketuk tombol Bagikan (kotak dengan panah ke atas)\n3. Pilih 'Tambahkan ke Layar Utama'\n4. Ketuk 'Tambah'");
 };
-function bukaHash() { if (rapatDariHash()) return; const p = (location.hash || "").slice(1); const b = p && document.querySelector(`.nv[data-p="${p}"]`); if (b && b.style.display !== "none") show(p); }   // pintasan aplikasi (#inbox, #tugas, …)
+function bukaHash() {   // pintasan aplikasi (#inbox, #tugas, …) + link hasil Studio dari chat (#gambar/12, #studio/3d/5, #panduan/7)
+  if (rapatDariHash()) return;
+  const [p, a, b2] = decodeURIComponent((location.hash || "").slice(1)).split("/"), nv = p && document.querySelector(`.nv[data-p="${p}"]`);
+  if (!nv || nv.style.display === "none") return;
+  if (p === "panduan" && /^\d+$/.test(a || "")) { PD_X = {id: +a}; PD_L = 0; }
+  if (p === "studio" && (a === "3d" || a === "svg")) { S3_J = a; }
+  show(p);
+  const id = p === "studio" ? b2 : a;
+  if ((p === "gambar" || p === "studio") && /^\d+$/.test(id || "")) sorotItem(`[data-sorot="${p === "studio" ? (a || "3d") : "gambar"}:${id}"]`);
+}
+function sorotItem(sel, n = 0) {   // tunggu daftar termuat, lalu gulir ke item dan beri bingkai emas sebentar
+  const e = document.querySelector(sel);
+  if (!e) { if (n < 40) setTimeout(() => sorotItem(sel, n + 1), 250); return; }
+  e.scrollIntoView({behavior: "smooth", block: "center"}); e.classList.add("sorot"); setTimeout(() => e.classList.remove("sorot"), 4000);
+}
+addEventListener("hashchange", bukaHash);
 
 /* ================= MULAI ================= */
 (async () => {
