@@ -260,17 +260,87 @@ SKILL_SEED = [
 
 
 # ---------- DATABASE (Postgres jika DATABASE_URL, selain itu SQLite sementara) ----------
+# Kolam koneksi kecil: dulu SETIAP query membuka koneksi baru ke Neon (jabat tangan TCP+TLS ±50-150 ms).
+# Sekarang koneksi dipakai ulang selama masih segar (< DB_IDLE detik). Analogi: telepon tidak ditutup-pasang tiap kalimat.
+# Koneksi menganggur ditutup cepat supaya Neon tetap bisa "tidur" (scale to zero) dan tidak menghabiskan jatah jam komputasi gratis.
+DB_IDLE, DB_KOLAM_MAKS = 45, 6
+_KOLAM, _KOLAM_LOCK = [], threading.Lock()
+DB_AKTIF = [0.0]   # waktu terakhir database dipakai oleh permintaan web (database sedang "bangun")
+
+
+def _kolam_ambil():
+    while True:
+        with _KOLAM_LOCK:
+            if not _KOLAM:
+                break
+            c, t = _KOLAM.pop()
+        if time.time() - t < DB_IDLE and not c.closed:
+            try:
+                c.poll()   # cek cepat: koneksi masih hidup?
+                return c
+            except Exception:
+                pass
+        try:
+            c.close()
+        except Exception:
+            pass
+    return psycopg2.connect(DATABASE_URL, connect_timeout=10)
+
+
+def _kolam_sapu():
+    """Tutup koneksi yang menganggur terlalu lama (dipanggil berkala dari utas kecil)."""
+    while True:
+        time.sleep(15)
+        with _KOLAM_LOCK:
+            basi = [x for x in _KOLAM if time.time() - x[1] >= DB_IDLE]
+            _KOLAM[:] = [x for x in _KOLAM if time.time() - x[1] < DB_IDLE]
+        for c, _t in basi:
+            try:
+                c.close()
+            except Exception:
+                pass
+
+
 @contextlib.contextmanager
 def db():
-    c = psycopg2.connect(DATABASE_URL, connect_timeout=10) if PG else sqlite3.connect(DB_PATH)
+    if not PG:
+        c = sqlite3.connect(DB_PATH)
+        try:
+            yield c
+            c.commit()
+        except Exception:
+            c.rollback()
+            raise
+        finally:
+            c.close()
+        return
+    if has_request_context():
+        DB_AKTIF[0] = time.time()
+    c, sehat = _kolam_ambil(), True
     try:
         yield c
         c.commit()
     except Exception:
-        c.rollback()
+        try:
+            c.rollback()
+        except Exception:
+            sehat = False
         raise
     finally:
-        c.close()
+        if sehat and not c.closed:
+            with _KOLAM_LOCK:
+                if len(_KOLAM) < DB_KOLAM_MAKS:
+                    _KOLAM.append((c, time.time()))
+                    c = None
+        if c is not None:
+            try:
+                c.close()
+            except Exception:
+                pass
+
+
+if PG:
+    threading.Thread(target=_kolam_sapu, daemon=True, name="sapu-koneksi").start()
 
 
 def sql(c, q, p=()):
@@ -2334,7 +2404,15 @@ def _lap_jatuh_tempo(now):
 
 async def laporan_jadwal():
     await asyncio.sleep(60)
+    terakhir = 0.0
     while True:
+        # Hemat jam komputasi Neon: database gratis "tidur" setelah 5 menit tanpa query, tetapi dulu pemeriksaan ini jalan tiap 5 menit
+        # sehingga database TIDAK PERNAH tidur (jatah 100 jam/bulan habis di pertengahan bulan). Sekarang: kalau database sedang bangun
+        # karena ada yang membuka web, periksa tiap 5 menit (gratis, toh sudah bangun); kalau sepi, cukup tiap DB_CEK_SEPI detik.
+        if PG and time.time() - DB_AKTIF[0] > 240 and time.time() - terakhir < DB_CEK_SEPI:
+            await asyncio.sleep(60)
+            continue
+        terakhir = time.time()
         try:
             now = datetime.now(WIB)
             if _lap_jatuh_tempo(now):
@@ -2378,7 +2456,7 @@ async def laporan_jadwal():
             await asyncio.to_thread(pk_cek_pinjaman)
         except Exception:
             log.exception("Cek pinjaman mitra proyek gagal")
-        await asyncio.sleep(300)
+        await asyncio.sleep(240)
 
 
 # ---------- WEB ----------
@@ -5698,6 +5776,9 @@ def _resep_dari(teks):
         if isinstance(t, list) and t and not isinstance(t[0], (list, tuple)):   # daftar rata [x1,y1,x2,y2] -> pasangan
             b["titik"] = [[t[k], t[k + 1]] for k in range(0, len(t) - 1, 2)]
     return d
+
+
+DB_CEK_SEPI = int(os.getenv("DB_CEK_SEPI", "3600"))   # detik antar pemeriksaan latar saat web sepi
 
 
 M3D_TINJAU = os.getenv("STUDIO3D_TINJAU", "1").strip().lower() not in ("0", "false", "tidak")
