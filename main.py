@@ -2985,7 +2985,7 @@ def api_argon_anggaran():
             if "kurs" in d:
                 SET["kurs_usd"] = max(1000, int(float(d["kurs"])))
             if "mesin" in d:   # mesin Studio 3D & Panduan Rakit
-                if d["mesin"] not in ("argon", "gemini", "claude"):
+                if d["mesin"] not in ("argon", "gemini", "claude", *MESIN_LAIN):
                     return jsonify({"error": "Mesin tidak dikenal"}), 400
                 SET["ai_kode"] = d["mesin"]
             if d.get("claude_model") in CLAUDE_PILIHAN:
@@ -3000,7 +3000,8 @@ def api_argon_anggaran():
     return jsonify({"terpakai": round(rp), "anggaran": int(SET.get("argon_anggaran") or 0), "kurs": SET.get("kurs_usd"), "harga": SET.get("argon_harga"),
                     "habis": argon_habis(), "bulan": today()[:7], "kunci": bool(KUNCI_TIER1),
                     "mesin": ai_kode() or ("claude" if ANTHROPIC_KEY else "gemini"), "aktif": mesin_kode(), "claude_kunci": bool(ANTHROPIC_KEY),
-                    "claude_model": claude_model(), "claude_pilihan": CLAUDE_PILIHAN, "claude_harga": {k: CLAUDE_HARGA[k] for k in CLAUDE_PILIHAN}})
+                    "claude_model": claude_model(), "claude_pilihan": CLAUDE_PILIHAN, "claude_harga": {k: CLAUDE_HARGA[k] for k in CLAUDE_PILIHAN},
+                    "lain": [{"id": k, "nama": v["nama"], "model": v["model"], "siap": bool(mesin_kunci(k)), "kunci": v["kunci"]} for k, v in MESIN_LAIN.items()]})
 
 
 # ---------- HP RINGAN: anggota ber-HP lemot dapat tampilan hemat RAM (tanpa 3D, foto kecil, jarang polling) ----------
@@ -5558,7 +5559,10 @@ MESIN_LAIN = {
     "cerebras": {"nama": "Cerebras", "url": "https://api.cerebras.ai/v1/chat/completions", "kunci": "CEREBRAS_API_KEY", "model": os.getenv("CEREBRAS_MODEL", "llama-3.3-70b")},
     "openrouter": {"nama": "OpenRouter", "url": "https://openrouter.ai/api/v1/chat/completions", "kunci": "OPENROUTER_API_KEY",
                    "model": os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free")},
-    "mistral": {"nama": "Mistral", "url": "https://api.mistral.ai/v1/chat/completions", "kunci": "MISTRAL_API_KEY", "model": os.getenv("MISTRAL_MODEL", "mistral-small-latest")},
+    "mistral": {"nama": "Mistral", "url": "https://api.mistral.ai/v1/chat/completions", "kunci": "MISTRAL_API_KEY", "model": os.getenv("MISTRAL_MODEL", "mistral-large-latest")},
+    # NVIDIA NIM (build.nvidia.com): gratis untuk anggota NVIDIA Developer Program, kunci diawali nvapi-
+    "nvidia": {"nama": "NVIDIA NIM", "url": "https://integrate.api.nvidia.com/v1/chat/completions", "kunci": "NVIDIA_API_KEY",
+               "model": os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3-ultra-550b-a55b")},
 }
 # Gemini 4 Argon: model terkuat Google (rilis umum 13 Okt 2026), BERBAYAR saja (tidak ada di paket gratis).
 # Aktif hanya kalau ARGON_AKTIF=1 (tanda billing Gemini sudah dinyalakan). Gagal/ditolak -> otomatis jatuh ke mesin biasa.
@@ -5679,11 +5683,18 @@ def _kompatibel(k, sistem, prompt, maks=8000, json_mode=False):
     req = urllib.request.Request(m["url"], method="POST", data=json.dumps(body).encode(),
                                  headers={"Authorization": f"Bearer {mesin_kunci(k)}", "Content-Type": "application/json", "User-Agent": "MCI-HQ/1.0"})   # User-Agent bawaan urllib ditolak sebagian penyedia
     try:
-        with urllib.request.urlopen(req, timeout=120) as f:
+        with urllib.request.urlopen(req, timeout=240) as f:   # model "reasoning" besar bisa berpikir lama
             d = json.loads(f.read().decode())
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"{m['nama']} menolak ({e.code}): {e.read().decode(errors='replace')[:300]}") from None
-    return str(d["choices"][0]["message"]["content"] or "").strip()
+    teks = str(d["choices"][0]["message"]["content"] or "")
+    teks = re.sub(r"(?s)<think>.*?</think>", "", teks).strip()   # buang "catatan berpikir" model reasoning
+    try:
+        u = d.get("usage") or {}
+        usage_add(f"{k}:{m['model']}", int(u.get("prompt_tokens") or 0), int(u.get("completion_tokens") or 0), 0)
+    except Exception:
+        pass
+    return teks
 
 
 def _claude(sistem, prompt, maks=16000, parts=None, schema=None):
