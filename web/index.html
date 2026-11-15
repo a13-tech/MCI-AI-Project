@@ -1720,16 +1720,21 @@ async function loadArgon() {   // kartu anggaran Argon (khusus Dev)
     const d = await api("/api/argon-anggaran"), pct = d.anggaran ? Math.min(100, Math.round(d.terpakai / d.anggaran * 100)) : 0;
     const warna = d.habis ? "#C0392B" : pct >= 80 ? "#D98E04" : "#2E8B57";
     el.hidden = false;
-    el.innerHTML = `<b>💳 Anggaran Gemini 4 Argon · ${esc(d.bulan)}</b>
+    const mesinNama = {argon: "Gemini 4 Argon", gemini: "Gemini Flash (gratis)", claude: (d.claude_pilihan || {})[d.claude_model] || "Claude"};
+    el.innerHTML = `<b>🧠 Mesin AI Studio 3D & Panduan Rakit</b>
+      <div class="fl" style="margin-top:8px"><label>Mesin<select id="agMs"><option value="argon" ${d.mesin === "argon" ? "selected" : ""}>Gemini 4 Argon · $2/$10 (promo, $4/$20 mulai 1 Des)</option><option value="claude" ${d.mesin === "claude" ? "selected" : ""}>Claude${d.claude_kunci ? "" : " (kunci belum dipasang)"}</option><option value="gemini" ${d.mesin === "gemini" ? "selected" : ""}>Gemini Flash · paling hemat</option></select></label>
+        <label>Model Claude<select id="agCm">${Object.entries(d.claude_pilihan || {}).map(([k, v]) => `<option value="${k}" ${k === d.claude_model ? "selected" : ""}>${esc(v)} · $${d.claude_harga[k][0]}/$${d.claude_harga[k][1]}</option>`).join("")}</select></label></div>
+      <p class="mu" style="font-size:12.5px;margin:6px 0 12px">Sedang dipakai: <b>${esc(mesinNama[d.aktif] || d.aktif)}</b>${d.mesin === "claude" && !d.claude_kunci ? " · isi <code>ANTHROPIC_API_KEY</code> di Render dulu supaya Claude aktif" : ""}. Harga = USD per 1 juta token masuk / keluar.</p>
+      <b>💳 Anggaran AI berbayar (Argon + Claude) · ${esc(d.bulan)}</b>
       <div style="margin:10px 0 6px;display:flex;justify-content:space-between;font-size:14px"><span>Perkiraan tagihan <b>${rp(d.terpakai)}</b></span><span>batas ${d.anggaran ? rp(d.anggaran) : "tanpa batas"}</span></div>
       <div style="height:12px;border-radius:99px;background:#E7E1D3;overflow:hidden"><div style="height:100%;width:${pct}%;background:${warna}"></div></div>
       <p class="mu" style="font-size:12.5px;margin:8px 0 10px">${d.habis ? "⛔ Anggaran habis: Studio 3D, Panduan Rakit, dan Apex otomatis memakai Gemini Flash sampai tanggal 1 bulan depan." : "Kalau batas tercapai, semua fitur otomatis pindah ke Gemini Flash dan kamu dapat kabar di Inbox (juga saat 80%)."} Perkiraan dihitung dari token yang tercatat; tagihan pasti ada di billing Google AI Studio.</p>
       <div class="fl"><label>Batas per bulan (Rp, 0 = tanpa batas)<input type="text" inputmode="numeric" id="agB" value="${d.anggaran}"></label>
         <label>Kurs 1 USD (Rp)<input type="text" inputmode="numeric" id="agK" value="${d.kurs}"></label>
-        <label>Harga masuk (USD / 1 juta token)<input type="text" inputmode="decimal" id="agHm" value="${d.harga[0]}"></label>
-        <label>Harga keluar (USD / 1 juta token)<input type="text" inputmode="decimal" id="agHk" value="${d.harga[1]}"></label></div>
+        <label>Harga Argon masuk (USD / 1 juta token)<input type="text" inputmode="decimal" id="agHm" value="${d.harga[0]}"></label>
+        <label>Harga Argon keluar (USD / 1 juta token)<input type="text" inputmode="decimal" id="agHk" value="${d.harga[1]}"></label></div>
       <div class="bar" style="margin:10px 0 0"><button class="bt g" id="agS">Simpan</button><span class="mu" id="agM"></span></div>`;
-    $("#agS").onclick = async () => { try { await api("/api/argon-anggaran", {json: {anggaran: $("#agB").value.replace(/\D/g, ""), kurs: $("#agK").value.replace(/\D/g, ""), harga_masuk: $("#agHm").value.replace(",", "."), harga_keluar: $("#agHk").value.replace(",", ".")}}); loadArgon(); } catch (e) { $("#agM").textContent = e.message; } };
+    $("#agS").onclick = async () => { try { await api("/api/argon-anggaran", {json: {mesin: $("#agMs").value, claude_model: $("#agCm").value, anggaran: $("#agB").value.replace(/\D/g, ""), kurs: $("#agK").value.replace(/\D/g, ""), harga_masuk: $("#agHm").value.replace(",", "."), harga_keluar: $("#agHk").value.replace(",", ".")}}); loadArgon(); } catch (e) { $("#agM").textContent = e.message; } };
   } catch (e) { el.hidden = false; el.innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
 }
 async function loadUsage() {

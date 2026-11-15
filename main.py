@@ -2984,6 +2984,12 @@ def api_argon_anggaran():
                 SET["argon_anggaran"] = max(0, int(float(d["anggaran"])))
             if "kurs" in d:
                 SET["kurs_usd"] = max(1000, int(float(d["kurs"])))
+            if "mesin" in d:   # mesin Studio 3D & Panduan Rakit
+                if d["mesin"] not in ("argon", "gemini", "claude"):
+                    return jsonify({"error": "Mesin tidak dikenal"}), 400
+                SET["ai_kode"] = d["mesin"]
+            if d.get("claude_model") in CLAUDE_PILIHAN:
+                SET["claude_model"] = d["claude_model"]
             if "harga_masuk" in d or "harga_keluar" in d:
                 hm, hk = SET.get("argon_harga") or [2, 10]
                 SET["argon_harga"] = [max(0.0, float(d.get("harga_masuk", hm))), max(0.0, float(d.get("harga_keluar", hk)))]
@@ -2992,7 +2998,9 @@ def api_argon_anggaran():
         set_save()
     rp = argon_biaya_bulan(True)
     return jsonify({"terpakai": round(rp), "anggaran": int(SET.get("argon_anggaran") or 0), "kurs": SET.get("kurs_usd"), "harga": SET.get("argon_harga"),
-                    "habis": argon_habis(), "bulan": today()[:7], "kunci": bool(KUNCI_TIER1)})
+                    "habis": argon_habis(), "bulan": today()[:7], "kunci": bool(KUNCI_TIER1),
+                    "mesin": ai_kode() or ("claude" if ANTHROPIC_KEY else "gemini"), "aktif": mesin_kode(), "claude_kunci": bool(ANTHROPIC_KEY),
+                    "claude_model": claude_model(), "claude_pilihan": CLAUDE_PILIHAN, "claude_harga": {k: CLAUDE_HARGA[k] for k in CLAUDE_PILIHAN}})
 
 
 # ---------- HP RINGAN: anggota ber-HP lemot dapat tampilan hemat RAM (tanpa 3D, foto kecil, jarang polling) ----------
@@ -5522,6 +5530,21 @@ def api_beranda():
 # ---------- MESIN KODE: Gemini sekarang; otomatis pindah ke Claude kalau ANTHROPIC_API_KEY dipasang di Render ----------
 ANTHROPIC_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-5-5")
+# Harga resmi Claude API (USD per 1 juta token: masuk, keluar). Sumber: platform.claude.com/docs/en/models/overview
+CLAUDE_HARGA = {"claude-opus-5-5": (4.0, 20.0), "claude-sonnet-5-5": (2.0, 10.0), "claude-haiku-5-5": (0.10, 0.50), "claude-fable-5-2": (8.0, 40.0)}
+CLAUDE_PILIHAN = {"claude-sonnet-5-5": "Claude Sonnet 5.5", "claude-opus-5-5": "Claude Opus 5.5", "claude-haiku-5-5": "Claude Haiku 5.5"}
+
+
+def claude_model():
+    m = SET.get("claude_model") or CLAUDE_MODEL
+    return m if m in CLAUDE_PILIHAN or m == CLAUDE_MODEL else "claude-sonnet-5-5"
+
+
+def claude_harga(model):
+    for k, v in CLAUDE_HARGA.items():
+        if str(model).startswith(k):
+            return v
+    return CLAUDE_HARGA["claude-sonnet-5-5"]
 KUOTA["studio"] = max(0, int(os.getenv("KUOTA_STUDIO", "8")))
 IZIN_PILIHAN["studio_buat"] = "Membuat model 3D & gambar kode"
 for _k in ("manager", "pj", "designer", "dokumentasi"):
@@ -5570,7 +5593,11 @@ def argon_biaya_bulan(segar=False):
         with db() as c:
             r = sql(c, "SELECT COALESCE(SUM(masuk),0), COALESCE(SUM(keluar),0), COALESCE(SUM(pikir),0) FROM pemakaian WHERE tanggal>=? AND model LIKE ?",
                     (today()[:8] + "01", "%argon%")).fetchone()
-        rp = ((float(r[0]) * hm + (float(r[1]) + float(r[2])) * hk) / 1e6) * float(SET.get("kurs_usd") or 16500)
+            cl = sql(c, "SELECT model, COALESCE(SUM(masuk),0), COALESCE(SUM(keluar),0) FROM pemakaian WHERE tanggal>=? AND model LIKE ? GROUP BY model",
+                     (today()[:8] + "01", "claude%")).fetchall()
+        usd = (float(r[0]) * hm + (float(r[1]) + float(r[2])) * hk) / 1e6
+        usd += sum((float(a) * claude_harga(m)[0] + float(b) * claude_harga(m)[1]) / 1e6 for m, a, b in cl)   # Claude ikut satu anggaran AI berbayar
+        rp = usd * float(SET.get("kurs_usd") or 16500)
     except Exception:
         log.exception("hitung biaya argon gagal")
         rp = _ARGON_BIAYA[1]
@@ -5609,6 +5636,11 @@ def kunci_hydrogen():
 AI_KODE = os.getenv("AI_KODE", "").strip().lower()   # mesin pilihan Studio: claude | gemini | groq | cerebras | openrouter | mistral (kosong = otomatis)
 
 
+def ai_kode():
+    """Mesin Studio 3D & Panduan Rakit: pilihan di web (Tim & Token) mengalahkan env AI_KODE."""
+    return str(SET.get("ai_kode") or AI_KODE or "").strip().lower()
+
+
 def mesin_kunci(k):
     return os.getenv(MESIN_LAIN[k]["kunci"], "").strip()
 
@@ -5620,18 +5652,22 @@ def mesin_daftar():
             "catatan": "" if kunci_hydrogen() else "isi GEMINI_KEY_FREE di Render"},
            {"id": "argon", "nama": "Gemini 4 Argon", "model": ARGON_MODEL, "siap": bool(kunci_argon()) and ARGON_AKTIF,
             "catatan": "" if ARGON_AKTIF else "berbayar: isi GEMINI_KEY_TIER1 (kunci tier 1) di Render"},
-           {"id": "claude", "nama": "Claude", "model": CLAUDE_MODEL, "siap": bool(ANTHROPIC_KEY)}]
+           {"id": "claude", "nama": CLAUDE_PILIHAN.get(claude_model(), "Claude"), "model": claude_model(), "siap": bool(ANTHROPIC_KEY),
+            "catatan": "" if ANTHROPIC_KEY else "isi ANTHROPIC_API_KEY di Render"}]
     return out + [{"id": k, "nama": v["nama"], "model": v["model"], "siap": bool(mesin_kunci(k))} for k, v in MESIN_LAIN.items()]
 
 
 def mesin_kode():
-    if AI_KODE == "argon" and ARGON_AKTIF and kunci_argon():
+    k = ai_kode()
+    if k == "argon" and ARGON_AKTIF and kunci_argon():
         return "argon"
-    if AI_KODE == "hydrogen" and kunci_hydrogen():
+    if k == "hydrogen" and kunci_hydrogen():
         return "hydrogen"
-    if AI_KODE == "gemini" or (AI_KODE in MESIN_LAIN and mesin_kunci(AI_KODE)):
-        return AI_KODE
-    return "claude" if ANTHROPIC_KEY else "gemini"
+    if k == "gemini" or (k in MESIN_LAIN and mesin_kunci(k)):
+        return k
+    if k == "argon":   # Argon dipilih tetapi anggaran habis / kunci kosong -> mesin gratis
+        return "gemini"
+    return "claude" if ANTHROPIC_KEY and not argon_habis() else "gemini"   # Claude juga berhenti saat anggaran AI berbayar habis
 
 
 def _kompatibel(k, sistem, prompt, maks=8000, json_mode=False):
@@ -5650,13 +5686,38 @@ def _kompatibel(k, sistem, prompt, maks=8000, json_mode=False):
     return str(d["choices"][0]["message"]["content"] or "").strip()
 
 
-def _claude(sistem, prompt, maks=8000):
-    import urllib.request
-    req = urllib.request.Request("https://api.anthropic.com/v1/messages", method="POST",
-                                 data=json.dumps({"model": CLAUDE_MODEL, "max_tokens": maks, "system": sistem, "messages": [{"role": "user", "content": prompt}]}).encode(),
+def _claude(sistem, prompt, maks=16000, parts=None, schema=None):
+    """Panggil Claude API (Messages). Bisa melihat gambar (sketsa/foto), mencatat token & biaya, dan memakai prompt caching
+    untuk instruksi sistem yang panjang (SISTEM_3D dll.): bagian yang sama dibaca dari cache dengan harga 10%."""
+    import urllib.request, urllib.error
+    model = claude_model()
+    if schema is not None:
+        try:
+            sk = json.dumps(schema.model_json_schema(), ensure_ascii=False)
+        except Exception:
+            sk = ""
+        sistem = sistem + "\n\nFORMAT JAWABAN: keluarkan HANYA satu objek JSON valid (tanpa teks lain, tanpa ```)" + (f" yang sesuai JSON Schema ini:\n{sk}" if sk else ".")
+    isi = []
+    for p in parts or []:
+        dt = getattr(p, "inline_data", None)
+        if dt is not None and getattr(dt, "data", None):
+            isi.append({"type": "image", "source": {"type": "base64", "media_type": dt.mime_type or "image/jpeg", "data": base64.b64encode(dt.data).decode("ascii")}})
+    isi.append({"type": "text", "text": prompt})
+    body = {"model": model, "max_tokens": maks, "system": [{"type": "text", "text": sistem, "cache_control": {"type": "ephemeral"}}],
+            "messages": [{"role": "user", "content": isi}]}
+    req = urllib.request.Request("https://api.anthropic.com/v1/messages", method="POST", data=json.dumps(body).encode(),
                                  headers={"x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"})
-    with urllib.request.urlopen(req, timeout=120) as f:
-        d = json.loads(f.read().decode())
+    try:
+        with urllib.request.urlopen(req, timeout=300) as f:
+            d = json.loads(f.read().decode())
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"Claude menolak ({e.code}): {e.read().decode(errors='replace')[:300]}") from None
+    u = d.get("usage") or {}
+    masuk = int(u.get("input_tokens") or 0) + round(int(u.get("cache_creation_input_tokens") or 0) * 1.25) + round(int(u.get("cache_read_input_tokens") or 0) * 0.1)
+    try:
+        usage_add(d.get("model") or model, masuk, int(u.get("output_tokens") or 0), 0)   # dicatat setara harga token masuk biasa
+    except Exception:
+        log.exception("catat token Claude gagal")
     return "".join(b.get("text", "") for b in d.get("content", []) if b.get("type") == "text").strip()
 
 
@@ -5670,6 +5731,14 @@ async def kode_ai(sistem, prompt, act, schema=None, parts=None):
                              model=ARGON_MODEL if pilih == "argon" else HYDROGEN_MODEL, kunci=kunci_argon() if pilih == "argon" else kunci_hydrogen()), pilih
         except Exception:
             log.exception("Gemini 4 %s gagal (billing / kuota / nama model?), pakai mesin cadangan", pilih)
+    if pilih == "claude":
+        _begin("canvas", f"{act} (Claude)")
+        try:
+            return await asyncio.to_thread(_claude, sistem, prompt, 16000, parts, schema), "claude"
+        except Exception:
+            log.exception("Claude gagal (kunci / saldo / nama model?), pakai Gemini")
+        finally:
+            _end("canvas")
     if parts:
         return await ask("canvas", prompt, parts=parts, sistem=sistem, schema=schema, use_mcp=False, cache=False, act=act, model=MODEL), "gemini"
     if pilih in MESIN_LAIN:
@@ -5677,11 +5746,6 @@ async def kode_ai(sistem, prompt, act, schema=None, parts=None):
             return await asyncio.to_thread(_kompatibel, pilih, sistem, prompt, 8000, schema is not None), pilih
         except Exception:
             log.exception("%s gagal, pakai mesin cadangan", pilih)
-    if ANTHROPIC_KEY and pilih != "gemini":
-        try:
-            return await asyncio.to_thread(_claude, sistem, prompt), "claude"
-        except Exception:
-            log.exception("Claude gagal, pakai Gemini")
     return await ask("canvas", prompt, sistem=sistem, schema=schema, use_mcp=False, cache=False, act=act, model=MODEL), "gemini"
 
 
@@ -6395,7 +6459,7 @@ def api_mesin():
     if not is_admin(r):
         abort(403)
     if request.method == "GET":
-        return jsonify({"mesin": mesin_daftar(), "studio": mesin_kode(), "ai_kode": AI_KODE})
+        return jsonify({"mesin": mesin_daftar(), "studio": mesin_kode(), "ai_kode": ai_kode()})
     d = request.get_json(silent=True) or {}
     prompt, mode = str(d.get("prompt") or "").strip()[:2000], ("3d" if d.get("mode") == "3d" else "teks")
     ids = {str(x) for x in (d.get("mesin") or [])}
