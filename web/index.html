@@ -1065,7 +1065,7 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
   <div class="cd" id="bkKonf" hidden><b>Menunggu konfirmasi</b><div id="bkMenunggu" style="margin-top:10px"></div></div>
   <div class="cd" id="bkAtur" hidden><b>Atur iuran (Bendahara)</b>
    <div class="fl" style="margin-top:12px"><label>Tarif Biasa per minggu (Rp)<input type="number" id="bkTB" min="1" step="500"></label><label>Tarif Keringanan per minggu (Rp)<input type="number" id="bkTR" min="1" step="500"></label><label>Minggu ke-1 dimulai tanggal<input type="date" id="bkMulai"></label></div>
-   <div class="tb" style="margin-top:12px"><table><thead><tr><th>Anggota</th><th>Tingkat</th><th class="rt">Per minggu</th></tr></thead><tbody id="bkTk"></tbody></table></div>
+   <div class="tb" style="margin-top:12px"><table><thead><tr><th>Anggota</th><th>Tingkat</th><th title="Minggu sebelum tanggal ini tidak dihitung nunggak (anggota baru)">Wajib kas mulai</th><th class="rt">Per minggu</th></tr></thead><tbody id="bkTk"></tbody></table></div>
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="bkSaveT">Simpan pengaturan</button><span class="mu" id="bkMsgT"></span></div>
    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
    <b>Catat pembayaran anggota</b><div class="mu" style="font-size:12.5px">Untuk yang bayar langsung ke Bendahara; langsung tercatat. Kalau dia bayar kurang dari tagihan, isi <b>Jumlah khusus</b> (misal Rp18.000): sisanya otomatis tercatat sebagai kekurangan.</div>
@@ -3292,7 +3292,7 @@ function renderBayarKas() {
   $("#bkAtur").hidden = !d.bisa_konfirmasi;
   if (d.bisa_konfirmasi) {
     if (document.activeElement !== $("#bkMulai")) $("#bkMulai").value = d.mulai_tgl; if (document.activeElement !== $("#bkTB")) $("#bkTB").value = d.tarif.biasa; if (document.activeElement !== $("#bkTR")) $("#bkTR").value = d.tarif.ringan;
-    $("#bkTk").innerHTML = d.anggota.map(a => `<tr><td>${esc(a.nama)}</td><td><select data-tk="${a.id}" style="max-width:240px">${Object.entries(d.tingkat_nama).map(([k, v]) => `<option value="${k}" ${k === a.tingkat ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></td><td class="rt">${a.nominal ? rp(a.nominal) : "-"}</td></tr>`).join("");
+    $("#bkTk").innerHTML = d.anggota.map(a => `<tr><td>${esc(a.nama)}</td><td><select data-tk="${a.id}" style="max-width:240px">${Object.entries(d.tingkat_nama).map(([k, v]) => `<option value="${k}" ${k === a.tingkat ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></td><td><input type="date" data-km="${a.id}" value="${a.kas_mulai_tgl || ""}" style="max-width:150px" title="${esc(a.kas_mulai_label || "")}"></td><td class="rt">${a.nominal ? rp(a.nominal) : "-"}</td></tr>`).join("");
     const cur = $("#bkCA").value, wajib = d.anggota.filter(a => a.tingkat !== "bebas");
     $("#bkCA").innerHTML = wajib.map(a => `<option value="${a.id}" ${String(a.id) === cur ? "selected" : ""}>${esc(a.nama)} (${rp(a.nominal)}/minggu)</option>`).join("");
     if (!$("#bkcM")) { $("#bkcWrap").innerHTML = bkMetode("bkc"); bkMetodeBind("bkc", m => { $("#bkCFL").firstChild.textContent = m === "transfer" ? "Foto bukti transfer (wajib)" : "Foto bukti (tidak wajib untuk tunai)"; }); }
@@ -3316,9 +3316,10 @@ $("#bkPrev").onclick = () => BKD && BKD.prev && loadBayarKas(BKD.prev);
 $("#bkNext").onclick = () => BKD && BKD.next && loadBayarKas(BKD.next);
 $("#bkNow").onclick = () => loadBayarKas();
 $("#bkSaveT").onclick = async () => {
-  const tingkat = {}; $$("[data-tk]").forEach(s => tingkat[s.dataset.tk] = s.value);
+  const tingkat = {}, kas_mulai = {}; $$("[data-tk]").forEach(s => tingkat[s.dataset.tk] = s.value);
+  $$("[data-km]").forEach(s => { if (s.value !== s.defaultValue) kas_mulai[s.dataset.km] = s.value; });
   $("#bkSaveT").disabled = true; $("#bkMsgT").textContent = "Menyimpan…";
-  try { BKD = await api("/api/iuran/atur", {json: {biasa: +$("#bkTB").value, ringan: +$("#bkTR").value, mulai_tgl: $("#bkMulai").value, tingkat, minggu: BKD.minggu}}); renderBayarKas(); $("#bkMsgT").textContent = "Tersimpan. Anggota yang tingkatnya berubah dapat notifikasi."; }
+  try { BKD = await api("/api/iuran/atur", {json: {biasa: +$("#bkTB").value, ringan: +$("#bkTR").value, mulai_tgl: $("#bkMulai").value, tingkat, kas_mulai, minggu: BKD.minggu}}); renderBayarKas(); $("#bkMsgT").textContent = "Tersimpan. Anggota yang tingkatnya berubah dapat notifikasi."; }
   catch (e) { $("#bkMsgT").textContent = e.message; }
   $("#bkSaveT").disabled = false;
 };

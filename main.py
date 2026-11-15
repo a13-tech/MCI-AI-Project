@@ -131,6 +131,22 @@ IDENTITAS_AI = ("\n\nIDENTITAS: kamu bagian dari 7 Cipher AI, sistem AI yang dik
                 "Kalau ditanya model bahasa dasarnya, jawab bahwa 7 Cipher AI menggabungkan beberapa model bahasa besar (LLM) dengan alat buatan MCI, dan detail model dasarnya tidak dipublikasikan. "
                 "Jangan mengaku model bahasanya dilatih atau dibuat sendiri oleh MCI, dan jangan menyebut nama perusahaan penyedia modelnya. "
                 "Seri sistem AI MCI, dari yang pertama: " + " → ".join(x["seri"] for x in AI_SERI) + f". Versi yang dipakai sekarang: {AI_SERI[-1]['seri']}.")
+PANGGILAN_BOS = ("\n\nLAWAN BICARAMU: Alvaro, pendiri dan Dev (pemilik) MCI, atasanmu langsung. Panggil dia \"Bos\" "
+                 "(contoh: \"Siap, Bos!\", \"Bos, ini hasilnya\"). Tetap jujur dan berani menyampaikan risiko atau ketidaksetujuan; panggilan Bos bukan alasan untuk asal setuju.")
+import contextvars as _cv
+_PENANYA = _cv.ContextVar("penanya", default=None)   # peran yang sedang mengobrol dengan bot (web / Telegram)
+
+
+def _penanya_bos():
+    r = _PENANYA.get()
+    if r is None and has_request_context():
+        try:
+            r = role()
+        except Exception:
+            r = None
+    return bool(r) and is_admin(r)
+
+
 TANPA_LATEX = ("\n\nFORMAT: jangan pakai LaTeX atau tanda dolar untuk rumus (web dan Telegram tidak bisa menampilkannya). "
                "Tulis rumus sebagai teks biasa, contoh: R = (V sumber - Vf) / If, dan satuan ditulis biasa: 5V, 20mA, 220 ohm atau 220Ω.")
 CAVEMAN = ("\n\nMODE HEMAT AKTIF: jawab singkat tanpa basa-basi, tanpa pembuka atau penutup, tapi tetap pakai kalimat utuh yang sederhana "
@@ -848,6 +864,8 @@ async def ask(key, text, history=None, parts=None, schema=None, model=None, act=
         sysp += CAVEMAN
     if not schema:
         sysp += GAYA_JAWAB + TANPA_LATEX
+        if _penanya_bos():
+            sysp += PANGGILAN_BOS
         try:   # data umum: kontak resmi MCI (bot internal; jawaban publik ber-schema tidak memakai ini)
             k = kontak_mci()
             sysp += f"\n\nKONTAK RESMI MCI: Instagram {k['ig']}, TikTok {k['tt']}, WhatsApp admin {k['wa']}."
@@ -2569,9 +2587,16 @@ def member_simpan(d):
         if i.isdigit():
             sql(c, "UPDATE anggota SET nama=?, divisi=?, jabatan=?, aktif=? WHERE id=?", (nama, json.dumps(dv), json.dumps(jb), aktif, int(i)))
         else:
-            sql(c, "INSERT INTO anggota (nama,token,divisi,jabatan,aktif,dibuat) VALUES (?,?,?,?,?,?)",
-                (nama, token_baru(nama), json.dumps(dv), json.dumps(jb), aktif, _now()))
+            q = "INSERT INTO anggota (nama,token,divisi,jabatan,aktif,dibuat) VALUES (?,?,?,?,?,?)"
+            pr = (nama, token_baru(nama), json.dumps(dv), json.dumps(jb), aktif, _now())
+            baru = sql(c, q + " RETURNING id", pr).fetchone() if PG else (sql(c, q, pr).lastrowid,)
     members_load()
+    if not i.isdigit() and baru:   # anggota baru: minggu bergabung gratis, kas wajib mulai minggu berikutnya
+        try:
+            iuran_set().setdefault("dari", {})[str(int(baru[0]))] = minggu_geser(minggu_key(), 1)
+            set_save()
+        except Exception:
+            log.exception("atur mulai kas anggota baru gagal")
 
 
 def member_token_ulang(i):
@@ -7864,6 +7889,7 @@ def iuran_set():
     d.setdefault("biasa", 25000)
     d.setdefault("ringan", 10000)
     d.setdefault("tingkat", {})
+    d.setdefault("dari", {})   # {id_anggota: minggu pertama wajib kas} untuk anggota baru / masa bebas sementara
     if baru:
         d["mulai"] = minggu_key()   # tunggakan dihitung sejak fitur ini dipakai, bukan mundur ke belakang
         try:
@@ -7871,6 +7897,13 @@ def iuran_set():
         except Exception:
             log.exception("simpan iuran gagal")
     return d
+
+
+def kas_mulai_of(mid):
+    """Minggu pertama anggota ini wajib bayar kas (minggu sebelum itu tidak dihitung nunggak)."""
+    d = iuran_set()
+    k = d["dari"].get(str(mid), "")
+    return k if minggu_valid(k) and k > d["mulai"] else d["mulai"]
 
 
 def tingkat_of(mid):
@@ -7930,7 +7963,7 @@ def _st_minggu(rows, mid, k):
 def minggu_bisa_bayar(rows, mid):
     """Minggu yang boleh dibayar: sejak mulai s/d 4 minggu ke depan, yang belum lunas (termasuk yang baru dibayar sebagian) & tidak sedang menunggu."""
     cur, d = minggu_key(), iuran_set()
-    return [k for k in minggu_antara(d["mulai"], minggu_geser(cur, 4)) if _st_minggu(rows, mid, k) in ("belum", "kurang")][-16:]
+    return [k for k in minggu_antara(kas_mulai_of(mid), minggu_geser(cur, 4)) if _st_minggu(rows, mid, k) in ("belum", "kurang")][-16:]
 
 
 def _pilihan_minggu(rows, mid):
@@ -7951,13 +7984,15 @@ def iuran_data(r, minggu=None):
     lalu = minggu_antara(d["mulai"], minggu_geser(cur, -1))   # minggu berjalan belum dihitung nunggak
     anggota = []
     for m in sorted((m for m in MEMBERS.values() if m["aktif"]), key=lambda m: m["nama"].lower()):
-        t = tingkat_of(m["id"])
-        tg = [] if t == "bebas" else [k for k in lalu if _st_minggu(rows, m["id"], k) in ("belum", "kurang")]
-        anggota.append({"id": m["id"], "nama": m["nama"], "tingkat": t, "tingkat_label": TINGKAT[t], "nominal": nominal_of(m["id"]),
-                        "status": "bebas" if t == "bebas" else _st_minggu(rows, m["id"], minggu), "tunggak": len(tg), "tunggak_minggu": tg[-8:], "tunggak_semua": tg,
-                        "sisa": 0 if t == "bebas" else _sisa_minggu(rows, m["id"], minggu), "tunggak_rp": sum(_sisa_minggu(rows, m["id"], k) for k in tg)})
+        t, km = tingkat_of(m["id"]), kas_mulai_of(m["id"])
+        lepas = t == "bebas" or minggu < km   # bebas permanen, atau minggu ini belum wajib (anggota baru)
+        tg = [] if t == "bebas" else [k for k in lalu if k >= km and _st_minggu(rows, m["id"], k) in ("belum", "kurang")]
+        anggota.append({"id": m["id"], "nama": m["nama"], "tingkat": t, "tingkat_label": TINGKAT[t] if minggu >= km or t == "bebas" else f"Belum wajib (mulai {minggu_label(km)})",
+                        "nominal": nominal_of(m["id"]), "kas_mulai": km, "kas_mulai_label": minggu_label(km), "kas_mulai_tgl": _senin(km).isoformat(),
+                        "status": "bebas" if lepas else _st_minggu(rows, m["id"], minggu), "tunggak": len(tg), "tunggak_minggu": tg[-8:], "tunggak_semua": tg,
+                        "sisa": 0 if lepas else _sisa_minggu(rows, m["id"], minggu), "tunggak_rp": sum(_sisa_minggu(rows, m["id"], k) for k in tg), "_lepas": lepas})
     masuk = sum(x["rincian"].get(minggu, 0) for x in rows if x["status"] == "lunas" and minggu in x["minggu"])
-    wajib = [a for a in anggota if a["tingkat"] != "bebas"]
+    wajib = [a for a in anggota if not a.pop("_lepas")]
     out = {"minggu": minggu, "label": minggu_label(minggu), "sekarang": cur, "mulai": d["mulai"], "mulai_tgl": _senin(d["mulai"]).isoformat(), "no_sekarang": minggu_no(cur), "no": minggu_no(minggu), "prev": minggu_geser(minggu, -1) if minggu > d["mulai"] else None,
            "next": minggu_geser(minggu, 1) if minggu < minggu_geser(cur, 4) else None, "tarif": {"biasa": d["biasa"], "ringan": d["ringan"]}, "tingkat_nama": TINGKAT,
            "anggota": anggota, "lunas": sum(1 for a in wajib if a["status"] == "lunas"), "wajib": len(wajib), "masuk": masuk,
@@ -7968,7 +8003,7 @@ def iuran_data(r, minggu=None):
     if konf:
         out["menunggu"] = [x for x in rows if x["status"] == "menunggu"][:100]
         out["riwayat"] = rows[:60]
-        out["pilihan_anggota"] = {str(a["id"]): _pilihan_minggu(rows, a["id"]) for a in wajib}
+        out["pilihan_anggota"] = {str(a["id"]): _pilihan_minggu(rows, a["id"]) for a in anggota if a["tingkat"] != "bebas"}
     elif mine is not None:
         out["riwayat"] = [x for x in rows if x["anggota"] == mine][:30]
     return out
@@ -8163,6 +8198,15 @@ def api_iuran_atur():
         if tg > datetime.now(WIB).date():
             return jsonify({"error": "Tanggal mulai tidak boleh di masa depan"}), 400
         d["mulai"] = minggu_key(tg)
+    for k, v in (b.get("kas_mulai") or {}).items():   # {id: "YYYY-MM-DD" | ""} minggu pertama wajib kas per anggota
+        if str(k).isdigit() and int(k) in MEMBERS:
+            if not v:
+                d["dari"].pop(str(int(k)), None)
+                continue
+            try:
+                d["dari"][str(int(k))] = minggu_key(datetime.strptime(str(v)[:10], "%Y-%m-%d").date())
+            except ValueError:
+                return jsonify({"error": "Tanggal mulai kas tidak valid"}), 400
     ubah = []
     for k, v in (b.get("tingkat") or {}).items():
         if str(k).isdigit() and int(k) in MEMBERS and v in TINGKAT:
@@ -10714,6 +10758,7 @@ async def apex_tanya(pesan, riwayat, model_id="gemini", alir=None):
     """Jalankan satu giliran obrolan. riwayat: format netral [{role, text}] sehingga nyambung walau modelnya ganti. Balik (jawaban, alat, model)."""
     jejak = []
     _APEX_LOG.set(jejak)
+    _PENANYA.set("admin")   # Tanya Apex khusus Dev
     hist = ke_content([h for h in riwayat if isinstance(h, dict)][-APEX_RIWAYAT:])
     pil, kunci = _apex_mesin(model_id)
     jawab = await ask("apex", pesan, history=hist, model=pil["model"], act="Menjawab pertanyaan Dev", use_mcp=False, cache=False, fungsi=APEX_ALAT,
@@ -11531,6 +11576,7 @@ def make_handlers(key):
         m = u.message
         if not m or not m.text or not _addressed(u, c):
             return
+        _PENANYA.set(tg_role(u.effective_user))
         text = m.text.replace(f"@{c.bot.username}", "").strip() if c.bot.username else m.text
         if text.lower().startswith("!izin"):
             await izin_minta(m, c, key)
@@ -11663,6 +11709,7 @@ def make_handlers(key):
 
     async def photo(u, c):
         m = u.message
+        _PENANYA.set(tg_role(u.effective_user))
         cap = (m.caption or "").strip()
         if re.match(r"/gambar(@\w+)?(\s|$)", cap, re.I):  # foto + caption /gambar = edit foto, semua bot
             if not _ok(u.effective_user):
