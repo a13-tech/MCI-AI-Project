@@ -8117,7 +8117,8 @@ def kas_tutup_cek():
     ik = iuran_data("admin")
     nunggak = [a for a in ik["anggota"] if a["tunggak"] and a["tingkat"] != "bebas" and not _absen_kebal(a["id"])]
     batas_txt = f"{_HARI[batas.weekday()]} {batas.day} {_BLN[batas.month - 1]} pukul {batas.strftime('%H.%M')} WIB"
-    tahap = "akhir" if now.date() == batas.date() and now.hour >= 8 else ("umum" if now < batas else "")
+    # pengumuman pertama baru dikirim setelah minggu terakhir kas lewat (Senin pagi), supaya angka tunggakannya sudah lengkap
+    tahap = "akhir" if now.date() == batas.date() and now.hour >= 8 else ("umum" if now < batas and minggu_key() > kas_akhir() and now.hour >= 7 else "")
     sudah = d.setdefault("tutup_ingat", [])
     if tahap and tahap not in sudah and now < batas:
         sudah.append(tahap)
