@@ -1741,11 +1741,15 @@ async function loadUsage() {
     $("#usage").innerHTML = `<b>Pemakaian token ${esc(USE.tanggal)}</b><div class="mu" style="margin:4px 0 12px">Total ${num(USE.total)}${USE.batas ? " dari batas " + num(USE.batas) : ""} · RPM ${USE.rpm} · ${num(USE.router_hemat)} pesan tanpa Boss · ${num(USE.cache_hit)} dari cache · Boss dipanggil ${num(USE.boss_dipanggil)}x</div><div class="tb"><table><thead><tr><th>Model</th><th class="rt">Panggilan</th><th class="rt">Token masuk</th><th class="rt">Token keluar</th><th class="rt">Thinking</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   } catch (e) {}
 }
-let POLL_T = 0;
+let POLL_T = 0, DIAM_SEJAK = Date.now();
+// Layar dibiarkan tanpa disentuh 10 menit (misalnya tab terbuka di laptop semalaman) -> berhenti memeriksa server,
+// supaya database gratis bisa "tidur". Begitu digerakkan/disentuh lagi, langsung segar kembali.
+const DIAM_MAKS = 10 * 60 * 1000, layarDiam = () => Date.now() - DIAM_SEJAK > DIAM_MAKS;
+["pointerdown", "keydown", "wheel", "touchstart", "mousemove"].forEach(ev => addEventListener(ev, () => { const tadi = layarDiam(); DIAM_SEJAK = Date.now(); if (tadi && !document.hidden) poll(); }, {passive: true}));
 const jedaPoll = () => (!$("#p-office").hidden || !$("#p-cmd").hidden) ? (RINGAN ? 6000 : ME.role === "admin" ? 2000 : 4000) : (RINGAN ? 45000 : 20000);
 function pollMulai() {   // jadwal ulang dari sekarang (dipanggil saat pindah halaman supaya langsung ikut ritme baru)
   clearTimeout(POLL_T);
-  POLL_T = setTimeout(async () => { if (!document.hidden) await poll(); pollMulai(); }, jedaPoll());
+  POLL_T = setTimeout(async () => { if (!document.hidden && !layarDiam()) await poll(); pollMulai(); }, jedaPoll());
 }
 async function poll() {
   try {
@@ -6885,7 +6889,7 @@ addEventListener("hashchange", bukaHash);
   if (!PUNYA_INBOX()) ["inbox", "bayarkas"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // viewer tidak punya inbox & iuran
   if (ME.role !== "viewer") api("/api/absen").then(d => { AB = d; const nb = $("#nbAbsen"); if (nb) nb.hidden = !(d.status === "belum"); }).catch(() => {});   // tanda "!" kalau belum absen
   if (!ADM()) $("#nvApex").style.display = "none";   // Tanya Apex khusus token admin
-  inboxBadge(); setInterval(() => { if (!document.hidden) inboxBadge(); }, 20000);
+  inboxBadge(); setInterval(() => { if (!document.hidden && !layarDiam()) inboxBadge(); }, 20000);
   pasangAI();
   const NP = ME.anggota ? ME.anggota.nama + " · " + ME.anggota.jabatan.join(", ") + (ME.anggota.sp ? " · SP" + ME.anggota.sp : "") : (ME.nama_peran || "Viewer");
   $("#whoRole").innerHTML = ADM() ? `<span class="wl">Masuk sebagai</span><span class="wh">Masuk sebagai</span> <b>Admin</b>`
@@ -6923,7 +6927,7 @@ addEventListener("hashchange", bukaHash);
   pollMulai();
   document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
   setInterval(() => { if (!$("#p-office").hidden) renderList(); }, 1000);
-  setInterval(() => { if (can("tim")) loadUsage(); }, 15000);
+  setInterval(() => { if (can("tim") && !document.hidden && !layarDiam()) loadUsage(); }, 15000);
 })();
 </script>
 </body>
