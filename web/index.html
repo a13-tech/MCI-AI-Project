@@ -1060,11 +1060,13 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
    <div class="cd"><div class="k">Menunggu konfirmasi</div><div class="v" id="bk2">-</div></div>
    <div class="cd"><div class="k">Masuk minggu ini</div><div class="v" id="bk3">-</div></div>
   </div>
+  <div class="cd" id="bkTutup" hidden style="border:2px solid #B42318;background:#FEF3F2"></div>
   <div class="cd" id="bkBayar" hidden></div>
   <div class="cd"><b>Status anggota</b><div class="mu" style="font-size:12.5px;margin-top:4px">Hijau = lunas · Kuning = menunggu konfirmasi Bendahara · Merah = belum bayar · Abu-abu = tidak bayar (peminjam)</div><div class="bkg" id="bkList"></div></div>
   <div class="cd" id="bkKonf" hidden><b>Menunggu konfirmasi</b><div id="bkMenunggu" style="margin-top:10px"></div></div>
   <div class="cd" id="bkAtur" hidden><b>Atur iuran (Bendahara)</b>
    <div class="fl" style="margin-top:12px"><label>Tarif Biasa per minggu (Rp)<input type="number" id="bkTB" min="1" step="500"></label><label>Tarif Keringanan per minggu (Rp)<input type="number" id="bkTR" min="1" step="500"></label><label>Minggu ke-1 dimulai tanggal<input type="date" id="bkMulai"></label></div>
+   <div class="fl" style="margin-top:8px"><label title="Isi tanggal di minggu TERAKHIR yang masih ditagih. Kosongkan = kas mingguan berjalan terus">Kas berhenti setelah minggu (tanggal)<input type="date" id="bkSelesai"></label><label title="Setelah lewat, yang masih menunggak otomatis dikeluarkan">Batas lunas tunggakan<input type="datetime-local" id="bkBatas"></label></div>
    <div class="tb" style="margin-top:12px"><table><thead><tr><th>Anggota</th><th>Tingkat</th><th title="Minggu sebelum tanggal ini tidak dihitung nunggak (anggota baru)">Wajib kas mulai</th><th class="rt">Per minggu</th></tr></thead><tbody id="bkTk"></tbody></table></div>
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="bkSaveT">Simpan pengaturan</button><span class="mu" id="bkMsgT"></span></div>
    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
@@ -3247,6 +3249,11 @@ function bkMinggu(list, name, cek) { return list.length ? list.map(w => `<label 
 function renderBayarKas() {
   const d = BKD; if (!d) return;
   $("#bkLabel").textContent = d.label + (d.minggu === d.sekarang ? " (minggu ini)" : "");
+  const tt = $("#bkTutup"), sy = d.saya && d.anggota.find(a => a.id === d.saya.id);
+  tt.hidden = !d.selesai;
+  if (d.selesai) tt.innerHTML = `<b>📢 Kas mingguan diberhentikan</b><div style="font-size:13.5px;margin-top:4px">Kas terakhir ditagih ${esc(d.selesai_label)}. Tunggakan wajib lunas paling lambat <b>${esc(d.lunas_batas.replace("T", " "))} WIB</b>; yang masih menunggak setelah itu otomatis <b>dikeluarkan dari MCI</b>.</div>`
+    + (sy ? `<div style="margin-top:6px;font-weight:600;color:${sy.tunggak ? "#B42318" : "#067647"}">${sy.tunggak ? `Tunggakanmu: ${sy.tunggak} minggu (${rp(sy.tunggak_rp)}). Bayar di bawah.` : "Kamu aman, tidak ada tunggakan ✅"}</div>` : "")
+    + (d.bisa_konfirmasi ? `<div class="mu" style="font-size:12.5px;margin-top:6px">Masih menunggak: ${esc(d.anggota.filter(a => a.tunggak).map(a => `${a.nama} (${a.tunggak} mg, ${rp(a.tunggak_rp)})`).join(", ") || "tidak ada")}</div>` : "");
   $("#bkPrev").disabled = !d.prev; $("#bkNext").disabled = !d.next; $("#bkNow").hidden = d.minggu === d.sekarang;
   $("#bk1").textContent = `${d.lunas} / ${d.wajib}`; $("#bk2").textContent = num(d.anggota.filter(a => a.status === "menunggu").length); $("#bk3").textContent = rp(d.masuk);
   $("#bkList").innerHTML = d.anggota.map(a => `<div class="bkm ${a.status}"><b>${esc(a.nama)}</b><span class="ch ${BK_ST[a.status][0]}">${BK_ST[a.status][1]}${a.status === "kurang" ? " " + rp(a.sisa) : ""}</span>
@@ -3291,7 +3298,8 @@ function renderBayarKas() {
   // pengaturan
   $("#bkAtur").hidden = !d.bisa_konfirmasi;
   if (d.bisa_konfirmasi) {
-    if (document.activeElement !== $("#bkMulai")) $("#bkMulai").value = d.mulai_tgl; if (document.activeElement !== $("#bkTB")) $("#bkTB").value = d.tarif.biasa; if (document.activeElement !== $("#bkTR")) $("#bkTR").value = d.tarif.ringan;
+    if (document.activeElement !== $("#bkMulai")) $("#bkMulai").value = d.mulai_tgl;
+    if (document.activeElement !== $("#bkSelesai")) $("#bkSelesai").value = d.selesai ? d.selesai_tgl || "" : ""; if (document.activeElement !== $("#bkBatas")) $("#bkBatas").value = d.lunas_batas ? d.lunas_batas.replace(" ", "T") : ""; if (document.activeElement !== $("#bkTB")) $("#bkTB").value = d.tarif.biasa; if (document.activeElement !== $("#bkTR")) $("#bkTR").value = d.tarif.ringan;
     $("#bkTk").innerHTML = d.anggota.map(a => `<tr><td>${esc(a.nama)}</td><td><select data-tk="${a.id}" style="max-width:240px">${Object.entries(d.tingkat_nama).map(([k, v]) => `<option value="${k}" ${k === a.tingkat ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></td><td><input type="date" data-km="${a.id}" value="${a.kas_mulai_tgl || ""}" style="max-width:150px" title="${esc(a.kas_mulai_label || "")}"></td><td class="rt">${a.nominal ? rp(a.nominal) : "-"}</td></tr>`).join("");
     const cur = $("#bkCA").value, wajib = d.anggota.filter(a => a.tingkat !== "bebas");
     $("#bkCA").innerHTML = wajib.map(a => `<option value="${a.id}" ${String(a.id) === cur ? "selected" : ""}>${esc(a.nama)} (${rp(a.nominal)}/minggu)</option>`).join("");
@@ -3319,7 +3327,8 @@ $("#bkSaveT").onclick = async () => {
   const tingkat = {}, kas_mulai = {}; $$("[data-tk]").forEach(s => tingkat[s.dataset.tk] = s.value);
   $$("[data-km]").forEach(s => { if (s.value !== s.defaultValue) kas_mulai[s.dataset.km] = s.value; });
   $("#bkSaveT").disabled = true; $("#bkMsgT").textContent = "Menyimpan…";
-  try { BKD = await api("/api/iuran/atur", {json: {biasa: +$("#bkTB").value, ringan: +$("#bkTR").value, mulai_tgl: $("#bkMulai").value, tingkat, kas_mulai, minggu: BKD.minggu}}); renderBayarKas(); $("#bkMsgT").textContent = "Tersimpan. Anggota yang tingkatnya berubah dapat notifikasi."; }
+  try { BKD = await api("/api/iuran/atur", {json: {biasa: +$("#bkTB").value, ringan: +$("#bkTR").value, mulai_tgl: $("#bkMulai").value, tingkat, kas_mulai, minggu: BKD.minggu,
+    ...(($("#bkSelesai").value || "") !== (BKD.selesai ? BKD.selesai_tgl || "" : "") || ($("#bkBatas").value || "") !== (BKD.lunas_batas || "").replace(" ", "T") ? {selesai_tgl: $("#bkSelesai").value, lunas_batas: $("#bkBatas").value} : {})}}); renderBayarKas(); $("#bkMsgT").textContent = "Tersimpan. Anggota yang tingkatnya berubah dapat notifikasi."; }
   catch (e) { $("#bkMsgT").textContent = e.message; }
   $("#bkSaveT").disabled = false;
 };

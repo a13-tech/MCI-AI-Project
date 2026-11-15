@@ -2362,6 +2362,11 @@ async def laporan_jadwal():
         except Exception:
             log.exception("Cek absen gagal")
         try:
+            for nama in await asyncio.to_thread(kas_tutup_cek):
+                log.info("Anggota dikeluarkan (tunggakan kas): %s", nama)
+        except Exception:
+            log.exception("Cek batas lunas kas gagal")
+        try:
             await asyncio.to_thread(alat_cek_telat)
             await backup_jadwal_cek()
             await pagi_cek()
@@ -7972,6 +7977,22 @@ def iuran_set():
     return d
 
 
+def kas_akhir():
+    """Minggu terakhir kas ditagih (kas mingguan diberhentikan setelahnya), atau None kalau kas masih berjalan."""
+    k = iuran_set().get("selesai") or ""
+    return k if minggu_valid(k) else None
+
+
+def kas_batas_lunas():
+    """Batas waktu melunasi tunggakan setelah kas diberhentikan (datetime WIB) atau None."""
+    t = iuran_set().get("lunas_batas") or ""
+    try:
+        dt = datetime.fromisoformat(t)
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else (WIB.localize(dt) if hasattr(WIB, "localize") else dt.replace(tzinfo=WIB))
+
+
 def kas_mulai_of(mid):
     """Minggu pertama anggota ini wajib bayar kas (minggu sebelum itu tidak dihitung nunggak)."""
     d = iuran_set()
@@ -8036,7 +8057,8 @@ def _st_minggu(rows, mid, k):
 def minggu_bisa_bayar(rows, mid):
     """Minggu yang boleh dibayar: sejak mulai s/d 4 minggu ke depan, yang belum lunas (termasuk yang baru dibayar sebagian) & tidak sedang menunggu."""
     cur, d = minggu_key(), iuran_set()
-    return [k for k in minggu_antara(kas_mulai_of(mid), minggu_geser(cur, 4)) if _st_minggu(rows, mid, k) in ("belum", "kurang")][-16:]
+    ujung = min(minggu_geser(cur, 4), kas_akhir() or "9999-W99")
+    return [k for k in minggu_antara(kas_mulai_of(mid), ujung) if _st_minggu(rows, mid, k) in ("belum", "kurang")][-16:]
 
 
 def _pilihan_minggu(rows, mid):
@@ -8054,11 +8076,12 @@ def iuran_data(r, minggu=None):
     d, cur, mine, konf = iuran_set(), minggu_key(), mid_of(r), can("kas_edit", r)
     minggu = minggu if minggu_valid(minggu) else cur
     rows = bayar_rows()
-    lalu = minggu_antara(d["mulai"], minggu_geser(cur, -1))   # minggu berjalan belum dihitung nunggak
+    akhir = kas_akhir()
+    lalu = minggu_antara(d["mulai"], min(minggu_geser(cur, -1), akhir or "9999-W99"))   # minggu berjalan belum dihitung nunggak; berhenti di minggu terakhir kas
     anggota = []
     for m in sorted((m for m in MEMBERS.values() if m["aktif"]), key=lambda m: m["nama"].lower()):
         t, km = tingkat_of(m["id"]), kas_mulai_of(m["id"])
-        lepas = t == "bebas" or minggu < km   # bebas permanen, atau minggu ini belum wajib (anggota baru)
+        lepas = t == "bebas" or minggu < km or bool(akhir and minggu > akhir)   # bebas permanen, belum wajib (anggota baru), atau kas sudah diberhentikan
         tg = [] if t == "bebas" else [k for k in lalu if k >= km and _st_minggu(rows, m["id"], k) in ("belum", "kurang")]
         anggota.append({"id": m["id"], "nama": m["nama"], "tingkat": t, "tingkat_label": TINGKAT[t] if minggu >= km or t == "bebas" else f"Belum wajib (mulai {minggu_label(km)})",
                         "nominal": nominal_of(m["id"]), "kas_mulai": km, "kas_mulai_label": minggu_label(km), "kas_mulai_tgl": _senin(km).isoformat(),
@@ -8067,9 +8090,10 @@ def iuran_data(r, minggu=None):
     masuk = sum(x["rincian"].get(minggu, 0) for x in rows if x["status"] == "lunas" and minggu in x["minggu"])
     wajib = [a for a in anggota if not a.pop("_lepas")]
     out = {"minggu": minggu, "label": minggu_label(minggu), "sekarang": cur, "mulai": d["mulai"], "mulai_tgl": _senin(d["mulai"]).isoformat(), "no_sekarang": minggu_no(cur), "no": minggu_no(minggu), "prev": minggu_geser(minggu, -1) if minggu > d["mulai"] else None,
-           "next": minggu_geser(minggu, 1) if minggu < minggu_geser(cur, 4) else None, "tarif": {"biasa": d["biasa"], "ringan": d["ringan"]}, "tingkat_nama": TINGKAT,
+           "next": minggu_geser(minggu, 1) if minggu < min(minggu_geser(cur, 4), akhir or "9999-W99") else None, "tarif": {"biasa": d["biasa"], "ringan": d["ringan"]}, "tingkat_nama": TINGKAT,
            "anggota": anggota, "lunas": sum(1 for a in wajib if a["status"] == "lunas"), "wajib": len(wajib), "masuk": masuk,
-           "bisa_konfirmasi": konf, "saya": None, "menunggu": [], "riwayat": []}
+           "bisa_konfirmasi": konf, "saya": None, "menunggu": [], "riwayat": [],
+           "selesai": akhir, "selesai_label": minggu_label(akhir) if akhir else "", "selesai_tgl": _senin(akhir).isoformat() if akhir else "", "lunas_batas": kas_batas_lunas().strftime("%Y-%m-%d %H:%M") if kas_batas_lunas() else ""}
     if mine is not None and mine in MEMBERS:
         out["saya"] = {"id": mine, "tingkat": tingkat_of(mine), "tingkat_label": TINGKAT[tingkat_of(mine)], "nominal": nominal_of(mine),
                        "pilihan": _pilihan_minggu(rows, mine), "bendahara": "bendahara" in MEMBERS[mine]["jabatan"]}
@@ -8080,6 +8104,46 @@ def iuran_data(r, minggu=None):
     elif mine is not None:
         out["riwayat"] = [x for x in rows if x["anggota"] == mine][:30]
     return out
+
+
+def kas_tutup_cek():
+    """Kas mingguan diberhentikan: ingatkan yang masih menunggak (saat diumumkan & pagi hari terakhir),
+    lalu setelah batas lunas lewat, yang MASIH menunggak otomatis dikeluarkan. Pembayaran yang sedang menunggu konfirmasi tidak dihitung nunggak.
+    Dev/pemegang akses penuh tidak dikeluarkan otomatis. Kembalikan daftar nama yang dikeluarkan."""
+    d, batas = iuran_set(), kas_batas_lunas()
+    if not kas_akhir() or not batas or d.get("tutup_diproses"):
+        return []
+    now = datetime.now(WIB)
+    ik = iuran_data("admin")
+    nunggak = [a for a in ik["anggota"] if a["tunggak"] and a["tingkat"] != "bebas" and not _absen_kebal(a["id"])]
+    batas_txt = f"{_HARI[batas.weekday()]} {batas.day} {_BLN[batas.month - 1]} pukul {batas.strftime('%H.%M')} WIB"
+    tahap = "akhir" if now.date() == batas.date() and now.hour >= 8 else ("umum" if now < batas else "")
+    sudah = d.setdefault("tutup_ingat", [])
+    if tahap and tahap not in sudah and now < batas:
+        sudah.append(tahap)
+        set_save()
+        for a in nunggak:
+            inbox_kirim([a["id"]], "bayar_kas", ("⏰ HARI TERAKHIR lunasi tunggakan kas" if tahap == "akhir" else "📢 Kas mingguan diberhentikan, lunasi tunggakanmu"),
+                        f"Kas mingguan MCI berhenti setelah {ik['selesai_label']}. Kamu masih menunggak {a['tunggak']} minggu ({rp(a['tunggak_rp'])}). "
+                        f"Lunasi lewat halaman Bayar Kas paling lambat {batas_txt}. Kalau belum lunas, kamu otomatis DIKELUARKAN dari MCI.")
+        return []
+    if now < batas:
+        return []
+    d["tutup_diproses"] = now.isoformat(timespec="seconds")
+    hari, keluar = today(), []
+    for a in nunggak:
+        with db() as c:
+            sql(c, "UPDATE anggota SET aktif=0 WHERE id=?", (a["id"],))
+            sql(c, "DELETE FROM dikeluarkan WHERE nama=?", (a["nama"],))
+            sql(c, "INSERT INTO dikeluarkan (nama,tanggal,alasan) VALUES (?,?,?)", (a["nama"], hari, f"Kas: tunggakan {a['tunggak']} minggu ({rp(a['tunggak_rp'])}) tidak dilunasi sampai {batas_txt}"))
+        inbox_kirim([a["id"]], "bayar_kas", "Kamu dikeluarkan dari MCI", f"Tunggakan kas {a['tunggak']} minggu ({rp(a['tunggak_rp'])}) tidak dilunasi sampai {batas_txt}. Hubungi Pemilik MCI jika ada keberatan.")
+        keluar.append(f"{a['nama']} ({a['tunggak']} minggu, {rp(a['tunggak_rp'])})")
+    set_save()
+    if keluar:
+        members_load()
+    inbox_kirim([0] + penerima_konfirmasi(), "bayar_kas", f"🚪 Batas lunas kas lewat: {len(keluar)} anggota dikeluarkan",
+                ("Dikeluarkan otomatis:\n- " + "\n- ".join(keluar) + "\n\nBisa dipulihkan di halaman Anggota (aktifkan lagi).") if keluar else "Semua tunggakan sudah lunas. Tidak ada yang dikeluarkan.")
+    return keluar
 
 
 def _kas_iuran(nama, mg, jumlah):
@@ -8271,6 +8335,18 @@ def api_iuran_atur():
         if tg > datetime.now(WIB).date():
             return jsonify({"error": "Tanggal mulai tidak boleh di masa depan"}), 400
         d["mulai"] = minggu_key(tg)
+    if "selesai_tgl" in b:   # hentikan kas mingguan: {selesai_tgl: tanggal di minggu terakhir yang ditagih, lunas_batas: "YYYY-MM-DDTHH:MM"} ; "" = kas jalan lagi
+        if not b["selesai_tgl"]:
+            for k in ("selesai", "lunas_batas", "tutup_diproses", "tutup_ingat"):
+                d.pop(k, None)
+        else:
+            try:
+                d["selesai"] = minggu_key(datetime.strptime(str(b["selesai_tgl"])[:10], "%Y-%m-%d").date())
+                d["lunas_batas"] = datetime.strptime(str(b.get("lunas_batas") or "")[:16], "%Y-%m-%dT%H:%M").isoformat(timespec="minutes")
+            except ValueError:
+                return jsonify({"error": "Tanggal berhenti / batas lunas tidak valid"}), 400
+            d.pop("tutup_diproses", None)
+            d.pop("tutup_ingat", None)
     for k, v in (b.get("kas_mulai") or {}).items():   # {id: "YYYY-MM-DD" | ""} minggu pertama wajib kas per anggota
         if str(k).isdigit() and int(k) in MEMBERS:
             if not v:
