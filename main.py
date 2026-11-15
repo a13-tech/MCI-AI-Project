@@ -434,7 +434,7 @@ def db_init():
                 sql(c, f"ALTER TABLE jasa_pesan ADD COLUMN {kol}")
         except Exception:
             pass   # sudah ada
-    for kol in ("berkas_svg TEXT", "berkas_stl TEXT"):   # Studio 3D: pratinjau & STL disimpan sekali, tidak dihitung ulang tiap unduh/deploy
+    for kol in ("berkas_svg TEXT", "berkas_stl TEXT", "sketsa TEXT"):   # Studio 3D: pratinjau & STL disimpan sekali, tidak dihitung ulang tiap unduh/deploy
         try:
             with db() as c:
                 sql(c, f"ALTER TABLE model3d ADD COLUMN {kol}")
@@ -5698,12 +5698,14 @@ def _resep_dari(teks):
 M3D_TINJAU = os.getenv("STUDIO3D_TINJAU", "1").strip().lower() not in ("0", "false", "tidak")
 
 
-async def _m3d_tinjau(permintaan, resep, lap, gbr, sketsa=None):
+async def _m3d_tinjau(permintaan, resep, lap, gbr, sketsa=None, ukur=""):
     """Kirim gambar 3 arah ke AI -> resep perbaikan. Kembalikan (resep, poligon, laporan, mesin) atau None kalau tidak lebih baik."""
     prompt = (f"PERMINTAAN:\n{permintaan}\n\nRESEP SAAT INI:\n{json.dumps(resep, ensure_ascii=False)}\n\n"
               f"HASIL UKUR MESIN: {json.dumps({k: lap[k] for k in ('ukuran_mm', 'volume_cm3')}, ensure_ascii=False)}\n"
               f"PERINGATAN MESIN: {'; '.join(lap.get('peringatan') or []) or 'tidak ada'}\n\n"
-              + ("GAMBAR PERTAMA = SKETSA ACUAN dari anggota. GAMBAR KEDUA = hasil nyata resep di atas. Bandingkan keduanya.\n" if sketsa else "") +
+              + ("GAMBAR PERTAMA = SKETSA ACUAN dari anggota. GAMBAR KEDUA = hasil nyata resep di atas. Bandingkan keduanya bagian demi bagian: "
+                 "siluet, urutan bagian dari depan ke belakang, tinggi relatif, bagian yang hilang atau yang tidak ada di sketsa. Sketsa yang menang, bukan selera kamu.\n"
+                 + (f"HASIL UKUR SKETSA:\n{ukur}\n" if ukur else "") if sketsa else "") +
               "GAMBAR HASIL = dari 3 arah: KIRI tampak atas, TENGAH tampak samping, KANAN tampak miring 3D.\n"
               "Periksa seperti desainer produk: apakah benda ini langsung dikenali sebagai yang diminta? Cek proporsi, bagian yang hilang, "
               "bagian melayang atau menembus keluar, bentuk kaku yang seharusnya melengkung (gunakan 'lambung' atau 'putar'), dan detail yang terlalu kecil untuk dicetak.\n"
@@ -5714,26 +5716,53 @@ async def _m3d_tinjau(permintaan, resep, lap, gbr, sketsa=None):
     if json.dumps(baru, sort_keys=True) == json.dumps(resep, sort_keys=True):
         return None
     try:
-        polis, lap2 = await asyncio.to_thread(m3d_bangun, baru)
+        polis, lap2, gbr2 = await asyncio.to_thread(m3d_bangun, baru, True)
     except (ValueError, KeyError, TypeError):
         return None   # perbaikan malah rusak -> tetap pakai versi sebelumnya
     if len(lap2.get("peringatan") or []) > len(lap.get("peringatan") or []) + 1:
         return None
-    return baru, polis, lap2, mesin
+    return baru, polis, lap2, mesin, gbr2
+
+
+SKETSA_BACA = """Kamu juru ukur gambar teknik. Lihat SKETSA terlampir dan UKUR, jangan menebak dari nama benda.
+Jawab teks biasa, ringkas, dengan angka:
+1. TAMPAK: sketsa ini tampak apa (samping / atas / depan / miring 3D / beberapa tampak)? Sebutkan arah depan benda (kiri atau kanan gambar).
+2. KOTAK BATAS: rasio panjang : lebar : tinggi benda utama yang terlihat (contoh 10 : 1,6 : 1,2). Kalau ada angka ukuran tertulis di gambar, salin persis.
+3. GARIS LUAR (siluet) benda utama: 10-16 titik (u, v) dalam PERSEN, u = 0 ujung kiri -> 100 ujung kanan, v = 0 paling bawah -> 100 paling atas. Urut mengelilingi siluet.
+4. BAGIAN-BAGIAN: tiap bagian yang terlihat (nama, u_awal-u_akhir %, v_bawah-v_atas %, bentuk: kotak/bulat/lengkung/meruncing). Termasuk yang kecil kalau jelas terlihat.
+5. CIRI KHAS: 3-6 hal yang membuat benda ini dikenali (contoh: haluan miring ke depan, cerobong di belakang, dek rata panjang).
+Jangan tulis resep atau JSON."""
+
+
+async def _sketsa_ukur(sketsa, permintaan):
+    """Langkah 1 dari sketsa: AI MENGUKUR gambar dulu (siluet & posisi bagian dalam persen), baru kemudian merancang.
+    Analogi: tukang kayu menjiplak pola ke kertas milimeter sebelum memotong, bukan langsung memotong dari ingatan."""
+    try:
+        teks, _m = await kode_ai(SKETSA_BACA, f"Permintaan anggota: {permintaan}\nUkur sketsa terlampir.", "Membaca ukuran sketsa",
+                                 parts=[types.Part.from_bytes(data=sketsa[0], mime_type=sketsa[1])])
+        return (teks or "").strip()[:4000]
+    except Exception:
+        log.exception("baca sketsa gagal")
+        return ""
 
 
 SKETSA_PETUNJUK = ("SKETSA TERLAMPIR (gambar pertama): ini acuan bentuk dari anggota, boleh coretan tangan, foto benda, atau gambar teknik. "
                    "Tafsirkan bentuk dan proporsinya, abaikan noda/garis bantu. Kalau ukuran tidak tertulis, perkirakan ukuran wajar dan sebutkan di 'penjelasan'. "
-                   "Bentuk lengkung pada sketsa buat dengan 'lambung' atau 'putar', jangan diganti kotak kaku.\n\n")
+                   "Bentuk lengkung pada sketsa buat dengan 'lambung' atau 'putar', jangan diganti kotak kaku.\n"
+                   "PATUHI SKETSA, BUKAN BAYANGANMU tentang benda sejenis: jumlah, urutan, dan posisi bagian harus sama dengan sketsa. "
+                   "Pakai HASIL UKUR SKETSA di bawah: ubah persen u/v jadi milimeter (u -> sumbu X dari -panjang/2 sampai +panjang/2, v -> sumbu Z dari dasar). "
+                   "Siluet tampak samping model harus menimpa garis luar sketsa.\n\n")
 
 
 async def model3d_buat(permintaan, lama=None, sketsa=None):
     """AI menulis resep -> mesin menghitung & mengukur -> kalau salah/ada peringatan, AI memperbaiki (maks 2 putaran).
     sketsa = (bytes, mime) gambar 2D acuan (opsional)."""
     lampir = [types.Part.from_bytes(data=sketsa[0], mime_type=sketsa[1])] if sketsa else None
-    prompt = (SKETSA_PETUNJUK if sketsa else "") + f"PERMINTAAN:\n{permintaan}"
+    ukur = await _sketsa_ukur(sketsa, permintaan) if sketsa else ""
+    acuan = (SKETSA_PETUNJUK + (f"HASIL UKUR SKETSA:\n{ukur}\n\n" if ukur else "")) if sketsa else ""
+    prompt = acuan + f"PERMINTAAN:\n{permintaan}"
     if lama:
-        prompt = f"RESEP SEBELUMNYA:\n{json.dumps(lama, ensure_ascii=False)}\n\nPERUBAHAN YANG DIMINTA:\n{permintaan}\n\nKeluarkan resep lengkap yang sudah diperbaiki."
+        prompt = acuan + f"RESEP SEBELUMNYA:\n{json.dumps(lama, ensure_ascii=False)}\n\nPERUBAHAN YANG DIMINTA:\n{permintaan}\n\nKeluarkan resep lengkap yang sudah diperbaiki."
     galat, resep, polis, lap, mesin = "", None, None, None, "gemini"
     for putaran in range(3):
         teks, mesin = await kode_ai(SISTEM_3D, prompt, "Merancang model 3D" + (" dari sketsa" if sketsa else ""), schema=Resep3D, parts=lampir)
@@ -5749,17 +5778,23 @@ async def model3d_buat(permintaan, lama=None, sketsa=None):
             break
         masalah = f"GALAT: {galat}" if galat else "PERINGATAN MESIN:\n- " + "\n- ".join(lap["peringatan"])
         ukur = "" if galat else f"\nHASIL UKUR MESIN: {json.dumps({k: lap[k] for k in ('ukuran_mm', 'volume_cm3', 'bagian')}, ensure_ascii=False)}"
-        prompt = (f"PERMINTAAN:\n{permintaan}\n\nRESEP KAMU SEBELUMNYA:\n{json.dumps(resep, ensure_ascii=False) if resep else teks[:3000]}\n\n{masalah}{ukur}\n\n"
+        prompt = (acuan + f"PERMINTAAN:\n{permintaan}\n\nRESEP KAMU SEBELUMNYA:\n{json.dumps(resep, ensure_ascii=False) if resep else teks[:3000]}\n\n{masalah}{ukur}\n\n"
                   "Periksa ulang koordinat tiap bagian, perbaiki masalah di atas, lalu keluarkan resep lengkap yang benar.")
     if polis is None:
         raise RuntimeError(f"AI belum berhasil membuat model yang sah ({galat}). Coba jelaskan ukurannya lebih rinci.")
-    if M3D_TINJAU and gbr:   # AI melihat hasilnya sendiri (3 arah) lalu memperbaiki sekali, seperti desainer mengecek render
-        try:
-            hasil = await _m3d_tinjau(permintaan, resep, lap, gbr, sketsa)
-            if hasil:
-                resep, polis, lap, mesin = hasil
-        except Exception:
-            log.exception("tinjauan visual 3D gagal, pakai hasil sebelumnya")
+    if M3D_TINJAU and gbr:   # AI melihat hasilnya sendiri (3 arah) lalu memperbaiki, seperti desainer mengecek render; dari sketsa 2 putaran
+        for _ in range(2 if sketsa else 1):
+            try:
+                hasil = await _m3d_tinjau(permintaan, resep, lap, gbr, sketsa, ukur)
+            except Exception:
+                log.exception("tinjauan visual 3D gagal, pakai hasil sebelumnya")
+                break
+            if not hasil:
+                break
+            resep, polis, lap, mesin = hasil[:4]
+            gbr = hasil[4]
+            if not gbr:
+                break
     M3D_BARU[_m3d_sidik(resep)] = polis   # dipakai saat pratinjau pertama dibuka -> langsung disimpan, tidak dihitung ulang
     while len(M3D_BARU) > 4:
         M3D_BARU.pop(next(iter(M3D_BARU)))
@@ -6294,15 +6329,46 @@ def api_mesin():
 
 def m3d_rows(batas=60):
     with db() as c:
-        rows = sql(c, "SELECT id,judul,permintaan,laporan,mesin,oleh,dibuat FROM model3d ORDER BY id DESC LIMIT ?", (batas,)).fetchall()
+        rows = sql(c, "SELECT id,judul,permintaan,laporan,mesin,oleh,dibuat,CASE WHEN sketsa IS NULL OR sketsa='' THEN 0 ELSE 1 END FROM model3d ORDER BY id DESC LIMIT ?", (batas,)).fetchall()
     out = []
     for a in rows:
         try:
             lap = json.loads(a[3] or "{}")
         except ValueError:
             lap = {}
-        out.append({"id": int(a[0]), "judul": a[1], "permintaan": a[2] or "", "laporan": lap, "mesin": a[4] or "", "oleh": a[5] or "", "dibuat": a[6] or ""})
+        out.append({"id": int(a[0]), "judul": a[1], "permintaan": a[2] or "", "laporan": lap, "mesin": a[4] or "", "oleh": a[5] or "", "dibuat": a[6] or "", "sketsa": bool(a[7])})
     return out
+
+
+def sketsa_kecil(raw, mime, sisi=1024):
+    """Perkecil sketsa jadi JPEG <= 1024 px supaya hemat database & token AI. Tanpa Pillow -> apa adanya."""
+    try:
+        from PIL import Image, ImageOps
+        im = ImageOps.exif_transpose(Image.open(io.BytesIO(raw)))
+        if im.mode in ("RGBA", "LA", "P"):
+            bg = Image.new("RGB", im.size, (255, 255, 255))
+            im = im.convert("RGBA")
+            bg.paste(im, mask=im.split()[-1])
+            im = bg
+        im = im.convert("RGB")
+        im.thumbnail((sisi, sisi))
+        out = io.BytesIO()
+        im.save(out, "JPEG", quality=85, optimize=True)
+        return out.getvalue(), "image/jpeg"
+    except Exception:
+        return raw, mime
+
+
+def m3d_sketsa(i):
+    """Sketsa acuan yang tersimpan bersama model -> (bytes, mime) atau None."""
+    with db() as c:
+        a = sql(c, "SELECT sketsa FROM model3d WHERE id=?", (i,)).fetchone()
+    if not a or not a[0]:
+        return None
+    try:
+        return base64.b64decode(a[0]), "image/jpeg"
+    except ValueError:
+        return None
 
 
 def _m3d_get(i):
@@ -6459,7 +6525,7 @@ def api_studio():
         raw = f.read(8_000_001)
         if len(raw) > 8_000_000 or not (f.mimetype or "").startswith("image/"):
             return jsonify({"error": "Sketsa harus gambar, maksimal 8 MB"}), 400
-        sketsa = (raw, f.mimetype)
+        sketsa = sketsa_kecil(raw, f.mimetype)
         minta = minta or "Buat model 3D sesuai sketsa ini."
     if len(minta) < 8:
         return jsonify({"error": "Jelaskan lebih rinci apa yang mau dibuat (bentuk dan ukurannya)."}), 400
@@ -6470,11 +6536,13 @@ def api_studio():
     try:
         if jenis == "3d":
             lama = _m3d_get(int(d["dari"]))[1] if str(d.get("dari") or "").isdigit() else None
+            if lama and not sketsa:   # revisi tetap dibandingkan dengan sketsa aslinya
+                sketsa = m3d_sketsa(int(d["dari"]))
             resep, lap, mesin = asyncio.run_coroutine_threadsafe(model3d_buat(minta, lama, sketsa), LOOP).result(600)
             with db() as c:
-                sql(c, "INSERT INTO model3d (judul,permintaan,resep,laporan,mesin,oleh_id,oleh,dibuat) VALUES (?,?,?,?,?,?,?,?)",
+                sql(c, "INSERT INTO model3d (judul,permintaan,resep,laporan,mesin,oleh_id,oleh,dibuat,sketsa) VALUES (?,?,?,?,?,?,?,?,?)",
                     (str(resep.get("judul") or minta)[:120], minta, json.dumps(resep, ensure_ascii=False), json.dumps({**lap, "penjelasan": str(resep.get("penjelasan") or "")[:800]}, ensure_ascii=False),
-                     mesin, mid_of(r), nama_peran(r), _now()))
+                     mesin, mid_of(r), nama_peran(r), _now(), base64.b64encode(sketsa[0]).decode("ascii") if sketsa else None))
         else:
             teks, mesin = asyncio.run_coroutine_threadsafe(kode_ai(SISTEM_SVG, f"Gambarlah: {minta}", "Menggambar dengan kode SVG"), LOOP).result(180)
             svg, err = studio3d.svg_bersih(teks)
@@ -6558,6 +6626,11 @@ def api_studio_3d(i, ext):
     judul, resep = _m3d_get(i)
     if ext == "json":
         return jsonify(resep)
+    if ext == "jpg":   # sketsa acuan
+        sk = m3d_sketsa(i)
+        if not sk:
+            abort(404)
+        return Response(sk[0], mimetype="image/jpeg", headers={"Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff"})
     if ext not in ("stl", "svg"):
         abort(404)
     try:
@@ -10627,11 +10700,13 @@ async def _kerja_gambar(teks, r, sumber):
 
 
 async def _kerja_3d(teks, r, sketsa=None):
+    if sketsa:
+        sketsa = await asyncio.to_thread(sketsa_kecil, *sketsa)
     resep, lap, mesin = await model3d_buat(teks, None, sketsa)
     judul = str(resep.get("judul") or teks)[:120]
-    q = "INSERT INTO model3d (judul,permintaan,resep,laporan,mesin,oleh_id,oleh,dibuat) VALUES (?,?,?,?,?,?,?,?)"
+    q = "INSERT INTO model3d (judul,permintaan,resep,laporan,mesin,oleh_id,oleh,dibuat,sketsa) VALUES (?,?,?,?,?,?,?,?,?)"
     p = (judul, teks, json.dumps(resep, ensure_ascii=False), json.dumps({**lap, "penjelasan": str(resep.get("penjelasan") or "")[:800]}, ensure_ascii=False),
-         mesin, mid_of(r), nama_peran(r), _now())
+         mesin, mid_of(r), nama_peran(r), _now(), base64.b64encode(sketsa[0]).decode("ascii") if sketsa else None)
 
     def simpan():
         with db() as c:
