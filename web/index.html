@@ -625,6 +625,10 @@ button.ng{font-size:12px;letter-spacing:.02em;text-transform:none;font-weight:50
 }
 @media (min-width:901px) and (max-width:1240px){#sd .nv.ut[data-p=info],#sd .nv.ut[data-p=portofolio],#sd #cariBuka kbd{display:none!important}}
 @media (min-width:901px) and (max-width:1060px){#sd .nv.ut[data-p=bayarkas],#sd .nv.ut[data-p=tugas],#sd .who #whoRole{display:none!important}}
+/* sampul Beranda: sketsa JalaDhipa-1 */
+.sampul{display:block;width:100%;height:auto;aspect-ratio:1241/525;object-fit:cover;border-radius:var(--r);border:1px solid var(--line);background:#fff;margin:0 0 28px}
+:root[data-tema=gelap] .sampul{filter:brightness(.9) contrast(1.05);border-color:var(--line2)}
+@media (max-width:900px){.sampul{margin-bottom:20px;border-radius:12px}}
 /* penjelasan panjang di atas halaman dilipat */
 details.cara{margin:8px 0 22px;max-width:68ch}
 details.cara>summary{list-style:none;display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:var(--mute);font-size:13px;padding:5px 10px 5px 8px;border:1px solid var(--line);border-radius:99px}
@@ -799,6 +803,7 @@ details.cara p{line-height:1.65}
  <div class="demo" id="demoBanner" hidden>DEMO: semua data contoh. Tanpa server dan tanpa AI sungguhan.</div>
 
  <section id="p-beranda" class="pg">
+  <img class="sampul" src="/aset/jaladhipa-sketsa-800.webp" srcset="/aset/jaladhipa-sketsa-800.webp 800w, /aset/jaladhipa-sketsa.webp 1241w" sizes="(min-width:901px) 976px, 100vw" width="1241" height="525" alt="Sketsa kapal JalaDhipa-1 karya MCI di pelabuhan" decoding="async">
   <div class="ey" id="brHari"></div><h1 id="brHalo">Beranda</h1>
   <div id="brBox"><p class="mu">Memuat…</p></div>
  </section>

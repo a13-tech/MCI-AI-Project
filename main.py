@@ -9485,7 +9485,7 @@ def seo_head(judul, desk, path, faq=False):
             + (f'<meta name="google-site-verification" content="{e(GSC_META)}">' if GSC_META else "") + seo_jsonld(faq))
 
 
-CSS_PUBLIK = """:root{--n:#0B1730;--g:#DCC48E;--t:#141B2B;--m:#5B6475;--bg:#F5F6F8}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:16px/1.65 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+CSS_PUBLIK = """.sampul{display:block;width:100%;height:auto;aspect-ratio:1241/525;object-fit:cover;border-radius:14px;border:1px solid #E3E6EC;background:#fff;margin:4px 0 8px}:root{--n:#0B1730;--g:#DCC48E;--t:#141B2B;--m:#5B6475;--bg:#F5F6F8}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:16px/1.65 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 header{background:var(--n);color:#F2EBDD;padding:40px 20px;display:flex;gap:18px;align-items:center;justify-content:center;text-align:left}header img{border-radius:50%;flex:none}
 h1{font:700 clamp(26px,5vw,40px)/1.15 Georgia,serif;margin:2px 0;color:#fff}.ey{margin:0;color:var(--g);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12.5px}.sub{margin:4px 0 0;color:#C9D7F5}
 main{max-width:820px;margin:0 auto;padding:12px 20px 40px}section{margin:28px 0}h2{font:700 22px/1.3 Georgia,serif;color:var(--n);margin:0 0 10px}.lead{font-size:18px}
@@ -9510,7 +9510,7 @@ def halaman_profil():
     sos = "".join(f'<a href="{e(u)}" rel="noopener me" target="_blank">{"Instagram" if "instagram" in u else "TikTok"}</a>' for u in seo_sosial())
     body = f"""<header><img src="/aset/logo-mci-192.webp" width="72" height="72" alt="Logo Mahardika Cakrawala Indonesia (MCI)"><div><p class="ey">{e(SEO['slogan'])}</p>
 <h1>Mahardika Cakrawala Indonesia</h1><p class="sub">MCI · Organisasi R&amp;D teknologi · {e(SEO['kota'])}, {e(SEO['provinsi'])}</p></div></header>
-<main><section><h2>Tentang MCI</h2><p class="lead">{e(SEO['deskripsi'])}</p>
+<main><img class="sampul" src="/aset/jaladhipa-sketsa.webp" srcset="/aset/jaladhipa-sketsa-800.webp 800w, /aset/jaladhipa-sketsa.webp 1241w" sizes="(min-width:860px) 820px, 100vw" width="1241" height="525" alt="Sketsa kapal JalaDhipa-1, proyek kapal kargo karya Mahardika Cakrawala Indonesia" decoding="async"><section><h2>Tentang MCI</h2><p class="lead">{e(SEO['deskripsi'])}</p>
 <p>MCI didirikan pada {e(SEO['berdiri_teks'])} oleh tiga pendiri yang dipimpin {e(SEO['pendiri'])}. Berawal dari riset roket, MCI kini mengembangkan elektronika, perangkat IoT,
 robotika, dan sistem kecerdasan buatan, dengan semangat <b>{e(SEO['slogan'])}</b>.</p></section>
 <section><h2>Bidang yang dikerjakan</h2><ul class="bd"><li><b>Roket &amp; dirgantara</b>Desain dan uji prototipe roket.</li><li><b>Elektronika &amp; sistem tertanam</b>Arduino, ESP32, sensor, dan PCB.</li>
@@ -9587,7 +9587,7 @@ def halaman_portofolio():
             y = rk_get("proyek", x["id"])
             if y:
                 _pf_ringkasan_ai(y)
-    body = (f'<section><p class="lead">Proyek riset dan rekayasa yang dikerjakan tim MCI: roket, elektronika, IoT, robotika, dan kecerdasan buatan.</p></section>'
+    body = ('<img class="sampul" src="/aset/jaladhipa-sketsa.webp" srcset="/aset/jaladhipa-sketsa-800.webp 800w, /aset/jaladhipa-sketsa.webp 1241w" sizes="(min-width:860px) 820px, 100vw" width="1241" height="525" alt="Sketsa kapal JalaDhipa-1, proyek kapal kargo karya Mahardika Cakrawala Indonesia" decoding="async">' + f'<section><p class="lead">Proyek riset dan rekayasa yang dikerjakan tim MCI: roket, elektronika, IoT, robotika, dan kecerdasan buatan.</p></section>'
             + (f'<section><h2>Sedang dikerjakan</h2><ul class="pf">{sorot}</ul></section>' if sorot else "")
             + f'<section><h2>Proyek selesai</h2>' + (f'<ul class="pf">{isi}</ul>' if isi else '<p class="bc">Belum ada proyek selesai yang dipublikasikan.</p>') + "</section>")
     ld = {"@context": "https://schema.org", "@type": "CollectionPage", "name": "Portofolio Mahardika Cakrawala Indonesia", "url": SITE_URL + "/portofolio",
