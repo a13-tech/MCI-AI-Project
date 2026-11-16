@@ -728,7 +728,7 @@ details.cara p{line-height:1.65}
 :root[data-tema=gelap] .seg[style*="EFECE4"] button:not(.on){color:#C8BFB2}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media print{#hpNav{display:none!important}}
-/* ===== Panel Dev ===== */
+/* ===== Panel CEO ===== */
 #p-panel .pnK{max-width:380px;margin:40px auto;text-align:center}
 #p-panel .pnK input::placeholder{letter-spacing:normal;font-size:15px;font-weight:400}
 #p-panel .pnK input{font:600 26px/1 var(--sans);letter-spacing:.5em;text-align:center;padding:12px 10px 12px 22px;max-width:260px}
@@ -903,7 +903,7 @@ details.cara p{line-height:1.65}
  <button class="nv" data-p="skills">Skills</button>
  <button class="nv" data-p="tim">Tim &amp; Token</button>
  <button class="ng" type="button">Lainnya</button>
- <button class="nv" data-p="panel" id="nvPanel">Panel Dev</button>
+ <button class="nv" data-p="panel" id="nvPanel">Panel CEO</button>
  <button class="nv" data-p="berita">Berita Hari Ini</button>
  <button class="nv" data-p="tentang">Tentang Kami</button>
  <button class="nv inst" id="pasangApp" hidden>Pasang aplikasi</button>
@@ -940,13 +940,13 @@ details.cara p{line-height:1.65}
  </section>
  <section id="p-jasa" class="pg" hidden>
   <div class="ey">Khusus anggota MCI</div><h1>Jasa Internal</h1>
-  <p class="mu" style="max-width:760px">Daftar jasa antaranggota MCI, misalnya pembuatan website, desain, atau perakitan. Hanya anggota yang bisa melihat halaman ini; jasa di sini tidak tampil di katalog publik, kecuali Dev menyalakan setelan "Tampilkan di katalog publik" pada jasa tertentu. Jasa baru dan setiap pesanan harus disetujui Dev dulu. Pesanan berbayar otomatis dibuatkan invoice, dan pembayarannya masuk kas MCI setelah dinyatakan lunas (<a href="#" id="jsPasal">UU MCI Pasal 20</a>).</p>
+  <p class="mu" style="max-width:760px">Daftar jasa antaranggota MCI, misalnya pembuatan website, desain, atau perakitan. Hanya anggota yang bisa melihat halaman ini; jasa di sini tidak tampil di katalog publik, kecuali CEO menyalakan setelan "Tampilkan di katalog publik" pada jasa tertentu. Jasa baru dan setiap pesanan harus disetujui CEO dulu. Pesanan berbayar otomatis dibuatkan invoice, dan pembayarannya masuk kas MCI setelah dinyatakan lunas (<a href="#" id="jsPasal">UU MCI Pasal 20</a>).</p>
   <details class="cd" id="jsBaru"><summary style="cursor:pointer;font-weight:700">Ajukan jasa baru</summary>
    <div class="fl" style="margin-top:12px"><label>Nama jasa<input type="text" id="jsNama" maxlength="100" placeholder="Contoh: Pembuatan website"></label>
     <label>Harga atau kisaran (boleh kosong)<input type="text" id="jsHarga" maxlength="80" placeholder="Contoh: Rp 300.000 – 1.000.000"></label>
     <label class="full">Penjelasan<textarea id="jsDesk" rows="3" maxlength="1500" placeholder="Apa yang dikerjakan, apa yang didapat pemesan, berapa lama."></textarea></label>
     <label>Pengerja<select id="jsPg"></select></label>
-    <label class="full" id="jsPubW" hidden style="display:flex;gap:10px;align-items:center;font-weight:600"><input type="checkbox" id="jsPub" style="width:20px;height:20px;flex:none"> Tampilkan juga di katalog publik (setelan khusus Dev)</label>
+    <label class="full" id="jsPubW" hidden style="display:flex;gap:10px;align-items:center;font-weight:600"><input type="checkbox" id="jsPub" style="width:20px;height:20px;flex:none"> Tampilkan juga di katalog publik (setelan khusus CEO)</label>
     <div class="bar full" style="margin:0"><button class="bt g" id="jsKirim" type="button">Ajukan jasa</button><span class="mu" id="jsMsg"></span></div></div></details>
   <div class="cd" id="plKartu" hidden></div>
   <div id="jsBox"><p class="mu">Memuat…</p></div>
@@ -984,7 +984,7 @@ details.cara p{line-height:1.65}
   <div class="bar" id="ctIsiBar" style="margin:0 0 10px;gap:8px"><span class="mu" style="font-size:13px">Isi cetakan (infill):</span><select id="ctIsi" style="width:auto"><option value="10">10% ringan</option><option value="20" selected>20% normal</option><option value="40">40% kuat</option><option value="100">100% padat</option></select></div>
   <div id="s3Box"><p class="mu">Memuat…</p></div>
   <div class="cd" id="ctBox" style="margin-top:14px"></div>
-  <details class="cd" id="labMesin" hidden style="margin-top:18px"><summary style="cursor:pointer;font-weight:700">Lab Mesin AI (khusus Dev)</summary>
+  <details class="cd" id="labMesin" hidden style="margin-top:18px"><summary style="cursor:pointer;font-weight:700">Lab Mesin AI (khusus CEO)</summary>
    <p class="mu" style="font-size:13.5px">Kirim satu perintah yang sama ke beberapa mesin AI, lalu bandingkan jawaban dan kecepatannya. Mode "Resep 3D" menguji apakah resep tiap mesin lolos mesin hitung MCI. Mesin tanpa kunci tidak bisa dipilih: isi kuncinya di environment Render.</p>
    <div id="labDaftar" class="picks" style="margin:10px 0"></div>
    <div class="seg" style="margin:0 0 10px;background:#EFECE4" id="labSeg"><button class="on" data-lab="teks">Jawaban teks</button><button data-lab="3d">Resep 3D</button></div>
@@ -1142,7 +1142,7 @@ details.cara p{line-height:1.65}
    <b>Sambungkan ESP32</b>
    <div class="kv"><span>Endpoint</span><code id="iotEp">-</code><button class="clr" style="position:static" data-cp="iotEp">Salin</button></div>
    <div class="kv"><span>Kunci IoT</span><code id="iotKey">-</code><button class="clr" style="position:static" id="iotShow">Lihat</button><button class="clr" style="position:static" data-cp="iotKey">Salin</button></div>
-   <p class="mu" style="font-size:12.5px;margin:10px 0">Kode di bawah sudah terisi endpoint dan kunci. Ganti nama & password WiFi, lalu upload ke ESP32 dari Arduino IDE (board "ESP32 Dev Module").</p>
+   <p class="mu" style="font-size:12.5px;margin:10px 0">Kode di bawah sudah terisi endpoint dan kunci. Ganti nama & password WiFi, lalu upload ke ESP32 dari Arduino IDE (board "ESP32 CEO Module").</p>
    <div class="tw"><pre class="code" id="iotCode"></pre><button class="clr" id="iotCopy">Salin kode</button></div>
   </div>
  </section>
@@ -1166,7 +1166,7 @@ details.cara p{line-height:1.65}
 
  <section id="p-anggota" class="pg" hidden>
   <h1>Anggota</h1>
-  <p class="mu">Khusus Dev. Tiap anggota punya token pribadi (diawali nama depan). Hak akses mengikuti jabatan dan divisinya: maksimal 2 divisi dan 3 jabatan per orang. Ganti jabatan tidak perlu ganti token. Divisi dan jabatan baru bisa ditambah di bagian bawah halaman ini.</p>
+  <p class="mu">Khusus CEO. Tiap anggota punya token pribadi (diawali nama depan). Hak akses mengikuti jabatan dan divisinya: maksimal 2 divisi dan 3 jabatan per orang. Ganti jabatan tidak perlu ganti token. Divisi dan jabatan baru bisa ditambah di bagian bawah halaman ini.</p>
   <div class="cd" id="agForm"><b id="agTitle">Tambah anggota</b>
    <div class="fl" style="margin-top:12px"><label class="full">Nama<input type="text" id="agNama" maxlength="60" placeholder="contoh: Budi Santoso"></label></div>
    <div style="margin-top:10px"><b style="font-size:13px">Divisi</b> <span class="mu" style="font-size:12px">(maks 2)</span><div class="picks" id="agDiv" style="margin-top:6px"></div></div>
@@ -1178,7 +1178,7 @@ details.cara p{line-height:1.65}
    <p class="mu" style="margin:6px 0 10px;font-size:13px">Centang anggota yang HP-nya sering lemot atau keluar sendiri saat buka web. Untuk mereka: gedung 3D dimatikan, foto dikirim versi kecil, animasi mati, dan cek data lebih jarang. Berlaku saat mereka membuka ulang web. HP dengan RAM 2 GB ke bawah otomatis ikut mode ini.</p>
    <div class="picks" id="hrList"></div><span id="hrMsg" class="mu" style="font-size:12.5px"></span></div>
   <details style="margin-top:18px"><summary style="cursor:pointer;font-weight:800;font-size:17px">Atur Divisi &amp; Jabatan (lanjutan)</summary>
-  <p class="mu">Tambah divisi atau jabatan baru, lalu centang izinnya. Izin seseorang = gabungan semua jabatan + divisinya. Yang bawaan tidak bisa dihapus tapi izinnya bisa diubah; Admin/Dev selalu bisa semua. Sidang Dewan, Lab IoT, dan menu Anggota tetap khusus Dev.</p>
+  <p class="mu">Tambah divisi atau jabatan baru, lalu centang izinnya. Izin seseorang = gabungan semua jabatan + divisinya. Yang bawaan tidak bisa dihapus tapi izinnya bisa diubah; Admin/CEO selalu bisa semua. Sidang Dewan, Lab IoT, dan menu Anggota tetap khusus CEO.</p>
   <div class="cd" id="sxForm"><b id="sxTitle">Tambah divisi / jabatan</b>
    <div class="fl" style="margin-top:12px"><label>Jenis<select id="sxJenis"><option value="divisi">Divisi</option><option value="jabatan">Jabatan</option></select></label><label>Nama<input type="text" id="sxNama" maxlength="40" placeholder="contoh: Humas, Wakil Manager"></label></div>
    <div style="margin-top:10px"><b style="font-size:13px">Izin</b> <button class="bt o" id="sxDasar" type="button" style="padding:3px 9px;min-height:28px;font-size:12px">Pakai izin dasar anggota</button><div class="picks" id="sxIzin" style="margin-top:6px"></div></div>
@@ -1192,7 +1192,7 @@ details.cara p{line-height:1.65}
   <h1>Catatan</h1>
   <div class="seg" id="ctTabs" role="tablist" style="margin:4px 0 14px;background:#EFECE4"><button type="button" role="tab" data-ctab="catat" class="on">📝 Catatan</button><button type="button" role="tab" data-ctab="belanja">🛒 Daftar Belanja <span class="nb" id="nbBelanja" hidden></span></button></div>
   <div id="ctPanel">
-  <p class="mu">Catatan pribadi hanya bisa dibaca pemiliknya. Catatan bersama tampil untuk semua anggota; Sekretaris dan Dev bisa merapikan dan menyematkannya di atas. Tips: awali baris dengan <code>[ ]</code> untuk checklist, tulis <code>#tag</code> untuk mengelompokkan, atau kirim <b>catat: …</b> / voice note ke bot Telegram.</p>
+  <p class="mu">Catatan pribadi hanya bisa dibaca pemiliknya. Catatan bersama tampil untuk semua anggota; Sekretaris dan CEO bisa merapikan dan menyematkannya di atas. Tips: awali baris dengan <code>[ ]</code> untuk checklist, tulis <code>#tag</code> untuk mengelompokkan, atau kirim <b>catat: …</b> / voice note ke bot Telegram.</p>
   <div class="cd"><b id="ctTitle">Catatan baru</b>
    <div class="ctAlat"><button class="bt o" id="ctRekam" type="button">🎙️ Rekam suara</button><button class="bt o" id="ctFotoB" type="button" hidden>📸 Foto jadi catatan</button><input type="file" id="ctFoto" accept="image/*" hidden><button class="bt o" id="ctRapi" type="button">✨ Rapikan dengan AI</button><span class="mu" id="ctAlatMsg" style="font-size:13px"></span></div>
    <div class="fl" style="margin-top:12px"><label class="full">Judul<input type="text" id="ctJudul" maxlength="120"></label><label class="full">Isi<textarea id="ctIsi" rows="5" placeholder="Tulis bebas. Contoh:&#10;besok jam 9 kirim invoice ke mitra&#10;[ ] beli solder baru #belanja"></textarea></label>
@@ -1201,13 +1201,13 @@ details.cara p{line-height:1.65}
    <div class="bar" style="margin:12px 0 0;flex-wrap:wrap"><button class="bt g" id="ctSave">Simpan</button><button class="bt o" id="ctReset">Kosongkan</button>
     <label class="mu" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="ctBersama">Bagikan ke semua anggota</label>
     <label class="mu" id="ctSemW" hidden style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="ctSem">Sematkan</label><span id="ctMsg" class="mu"></span></div>
-   <label class="mu" id="ctFotoSetW" hidden style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:13px"><input type="checkbox" id="ctFotoSet"> Izinkan semua anggota memakai "Foto jadi catatan" (setelan khusus Dev)</label>
+   <label class="mu" id="ctFotoSetW" hidden style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:13px"><input type="checkbox" id="ctFotoSet"> Izinkan semua anggota memakai "Foto jadi catatan" (setelan khusus CEO)</label>
   </div>
   <div class="ctSaring"><input type="search" id="ctCari" placeholder="Cari catatan…" aria-label="Cari catatan"><div id="ctTags" class="ctTags"></div></div>
   <div class="tm" id="ctList"></div>
   </div>
   <div id="bjPanel" hidden>
-  <p class="mu" style="max-width:760px">Bahan dan komponen yang harus dibeli. Semua anggota bisa menambah; Dev dan Bendahara menandai sudah dibeli. Barang yang sama otomatis digabung. Bisa juga lewat Telegram: kirim <b>beli: resistor 10k 20pcs, kabel jumper 1 pack</b>.</p>
+  <p class="mu" style="max-width:760px">Bahan dan komponen yang harus dibeli. Semua anggota bisa menambah; CEO dan Bendahara menandai sudah dibeli. Barang yang sama otomatis digabung. Bisa juga lewat Telegram: kirim <b>beli: resistor 10k 20pcs, kabel jumper 1 pack</b>.</p>
   <div class="cd"><div class="fl"><label class="full">Tambah cepat (pisahkan dengan koma)<input type="text" id="bjCepat" placeholder="Contoh: resistor 10k 20pcs, LED merah 10, kabel jumper 1 pack"></label></div>
    <details style="margin-top:10px"><summary class="mu" style="cursor:pointer;font-size:13.5px">Isi lengkap (harga, catatan, prioritas)</summary>
     <div class="fl" style="margin-top:10px"><label>Nama barang<input type="text" id="bjNama" maxlength="120"></label><label>Jumlah<input type="number" id="bjJml" min="1" value="1"></label>
@@ -1221,7 +1221,7 @@ details.cara p{line-height:1.65}
 
  <section id="p-polling" class="pg" hidden>
   <h1>Voting</h1>
-  <p class="mu">Pemilihan divisi, manager, dan lainnya. 1 anggota = 1 suara dan suaranya rahasia. Hasil tampil setelah polling ditutup; pemenangnya ditetapkan Dev di halaman Anggota.</p>
+  <p class="mu">Pemilihan divisi, manager, dan lainnya. 1 anggota = 1 suara dan suaranya rahasia. Hasil tampil setelah polling ditutup; pemenangnya ditetapkan CEO di halaman Anggota.</p>
   <div class="cd" id="plForm" hidden><b>Buat polling</b>
    <div class="fl" style="margin-top:12px">
     <label class="full">Judul<input type="text" id="plJudul" maxlength="150" placeholder="contoh: Pemilihan Manager 2027"></label>
@@ -1252,7 +1252,7 @@ details.cara p{line-height:1.65}
 
  <section id="p-blacklist" class="pg" hidden>
   <h1>Blacklist</h1>
-  <p class="mu">Daftar orang yang diblokir dari kegiatan MCI. Semua bisa melihat; hanya Dev dan tim Secret Service yang bisa menambah atau menghapus.</p>
+  <p class="mu">Daftar orang yang diblokir dari kegiatan MCI. Semua bisa melihat; hanya CEO dan tim Secret Service yang bisa menambah atau menghapus.</p>
   <div class="cd" id="blForm"><b>Tambah ke blacklist</b>
    <div class="fl" style="margin-top:12px"><label>Nama<input type="text" id="blNama" maxlength="80"></label><label>Alasan<input type="text" id="blAlasan" maxlength="200"></label><label class="full">Keterangan<input type="text" id="blKet" maxlength="500"></label></div>
    <div id="blPrev" hidden style="margin-top:14px;padding:12px;border:1px dashed #BFD0F2;border-radius:12px;background:#F7F9FE"></div>
@@ -1263,7 +1263,7 @@ details.cara p{line-height:1.65}
 
  <section id="p-sp" class="pg" hidden>
   <h1>Surat Peringatan (SP)</h1>
-  <p class="mu">Dev menulis surat, suratnya langsung masuk ke Inbox anggota (dan Telegram kalau terhubung). Semua anggota bisa melihat siapa yang sedang kena SP; isi surat hanya bisa dibaca Dev dan penerimanya.</p>
+  <p class="mu">CEO menulis surat, suratnya langsung masuk ke Inbox anggota (dan Telegram kalau terhubung). Semua anggota bisa melihat siapa yang sedang kena SP; isi surat hanya bisa dibaca CEO dan penerimanya.</p>
   <div class="cd" id="spSaya" hidden></div>
   <div class="cd" id="spForm" hidden><b>Tulis surat peringatan</b>
    <div class="fl" style="margin-top:12px"><label>Untuk anggota<select id="spAng"></select></label><label>Tingkat<select id="spLv"><option value="1">SP 1 · Teguran</option><option value="2">SP 2 · Peringatan tertulis</option><option value="3">SP 3 · Peringatan terakhir</option></select></label><label class="full">Judul (boleh kosong)<input type="text" id="spJudul" placeholder="contoh: Tidak hadir rapat 3x"></label><label class="full">Isi surat<textarea id="spIsi" rows="10" placeholder="Tulis alasan, kejadian, dan apa yang harus diperbaiki."></textarea></label></div>
@@ -1321,7 +1321,7 @@ details.cara p{line-height:1.65}
 
  <section id="p-graf" class="pg" hidden>
   <h1>Peta &amp; Grafik</h1>
-  <p class="mu" style="max-width:720px">Khusus Dev. Peta pengetahuan ala Graphify: siapa terhubung ke apa (anggota, divisi, proyek, tugas aktif, alat dipinjam, rapat, konten, dan pasal), dikelompokkan otomatis menjadi komunitas, lengkap dengan titik pusat, koneksi mengejutkan, anggota terisolasi, dan pelacak jalur. Apex juga membaca peta ini lewat alat cek_peta, sehingga cukup satu panggilan untuk pertanyaan seperti "Budi lagi pegang apa?".</p>
+  <p class="mu" style="max-width:720px">Khusus CEO. Peta pengetahuan ala Graphify: siapa terhubung ke apa (anggota, divisi, proyek, tugas aktif, alat dipinjam, rapat, konten, dan pasal), dikelompokkan otomatis menjadi komunitas, lengkap dengan titik pusat, koneksi mengejutkan, anggota terisolasi, dan pelacak jalur. Apex juga membaca peta ini lewat alat cek_peta, sehingga cukup satu panggilan untuk pertanyaan seperti "Budi lagi pegang apa?".</p>
   <div class="seg" id="grafSeg" style="margin:0 0 14px;background:#EFECE4"><button type="button" class="on" data-gf="peta">Peta data</button><button type="button" data-gf="grafik">Grafik</button></div>
   <div id="grafPeta" class="obs">
    <canvas id="grafKanvas" aria-label="Peta jaringan data MCI. Klik titik untuk detail."></canvas>
@@ -1340,10 +1340,10 @@ details.cara p{line-height:1.65}
   </div></div>
  </section>
  <section id="p-panel" class="pg" hidden>
-  <h1>Panel Dev</h1>
+  <h1>Panel CEO</h1>
   <div id="pnKunci" class="cd pnK">
    <b id="pnKJudul">Masukkan PIN</b>
-   <p class="mu" id="pnKKet" style="font-size:13px;margin:6px 0 14px">PIN 6 angka khusus Dev. Panel terkunci lagi otomatis setelah 15 menit tidak dipakai.</p>
+   <p class="mu" id="pnKKet" style="font-size:13px;margin:6px 0 14px">PIN 6 angka khusus CEO. Panel terkunci lagi otomatis setelah 15 menit tidak dipakai.</p>
    <input type="password" id="pnPin" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="PIN 6 angka">
    <input type="password" id="pnPin2" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="Ulangi PIN" placeholder="ulangi PIN" hidden style="margin-top:10px">
    <div style="margin-top:14px"><button class="bt g" id="pnBuka" type="button">Buka panel</button></div>
@@ -1374,7 +1374,7 @@ details.cara p{line-height:1.65}
    </div>
    <div class="adu" id="aduHasil"></div>
    <div class="cd" style="margin-top:16px"><b>Kunci AI</b><div class="mu" style="font-size:12.5px;margin:2px 0 4px">Disimpan terenkripsi, tidak ikut backup, dan tidak pernah ditampilkan utuh. Kunci dari panel mengalahkan nilai di Render; "Pakai nilai Render" menghapus isian panel.</div><div id="pnKey"></div></div>
-   <div class="cd" style="margin-top:16px"><b>Halaman</b><div class="mu" style="font-size:12.5px;margin:2px 0 8px">Halaman yang dimatikan hilang dari menu semua orang kecuali Dev (Dev melihat tanda "mati").</div><div class="pnHal" id="pnHal"></div></div>
+   <div class="cd" style="margin-top:16px"><b>Halaman</b><div class="mu" style="font-size:12.5px;margin:2px 0 8px">Halaman yang dimatikan hilang dari menu semua orang kecuali CEO (CEO melihat tanda "mati").</div><div class="pnHal" id="pnHal"></div></div>
    <div class="cd" style="margin-top:16px"><b>Riwayat perubahan</b><div class="pnH" id="pnRiwayat"></div></div>
   </div>
  </section>
@@ -1388,7 +1388,7 @@ details.cara p{line-height:1.65}
  <section id="p-sidang" class="pg" hidden><div id="rk-sidang"></div></section>
  <section id="p-putusan" class="pg" hidden><div id="rk-putusan"></div></section>
  <section id="p-surat" class="pg" hidden>
-  <div class="ey">Khusus Dev</div><h1>Surat Penerimaan</h1>
+  <div class="ey">Khusus CEO</div><h1>Surat Penerimaan</h1>
   <p class="mu" style="max-width:760px">Buat surat penerimaan anggota, lalu salin linknya atau kirim langsung lewat WhatsApp. Orangnya bisa membuka link tanpa login dan menyimpannya sebagai PDF. Nomor surat dibuat otomatis per tahun. Surat yang dicabut tetap bisa dibuka, tetapi bertanda tidak berlaku.</p>
   <details class="cd" id="srBaru" open><summary style="cursor:pointer;font-weight:700">Buat surat baru</summary>
    <div class="fl" style="margin-top:12px">
@@ -1400,7 +1400,7 @@ details.cara p{line-height:1.65}
     <label>Mulai berlaku<input type="date" id="srMulai"></label>
     <label>Tanggal surat<input type="date" id="srTgl"></label>
     <label>Ditandatangani oleh<input type="text" id="srTtd" maxlength="60" placeholder="Nama penanda tangan"></label>
-    <label>Jabatan penanda tangan<input type="text" id="srTtdJ" maxlength="60" value="Dev MCI"></label>
+    <label>Jabatan penanda tangan<input type="text" id="srTtdJ" maxlength="60" value="CEO MCI"></label>
     <label class="full">Pesan tambahan (boleh kosong)<textarea id="srPesan" rows="2" maxlength="600" placeholder="Contoh: Kamu akan dibimbing langsung oleh tim Creative."></textarea></label>
     <div class="bar full" style="margin:0"><button class="bt g" id="srKirim" type="button">Buat surat</button><span class="mu" id="srMsg"></span></div></div></details>
   <div id="srBox"><p class="mu">Memuat…</p></div>
@@ -1481,7 +1481,7 @@ details.cara p{line-height:1.65}
 
  <section id="p-produk" class="pg" hidden>
   <h1>Produk</h1>
-  <p class="mu">Katalog barang yang dijual MCI dan mitra: daftar harga, jenis barang, dan mitra. Yang bisa menambah dan mengubah: <b>Dev, Manager, dan Bendahara</b>. Pembeli membuka katalog publik (tanpa login), bisa bertanya <b>maks 2 pesan per IP per 24 jam</b>: detail barang dijawab AI, soal pembayaran dijawab admin pada jam kerja <b>Senin–Sabtu 17.00–20.30 WIB</b>.</p>
+  <p class="mu">Katalog barang yang dijual MCI dan mitra: daftar harga, jenis barang, dan mitra. Yang bisa menambah dan mengubah: <b>CEO, Manager, dan Bendahara</b>. Pembeli membuka katalog publik (tanpa login), bisa bertanya <b>maks 2 pesan per IP per 24 jam</b>: detail barang dijawab AI, soal pembayaran dijawab admin pada jam kerja <b>Senin–Sabtu 17.00–20.30 WIB</b>.</p>
   <div class="cd" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><b>Link katalog publik:</b><code id="prLink" style="background:#EEF3FC;padding:6px 10px;border-radius:8px;word-break:break-all"></code>
    <button class="bt o" id="prCopy">Salin link</button><a class="bt o" id="prOpen" target="_blank" rel="noopener">Buka</a><span class="ch" id="prJam"></span></div>
   <div class="gr">
@@ -1548,7 +1548,7 @@ details.cara p{line-height:1.65}
 
  <section id="p-absen" class="pg" hidden>
   <h1>Absen Harian</h1>
-  <p class="mu">Wajib Senin–Sabtu sampai pukul 23.59 WIB, Minggu libur. Cukup tekan tombol Absen sekarang. Berhalangan? Ajukan izin (maksimal 3 kali sebulan, lebih dari itu hanya izin khusus Manager atau Dev). Bolos lebih dari 5 kali tanpa izin = otomatis dikeluarkan (<a href="#" data-gopasal="19">UU MCI Pasal 19</a>).</p>
+  <p class="mu">Wajib Senin–Sabtu sampai pukul 23.59 WIB, Minggu libur. Cukup tekan tombol Absen sekarang. Berhalangan? Ajukan izin (maksimal 3 kali sebulan, lebih dari itu hanya izin khusus Manager atau CEO). Bolos lebih dari 5 kali tanpa izin = otomatis dikeluarkan (<a href="#" data-gopasal="19">UU MCI Pasal 19</a>).</p>
   <div id="abBox"><p class="mu">Memuat…</p></div>
  </section>
 
@@ -1566,7 +1566,7 @@ details.cara p{line-height:1.65}
 
  <section id="p-invoice" class="pg" hidden>
   <h1>Invoice</h1>
-  <p class="mu">Tagihan digital untuk pembeli. Item bisa diambil dari <b>produk jualan</b>, <b>stok gudang</b>, atau diketik manual; harga dibekukan di invoice. Stok gudang <b>dibooking saat dikirim</b>, <b>dikurangi saat lunas</b>, dan <b>kembali kalau dibatalkan</b>. Pembeli membuka link acak (tanpa login) dan bisa mengunggah bukti bayar. Membuat invoice: Dev, Manager, Bendahara. Menandai <b>lunas</b> (barang dikurangi diskon masuk Kas · Penjualan; ongkir masuk tabel Dana Ongkir): <b>Bendahara dan Dev</b>.</p>
+  <p class="mu">Tagihan digital untuk pembeli. Item bisa diambil dari <b>produk jualan</b>, <b>stok gudang</b>, atau diketik manual; harga dibekukan di invoice. Stok gudang <b>dibooking saat dikirim</b>, <b>dikurangi saat lunas</b>, dan <b>kembali kalau dibatalkan</b>. Pembeli membuka link acak (tanpa login) dan bisa mengunggah bukti bayar. Membuat invoice: CEO, Manager, Bendahara. Menandai <b>lunas</b> (barang dikurangi diskon masuk Kas · Penjualan; ongkir masuk tabel Dana Ongkir): <b>Bendahara dan CEO</b>.</p>
   <div class="gr">
    <div class="cd"><div class="k">Draft</div><div class="v" id="iv1">-</div></div>
    <div class="cd"><div class="k">Menunggu bayar</div><div class="v" id="iv2">-</div><div class="mu" id="iv2b" style="font-size:12.5px"></div></div>
@@ -1642,7 +1642,7 @@ details.cara p{line-height:1.65}
 
  <section id="p-stok" class="pg" hidden>
   <h1>Stok Komponen</h1>
-  <p class="mu">Persediaan barang MCI, dijaga <b>MCI.Nexus</b> di ruang <b>Storage Barang</b> (LT 3, sayap barat). Foto barang ikut ditempel di kardusnya di kantor 3D. Halaman ini untuk semua anggota; yang bisa mengubah hanya Dev (bisa langsung dari foto, dihitung AI). Viewer cuma bisa melihat kardusnya di ruang Storage 3D.</p>
+  <p class="mu">Persediaan barang MCI, dijaga <b>MCI.Nexus</b> di ruang <b>Storage Barang</b> (LT 3, sayap barat). Foto barang ikut ditempel di kardusnya di kantor 3D. Halaman ini untuk semua anggota; yang bisa mengubah hanya CEO (bisa langsung dari foto, dihitung AI). Viewer cuma bisa melihat kardusnya di ruang Storage 3D.</p>
   <div class="bar" style="margin:0 0 12px"><button class="bt o" data-stiker="stok">🏷️ Cetak stiker QR laci</button><span class="mu" style="font-size:12.5px">Tempel di laci/kotak; scan pakai kamera HP untuk mengambil komponen ke proyek.</span></div>
   <div class="cd" id="stPinjam" hidden style="background:#F3F5F9"><b>Status kamu: Peminjam.</b> Kamu tidak ikut iuran kas, jadi barang dan komponen MCI bukan hak milikmu; kamu hanya boleh meminjam (minta izin dulu).</div>
   <div class="gr">
@@ -1684,7 +1684,7 @@ details.cara p{line-height:1.65}
 
  <section id="p-perpus" class="pg" hidden>
   <h1>Perpustakaan</h1>
-  <p class="mu">Koleksi bacaan MCI: buku, modul, datasheet, catatan materi, dan arsip. Semua orang yang bisa membuka web ini, termasuk viewer, boleh membaca dan mengunduh. Yang bisa mengunggah buku (PDF, Word, atau e-book) hanya anggota; viewer cuma bisa baca. Mengubah dan menghapus koleksi orang lain hanya Dev. Ruangannya ada di LT 3 kantor 3D.</p>
+  <p class="mu">Koleksi bacaan MCI: buku, modul, datasheet, catatan materi, dan arsip. Semua orang yang bisa membuka web ini, termasuk viewer, boleh membaca dan mengunduh. Yang bisa mengunggah buku (PDF, Word, atau e-book) hanya anggota; viewer cuma bisa baca. Mengubah dan menghapus koleksi orang lain hanya CEO. Ruangannya ada di LT 3 kantor 3D.</p>
   <div class="cd" id="ppForm" hidden><b id="ppTitle">Unggah koleksi</b><div class="mu" id="ppNote" style="margin-top:4px">Unggahanmu langsung tampil untuk semua orang. Isi salah satu: file, link, atau teks bacaan. Jatah unggah dibatasi per hari.</div>
    <div class="fl" style="margin-top:12px">
     <label>Judul<input type="text" id="ppJudul" maxlength="150" placeholder="contoh: Dasar Pemrograman ESP32"></label>
@@ -1766,7 +1766,7 @@ details.cara p{line-height:1.65}
     Baterai  + -> resistor 100k -> GPIO 34 -> resistor 100k -> GND  (pembagi 1/2, maks 6.6V)
              (lewati bagian baterai kalau tidak dipakai; nilainya jadi ~0)
 
-  Board: "ESP32 Dev Module". Tidak perlu library tambahan (WiFi, HTTPClient sudah bawaan).
+  Board: "ESP32 CEO Module". Tidak perlu library tambahan (WiFi, HTTPClient sudah bawaan).
 */
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
@@ -2010,7 +2010,7 @@ function renderKuota() {
   $("#bq").textContent = k.boss ? `Jatah Boss kamu: ${kuotaTxt(k.boss)} (reset 00.00 WIB)` : "";
   $("#bq").hidden = !k.boss;
 }
-let RINGAN = false;   // HP Ringan: ditandai Dev di halaman Anggota, atau otomatis di HP ber-RAM <= 2 GB
+let RINGAN = false;   // HP Ringan: ditandai CEO di halaman Anggota, atau otomatis di HP ber-RAM <= 2 GB
 let ME = {}, DATA = [], LOG = [], KAS = null, PV = [], USE = null, MODE = "boss", SKL = {skills: [], bots: []};
 function show(p) {
   if (p !== "office" && typeof voKeluar === "function") voKeluar(false);
@@ -2119,7 +2119,7 @@ async function loadTg() {
     $$("[data-tgid]").forEach(b => b.onclick = async () => { if (["cabut", "tolak"].includes(b.dataset.tgp) && !confirm("Yakin?")) return; await api("/api/tg", {json: {id: b.dataset.tgid, peran: b.dataset.tgp}}); loadTg(); });
   } catch (e) { el.innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
 }
-async function loadSehat() {   // kartu Kesehatan Sistem (khusus Dev): jatah database, RAM, anggaran AI di satu layar
+async function loadSehat() {   // kartu Kesehatan Sistem (khusus CEO): jatah database, RAM, anggaran AI di satu layar
   const el = $("#sehatCard"); if (!el || !ADM()) return;
   const warna = p => p >= 90 ? "#C0392B" : p >= 75 ? "#D98E04" : "#2E8B57";
   const bar = (judul, p, kiri, kanan, catatan) => `<div style="margin-top:12px"><div style="display:flex;justify-content:space-between;gap:8px;font-size:13.5px"><b>${judul}</b><span style="color:${warna(p)};font-weight:700">${p}%</span></div>
@@ -2139,7 +2139,7 @@ async function loadSehat() {   // kartu Kesehatan Sistem (khusus Dev): jatah dat
     const b = $("#shS"); if (b) b.onclick = async () => { try { await api("/api/sehat", {json: {cu_jam: $("#shCu").value}}); loadSehat(); } catch (e) { alert(e.message); } };
   } catch (e) { el.hidden = false; el.innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
 }
-async function loadArgon() {   // kartu anggaran Argon (khusus Dev)
+async function loadArgon() {   // kartu anggaran Argon (khusus CEO)
   const el = $("#argonCard"); if (!el || !ADM()) return;
   try {
     const d = await api("/api/argon-anggaran"), pct = d.anggaran ? Math.min(100, Math.round(d.terpakai / d.anggaran * 100)) : 0;
@@ -2252,7 +2252,7 @@ function kpRender() {
     el.dataset.siap = KP.dev; KP.peta = null;
     el.innerHTML = `<div class="bar" style="margin:0;justify-content:space-between;flex-wrap:wrap"><b>🚢 Dashboard kapal</b>${kapal.length > 1 ? `<select id="kpPilih" style="width:auto">${kapal.map(k => `<option ${k.perangkat === KP.dev ? "selected" : ""}>${esc(k.perangkat)}</option>`).join("")}</select>` : `<span class="ch n">${esc(KP.dev)}</span>`}</div>
       <div class="kpWrap"><div id="kpPeta">${RINGAN ? "" : '<p class="mu" style="padding:12px">Memuat peta…</p>'}</div><div id="kpPanel"></div></div><div id="kpAlarm"></div>
-      <p class="mu" style="font-size:12px;margin:8px 0 0">Kirim dari ESP32 (atau Home Station yang menerima LoRa lalu meneruskan lewat WiFi): <code>lat</code>, <code>lon</code>, <code>kecepatan</code>, <code>arah</code>, <code>baterai</code>, <code>rssi</code>, <code>suhu</code>, <code>jarak</code>, <code>api</code>, <code>pir</code>. Lokasi hanya terlihat oleh Dev.</p>`;
+      <p class="mu" style="font-size:12px;margin:8px 0 0">Kirim dari ESP32 (atau Home Station yang menerima LoRa lalu meneruskan lewat WiFi): <code>lat</code>, <code>lon</code>, <code>kecepatan</code>, <code>arah</code>, <code>baterai</code>, <code>rssi</code>, <code>suhu</code>, <code>jarak</code>, <code>api</code>, <code>pir</code>. Lokasi hanya terlihat oleh CEO.</p>`;
     const pl = $("#kpPilih"); if (pl) pl.onchange = e => { KP.dev = e.target.value; kpRender(); };
     kpAlarmForm();
   }
@@ -2279,10 +2279,10 @@ function kpRender() {
   }).catch(e => { $("#kpPeta").innerHTML = `<p class="er" style="padding:12px">${esc(e.message)}</p>`; });
   el.hidden = false;
 }
-function kpAlarmForm() {   // setelan alarm kapal (Dev): keluar area, baterai lemah, sinyal hilang -> Inbox + notifikasi HP + Telegram
+function kpAlarmForm() {   // setelan alarm kapal (CEO): keluar area, baterai lemah, sinyal hilang -> Inbox + notifikasi HP + Telegram
   const el = $("#kpAlarm"), a = (IOTA.alarm || {})[KP.dev] || {}; if (!el) return;
   el.innerHTML = `<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="font-size:13.5px">🔔 Alarm kapal</b><span id="kpAlSt"></span></div>`
-    + (ADM() ? `<details style="margin-top:6px"><summary class="mu" style="cursor:pointer;font-size:13px">Atur alarm (kabar ke Inbox, notifikasi HP, dan Telegram Dev)</summary>
+    + (ADM() ? `<details style="margin-top:6px"><summary class="mu" style="cursor:pointer;font-size:13px">Atur alarm (kabar ke Inbox, notifikasi HP, dan Telegram CEO)</summary>
       <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-weight:600"><input type="checkbox" id="kaOn" style="width:20px;height:20px;flex:none" ${a.aktif ? "checked" : ""}> Nyalakan alarm untuk ${esc(KP.dev)}</label>
       <div class="fl" style="margin-top:8px"><label>Titik pusat area: lintang<input type="text" inputmode="decimal" id="kaLat" value="${a.lat ?? ""}" placeholder="-6.20000"></label>
         <label>Bujur<input type="text" inputmode="decimal" id="kaLon" value="${a.lon ?? ""}" placeholder="106.80000"></label>
@@ -2510,7 +2510,7 @@ $("#te").onclick = () => {
   };
 };
 
-/* Anggota (khusus Dev) */
+/* Anggota (khusus CEO) */
 let AGD = null;
 function agForm(m) {
   m = m || {divisi: [], jabatan: ["anggota"], aktif: true};
@@ -2539,7 +2539,7 @@ async function loadAnggota() {
   try { SXD = await api("/api/struktur"); sxForm(); renderSx(); } catch (e) { $("#sxList").innerHTML = '<tr><td colspan="5" class="er">' + esc(e.message) + "</td></tr>"; }
 }
 
-/* HP Ringan (khusus Dev): tandai anggota yang HP-nya lemot */
+/* HP Ringan (khusus CEO): tandai anggota yang HP-nya lemot */
 async function loadHpRingan() {
   const box = $("#hrList"); if (!box || !AGD) return;
   try {
@@ -2553,7 +2553,7 @@ async function loadHpRingan() {
   } catch (e) { box.innerHTML = '<span class="er">' + esc(e.message) + "</span>"; }
 }
 
-/* Divisi & jabatan (khusus Dev) */
+/* Divisi & jabatan (khusus CEO) */
 let SXD = null;
 const SX_DASAR = ["boss", "kas", "gambar_lihat", "memori", "skills", "tim", "stok", "catatan", "polling", "dok_lihat"];
 function sxForm(x, jenis) {
@@ -2635,7 +2635,7 @@ $("#ctSave").onclick = async () => {
   try { CTD = await api("/api/catatan", {json: {id: $("#ctJudul").dataset.id || null, judul: $("#ctJudul").value, isi: $("#ctIsi").value, tanggal: $("#ctTgl").value, bersama: $("#ctBersama").checked, sematkan: $("#ctSem").checked}}); renderCatatan(); ctForm(); $("#ctMsg").textContent = "Tersimpan."; }
   catch (e) { $("#ctMsg").textContent = e.message; }
 };
-$("#ctFotoSet").onchange = async e => { try { await api("/api/catatan/foto", {json: {semua: e.target.checked}}); pesan(e.target.checked ? "Semua anggota sekarang bisa memakai Foto jadi catatan" : "Foto jadi catatan kembali khusus Dev"); } catch (er) { alert(er.message); e.target.checked = !e.target.checked; } };
+$("#ctFotoSet").onchange = async e => { try { await api("/api/catatan/foto", {json: {semua: e.target.checked}}); pesan(e.target.checked ? "Semua anggota sekarang bisa memakai Foto jadi catatan" : "Foto jadi catatan kembali khusus CEO"); } catch (er) { alert(er.message); e.target.checked = !e.target.checked; } };
 $("#ctFotoB").onclick = () => $("#ctFoto").click();
 $("#ctFoto").onchange = async e => { const f = e.target.files[0]; if (!f) return; const m = $("#ctAlatMsg"); m.textContent = "AI membaca foto…";
   try { const fd = new FormData(); fd.append("foto", f); const d = await api("/api/catatan/foto", {method: "POST", body: fd});
@@ -2778,7 +2778,7 @@ async function loadSP(d) {
     }
     const sayaLv = ME.anggota ? (d.status.find(x => x.anggota === ME.anggota.id) || {}).level : 0;
     $("#spSaya").hidden = !sayaLv;
-    if (sayaLv) $("#spSaya").innerHTML = `<b style="color:#B3261E">Kamu sedang SP ${sayaLv}.</b> <span class="mu">Baca suratnya di bawah, lalu perbaiki dan hubungi Dev kalau ada yang mau dijelaskan.</span>`;
+    if (sayaLv) $("#spSaya").innerHTML = `<b style="color:#B3261E">Kamu sedang SP ${sayaLv}.</b> <span class="mu">Baca suratnya di bawah, lalu perbaiki dan hubungi CEO kalau ada yang mau dijelaskan.</span>`;
     $("#spStatus").innerHTML = d.status.map(x => `<tr><td><b>${esc(x.nama)}</b></td><td><span class="ch ${x.level >= 3 ? "r" : "y"}">SP ${x.level}</span></td><td>${x.jumlah}</td><td class="mu" style="font-size:12px">${esc(x.terakhir)}</td></tr>`).join("") || '<tr><td colspan="4" class="mu">Tidak ada anggota yang sedang SP.</td></tr>';
     $("#spRiwayatJudul").textContent = d.edit ? "Semua surat" : "Surat untuk kamu";
     $("#spRiwayat").innerHTML = d.surat.map(x => `<div class="cd" style="${x.dicabut ? "opacity:.55" : ""}"><div class="bar" style="justify-content:space-between;margin:0"><b>${esc(x.judul)}</b><span><span class="ch ${x.level >= 3 ? "r" : "y"}">SP ${x.level}</span>${x.dicabut ? ' <span class="ch n">Dicabut</span>' : ""}</span></div>
@@ -2898,7 +2898,7 @@ const RK_INFO = {
   mitra: ["Organisasi", "Database Mitra", "Daftar toko, sponsor, pemberi pinjaman, dan kolaborator MCI. Total subsidi, pinjaman, dan sisa utang dihitung otomatis dari Kas proyek, jadi tulis nama mitra sama persis dengan di Kas proyek.", "Tambah mitra"],
   alat: ["Organisasi", "Peminjaman Alat", "Alat milik MCI: siapa yang sedang memegang, sampai kapan, dan kondisinya. Anggota bisa meminjam sendiri paling lama 14 hari. Yang terlambat diingatkan otomatis setiap hari.", "Tambah alat"],
   konten: ["Konten & karya", "Jadwal Konten", "Kalender posting Instagram dan TikTok: dari ide, draf, siap tayang, sampai hasil tayangnya.", "Tambah konten"],
-  sidang: ["Hukum & disiplin", "Pelanggaran & Sidang", "Laporan pelanggaran UU MCI. Terlapor berhak membela diri sebelum sanksi ditetapkan (Pasal 18). Hanya Dewan, Dev, dan terlapor yang bisa melihat kasusnya.", "Laporkan pelanggaran"],
+  sidang: ["Hukum & disiplin", "Pelanggaran & Sidang", "Laporan pelanggaran UU MCI. Terlapor berhak membela diri sebelum sanksi ditetapkan (Pasal 18). Hanya Dewan, CEO, dan terlapor yang bisa melihat kasusnya.", "Laporkan pelanggaran"],
   putusan: ["Hukum & disiplin", "Arsip Putusan", "Semua putusan resmi Dewan, hasil sidang, keputusan rapat, dan perubahan UU, tersusun dan bisa dicari.", "Catat putusan"],
 };
 const rkNama = (d, id) => { const a = (d.anggota || []).find(x => x.id === id); return a ? a.nama : "-"; };
@@ -3459,7 +3459,7 @@ function exPasang() {   // tombol "Ekspor" di setiap halaman yang punya data
 }
 exPasang();
 
-/* Blacklist (khusus Secret Service + Dev) */
+/* Blacklist (khusus Secret Service + CEO) */
 async function loadBlacklist(d) {
   try { d = d || await api("/api/blacklist"); const ed = can("blacklist"); $("#blForm").hidden = !ed;
     $("#blList").innerHTML = d.items.map(x => `<tr><td><b>${esc(x.nama)}</b></td><td>${esc(x.alasan)}</td><td>${esc(x.keterangan)}</td><td class="mu" style="font-size:12px">${esc(x.tanggal)} · ${esc(x.oleh)}</td><td class="rt">${ed ? `<button class="bt o" data-bld="${x.id}" style="padding:5px 10px;min-height:34px">Hapus</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="5" class="mu">Belum ada.</td></tr>';
@@ -3742,7 +3742,7 @@ function renderBayarKas() {
       catch (e) { $("#bkMsg").textContent = e.message; $("#bkGo").disabled = false; }
     };
   }
-  // konfirmasi (Bendahara & Dev)
+  // konfirmasi (Bendahara & CEO)
   $("#bkKonf").hidden = !d.bisa_konfirmasi;
   $("#bkMenunggu").innerHTML = (d.menunggu || []).map(x => `<div class="bkk">${x.ada_foto ? `<a href="/api/iuran/${x.id}/foto" target="_blank" rel="noopener"><img src="/api/iuran/${x.id}/foto" alt="Foto bukti ${esc(x.nama)}" loading="lazy"></a>` : ""}
     <div style="flex:1;min-width:0"><b>${esc(x.nama)}</b> · ${rp(x.jumlah)} · <span class="ch n">${x.metode === "transfer" ? "Transfer" : "Tunai"}</span><div class="mu" style="font-size:12.5px">${esc(x.minggu_label.join("; "))} · ${relW(x.dibuat)}</div>${x.catatan ? `<div style="font-size:13px">${esc(x.catatan)}</div>` : ""}${x.ada_foto ? "" : '<div class="mu" style="font-size:12.5px">Tanpa foto: pastikan uangnya sudah kamu terima.</div>'}
@@ -3802,7 +3802,7 @@ $("#bkCS").onclick = async () => {
   $("#bkCS").disabled = false;
 };
 
-/* ===== Produk: katalog jual, kelola Dev/Manager/Bendahara, balas pertanyaan pembeli ===== */
+/* ===== Produk: katalog jual, kelola CEO/Manager/Bendahara, balas pertanyaan pembeli ===== */
 let PRD = null, PRT = [];
 function prMitraSync() {
   const v = ($("#prMitra").value || "").trim() || "MCI", sel = $("#prMitraSel"), ada = [...sel.options].some(o => o.value === v);
@@ -3926,7 +3926,7 @@ $("#prSave").onclick = async () => {
   $("#prSave").disabled = false;
 };
 
-/* ===== Tanya Apex: chat khusus Dev; Apex memanggil alat baca-saja di server dan menjawab dari data asli ===== */
+/* ===== Tanya Apex: chat khusus CEO; Apex memanggil alat baca-saja di server dan menjawab dari data asli ===== */
 const APX_LABEL = {buat_gambar: "🎨 Bikin gambar", buat_model_3d: "🧊 Bikin model 3D", buat_panduan_rakit: "🔧 Bikin panduan rakit", cek_stok: "📦 Stok gudang", cek_produk: "🛒 Katalog produk", cek_kas: "💰 Buku kas", cek_invoice: "🧾 Invoice", cek_hutang: "📒 Hutang", cek_iuran: "💸 Iuran kas", cek_anggota: "👥 Anggota",
   cek_blacklist: "⛔ Blacklist", cek_catatan: "📝 Catatan", cek_perpustakaan: "📚 Perpustakaan", cek_dokumentasi_dan_voting: "🗳️ Dokumentasi & voting", cek_iot: "📡 Sensor IoT", cek_status_bot: "🤖 Status bot"};
 const APX_SARAN = ["LED sisa berapa?", "Barang apa yang perlu restock?", "Saldo kas sekarang berapa?", "Siapa yang belum bayar kas minggu ini?", "Invoice mana yang belum lunas?", "Siapa yang hutangnya telat?", "Bot mana yang lagi kerja?"];
@@ -4009,7 +4009,7 @@ function rapatDariHash() { const m = (location.hash || "").match(/^#rapat=(\d+)\
 
 /* ===== Skor keaktifan ===== */
 let SK = null;
-async function rpMuat() {   // rapor bulanan (anggota: miliknya; Dev: semua anggota bulan terakhir)
+async function rpMuat() {   // rapor bulanan (anggota: miliknya; CEO: semua anggota bulan terakhir)
   const el = $("#rpBox"); if (!el) return;
   try {
     const d = await api("/api/rapor"), lbl = {absen: "Absen", tugas: "Tugas", iuran: "Iuran", rapat: "Rapat", proyek: "Proyek"};
@@ -4061,7 +4061,7 @@ async function buMuat() {
   catch (e) { $("#buInfo").textContent = e.message; return; }
   buDrive();
 }
-async function buDrive(opt) {   // backup otomatis ke Google Drive lewat skrip kecil di akun Google Dev (Apps Script)
+async function buDrive(opt) {   // backup otomatis ke Google Drive lewat skrip kecil di akun Google CEO (Apps Script)
   const el = $("#buDrive"); if (!el) return;
   let d; try { d = await api("/api/backup/info", opt); } catch (e) { el.innerHTML = '<p class="er">' + esc(e.message) + "</p>"; return; }
   const skrip = d.drive ? `// Backup MCI HQ -> Google Drive. Tempel di script.google.com, lalu jalankan pasangJadwal() SATU kali.
@@ -4143,16 +4143,16 @@ function abRender() {
       ${r.bolos_tanggal.length ? `<p class="mu" style="font-size:12.5px;margin:10px 0 0">Tanggal bolos: ${r.bolos_tanggal.map(t => esc(tglID(t))).join(", ")}</p>` : ""}
       <p class="mu" style="font-size:12px;margin:6px 0 0">Dihitung sejak ${esc(tglID(r.mulai, true))}.</p></div>`;
     const sisaIz = Math.max(0, d.izin_maks - d.izin_bulan_ini);
-    h += `<div class="cd fl"><b class="full">Ajukan izin</b><p class="mu full" style="margin:0;font-size:12.5px">Jatah izin ${esc(d.bulan_label)}: <b style="color:${sisaIz ? "inherit" : "#B4532A"}">${d.izin_bulan_ini} dari ${d.izin_maks} terpakai</b>${sisaIz ? "" : ". Sudah habis: izin tambahan hanya bisa dicatat khusus oleh Manager atau Dev."} Jatah dihitung menurut bulan tanggal izinnya.</p><label>Tanggal<input type="date" id="abIzT" value="${d.hari_ini}" min="${d.hari_ini}"></label><label class="full">Alasan<input type="text" id="abIzA" maxlength="300" placeholder="Contoh: sakit, acara keluarga, ujian"></label>
+    h += `<div class="cd fl"><b class="full">Ajukan izin</b><p class="mu full" style="margin:0;font-size:12.5px">Jatah izin ${esc(d.bulan_label)}: <b style="color:${sisaIz ? "inherit" : "#B4532A"}">${d.izin_bulan_ini} dari ${d.izin_maks} terpakai</b>${sisaIz ? "" : ". Sudah habis: izin tambahan hanya bisa dicatat khusus oleh Manager atau CEO."} Jatah dihitung menurut bulan tanggal izinnya.</p><label>Tanggal<input type="date" id="abIzT" value="${d.hari_ini}" min="${d.hari_ini}"></label><label class="full">Alasan<input type="text" id="abIzA" maxlength="300" placeholder="Contoh: sakit, acara keluarga, ujian"></label>
       <div class="bar full" style="margin:0"><button class="bt g" id="abIzK">Kirim izin</button><span class="mu" id="abIzM"></span></div>
-      ${d.izin.length ? `<div class="full" style="margin-top:4px">${d.izin.map(x => `<div class="meta"><span>${esc(x.label)}: ${esc(x.alasan)}</span><span class="ch ${x.status === "disetujui" ? "g" : x.status === "ditolak" ? "r" : "y"}">${x.status === "menunggu" ? "Menunggu" : x.status === "disetujui" ? "Disetujui" : "Ditolak"}</span>${x.khusus ? '<span class="ch n" title="Dicatat Manager/Dev, tidak memakai jatah bulanan">Khusus</span>' : ""}${x.status === "menunggu" ? `<button class="bt o" data-abbatal="${x.id}" style="min-height:26px;padding:2px 8px;font-size:11.5px">Batalkan</button>` : ""}</div>`).join("")}</div>` : ""}</div>`;
+      ${d.izin.length ? `<div class="full" style="margin-top:4px">${d.izin.map(x => `<div class="meta"><span>${esc(x.label)}: ${esc(x.alasan)}</span><span class="ch ${x.status === "disetujui" ? "g" : x.status === "ditolak" ? "r" : "y"}">${x.status === "menunggu" ? "Menunggu" : x.status === "disetujui" ? "Disetujui" : "Ditolak"}</span>${x.khusus ? '<span class="ch n" title="Dicatat Manager/CEO, tidak memakai jatah bulanan">Khusus</span>' : ""}${x.status === "menunggu" ? `<button class="bt o" data-abbatal="${x.id}" style="min-height:26px;padding:2px 8px;font-size:11.5px">Batalkan</button>` : ""}</div>`).join("")}</div>` : ""}</div>`;
   }
   if (d.kelola) {
     if (d.izin_menunggu.length) h += `<h2>Izin menunggu persetujuan</h2><div class="lst">${d.izin_menunggu.map(x => `<div class="it2"><h3>${esc(x.nama)} · ${esc(x.label)}</h3><div class="bd" style="font-size:13.5px">${esc(x.alasan)}</div>${x.anggota === d.saya ? '<p class="mu" style="font-size:12px">Izinmu sendiri diputus pengurus lain.</p>' : `<div class="ac"><button class="bt g" data-abput="${x.id}:disetujui">Setujui</button><button class="bt o" data-abput="${x.id}:ditolak">Tolak</button></div>`}</div>`).join("")}</div>`;
     const sudah = d.daftar.filter(x => x.jam).length;
     h += `<h2>Absen anggota hari ini · ${sudah}/${d.daftar.length}</h2><div class="cd" style="overflow-x:auto"><table class="tb" style="font-size:13px"><thead><tr><th>Anggota</th><th>Hari ini</th><th style="text-align:right">Total hadir</th><th style="text-align:right">Bolos</th></tr></thead><tbody>
       ${d.daftar.map(x => `<tr><td>${esc(x.nama)}</td><td>${x.jam ? `<span class="ch g">Hadir ${esc(x.jam)}</span>` : x.izin ? `<span class="ch y">Izin${x.izin === "menunggu" ? " (menunggu)" : ""}</span>` : d.minggu ? '<span class="ch n">Libur</span>' : '<span class="ch n">Belum</span>'}</td><td style="text-align:right">${x.hadir_total}</td><td style="text-align:right;${x.bolos >= d.maks - 1 ? "color:#B4532A;font-weight:700" : ""}">${x.bolos}${x.kebal ? ' <span class="mu" title="Akses penuh: tidak dikeluarkan otomatis">·</span>' : ""}</td></tr>`).join("")}</tbody></table></div>
-      <div class="cd fl"><b class="full">Catat izin untuk anggota</b><p class="mu full" style="margin:0;font-size:12.5px">${d.bisa_khusus ? `Sebagai Manager/Dev, izin yang kamu catat adalah <b>izin khusus</b>: tidak memakai jatah ${d.izin_maks} izin per bulan.` : `Jatah izin tiap anggota ${d.izin_maks} per bulan. Izin tambahan hanya bisa dicatat khusus oleh Manager atau Dev.`}</p><label>Anggota<select id="abCA">${d.daftar.filter(x => x.id !== d.saya).map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join("")}</select></label><label>Tanggal<input type="date" id="abCT" value="${d.hari_ini}"></label><label class="full">Alasan<input type="text" id="abCAl" maxlength="300"></label><div class="bar full" style="margin:0"><button class="bt g" id="abCK">Catat izin</button><span class="mu" id="abCM"></span></div></div>`;
+      <div class="cd fl"><b class="full">Catat izin untuk anggota</b><p class="mu full" style="margin:0;font-size:12.5px">${d.bisa_khusus ? `Sebagai Manager/CEO, izin yang kamu catat adalah <b>izin khusus</b>: tidak memakai jatah ${d.izin_maks} izin per bulan.` : `Jatah izin tiap anggota ${d.izin_maks} per bulan. Izin tambahan hanya bisa dicatat khusus oleh Manager atau CEO.`}</p><label>Anggota<select id="abCA">${d.daftar.filter(x => x.id !== d.saya).map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join("")}</select></label><label>Tanggal<input type="date" id="abCT" value="${d.hari_ini}"></label><label class="full">Alasan<input type="text" id="abCAl" maxlength="300"></label><div class="bar full" style="margin:0"><button class="bt g" id="abCK">Catat izin</button><span class="mu" id="abCM"></span></div></div>`;
     if (d.dikeluarkan.length) h += `<h2>Dikeluarkan karena absen</h2><div class="lst">${d.dikeluarkan.map(x => `<div class="it2"><h3>${esc(x.nama)}</h3><div class="meta"><span>${esc(tglID(x.tanggal))}</span><span>${esc(x.alasan)}</span></div>${d.pemilik && x.id ? `<div class="ac"><button class="bt g" data-abpul="${x.id}">Pulihkan</button></div>` : ""}</div>`).join("")}</div>`;
   }
   el.innerHTML = h || '<p class="mu">Tidak ada data absen.</p>';
@@ -4361,7 +4361,7 @@ async function loadInvoice() {
   } catch (e) { $("#ivList").innerHTML = `<tr><td colspan="5" class="er">${esc(e.message)}</td></tr>`; }
 }
 
-/* Perpustakaan: semua boleh baca dan mengunggah (ada jatah harian); ubah/hapus milik orang lain khusus Dev */
+/* Perpustakaan: semua boleh baca dan mengunggah (ada jatah harian); ubah/hapus milik orang lain khusus CEO */
 let PPD = {items: [], edit: false};
 const ppWarna = k => { let h = 0; for (const c of k) h = (h * 31 + c.charCodeAt(0)) % 360; return `linear-gradient(160deg,hsl(${h} 55% 28%),hsl(${(h + 40) % 360} 60% 42%))`; };
 function ppReset() { $("#ppTitle").textContent = "Unggah koleksi"; $("#ppForm").dataset.id = ""; ["#ppJudul", "#ppPenulis", "#ppKat", "#ppLink", "#ppRing", "#ppIsi"].forEach(q => $(q).value = ""); $("#ppFile").value = ""; $("#ppSampul").value = ""; $("#ppHf").checked = $("#ppHs").checked = false; $("#ppHfW").hidden = $("#ppHsW").hidden = true; $("#ppMsg").textContent = ""; }
@@ -6780,7 +6780,7 @@ addEventListener("keydown", e => {
   else if (e.key === "Escape" && !$("#cariHal").hidden) chTutup();
 });
 if (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) $("#cariBuka kbd").textContent = "⌘ K";
-/* ================= SURAT PENERIMAAN (khusus Dev) ================= */
+/* ================= SURAT PENERIMAAN (khusus CEO) ================= */
 let SR = null, SR_F = "a";
 const srLink = x => location.origin + "/surat/" + x.token;
 const srTeksWa = x => `Halo ${x.nama.split(" ")[0]}, selamat! Kamu resmi diterima sebagai ${x.jabatan}${x.divisi ? " divisi " + x.divisi : ""} di Mahardika Cakrawala Indonesia (MCI).\n\nIni surat penerimaanmu (nomor ${x.nomor}):\n${srLink(x)}\n\nSimpan baik-baik ya. Trimatra Vijaya Mahe!`;
@@ -6796,7 +6796,7 @@ function srRender() {
   const d = SR;
   if (!$("#srTgl").value) $("#srTgl").value = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
   if (!$("#srTtd").value && d.ttd.nama) $("#srTtd").value = d.ttd.nama;
-  if (d.ttd.jabatan && $("#srTtdJ").value === "Dev MCI") $("#srTtdJ").value = d.ttd.jabatan;
+  if (d.ttd.jabatan && $("#srTtdJ").value === "CEO MCI") $("#srTtdJ").value = d.ttd.jabatan;
   $("#srDivL").innerHTML = d.divisi.map(x => `<option>${esc(x)}</option>`).join("");
   if (!d.surat.length) { $("#srBox").innerHTML = '<p class="mu">Belum ada surat. Buat yang pertama lewat form di atas.</p>'; return; }
   $("#srBox").innerHTML = `<h2>Surat · ${d.surat.length}</h2><div class="lst">${d.surat.map(x => `<article class="it2" data-sr="${x.id}"><div class="ey">${esc(x.nomor)}</div><h3>${esc(x.nama)}</h3>
@@ -6820,9 +6820,9 @@ $("#srBox").addEventListener("click", async e => { const b = e.target.closest("b
   if (ds.src) { const [i, aksi] = ds.src.split(":"); if (aksi === "cabut" && !confirm("Cabut surat ini? Link tetap bisa dibuka, tetapi bertanda tidak berlaku.")) return; return srMuat("/api/surat/" + i, {json: {aksi}}); }
   if (ds.srh && confirm("Hapus surat ini? Link-nya tidak bisa dibuka lagi.")) return srMuat("/api/surat/" + ds.srh, {method: "DELETE"});
 });
-/* ================= JASA INTERNAL (khusus anggota; jasa & pesanan disetujui Dev) ================= */
+/* ================= JASA INTERNAL (khusus anggota; jasa & pesanan disetujui CEO) ================= */
 let JS = null, JS_PESAN = 0;
-const JS_ST = {menunggu: ["y", "Menunggu Dev"], aktif: ["g", "Aktif"], ditolak: ["r", "Ditolak"], nonaktif: ["n", "Nonaktif"], disetujui: ["g", "Disetujui"], selesai: ["n", "Selesai"]};
+const JS_ST = {menunggu: ["y", "Menunggu CEO"], aktif: ["g", "Aktif"], ditolak: ["r", "Ditolak"], nonaktif: ["n", "Nonaktif"], disetujui: ["g", "Disetujui"], selesai: ["n", "Selesai"]};
 const jsCh = st => `<span class="ch ${(JS_ST[st] || ["n"])[0]}">${(JS_ST[st] || ["", st])[1]}</span>`;
 /* ================= BUKU PANDUAN RAKIT ================= */
 var PD = null, PD_X = null, PD_T = 0, PD_L = 0, PD_UBAH = false;   // var: show() menyentuh PD_T sebelum baris ini dijalankan
@@ -6836,7 +6836,7 @@ async function pdMuat(buka) {
   catch (e) { $("#pdBox").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; return; }
   const sel = $("#pdPapan"); if (sel.options.length < 2) sel.innerHTML += PD.papan.map(b => `<option value="${b.id}">${esc(b.nama)}</option>`).join("");
   const j = PD.jatah;
-  $("#pdJatah").innerHTML = j.sisa == null ? "Dev: membuat panduan tanpa batas." : `Jatah panduan lengkap: <b>${j.sisa} dari ${j.batas}</b> tersisa per ${j.hari} hari${!j.sisa && j.lagi ? ` · bisa lagi ${esc(tglID(j.lagi))} pukul ${esc(j.lagi.slice(11, 16))}` : ""}. Membuat rencana tidak memakai jatah ini.`;
+  $("#pdJatah").innerHTML = j.sisa == null ? "CEO: membuat panduan tanpa batas." : `Jatah panduan lengkap: <b>${j.sisa} dari ${j.batas}</b> tersisa per ${j.hari} hari${!j.sisa && j.lagi ? ` · bisa lagi ${esc(tglID(j.lagi))} pukul ${esc(j.lagi.slice(11, 16))}` : ""}. Membuat rencana tidak memakai jatah ini.`;
   if (buka) return pdBuka(buka);
   if (PD_X) return pdBuka(PD_X.id);
   pdDaftar();
@@ -6884,7 +6884,7 @@ function pdDetail() {
         ${(rc.pertanyaan || []).length ? `<p style="font-weight:700;margin:0 0 8px">Jawab dulu supaya panduannya pas:</p>${rc.pertanyaan.map((q, i) => `<label class="pdQ">${esc(q)}<input type="text" data-pdq="${i}" maxlength="300" placeholder="Jawabanmu (boleh kosong, AI pakai pilihan paling aman)"></label>`).join("")}` : ""}
         <label class="pdQ">Catatan tambahan (boleh kosong)<input type="text" id="pdCat" maxlength="500" placeholder="Contoh: aku sudah punya breadboard dan kabel jumper."></label>
         <label style="display:flex;gap:10px;align-items:center;margin:12px 0 0;font-weight:600"><input type="checkbox" id="pdSetuju" style="width:20px;height:20px;flex:none"> Rencana sudah sesuai, buatkan panduan lengkapnya</label>
-        <p class="mu" style="font-size:12.5px;margin:6px 0 0">${PD.jatah.sisa == null ? "Dev: tanpa batas." : `Memakai 1 jatah (sisa ${PD.jatah.sisa} dari ${PD.jatah.batas} per ${PD.jatah.hari} hari).`}</p>
+        <p class="mu" style="font-size:12.5px;margin:6px 0 0">${PD.jatah.sisa == null ? "CEO: tanpa batas." : `Memakai 1 jatah (sisa ${PD.jatah.sisa} dari ${PD.jatah.batas} per ${PD.jatah.hari} hari).`}</p>
         <div class="bar" style="margin:12px 0 0;flex-wrap:wrap"><button class="bt g" id="pdKonfirmasi" type="button" ${PD.jatah.sisa === 0 ? "disabled" : ""}>Konfirmasi &amp; buat panduan</button><button class="bt o" id="pdUbahBuka" type="button">Ubah rencana</button><span class="mu" id="pdKMsg" style="font-size:13px"></span></div></div>` : ""}
       ${x.milik && x.status === "ditolak" ? `<div class="bar" style="margin:12px 0 0"><button class="bt o" id="pdUbahBuka" type="button">Ubah permintaan</button></div>` : ""}
       ${PD_UBAH ? `<div class="pdKonf"><label class="pdQ">Apa yang mau diubah?<textarea id="pdUbahIsi" rows="2" maxlength="800" placeholder="Contoh: pakai Arduino Uno saja, dan tambahkan layar LCD."></textarea></label>
@@ -6919,7 +6919,7 @@ function pdDetail() {
         <button class="bt g" id="pdNext" type="button">${sudah.includes(PD_L) ? (PD_L < L.length - 1 ? "Lanjut →" : "Selesai merakit ✓") : (PD_L < L.length - 1 ? "Sudah, lanjut →" : "Sudah, selesai ✓")}</button></div></div>
     <details class="cd"><summary style="cursor:pointer;font-weight:700">Lihat rangkaian lengkap</summary><div class="pdSvg" style="margin-top:12px">${d.diagram_lengkap || ""}</div></details>`;
   h += `<h2 class="pdH">3 · Kode program</h2><div class="cd">${(d.pustaka || []).length ? `<p style="margin:0 0 8px"><b>Pasang library dulu</b> (Arduino IDE → Tools → Manage Libraries): ${d.pustaka.map(p => `<span class="ch n">${esc(p)}</span>`).join(" ")}</p>` : ""}
-    ${x.papan === "esp32" ? '<p class="mu" style="font-size:13px;margin:0 0 8px">Pilih board "ESP32 Dev Module" di Arduino IDE (pasang dulu paket board ESP32 dari Boards Manager).</p>' : `<p class="mu" style="font-size:13px;margin:0 0 8px">Pilih board "${x.papan === "nano" ? "Arduino Nano" : "Arduino Uno"}" di Arduino IDE.${x.papan === "nano" ? " Kalau gagal unggah, coba Processor: ATmega328P (Old Bootloader)." : ""}</p>`}
+    ${x.papan === "esp32" ? '<p class="mu" style="font-size:13px;margin:0 0 8px">Pilih board "ESP32 CEO Module" di Arduino IDE (pasang dulu paket board ESP32 dari Boards Manager).</p>' : `<p class="mu" style="font-size:13px;margin:0 0 8px">Pilih board "${x.papan === "nano" ? "Arduino Nano" : "Arduino Uno"}" di Arduino IDE.${x.papan === "nano" ? " Kalau gagal unggah, coba Processor: ATmega328P (Old Bootloader)." : ""}</p>`}
     <div class="pdKode"><button class="bt o" id="pdSalin" type="button">Salin kode</button><pre><code>${esc(d.kode || "")}</code></pre></div>
     ${d.penjelasan_kode ? `<p style="white-space:pre-wrap;line-height:1.6;margin:12px 0 0">${esc(d.penjelasan_kode)}</p>` : ""}</div>`;
   h += `<div class="cd" style="background:#EEF6EE;border-color:#B9DDB9"><b>🧪 Uji dulu di Wokwi (simulator gratis)</b>
@@ -7006,7 +7006,7 @@ function jsRender() {
     return a.length ? `<div class="ac">${a.join("")}</div>` : ""; };
   const kartuJ = x => `<article class="it2"><div class="ey">${x.harga ? esc(x.harga) : "Harga dibicarakan"}</div><h3>${esc(x.nama)}</h3>
     <div class="meta">${jsCh(x.status)}<span class="ch ${x.publik ? "y" : "n"}">${x.publik ? "Tampil di katalog publik" : "Internal saja"}</span>${x.pengerja_nama ? `<span>Pengerja: ${esc(x.pengerja_nama)}</span>` : ""}<span>Diajukan ${esc(x.oleh)}</span></div>
-    <div class="bd">${esc(x.deskripsi)}</div>${x.catatan ? `<p class="mu" style="margin:8px 0 0">Catatan Dev: ${esc(x.catatan)}</p>` : ""}
+    <div class="bd">${esc(x.deskripsi)}</div>${x.catatan ? `<p class="mu" style="margin:8px 0 0">Catatan CEO: ${esc(x.catatan)}</p>` : ""}
     ${JS_PESAN === x.id ? `<div class="fl" style="margin-top:12px"><label class="full">Kebutuhanmu<textarea id="jsButuh" rows="3" maxlength="1500" placeholder="Untuk apa, isinya apa, dan kapan dibutuhkan."></textarea></label><label>Tenggat (boleh kosong)<input type="date" id="jsTgl"></label>${d.dev ? '<label>Harga disepakati (Rp, 0 = gratis)<input type="number" id="jsHrg" min="0" step="1000" value="0" inputmode="numeric"></label>' : ""}
       <div class="bar full" style="margin:0"><button class="bt g" data-jsk="${x.id}">${d.dev ? "Pesan (langsung disetujui)" : "Kirim pesanan"}</button><button class="bt o" data-jsp="0">Batal</button></div></div>` : aksiJ(x)}</article>`;
   const aksiP = x => { const a = [];
@@ -7020,7 +7020,7 @@ function jsRender() {
     <div class="bd">${esc(x.kebutuhan)}</div>${x.status !== "menunggu" && x.status !== "ditolak" ? `<div class="meta" style="margin-top:10px"><span>Harga: <b>${x.harga ? rp(x.harga) : "Gratis"}</b></span>${x.invoice ? `<span>${esc(x.invoice.nomor)}</span><span class="ch ${x.invoice.status === "lunas" ? "g" : x.invoice.status === "batal" ? "r" : "y"}">${esc(x.invoice.status_label)}</span>` : ""}</div>` : ""}${x.catatan ? `<p class="mu" style="margin:8px 0 0">Catatan: ${esc(x.catatan)}</p>` : ""}${aksiP(x)}</article>`;
   const tungguJ = d.jasa.filter(x => x.status === "menunggu"), aktif = d.jasa.filter(x => x.status === "aktif"), lain = d.jasa.filter(x => !["menunggu", "aktif"].includes(x.status));
   let h = "";
-  if (tungguJ.length) h += `<h2>${d.dev ? "Jasa menunggu persetujuanmu" : "Pengajuan jasamu yang menunggu Dev"} · ${tungguJ.length}</h2><div class="lst">${tungguJ.map(kartuJ).join("")}</div>`;
+  if (tungguJ.length) h += `<h2>${d.dev ? "Jasa menunggu persetujuanmu" : "Pengajuan jasamu yang menunggu CEO"} · ${tungguJ.length}</h2><div class="lst">${tungguJ.map(kartuJ).join("")}</div>`;
   h += `<h2>Jasa tersedia · ${aktif.length}</h2>` + (aktif.length ? `<div class="lst">${aktif.map(kartuJ).join("")}</div>` : '<p class="mu">Belum ada jasa. Ajukan jasa pertamamu lewat tombol di atas.</p>');
   if (d.pesan.length) h += `<h2>${d.dev ? "Semua pesanan" : "Pesanan"} · ${d.pesan.length}</h2><div class="lst">${d.pesan.map(kartuP).join("")}</div>`;
   if (lain.length) h += `<h2>Ditolak atau nonaktif · ${lain.length}</h2><div class="lst">${lain.map(kartuJ).join("")}</div>`;
@@ -7029,10 +7029,10 @@ function jsRender() {
 $("#jsPasal").onclick = e => { e.preventDefault(); show("uu"); setTimeout(() => uuKe("uu", 20), 400); };
 $("#jsKirim").onclick = async () => { const b = $("#jsKirim"); b.disabled = true; $("#jsMsg").textContent = "";
   const ok = await jsMuat("/api/jasa", {json: {nama: $("#jsNama").value, harga: $("#jsHarga").value, deskripsi: $("#jsDesk").value, pengerja: $("#jsPg").value, publik: $("#jsPub").checked}});
-  b.disabled = false; if (ok) { ["#jsNama", "#jsHarga", "#jsDesk"].forEach(q => $(q).value = ""); $("#jsPub").checked = false; $("#jsBaru").open = false; pesan(JS.dev ? "Jasa ditambahkan" : "Pengajuan terkirim, menunggu Dev"); } };
+  b.disabled = false; if (ok) { ["#jsNama", "#jsHarga", "#jsDesk"].forEach(q => $(q).value = ""); $("#jsPub").checked = false; $("#jsBaru").open = false; pesan(JS.dev ? "Jasa ditambahkan" : "Pengajuan terkirim, menunggu CEO"); } };
 $("#jsBox").addEventListener("click", async e => { const b = e.target.closest("button"); if (!b) return; const ds = b.dataset;
   if (ds.jsp !== undefined) { JS_PESAN = +ds.jsp; jsRender(); const t = $("#jsButuh"); if (t) t.focus(); return; }
-  if (ds.jsk) { b.disabled = true; const ok = await jsMuat(`/api/jasa/${ds.jsk}/pesan`, {json: {kebutuhan: $("#jsButuh").value, tenggat: $("#jsTgl").value, harga: $("#jsHrg") ? $("#jsHrg").value : 0}}); if (ok) { JS_PESAN = 0; jsRender(); pesan(JS.dev ? "Pesanan dicatat" : "Pesanan terkirim, menunggu Dev"); } else b.disabled = false; return; }
+  if (ds.jsk) { b.disabled = true; const ok = await jsMuat(`/api/jasa/${ds.jsk}/pesan`, {json: {kebutuhan: $("#jsButuh").value, tenggat: $("#jsTgl").value, harga: $("#jsHrg") ? $("#jsHrg").value : 0}}); if (ok) { JS_PESAN = 0; jsRender(); pesan(JS.dev ? "Pesanan dicatat" : "Pesanan terkirim, menunggu CEO"); } else b.disabled = false; return; }
   const putus = async (url, aksi, pesanan) => { let catatan = "", harga = 0;
     if (aksi === "tolak") { catatan = prompt("Alasan penolakan:") || ""; if (catatan.trim().length < 3) return; }
     if (aksi === "setuju" && pesanan) { const h = prompt("Harga yang disepakati dalam rupiah (angka saja). Isi 0 kalau gratis.\nKalau lebih dari 0, invoice dibuat otomatis untuk pemesan.", "0"); if (h === null) return; harga = +String(h).replace(/[^\d]/g, "") || 0; }
@@ -7211,7 +7211,7 @@ function s3Render() {
   $$("[data-s3png]").forEach(b => b.onclick = () => { const im = $(`[data-s3i="${b.dataset.s3png}"]`), r = (im.naturalHeight || 1) / (im.naturalWidth || 1), c = document.createElement("canvas"); c.width = 2160; c.height = Math.round(2160 * r);
     c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); c.toBlob(bl => { const a = document.createElement("a"); a.href = URL.createObjectURL(bl); a.download = `mci-gambar-kode-${b.dataset.s3png}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }, "image/png"); });
 }
-/* Lab Mesin AI (khusus Dev) */
+/* Lab Mesin AI (khusus CEO) */
 let LAB_MODE = "teks", LAB_T = 0;
 async function labMuat() {
   try { const d = await api("/api/mesin");
@@ -7253,7 +7253,7 @@ function cetakRender() {
     ${d.antrean.map((x, i) => `<tr><td>${i + 1}</td><td><b>${esc(x.judul)}</b>${x.catatan ? `<div class="mu" style="font-size:12px">${esc(x.catatan)}</div>` : ""}<div class="mu" style="font-size:12px">oleh ${esc(x.oleh || "")} · isi ${x.isi}%</div></td><td>${esc(x.pemesan || "")}</td>
       <td class="rt">${x.jumlah}</td><td class="rt">${num(x.gram)} g</td><td class="rt">${jamMenit(Math.round(x.menit || 0))}</td><td class="rt">${rp(x.harga)}</td><td><span class="ch ${(st[x.status] || ["", ""])[1]}">${(st[x.status] || [x.status])[0]}</span></td>
       <td class="rt" style="white-space:nowrap">${d.kelola && x.status === "antre" ? `<button class="bt o" data-cta="mulai:${x.id}">Mulai</button>` : ""}${d.kelola && (x.status === "antre" || x.status === "mencetak") ? `<button class="bt g" data-cta="selesai:${x.id}">Selesai</button>` : ""}${(d.kelola || x.oleh_id === d.saya) && (x.status === "antre" || x.status === "mencetak") ? `<button class="bt o" data-cta="batal:${x.id}">Batal</button>` : ""}${d.kelola && (x.status === "selesai" || x.status === "batal") ? `<button class="bt o" data-cta="hapus:${x.id}">Hapus</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="9" class="mu">Antrean kosong. Tekan "Masuk antrean cetak" di kartu model.</td></tr>'}</tbody></table></div>
-    ${d.kelola ? `<details style="margin-top:12px"><summary class="mu" style="cursor:pointer">Atur harga & printer (khusus Dev)</summary><div class="fl" style="margin-top:8px">
+    ${d.kelola ? `<details style="margin-top:12px"><summary class="mu" style="cursor:pointer">Atur harga & printer (khusus CEO)</summary><div class="fl" style="margin-top:8px">
       ${[["harga_gram", "Harga filamen (Rp/gram)"], ["densitas", "Massa jenis (g/cm³, PLA 1.24)"], ["isi", "Isi bawaan (%)"], ["laju", "Laju cetak (mm³/detik)"], ["watt", "Daya printer (watt)"], ["kwh", "Tarif listrik (Rp/kWh)"], ["setup", "Biaya tetap per pesanan (Rp)"], ["margin", "Keuntungan (%)"]].map(([k, l]) => `<label>${l}<input type="text" inputmode="decimal" data-cts="${k}" value="${a[k]}"></label>`).join("")}
       </div><div class="bar" style="margin:10px 0 0"><button class="bt g" id="ctSimpan">Simpan</button><span class="mu" id="ctMsg"></span></div></details>` : ""}`;
   $$("[data-cta]").forEach(b => b.onclick = async () => { const [aksi, id] = b.dataset.cta.split(":"); if (aksi === "hapus" && !confirm("Hapus dari daftar?")) return; try { CETAK = await api("/api/cetak/" + id, {json: {aksi}}); cetakRender(); } catch (e) { alert(e.message); } });
@@ -7463,7 +7463,7 @@ addEventListener("hashchange", bukaHash);
 /* ================= PANEL DEV ================= */
 const FITUR_HAL = {absen: ["absen"], pusat_info: ["info"], studio_gambar: ["gambar"]};
 function halMati() { const m = new Set(ME.hal_mati || []); (ME.fitur_mati || []).forEach(f => (FITUR_HAL[f] || []).forEach(p => m.add(p))); return m; }
-function halMatiAtur() {   // non-Dev: halaman mati hilang dari menu; Dev: tetap ada dengan tanda "mati"
+function halMatiAtur() {   // non-CEO: halaman mati hilang dari menu; CEO: tetap ada dengan tanda "mati"
   const m = halMati();
   $$("#sd .nv[data-p]").forEach(b => {
     const p = b.dataset.p, t = b.querySelector(".mt");
@@ -7485,7 +7485,7 @@ async function pnMuat() {
 function pnKunciTampil(baru) {
   PN_BARU = baru; $("#pnIsi").hidden = true; $("#pnKunci").hidden = false;
   $("#pnKJudul").textContent = baru ? "Buat PIN panel" : "Masukkan PIN";
-  $("#pnKKet").textContent = baru ? "Belum ada PIN. Buat PIN 6 angka; simpan baik-baik, karena PIN ini membuka kunci AI dan data anggota." : "PIN 6 angka khusus Dev. Panel terkunci lagi otomatis setelah 15 menit tidak dipakai.";
+  $("#pnKKet").textContent = baru ? "Belum ada PIN. Buat PIN 6 angka; simpan baik-baik, karena PIN ini membuka kunci AI dan data anggota." : "PIN 6 angka khusus CEO. Panel terkunci lagi otomatis setelah 15 menit tidak dipakai.";
   $("#pnPin2").hidden = !baru; $("#pnBuka").textContent = baru ? "Simpan PIN" : "Buka panel";
   $("#pnPin").value = $("#pnPin2").value = ""; $("#pnKMsg").textContent = ""; setTimeout(() => $("#pnPin").focus(), 50);
 }
@@ -7794,7 +7794,7 @@ async function grafikMuat() {
   if (RINGAN) { const vw = $("#voWrap"); if (vw) vw.hidden = true; const sl = $("#sl"); if (sl) sl.insertAdjacentHTML("beforebegin", '<p class="cd mu" id="voRingan" style="margin:0 0 12px">📱 <b>Mode HP Ringan</b> aktif: gedung 3D dimatikan supaya HP tidak berat. Status semua bot tetap tampil di bawah.</p>'); }
   $$(".nv").forEach(b => { const p = PAGE_PERM[b.dataset.p]; if (p && !can(p)) b.style.display = "none"; });
   if (!PUNYA_INBOX()) ["inbox", "bayarkas"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // viewer tidak punya inbox & iuran
-  if (!ADM()) { $("#nvPanel").style.display = "none"; $("#nvGraf").style.display = "none"; }   // Panel Dev & Peta khusus Dev
+  if (!ADM()) { $("#nvPanel").style.display = "none"; $("#nvGraf").style.display = "none"; }   // Panel CEO & Peta khusus CEO
   if (ME.role !== "viewer" && !(ME.fitur_mati || []).includes("absen")) api("/api/absen").then(d => { AB = d; const nb = $("#nbAbsen"); if (nb) nb.hidden = !(d.status === "belum"); }).catch(() => {});   // tanda "!" kalau belum absen
   if (!ADM()) $("#nvApex").style.display = "none";   // Tanya Apex khusus token admin
   inboxBadge(); setInterval(() => { if (!document.hidden && !layarDiam()) inboxBadge(); }, 20000);
@@ -7804,9 +7804,9 @@ async function grafikMuat() {
     : `<span class="wl">Masuk sebagai</span><span class="wh">⚡ Hemat token</span> <b>${esc(NP)}</b>`;
   if (ME.role === "viewer") ["beranda", "arsip", "studio", "absen", "pengumuman", "agenda", "tugas", "proyek", "mitra", "alat", "skor", "riwayat", "struktur", "uu", "sidang", "putusan", "rekapkas", "konten"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // halaman organisasi & UU khusus anggota
   if (ME.role === "viewer") ["jasa", "panduan"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // jasa internal khusus anggota
-  if (!ADM()) $('.nv[data-p="surat"]').style.display = "none";   // surat penerimaan khusus Dev
+  if (!ADM()) $('.nv[data-p="surat"]').style.display = "none";   // surat penerimaan khusus CEO
   if (ME.role === "viewer") ["blacklist", "sp"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // viewer tidak boleh melihat blacklist
-  if (ME.role !== "admin") $('.nv[data-p="backup"]').style.display = "none";   // backup seluruh data khusus Pemilik/Dev
+  if (ME.role !== "admin") $('.nv[data-p="backup"]').style.display = "none";   // backup seluruh data khusus Pemilik/CEO
   if (ME.role === "viewer") $("#logout").style.display = "none";   // viewer tidak perlu tombol keluar
   if (!ADM()) { const lb = $("#lpBuat"); if (lb) lb.closest(".cd").hidden = true; }   // Manager/Sekretaris cuma lihat laporan
   if (!ADM()) { const dw = $('[data-mode="dewan"]'); if (dw) dw.remove(); }   // Sidang Dewan khusus admin/dev
