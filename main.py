@@ -9485,7 +9485,7 @@ def seo_head(judul, desk, path, faq=False):
             + (f'<meta name="google-site-verification" content="{e(GSC_META)}">' if GSC_META else "") + seo_jsonld(faq))
 
 
-CSS_PUBLIK = """.sampul{display:block;width:100%;height:auto;aspect-ratio:1241/525;object-fit:cover;border-radius:14px;border:1px solid #E3E6EC;background:#fff;margin:4px 0 8px}:root{--n:#0B1730;--g:#DCC48E;--t:#141B2B;--m:#5B6475;--bg:#F5F6F8}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:16px/1.65 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+CSS_PUBLIK = """.sampul{display:block;width:100%;height:auto;max-height:520px;object-fit:contain;border-radius:14px;border:1px solid #E3E6EC;background:#fff;margin:4px 0 8px;animation:layar 26s ease-in-out infinite alternate}@keyframes layar{from{object-position:50% 50%;scale:1}to{object-position:50% 46%;scale:1.015}}@media (prefers-reduced-motion:reduce){.sampul{animation:none}}.pf.utuh img{aspect-ratio:auto;object-fit:contain;background:#fff}:root{--n:#0B1730;--g:#DCC48E;--t:#141B2B;--m:#5B6475;--bg:#F5F6F8}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:16px/1.65 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 header{background:var(--n);color:#F2EBDD;padding:40px 20px;display:flex;gap:18px;align-items:center;justify-content:center;text-align:left}header img{border-radius:50%;flex:none}
 h1{font:700 clamp(26px,5vw,40px)/1.15 Georgia,serif;margin:2px 0;color:#fff}.ey{margin:0;color:var(--g);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12.5px}.sub{margin:4px 0 0;color:#C9D7F5}
 main{max-width:820px;margin:0 auto;padding:12px 20px 40px}section{margin:28px 0}h2{font:700 22px/1.3 Georgia,serif;color:var(--n);margin:0 0 10px}.lead{font-size:18px}
@@ -9510,7 +9510,7 @@ def halaman_profil():
     sos = "".join(f'<a href="{e(u)}" rel="noopener me" target="_blank">{"Instagram" if "instagram" in u else "TikTok"}</a>' for u in seo_sosial())
     body = f"""<header><img src="/aset/logo-mci-192.webp" width="72" height="72" alt="Logo Mahardika Cakrawala Indonesia (MCI)"><div><p class="ey">{e(SEO['slogan'])}</p>
 <h1>Mahardika Cakrawala Indonesia</h1><p class="sub">MCI · Organisasi R&amp;D teknologi · {e(SEO['kota'])}, {e(SEO['provinsi'])}</p></div></header>
-<main><img class="sampul" src="/aset/jaladhipa-sketsa.webp" srcset="/aset/jaladhipa-sketsa-800.webp 800w, /aset/jaladhipa-sketsa.webp 1241w" sizes="(min-width:860px) 820px, 100vw" width="1241" height="525" alt="Sketsa kapal JalaDhipa-1, proyek kapal kargo karya Mahardika Cakrawala Indonesia" decoding="async"><section><h2>Tentang MCI</h2><p class="lead">{e(SEO['deskripsi'])}</p>
+<main><img class="sampul" src="/aset/jaladhipa-sketsa.webp" srcset="/aset/jaladhipa-sketsa-800.webp 800w, /aset/jaladhipa-sketsa.webp 1241w" sizes="(min-width:860px) 820px, 100vw" width="1241" height="864" alt="Sketsa kapal JalaDhipa-1, proyek kapal kargo karya Mahardika Cakrawala Indonesia" decoding="async"><section><h2>Tentang MCI</h2><p class="lead">{e(SEO['deskripsi'])}</p>
 <p>MCI didirikan pada {e(SEO['berdiri_teks'])} oleh tiga pendiri yang dipimpin {e(SEO['pendiri'])}. Berawal dari riset roket, MCI kini mengembangkan elektronika, perangkat IoT,
 robotika, dan sistem kecerdasan buatan, dengan semangat <b>{e(SEO['slogan'])}</b>.</p></section>
 <section><h2>Bidang yang dikerjakan</h2><ul class="bd"><li><b>Roket &amp; dirgantara</b>Desain dan uji prototipe roket.</li><li><b>Elektronika &amp; sistem tertanam</b>Arduino, ESP32, sensor, dan PCB.</li>
@@ -9587,8 +9587,8 @@ def halaman_portofolio():
             y = rk_get("proyek", x["id"])
             if y:
                 _pf_ringkasan_ai(y)
-    body = ('<img class="sampul" src="/aset/jaladhipa-sketsa.webp" srcset="/aset/jaladhipa-sketsa-800.webp 800w, /aset/jaladhipa-sketsa.webp 1241w" sizes="(min-width:860px) 820px, 100vw" width="1241" height="525" alt="Sketsa kapal JalaDhipa-1, proyek kapal kargo karya Mahardika Cakrawala Indonesia" decoding="async">' + f'<section><p class="lead">Proyek riset dan rekayasa yang dikerjakan tim MCI: roket, elektronika, IoT, robotika, dan kecerdasan buatan.</p></section>'
-            + (f'<section><h2>Sedang dikerjakan</h2><ul class="pf">{sorot}</ul></section>' if sorot else "")
+    body = ('<img class="sampul" src="/aset/jaladhipa-sketsa.webp" srcset="/aset/jaladhipa-sketsa-800.webp 800w, /aset/jaladhipa-sketsa.webp 1241w" sizes="(min-width:860px) 820px, 100vw" width="1241" height="864" alt="Sketsa kapal JalaDhipa-1, proyek kapal kargo karya Mahardika Cakrawala Indonesia" decoding="async">' + f'<section><p class="lead">Proyek riset dan rekayasa yang dikerjakan tim MCI: roket, elektronika, IoT, robotika, dan kecerdasan buatan.</p></section>'
+            + (f'<section><h2>Sedang dikerjakan</h2><ul class="pf utuh">{sorot}</ul></section>' if sorot else "")
             + f'<section><h2>Proyek selesai</h2>' + (f'<ul class="pf">{isi}</ul>' if isi else '<p class="bc">Belum ada proyek selesai yang dipublikasikan.</p>') + "</section>")
     ld = {"@context": "https://schema.org", "@type": "CollectionPage", "name": "Portofolio Mahardika Cakrawala Indonesia", "url": SITE_URL + "/portofolio",
           "isPartOf": {"@id": SITE_URL + "/#organisasi"},
@@ -9617,13 +9617,14 @@ def halaman_portofolio_satu(i):
 
 
 # ---------- PESAN JASA (publik): pengunjung portofolio memesan cetak 3D / rakit / program; masuk Inbox pengurus, lalu jadi draf invoice ----------
-PESAN_LAYANAN = ["Cetak 3D", "Rakit elektronika / IoT", "Pemrograman / website", "Desain 3D / gambar teknik"]
+PESAN_LAYANAN = ["Rakit elektronika / IoT", "Pemrograman / website"]   # cetak 3D & gambar teknik sengaja TIDAK ditawarkan ke publik (keputusan Dev)
+PESAN_TOLAK = re.compile(r"cetak\s*3d|3d\s*print|gambar\s*teknik|desain\s*3d", re.I)
 PESAN_PER_IP = int(os.getenv("PESAN_PER_IP", "2"))
 PESAN_STATUS = {"baru": "Baru", "diproses": "Diproses", "selesai": "Selesai", "ditolak": "Ditolak"}
 
 
 def pesan_layanan():
-    return PESAN_LAYANAN + [x["nama"] for x in jasa_publik() if x["nama"] not in PESAN_LAYANAN][:20] + ["Lainnya"]
+    return PESAN_LAYANAN + [x["nama"] for x in jasa_publik() if x["nama"] not in PESAN_LAYANAN and not PESAN_TOLAK.search(x["nama"])][:20] + ["Lainnya"]
 
 
 @app.route("/pesan")
@@ -9632,14 +9633,14 @@ def halaman_pesan():
     k = kontak_mci()
     opsi = "".join(f"<option>{e(x)}</option>" for x in pesan_layanan())
     body = (
-        '<section><p class="lead">Butuh cetak 3D, rakit alat elektronika atau IoT, atau program dan website? Isi formulir ini. Tim MCI akan menghubungi kamu lewat kontak yang kamu tulis, '
+        '<section><p class="lead">Butuh rakit alat elektronika atau IoT, atau program dan website? Isi formulir ini. Tim MCI akan menghubungi kamu lewat kontak yang kamu tulis, '
         'lalu mengirim penawaran harga. Mengisi formulir ini gratis dan belum mengikat.</p></section>'
         '<section><form id="f" class="fp" autocomplete="on">'
         '<label>Nama<input name="nama" maxlength="60" required placeholder="Nama kamu atau instansi"></label>'
         '<label>Kontak (WhatsApp atau email)<input name="kontak" maxlength="80" required placeholder="contoh: 0812xxxxxxx atau nama@email.com"></label>'
         f'<label>Layanan<select name="layanan" required>{opsi}</select></label>'
         '<label>Butuh selesai kapan? (boleh kosong)<input name="tenggat" type="date"></label>'
-        '<label class="w">Ceritakan kebutuhanmu<textarea name="kebutuhan" rows="5" maxlength="1500" required placeholder="Contoh: cetak 3D casing sensor ukuran 8 x 5 x 3 cm, 2 buah, warna hitam. File STL sudah ada."></textarea></label>'
+        '<label class="w">Ceritakan kebutuhanmu<textarea name="kebutuhan" rows="5" maxlength="1500" required placeholder="Contoh: alat pemantau suhu dan kelembapan gudang dengan ESP32, data tampil di HP, 3 titik sensor."></textarea></label>'
         '<label class="hp" aria-hidden="true">Situs web<input name="situs" tabindex="-1" autocomplete="off"></label>'
         '<button type="submit">Kirim pesanan</button><p id="st" role="status"></p></form></section>'
         f'<section><p class="bc">Lebih suka langsung? WhatsApp admin {e(k["wa"])} · Instagram {e(k["ig"])}. Data di formulir ini hanya dipakai pengurus MCI untuk menghubungi kamu soal pesanan.</p></section>'
@@ -9651,7 +9652,7 @@ def halaman_pesan():
         "try{const r=await fetch('/api/publik/pesan',{method:'POST',headers:{'Content-Type':'application/json','X-MCI':'1'},body:JSON.stringify(Object.fromEntries(new FormData(f)))});const d=await r.json();"
         "if(!r.ok)throw new Error(d.error||'Gagal mengirim');f.reset();st.style.color='#1E7B4A';st.textContent=d.pesan;}catch(e){st.style.color='#B42318';st.textContent=e.message;}b.disabled=false;});</script>")
     ld = {"@context": "https://schema.org", "@type": "ContactPage", "name": "Pesan Jasa MCI", "url": SITE_URL + "/pesan", "isPartOf": {"@id": SITE_URL + "/#organisasi"}}
-    return _pf_halaman("Pesan Jasa MCI | Mahardika Cakrawala Indonesia", "Pesan jasa cetak 3D, rakit elektronika dan IoT, serta pemrograman dari tim Mahardika Cakrawala Indonesia (MCI).", "/pesan", body, ld)
+    return _pf_halaman("Pesan Jasa MCI | Mahardika Cakrawala Indonesia", "Pesan jasa rakit elektronika dan IoT, serta pemrograman dan website dari tim Mahardika Cakrawala Indonesia (MCI).", "/pesan", body, ld)
 
 
 @app.route("/api/publik/pesan", methods=["POST"])

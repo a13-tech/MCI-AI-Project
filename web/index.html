@@ -626,9 +626,29 @@ button.ng{font-size:12px;letter-spacing:.02em;text-transform:none;font-weight:50
 @media (min-width:901px) and (max-width:1240px){#sd .nv.ut[data-p=info],#sd .nv.ut[data-p=portofolio],#sd #cariBuka kbd{display:none!important}}
 @media (min-width:901px) and (max-width:1060px){#sd .nv.ut[data-p=bayarkas],#sd .nv.ut[data-p=tugas],#sd .who #whoRole{display:none!important}}
 /* sampul Beranda: sketsa JalaDhipa-1 */
-.sampul{display:block;width:100%;height:auto;aspect-ratio:1241/525;object-fit:cover;border-radius:var(--r);border:1px solid var(--line);background:#fff;margin:0 0 28px}
-:root[data-tema=gelap] .sampul{filter:brightness(.9) contrast(1.05);border-color:var(--line2)}
-@media (max-width:900px){.sampul{margin-bottom:20px;border-radius:12px}}
+.sampulW{overflow:hidden;border-radius:var(--r);border:1px solid var(--line);background:#fff;margin:0 0 28px}
+.sampul{display:block;width:100%;height:auto;max-height:500px;object-fit:contain;background:#fff;will-change:translate}
+:root[data-tema=gelap] .sampulW{border-color:var(--line2)}:root[data-tema=gelap] .sampul{filter:brightness(.9) contrast(1.05)}
+@media (max-width:900px){.sampulW{margin-bottom:20px;border-radius:12px}}
+/* =================== ANIMASI (mati otomatis di HP Ringan & "kurangi gerakan") =================== */
+@keyframes masuk{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes turun{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes layar{from{scale:1}to{scale:1.045}}
+@keyframes denyut{0%{transform:scale(1)}30%{transform:scale(1.35)}60%{transform:scale(.92)}100%{transform:scale(1)}}
+@keyframes naikToast{from{opacity:0;transform:translate(-50%,14px)}to{opacity:1;transform:translate(-50%,0)}}
+html.gerak .pg:not([hidden]){animation:masuk .32s cubic-bezier(.2,.7,.3,1) both}
+html.gerak .pg.baru .cd,html.gerak .pg.baru .it2{animation:masuk .4s cubic-bezier(.2,.7,.3,1) both}
+html.gerak .pg.baru .gr>.cd:nth-child(2),html.gerak .pg.baru .lst>.it2:nth-child(2){animation-delay:.04s}
+html.gerak .pg.baru .gr>.cd:nth-child(3),html.gerak .pg.baru .lst>.it2:nth-child(3){animation-delay:.08s}
+html.gerak .pg.baru .gr>.cd:nth-child(n+4),html.gerak .pg.baru .lst>.it2:nth-child(n+4){animation-delay:.12s}
+html.gerak .sampul{animation:layar 24s ease-in-out infinite alternate}
+@media (min-width:901px){html.gerak #mnPanel:not([hidden]){animation:turun .2s ease-out both}}
+html.gerak .bt,html.gerak .nv,html.gerak #mnSemua,html.gerak #temaBtn,html.gerak .exb{transition:transform .12s ease,background-color .15s,border-color .15s,color .15s}
+html.gerak .bt:active,html.gerak #temaBtn:active,html.gerak .exb:active,html.gerak #fabCatat:active{transform:scale(.96)}
+html.gerak .tst:not([hidden]){animation:naikToast .28s cubic-bezier(.2,.7,.3,1) both}
+html.gerak .nb.denyut{animation:denyut .7s ease-out 2}
+html.gerak.ganti-tema *,html.gerak.ganti-tema *::before,html.gerak.ganti-tema *::after{transition:background-color .3s ease,color .3s ease,border-color .3s ease!important}
+html.ringan .sampul,html.ringan .pg,html.ringan .cd{animation:none!important}
 /* penjelasan panjang di atas halaman dilipat */
 details.cara{margin:8px 0 22px;max-width:68ch}
 details.cara>summary{list-style:none;display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:var(--mute);font-size:13px;padding:5px 10px 5px 8px;border:1px solid var(--line);border-radius:99px}
@@ -803,7 +823,7 @@ details.cara p{line-height:1.65}
  <div class="demo" id="demoBanner" hidden>DEMO: semua data contoh. Tanpa server dan tanpa AI sungguhan.</div>
 
  <section id="p-beranda" class="pg">
-  <img class="sampul" src="/aset/jaladhipa-sketsa-800.webp" srcset="/aset/jaladhipa-sketsa-800.webp 800w, /aset/jaladhipa-sketsa.webp 1241w" sizes="(min-width:901px) 976px, 100vw" width="1241" height="525" alt="Sketsa kapal JalaDhipa-1 karya MCI di pelabuhan" decoding="async">
+  <div class="sampulW"><img class="sampul" src="/aset/jaladhipa-sketsa-800.webp" srcset="/aset/jaladhipa-sketsa-800.webp 800w, /aset/jaladhipa-sketsa.webp 1241w" sizes="(min-width:901px) 976px, 100vw" width="1241" height="864" alt="Sketsa kapal JalaDhipa-1 karya MCI di pelabuhan" decoding="async"></div>
   <div class="ey" id="brHari"></div><h1 id="brHalo">Beranda</h1>
   <div id="brBox"><p class="mu">Memuat…</p></div>
  </section>
@@ -1821,6 +1841,8 @@ let RINGAN = false;   // HP Ringan: ditandai Dev di halaman Anggota, atau otomat
 let ME = {}, DATA = [], LOG = [], KAS = null, PV = [], USE = null, MODE = "boss", SKL = {skills: [], bots: []};
 function show(p) {
   if (p !== "office" && typeof voKeluar === "function") voKeluar(false);
+  if (typeof angkaNaik === "function") setTimeout(() => angkaNaik($("#p-" + p)), 0);
+  { const pg = $("#p-" + p); if (pg) { pg.classList.add("baru"); clearTimeout(pg._baru); pg._baru = setTimeout(() => pg.classList.remove("baru"), 900); } }   // kartu muncul berurutan hanya sesaat setelah pindah halaman, bukan tiap data diperbarui
   $$(".pg").forEach(e => e.hidden = e.id !== "p-" + p);
   $$(".nv").forEach(b => b.classList.toggle("on", b.dataset.p === p));
   OFFICE.setVisible(p === "office");
@@ -6523,7 +6545,35 @@ function temaPasang(t) {
   const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = t === "gelap" ? "#0D121C" : (matchMedia("(max-width:900px)").matches ? "#0B1730" : "#F5F6F8");
   $("#temaBtn").title = t === "gelap" ? "Ganti ke tema terang" : "Ganti ke tema gelap";
 }
-$("#temaBtn").onclick = () => { const t = document.documentElement.dataset.tema === "gelap" ? "terang" : "gelap"; try { localStorage.setItem("tema", t); } catch (e) {} temaPasang(t); };
+$("#temaBtn").onclick = () => { const t = document.documentElement.dataset.tema === "gelap" ? "terang" : "gelap"; try { localStorage.setItem("tema", t); } catch (e) {}
+  const h = document.documentElement; h.classList.add("ganti-tema"); temaPasang(t); setTimeout(() => h.classList.remove("ganti-tema"), 380); };
+/* ---------- ANIMASI: hanya kalau HP kuat dan pengguna tidak memilih "kurangi gerakan" ---------- */
+const gerakBoleh = () => !RINGAN && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+function gerakAtur() { document.documentElement.classList.toggle("gerak", gerakBoleh()); }
+gerakAtur();
+function angkaNaik(pg) {   // angka di kartu (Rp, jumlah, skor) menghitung naik sekali saat halaman dibuka
+  if (!gerakBoleh() || !pg) return;
+  setTimeout(() => pg.querySelectorAll(".v").forEach(el => {
+    const asli = el.textContent.trim(), m = asli.match(/^(Rp\s?)?(\d{1,3}(?:\.\d{3})+|\d+)(.*)$/);
+    if (!m || el.dataset.naik === asli) return;
+    const target = +m[2].replace(/\./g, ""); if (!target || target > 1e12) return;
+    el.dataset.naik = asli; const t0 = performance.now(), dur = Math.min(900, 380 + String(target).length * 70);
+    const step = now => { if (el.textContent.trim() !== asli && el.dataset.naik !== asli) return;
+      const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = (m[1] || "") + Math.round(target * e).toLocaleString("id-ID") + m[3];
+      if (k < 1) requestAnimationFrame(step); else el.textContent = asli; };
+    requestAnimationFrame(step);
+  }), 260);
+}
+/* sampul kapal: bergeser pelan saat halaman digulir */
+let SP_RAF = 0;
+addEventListener("scroll", () => { if (SP_RAF || !gerakBoleh()) return; SP_RAF = requestAnimationFrame(() => { SP_RAF = 0;
+  const img = $("#p-beranda:not([hidden]) .sampul"); if (img) img.style.translate = `0 ${Math.min(60, scrollY * 0.12).toFixed(1)}px`; }); }, {passive: true});
+/* lencana Inbox berdenyut saat jumlahnya bertambah */
+let NB_LAMA = 0;
+new MutationObserver(() => { const b = $("#nbInbox"), n = parseInt(b.textContent) || 0;
+  if (n > NB_LAMA && !b.hidden) { b.classList.remove("denyut"); void b.offsetWidth; b.classList.add("denyut"); setTimeout(() => b.classList.remove("denyut"), 1500); }
+  NB_LAMA = n; }).observe($("#nbInbox"), {childList: true, characterData: true, subtree: true});
 temaPasang(document.documentElement.dataset.tema === "gelap" ? "gelap" : "terang");
 /* Penjelasan panjang di bawah judul halaman dilipat jadi tombol kecil "Tentang halaman ini" supaya isi utama langsung terlihat */
 $$(".pg").forEach(pg => { const anak = [...pg.children];
@@ -7231,6 +7281,7 @@ addEventListener("hashchange", bukaHash);
   if (DEMO) { $("#demoBanner").hidden = false; $("#csv").removeAttribute("href"); $("#csv").onclick = e => { e.preventDefault(); alert("Ekspor CSV aktif di versi server."); }; }
   try { ME = await api("/api/me"); if (ME.lantai) LANTAI = ME.lantai; } catch (e) { return; }
   RINGAN = !!ME.ringan || (navigator.deviceMemory > 0 && navigator.deviceMemory <= 2);
+  if (typeof gerakAtur === "function") gerakAtur();
   document.documentElement.classList.toggle("ringan", RINGAN);
   if (RINGAN) { const vw = $("#voWrap"); if (vw) vw.hidden = true; const sl = $("#sl"); if (sl) sl.insertAdjacentHTML("beforebegin", '<p class="cd mu" id="voRingan" style="margin:0 0 12px">📱 <b>Mode HP Ringan</b> aktif: gedung 3D dimatikan supaya HP tidak berat. Status semua bot tetap tampil di bawah.</p>'); }
   $$(".nv").forEach(b => { const p = PAGE_PERM[b.dataset.p]; if (p && !can(p)) b.style.display = "none"; });
