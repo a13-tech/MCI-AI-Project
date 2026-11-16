@@ -612,6 +612,7 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
     <label>Pengerja<select id="jsPg"></select></label>
     <label class="full" id="jsPubW" hidden style="display:flex;gap:10px;align-items:center;font-weight:600"><input type="checkbox" id="jsPub" style="width:20px;height:20px;flex:none"> Tampilkan juga di katalog publik (setelan khusus Dev)</label>
     <div class="bar full" style="margin:0"><button class="bt g" id="jsKirim" type="button">Ajukan jasa</button><span class="mu" id="jsMsg"></span></div></div></details>
+  <div class="cd" id="plKartu" hidden></div>
   <div id="jsBox"><p class="mu">Memuat…</p></div>
  </section>
  <section id="p-arsip" class="pg" hidden>
@@ -1649,7 +1650,7 @@ function show(p) {
   if (p === "skor") skMuat();
   if (p === "beranda") brMuat();
   if (p === "arsip") arMuat();
-  if (p === "jasa") jsMuat();
+  if (p === "jasa") { jsMuat(); plMuat(); }
   if (p === "surat") srMuat();
   if (p === "studio") s3Muat();
   clearTimeout(PD_T); if (p === "panduan") pdMuat();
@@ -6735,6 +6736,32 @@ async function cetakAntre(id) {
   const jumlah = prompt("Berapa buah yang dicetak?", "1"); if (jumlah === null) return;
   const pemesan = prompt("Untuk siapa? (nama klien, atau kosongkan untuk internal MCI)", "") ?? "";
   try { CETAK = await api("/api/cetak", {json: {model_id: id, jumlah: +jumlah || 1, isi: CETAK_ISI, pemesan: pemesan || "Internal MCI"}}); cetakRender(); $("#ctBox").scrollIntoView({behavior: "smooth", block: "start"}); } catch (e) { alert(e.message); }
+}
+/* Pesanan jasa dari orang luar (form publik /pesan): pengurus menindaklanjuti lalu membuat draf invoice */
+async function plMuat(opt) {
+  const el = $("#plKartu"); if (!el) return;
+  let d; try { d = await api("/api/pesanan-luar", opt); } catch (e) { el.hidden = true; return; }   // bukan pengurus: kartu tidak tampil
+  const warna = {baru: "r", diproses: "y", selesai: "g", ditolak: ""}, baru = d.items.filter(x => x.status === "baru").length;
+  el.hidden = false;
+  el.innerHTML = `<b>🛎️ Pesanan dari luar${baru ? ` <span class="ch r">${baru} baru</span>` : ""}</b>
+    <p class="mu" style="font-size:12.5px;margin:4px 0 10px">Dari formulir publik <a href="/pesan" target="_blank" rel="noopener">/pesan</a> (tautannya ada di halaman Portofolio). Hubungi pemesan dulu, sepakati harga, lalu buat invoice.</p>`
+    + (d.items.length ? d.items.map(x => `<div style="border-top:1px solid rgba(127,127,127,.25);padding:10px 0">
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>${esc(x.layanan)}</b><span class="ch ${warna[x.status] || ""}">${esc(x.status_label)}</span></div>
+        <div style="font-size:13.5px;margin-top:2px">${esc(x.nama)} · <b>${esc(x.kontak)}</b>${x.tenggat ? " · butuh selesai " + esc(x.tenggat) : ""}</div>
+        <div style="font-size:13.5px;white-space:pre-wrap;margin-top:4px">${esc(x.kebutuhan)}</div>
+        <div class="mu" style="font-size:12px;margin-top:3px">${esc((x.dibuat || "").slice(0, 16).replace("T", " "))}${x.diurus_oleh ? " · diurus " + esc(x.diurus_oleh) : ""}</div>
+        <div class="ac" style="margin-top:6px">${x.status === "baru" ? `<button class="bt g" data-pla="${x.id}:diproses">Saya urus</button>` : ""}
+          ${d.bisa_invoice && x.status !== "ditolak" ? `<button class="bt o" data-plinv="${x.id}">🧾 Buat draf invoice</button>` : ""}
+          ${x.status !== "selesai" ? `<button class="bt o" data-pla="${x.id}:selesai">Selesai</button>` : ""}${x.status === "baru" || x.status === "diproses" ? `<button class="bt o" data-pla="${x.id}:ditolak">Tolak</button>` : ""}
+          ${d.admin ? `<button class="bt o" data-pla="${x.id}:hapus">Hapus</button>` : ""}</div></div>`).join("") : '<p class="mu">Belum ada pesanan dari luar.</p>');
+  $$("[data-pla]").forEach(b => b.onclick = () => { const [id, aksi] = b.dataset.pla.split(":");
+    if ((aksi === "hapus" || aksi === "ditolak") && !confirm(aksi === "hapus" ? "Hapus pesanan ini selamanya?" : "Tolak pesanan ini?")) return; plMuat({json: {id, aksi}}); });
+  $$("[data-plinv]").forEach(b => b.onclick = () => { const x = d.items.find(y => y.id === +b.dataset.plinv); if (!x) return;
+    if (x.status === "baru") api("/api/pesanan-luar", {json: {id: x.id, aksi: "diproses"}}).catch(() => {});
+    const n = $('#sd .nv[data-p="invoice"]'); if (n) n.click(); else show("invoice");
+    setTimeout(() => { $("#ivPembeli").value = x.nama; $("#ivKontak").value = x.kontak;
+      IVI.push({sumber: "manual", produk_id: null, stok_id: null, nama: ("Jasa: " + x.layanan).slice(0, 120), satuan: "paket", jumlah: 1, harga: 0});
+      ivRenderItems(); $("#ivForm").scrollIntoView({behavior: "smooth", block: "start"}); }, 700); });
 }
 function cetakInvoice(judul, harga, gram) {   // buka halaman Invoice dengan item jasa cetak sudah terisi
   const n = $('#sd .nv[data-p="invoice"]'); if (n) n.click(); else show("invoice");

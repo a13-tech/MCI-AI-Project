@@ -509,6 +509,9 @@ def db_init():
                 sql(c, f"ALTER TABLE jasa_pesan ADD COLUMN {kol}")
         except Exception:
             pass   # sudah ada
+    with db() as c:   # pesanan jasa dari orang luar (form publik /pesan)
+        sql(c, f"CREATE TABLE IF NOT EXISTS pesanan_luar (id {pk}, ip TEXT NOT NULL, nama TEXT NOT NULL, kontak TEXT NOT NULL, layanan TEXT NOT NULL, kebutuhan TEXT NOT NULL, "
+               f"tenggat TEXT, status TEXT NOT NULL DEFAULT 'baru', catatan TEXT, diurus_oleh TEXT, dibuat TEXT NOT NULL)")
     for kol in ("berkas_svg TEXT", "berkas_stl TEXT", "sketsa TEXT"):   # Studio 3D: pratinjau & STL disimpan sekali, tidak dihitung ulang tiap unduh/deploy
         try:
             with db() as c:
@@ -9368,7 +9371,7 @@ def _pf_halaman(judul, desk, path, isi, ld):
              ".bc{font-size:13.5px;color:var(--m)}.bc a{color:var(--n)}</style></head><body>"
            f'<header><img src="/aset/logo-mci-192.webp" width="56" height="56" alt="Logo MCI"><div><p class="ey">Portofolio</p><h1>{e(judul.split(" | ")[0])}</h1>'
            f'<p class="sub">Mahardika Cakrawala Indonesia · {e(SEO["kota"])}, {e(SEO["provinsi"])}</p></div></header><main>{isi}'
-           f'<section><p class="ln"><a href="/profil">Profil MCI</a><a href="/portofolio">Semua proyek</a><a href="/produk">Katalog produk</a></p></section></main>'
+           f'<section><p class="ln"><a href="/profil">Profil MCI</a><a href="/portofolio">Semua proyek</a><a href="/produk">Katalog produk</a><a href="/pesan">Pesan jasa</a></p></section></main>'
            f'<footer>© {datetime.now(WIB).year} Mahardika Cakrawala Indonesia (MCI)</footer></body></html>')
     return Response(doc, mimetype="text/html", headers={"Cache-Control": "public, max-age=600", "X-Content-Type-Options": "nosniff"})
 
@@ -9419,9 +9422,103 @@ def halaman_portofolio_satu(i):
     return _pf_halaman(f"{x['nama']} | Portofolio MCI", (ring or f"Proyek {x['nama']} oleh Mahardika Cakrawala Indonesia.")[:155], f"/portofolio/{i}", body, ld)
 
 
+# ---------- PESAN JASA (publik): pengunjung portofolio memesan cetak 3D / rakit / program; masuk Inbox pengurus, lalu jadi draf invoice ----------
+PESAN_LAYANAN = ["Cetak 3D", "Rakit elektronika / IoT", "Pemrograman / website", "Desain 3D / gambar teknik"]
+PESAN_PER_IP = int(os.getenv("PESAN_PER_IP", "2"))
+PESAN_STATUS = {"baru": "Baru", "diproses": "Diproses", "selesai": "Selesai", "ditolak": "Ditolak"}
+
+
+def pesan_layanan():
+    return PESAN_LAYANAN + [x["nama"] for x in jasa_publik() if x["nama"] not in PESAN_LAYANAN][:20] + ["Lainnya"]
+
+
+@app.route("/pesan")
+def halaman_pesan():
+    e = lambda v: _esc_html(str(v or ""))
+    k = kontak_mci()
+    opsi = "".join(f"<option>{e(x)}</option>" for x in pesan_layanan())
+    body = (
+        '<section><p class="lead">Butuh cetak 3D, rakit alat elektronika atau IoT, atau program dan website? Isi formulir ini. Tim MCI akan menghubungi kamu lewat kontak yang kamu tulis, '
+        'lalu mengirim penawaran harga. Mengisi formulir ini gratis dan belum mengikat.</p></section>'
+        '<section><form id="f" class="fp" autocomplete="on">'
+        '<label>Nama<input name="nama" maxlength="60" required placeholder="Nama kamu atau instansi"></label>'
+        '<label>Kontak (WhatsApp atau email)<input name="kontak" maxlength="80" required placeholder="contoh: 0812xxxxxxx atau nama@email.com"></label>'
+        f'<label>Layanan<select name="layanan" required>{opsi}</select></label>'
+        '<label>Butuh selesai kapan? (boleh kosong)<input name="tenggat" type="date"></label>'
+        '<label class="w">Ceritakan kebutuhanmu<textarea name="kebutuhan" rows="5" maxlength="1500" required placeholder="Contoh: cetak 3D casing sensor ukuran 8 x 5 x 3 cm, 2 buah, warna hitam. File STL sudah ada."></textarea></label>'
+        '<label class="hp" aria-hidden="true">Situs web<input name="situs" tabindex="-1" autocomplete="off"></label>'
+        '<button type="submit">Kirim pesanan</button><p id="st" role="status"></p></form></section>'
+        f'<section><p class="bc">Lebih suka langsung? WhatsApp admin {e(k["wa"])} · Instagram {e(k["ig"])}. Data di formulir ini hanya dipakai pengurus MCI untuk menghubungi kamu soal pesanan.</p></section>'
+        "<style>.fp{display:grid;gap:12px;grid-template-columns:1fr 1fr;background:#fff;border:1px solid #E6E0D2;border-radius:14px;padding:18px}.fp label{display:grid;gap:5px;font-size:14px;font-weight:600;color:var(--n)}"
+        ".fp .w,.fp button,.fp #st{grid-column:1/-1}.fp input,.fp select,.fp textarea{font:inherit;padding:10px 12px;border:1px solid #CFC8B8;border-radius:10px;background:#fff;color:var(--t);width:100%}"
+        ".fp button{background:var(--n);color:#fff;border:0;border-radius:10px;padding:12px;font:inherit;font-weight:700;cursor:pointer}.fp button:disabled{opacity:.6}.fp #st{margin:0;font-size:14.5px}"
+        ".hp{position:absolute;left:-9999px;height:0;overflow:hidden}@media(max-width:640px){.fp{grid-template-columns:1fr}}</style>"
+        "<script>const f=document.getElementById('f'),st=document.getElementById('st');f.addEventListener('submit',async ev=>{ev.preventDefault();const b=f.querySelector('button');b.disabled=true;st.style.color='';st.textContent='Mengirim…';"
+        "try{const r=await fetch('/api/publik/pesan',{method:'POST',headers:{'Content-Type':'application/json','X-MCI':'1'},body:JSON.stringify(Object.fromEntries(new FormData(f)))});const d=await r.json();"
+        "if(!r.ok)throw new Error(d.error||'Gagal mengirim');f.reset();st.style.color='#1E7B4A';st.textContent=d.pesan;}catch(e){st.style.color='#B42318';st.textContent=e.message;}b.disabled=false;});</script>")
+    ld = {"@context": "https://schema.org", "@type": "ContactPage", "name": "Pesan Jasa MCI", "url": SITE_URL + "/pesan", "isPartOf": {"@id": SITE_URL + "/#organisasi"}}
+    return _pf_halaman("Pesan Jasa MCI | Mahardika Cakrawala Indonesia", "Pesan jasa cetak 3D, rakit elektronika dan IoT, serta pemrograman dari tim Mahardika Cakrawala Indonesia (MCI).", "/pesan", body, ld)
+
+
+@app.route("/api/publik/pesan", methods=["POST"])
+def api_publik_pesan():
+    d = request.get_json(silent=True) or {}
+    if str(d.get("situs") or "").strip():   # kolom jebakan: manusia tidak melihatnya, bot spam mengisinya
+        return jsonify({"ok": True, "pesan": "Pesanan terkirim. Tim MCI akan menghubungi kamu."})
+    bersih = lambda v, n: re.sub(r"[ \t]+", " ", str(v or "")).strip()[:n]
+    nama, kontak, layanan, butuh = bersih(d.get("nama"), 60), bersih(d.get("kontak"), 80), bersih(d.get("layanan"), 100), str(d.get("kebutuhan") or "").strip()[:1500]
+    tenggat = str(d.get("tenggat") or "")[:10]
+    tenggat = tenggat if re.fullmatch(r"\d{4}-\d{2}-\d{2}", tenggat) else ""
+    if len(nama) < 2:
+        return jsonify({"error": "Tulis namamu dulu"}), 400
+    if not (re.search(r"\d{8,}", re.sub(r"[\s+().-]", "", kontak)) or re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", kontak)):
+        return jsonify({"error": "Kontak harus nomor WhatsApp atau email yang benar, supaya tim MCI bisa menghubungi kamu"}), 400
+    if layanan not in pesan_layanan():
+        return jsonify({"error": "Pilih layanan dari daftar"}), 400
+    if len(butuh) < 15:
+        return jsonify({"error": "Ceritakan kebutuhanmu sedikit lebih jelas (minimal 15 huruf)"}), 400
+    ih, sejak = _ip_hash(client_ip()), (datetime.now(WIB) - timedelta(hours=24)).isoformat(timespec="seconds")
+    with _KLOCK:
+        with db() as c:
+            if int(sql(c, "SELECT COUNT(*) FROM pesanan_luar WHERE ip=? AND dibuat>=?", (ih, sejak)).fetchone()[0]) >= PESAN_PER_IP:
+                return jsonify({"error": f"Batas {PESAN_PER_IP} pesanan per 24 jam sudah tercapai. Tim MCI akan menghubungi kamu, atau coba lagi besok."}), 429
+            q = "INSERT INTO pesanan_luar (ip,nama,kontak,layanan,kebutuhan,tenggat,status,dibuat) VALUES (?,?,?,?,?,?,?,?)"
+            pr = (ih, nama, kontak, layanan, butuh, tenggat, "baru", _now())
+            pid = int(sql(c, q + " RETURNING id", pr).fetchone()[0] if PG else sql(c, q, pr).lastrowid)
+    inbox_kirim(penerima_produk(), "jasa", f"🛎️ Pesanan jasa dari luar: {layanan}",
+                f"{nama} ({kontak}){' · butuh selesai ' + tenggat if tenggat else ''}\n{butuh[:500]}\n\nBuka web → Jasa Internal → Pesanan dari luar.", pid)
+    return jsonify({"ok": True, "pesan": "Pesanan terkirim. Tim MCI akan menghubungi kamu lewat kontak yang kamu tulis."})
+
+
+@app.route("/api/pesanan-luar", methods=["GET", "POST"])
+def api_pesanan_luar():
+    r = role()
+    if not r:
+        abort(401)
+    if not bisa_produk(r):
+        abort(403)
+    if request.method == "POST":
+        d = request.get_json(silent=True) or {}
+        i, aksi = d.get("id"), str(d.get("aksi") or "")
+        if not str(i).isdigit() or aksi not in (*PESAN_STATUS, "hapus"):
+            return jsonify({"error": "Permintaan tidak dikenal"}), 400
+        with db() as c:
+            if aksi == "hapus":
+                if not is_admin(r):
+                    return jsonify({"error": "Hanya Dev yang bisa menghapus pesanan"}), 403
+                sql(c, "DELETE FROM pesanan_luar WHERE id=?", (int(i),))
+            else:
+                sql(c, "UPDATE pesanan_luar SET status=?, catatan=?, diurus_oleh=? WHERE id=?", (aksi, str(d.get("catatan") or "").strip()[:300], nama_peran(r), int(i)))
+            sql(c, "UPDATE inbox SET dibaca=1 WHERE jenis='jasa' AND ref=? AND judul LIKE ?", (int(i), "%Pesanan jasa dari luar%"))
+    with db() as c:
+        rows = sql(c, "SELECT id,nama,kontak,layanan,kebutuhan,tenggat,status,catatan,diurus_oleh,dibuat FROM pesanan_luar ORDER BY CASE status WHEN 'baru' THEN 0 WHEN 'diproses' THEN 1 ELSE 2 END, id DESC LIMIT 200").fetchall()
+    kol = ["id", "nama", "kontak", "layanan", "kebutuhan", "tenggat", "status", "catatan", "diurus_oleh", "dibuat"]
+    return jsonify({"items": [{**dict(zip(kol, x)), "status_label": PESAN_STATUS.get(x[6], x[6])} for x in rows], "admin": is_admin(r), "bisa_invoice": can("kas_edit", r) or is_admin(r)})
+
+
 @app.route("/robots.txt")
 def robots_txt():
-    isi = ("User-agent: *\nAllow: /$\nAllow: /profil\nAllow: /portofolio\nAllow: /produk\nAllow: /llms.txt\nAllow: /aset/\n"
+    isi = ("User-agent: *\nAllow: /$\nAllow: /profil\nAllow: /portofolio\nAllow: /pesan\nAllow: /produk\nAllow: /llms.txt\nAllow: /aset/\n"
            "Disallow: /api/\nDisallow: /surat/\nDisallow: /login\nDisallow: /*?k=\nDisallow: /invoice/\n\n"
            "# Bot AI (ChatGPT, Gemini, Claude, Perplexity) boleh membaca halaman publik yang sama\n"
            "User-agent: GPTBot\nUser-agent: OAI-SearchBot\nUser-agent: ChatGPT-User\nUser-agent: Google-Extended\nUser-agent: ClaudeBot\nUser-agent: Claude-SearchBot\nUser-agent: PerplexityBot\n"
@@ -9433,7 +9530,7 @@ def robots_txt():
 @app.route("/sitemap.xml")
 def sitemap_xml():
     hi = today()
-    url = [("/profil", "1.0", "weekly"), ("/portofolio", "0.8", "weekly"), ("/", "0.6", "weekly"), ("/produk", "0.7", "daily")]
+    url = [("/profil", "1.0", "weekly"), ("/portofolio", "0.8", "weekly"), ("/pesan", "0.7", "monthly"), ("/", "0.6", "weekly"), ("/produk", "0.7", "daily")]
     url += [(f"/portofolio/{x['id']}", "0.7", "monthly") for x in portofolio()]
     isi = ('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
            + "".join(f"  <url><loc>{SITE_URL}{u}</loc><lastmod>{hi}</lastmod><changefreq>{f}</changefreq><priority>{p}</priority></url>\n" for u, p, f in url) + "</urlset>\n")
