@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="icon" href="/aset/favicon.ico"><link rel="apple-touch-icon" href="/aset/app-apple-180.png"><link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#0F1E3A"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="MCI"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#0B1730"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="MCI"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>
 :root{--navy:#0A2A6B;--ink:#0B1F4D;--mute:#4A5A7A;--line:#D9E4FA;--bg:#F3F7FF;--gold:#D4AF5A;--gold2:#F1D58A}
 *{box-sizing:border-box}
@@ -506,6 +506,75 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
  table.tk td:empty{display:none}
  table.tk tr.tk1 td{padding:0;min-height:0;font-weight:400;font-size:inherit}
 }
+/* =================== TAMPILAN v3 (Nov 2026): simpel, lega, tenang ===================
+   Arah: ruang kendali kapal riset. Navy dan kuningan dari logo tetap jadi identitas, tetapi kertas krem diganti
+   porselen dingin, huruf serif hanya untuk judul halaman, garis tipis menggantikan bayangan, dan label tidak lagi HURUF BESAR. */
+:root{--navy:#12254A;--navy2:#0B1730;--ink:#141B2B;--mute:#5B6475;--line:#E3E6EC;--line2:#CCD2DB;--bg:#F5F6F8;--paper:#FFFFFF;--gold:#A8843F;--gold2:#DCC48E;--r:14px;--r2:10px;
+  --sans:'Instrument Sans',Inter,system-ui,-apple-system,'Segoe UI',sans-serif}
+body{background:var(--bg);color:var(--ink);font:14.5px/1.6 var(--sans);text-rendering:optimizeLegibility}
+::selection{background:var(--gold2);color:var(--navy2)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+h1{font:600 38px/1.08 var(--serif);letter-spacing:-.005em;color:var(--navy2)}
+h2{font:600 17px/1.3 var(--sans);letter-spacing:-.005em;color:var(--navy2);margin:32px 0 12px}
+.it2 h3{font:600 16.5px/1.35 var(--sans);letter-spacing:-.005em}
+.pg>h1+p.mu,.pg>.bar+p.mu{line-height:1.65;max-width:68ch}
+.ey{font-size:12.5px;letter-spacing:.01em;text-transform:none;color:var(--gold);font-weight:600;margin-bottom:8px}
+.k{font-size:12.5px;letter-spacing:0;text-transform:none;font-weight:500;color:var(--mute)}
+.v{font:600 28px/1.15 var(--sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--navy2);margin-top:8px}
+/* kartu: satu garis tipis, tanpa bayangan */
+.cd{border-radius:var(--r);border:1px solid var(--line);padding:22px 24px;box-shadow:none;background:var(--paper)}
+.it2{border-radius:var(--r);border-color:var(--line);padding:20px 22px}
+.gr{gap:16px}
+details.cd>summary::after{font-weight:500;font-size:12.5px}
+/* tombol & isian */
+.bt{border-radius:var(--r2);padding:9px 16px;min-height:40px;font-weight:600;font-size:13.5px;letter-spacing:0;transition:background .15s,border-color .15s,color .15s}
+.g{background:var(--navy2);color:#fff}.g:hover{background:var(--navy)}
+.o{background:var(--paper);color:var(--navy2);border:1px solid var(--line2)}.o:hover{border-color:var(--navy2);background:#FAFBFC}
+.bt:disabled{opacity:.5;cursor:not-allowed}
+textarea,input[type=text],input[type=number],input[type=search],input[type=url],input[type=file],input[type=date],input[type=datetime-local],input[type=time],input[type=password],select{border-radius:var(--r2);border:1px solid var(--line2);background:var(--paper);padding:10px 12px;transition:border-color .15s,box-shadow .15s}
+textarea:focus,input:focus,select:focus{outline:0;border-color:var(--gold);box-shadow:0 0 0 3px rgba(168,132,63,.18)}
+label{font-size:13px;color:var(--mute)}
+/* label status: bentuk kapsul, warna lebih kalem */
+.ch{border-radius:99px;padding:3px 10px;font-size:12px;font-weight:600;letter-spacing:0;background:#EEF0F4;color:#2B3650}
+.ch.y{background:#F6EDD8;color:#6B4F14}.ch.n{background:#EEF0F4;color:var(--mute)}.ch.r{background:#FBE7E4;color:#9A2B1E}.ch.g{background:#E1F1E7;color:#22603F}
+/* tabel */
+th{font-size:12.5px;letter-spacing:0;text-transform:none;font-weight:600;color:var(--mute);padding:10px 12px;border-bottom:1px solid var(--line2);background:transparent}
+td{border-top:1px solid var(--line)}
+/* menu samping: lebih gelap dan tenang, satu garis kuningan sebagai penanda */
+#sd{background:var(--navy2);border-right:0;scrollbar-color:rgba(220,196,142,.3) transparent}
+.brand{border-bottom-color:rgba(255,255,255,.08)}
+.nv{border-radius:8px;border-left:2px solid transparent;padding:9px 12px;color:#AEB8CB;font-weight:500}
+.nv:hover{background:rgba(255,255,255,.05);color:#fff}
+.nv.on{background:rgba(255,255,255,.08);color:#fff;font-weight:600;border-left-color:var(--gold2);border-radius:0 8px 8px 0}
+.exb{text-transform:none;letter-spacing:0;font-size:13px;border-radius:var(--r2)}
+.kb>div>b,.rgh,.cal div.hd{text-transform:none;letter-spacing:.01em;font-size:12.5px}
+button.ng{font-size:12px;letter-spacing:.02em;text-transform:none;font-weight:500;color:#7E8AA3}
+.ng{letter-spacing:.02em;text-transform:none;font-size:12px}
+#cariBuka{border-radius:var(--r2);background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:#AEB8CB}
+.cv{border-radius:var(--r2);border-color:rgba(255,255,255,.08)}
+.who{border-radius:var(--r2);border-color:rgba(255,255,255,.12)}
+.lo{border-radius:8px}
+/* kartu gelap: warna rata, tanpa gradasi */
+.pagiK{background:var(--navy2);border-radius:var(--r);padding:22px 24px 18px}
+.pagiK h2{font:600 20px/1.2 var(--serif);color:var(--gold2);margin:0 0 6px}
+.boss,.hero{border-radius:var(--r);border-color:#1E2E52;background:var(--navy2)}
+.boss small{letter-spacing:.04em;text-transform:none}
+.seg{border-radius:var(--r2)}.seg button{border-radius:7px}
+.demo,.tst{border-radius:var(--r2)}
+.adm form{border-radius:var(--r)}
+#fabCatat{box-shadow:0 6px 18px rgba(11,23,48,.28)}
+@media (min-width:901px){
+ main{padding:44px 56px 72px;max-width:1180px}
+ tbody tr:hover td{background:#FAFBFC}
+}
+@media (max-width:900px){
+ h1{font-size:30px}
+ .cd{padding:18px 16px}
+ #hpNav{background:var(--navy2);border-top:1px solid rgba(255,255,255,.08)}
+ #hpNav button{font-size:12.5px;font-weight:500;color:#AEB8CB;border-radius:0}
+ #hpNav button.on{background:transparent;color:#fff;font-weight:600;box-shadow:inset 0 2px 0 var(--gold2)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media print{#hpNav{display:none!important}}
 </style>
 </head>

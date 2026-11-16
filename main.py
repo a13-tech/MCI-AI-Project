@@ -3125,7 +3125,7 @@ MANIFEST = {
                   {"name": "Tugas", "url": "/#tugas", "icons": [{"src": "/aset/app-192.png", "sizes": "192x192"}]},
                   {"name": "Bayar Kas", "url": "/#bayarkas", "icons": [{"src": "/aset/app-192.png", "sizes": "192x192"}]}],
 }
-PWA_VER = "mci-v3"
+PWA_VER = "mci-v4"
 SW_JS = """// Service worker MCI v2 (mode offline).
 // - Tampilan aplikasi disimpan supaya web tetap terbuka tanpa sinyal.
 // - Hanya data ringan milik pemakai (beranda, tugas, agenda, pengumuman, catatan, absen, inbox) yang disimpan, dan HANYA dipakai saat offline.
@@ -9468,7 +9468,7 @@ def seo_head(judul, desk, path, faq=False):
             + (f'<meta name="google-site-verification" content="{e(GSC_META)}">' if GSC_META else "") + seo_jsonld(faq))
 
 
-CSS_PUBLIK = """:root{--n:#0F1E3A;--g:#D4AF5A;--t:#1D2939;--m:#5B6578;--bg:#F6F3EC}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:16px/1.65 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+CSS_PUBLIK = """:root{--n:#0B1730;--g:#DCC48E;--t:#141B2B;--m:#5B6475;--bg:#F5F6F8}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:16px/1.65 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 header{background:var(--n);color:#F2EBDD;padding:40px 20px;display:flex;gap:18px;align-items:center;justify-content:center;text-align:left}header img{border-radius:50%;flex:none}
 h1{font:700 clamp(26px,5vw,40px)/1.15 Georgia,serif;margin:2px 0;color:#fff}.ey{margin:0;color:var(--g);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12.5px}.sub{margin:4px 0 0;color:#C9D7F5}
 main{max-width:820px;margin:0 auto;padding:12px 20px 40px}section{margin:28px 0}h2{font:700 22px/1.3 Georgia,serif;color:var(--n);margin:0 0 10px}.lead{font-size:18px}
