@@ -266,6 +266,7 @@ SKILL_SEED = [
 DB_IDLE, DB_KOLAM_MAKS = 45, 6
 _KOLAM, _KOLAM_LOCK = [], threading.Lock()
 DB_AKTIF = [0.0]   # waktu terakhir database dipakai oleh permintaan web (database sedang "bangun")
+DB_BANGUN = {"sampai": 0.0, "detik": 0.0}   # detik database menyala yang belum dicatat ke pengaturan
 
 
 def _kolam_ambil():
@@ -314,8 +315,12 @@ def db():
         finally:
             c.close()
         return
+    t = time.time()
     if has_request_context():
-        DB_AKTIF[0] = time.time()
+        DB_AKTIF[0] = t
+    # meteran "database bangun": Neon tetap menyala 5 menit setelah query terakhir, dan itulah yang memakan jatah jam komputasi
+    DB_BANGUN["detik"] += 300 if t > DB_BANGUN["sampai"] else max(0.0, t + 300 - DB_BANGUN["sampai"])
+    DB_BANGUN["sampai"] = t + 300
     c, sehat = _kolam_ambil(), True
     try:
         yield c
@@ -1004,14 +1009,28 @@ async def ask(key, text, history=None, parts=None, schema=None, model=None, act=
 
     _begin(show or key, act, room)  # show = bot yang tampil bekerja di kantor 3D
     try:
-        async with (mcp_tools() if use_mcp and not schema and not fungsi else contextlib.nullcontext(fungsi or None)) as tools:
-            try:
-                r = await call_safe(tools)
-            except Exception:
-                if not tools or fungsi:   # dengan alat data: jangan jawab tanpa data (nanti mengarang)
-                    raise
-                log.exception("Panggilan dengan MCP gagal, ulangi tanpa MCP")
-                r = await call_safe(None)
+        try:
+            async with (mcp_tools() if use_mcp and not schema and not fungsi else contextlib.nullcontext(fungsi or None)) as tools:
+                try:
+                    r = await call_safe(tools)
+                except Exception:
+                    if not tools or fungsi:   # dengan alat data: jangan jawab tanpa data (nanti mengarang)
+                        raise
+                    log.exception("Panggilan dengan MCP gagal, ulangi tanpa MCP")
+                    r = await call_safe(None)
+        except Exception as e:
+            # Gemini penuh/sibuk -> Groq menjawab supaya bot tidak diam (genset cadangan saat listrik utama padam)
+            if terkirim[0] or not cadangan_bisa(e, schema, fungsi, parts):
+                raise
+            log.warning("Gemini penuh (%s), jawaban diambil dari Groq", str(e)[:100])
+            out = await asyncio.to_thread(cadangan_groq, sysp, contents, schema)
+            if not out:
+                raise
+            if not schema:
+                out = latex_bersih(out)
+            if alir:
+                alir(out)
+            return out
         u = r.usage_metadata
         masuk = getattr(u, "prompt_token_count", 0) or 0
         keluar = getattr(u, "candidates_token_count", 0) or 0
@@ -2409,10 +2428,16 @@ async def laporan_jadwal():
         # Hemat jam komputasi Neon: database gratis "tidur" setelah 5 menit tanpa query, tetapi dulu pemeriksaan ini jalan tiap 5 menit
         # sehingga database TIDAK PERNAH tidur (jatah 100 jam/bulan habis di pertengahan bulan). Sekarang: kalau database sedang bangun
         # karena ada yang membuka web, periksa tiap 5 menit (gratis, toh sudah bangun); kalau sepi, cukup tiap DB_CEK_SEPI detik.
-        if PG and time.time() - DB_AKTIF[0] > 240 and time.time() - terakhir < DB_CEK_SEPI:
+        wib = datetime.now(WIB)
+        jam_penting = wib.minute < 2 and wib.hour in {0, 7, 8, 22, 23, LAP_JAM, PAGI_JAM} and time.time() - terakhir > 300   # jadwal tetap tepat waktu
+        if PG and time.time() - DB_AKTIF[0] > 240 and time.time() - terakhir < DB_CEK_SEPI and not jam_penting:
             await asyncio.sleep(60)
             continue
         terakhir = time.time()
+        try:
+            await asyncio.to_thread(sehat_catat)
+        except Exception:
+            log.exception("Catat kesehatan sistem gagal")
         try:
             now = datetime.now(WIB)
             if _lap_jatuh_tempo(now):
@@ -2457,6 +2482,140 @@ async def laporan_jadwal():
         except Exception:
             log.exception("Cek pinjaman mitra proyek gagal")
         await asyncio.sleep(240)
+
+
+# ---------- KESEHATAN SISTEM (khusus Dev): jatah Neon, RAM server, anggaran AI ----------
+NEON_BATAS_CU_JAM = float(os.getenv("NEON_BATAS_CU_JAM", "100"))   # jatah gratis Neon: 100 CU-jam per proyek per bulan
+NEON_CU = float(os.getenv("NEON_CU", "0.25"))                      # ukuran komputasi (0,25 CU): 1 jam menyala = 0,25 CU-jam
+NEON_API_KEY = os.getenv("NEON_API_KEY", "").strip()               # opsional: angka persis dari Neon
+NEON_PROJECT_ID = os.getenv("NEON_PROJECT_ID", "").strip()
+_NEON_API = {"t": 0.0}
+
+
+def _neon_set():
+    bln = today()[:7]
+    n = SET.setdefault("neon", {"bulan": "2026-11", "cu_detik": 313300, "hari": {"2026-11-15": 309600}, "sumber": "kalibrasi"})   # titik awal: angka Neon 16 Nov 2026
+    if n.get("bulan") != bln:
+        n.update(bulan=bln, cu_detik=0, hari={}, sumber="perkiraan")
+    n.setdefault("hari", {})
+    return n
+
+
+def _neon_api():
+    """Angka persis dari Neon (kalau NEON_API_KEY & NEON_PROJECT_ID diisi), paling sering tiap 30 menit."""
+    if not (NEON_API_KEY and NEON_PROJECT_ID) or time.time() - _NEON_API["t"] < 1800:
+        return
+    _NEON_API["t"] = time.time()
+    import urllib.request
+    try:
+        req = urllib.request.Request(f"https://console.neon.tech/api/v2/projects/{NEON_PROJECT_ID}", headers={"Authorization": f"Bearer {NEON_API_KEY}", "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=15) as f:
+            d = json.loads(f.read().decode()).get("project") or {}
+        if (d.get("consumption_period_start") or "")[:7] == today()[:7]:
+            n = _neon_set()
+            n.update(cu_detik=float(d.get("compute_time_seconds") or 0), sumber="neon")
+    except Exception as e:
+        log.warning("Neon API gagal: %s", str(e)[:120])
+
+
+def sehat_catat():
+    """Pindahkan meteran 'database bangun' ke pengaturan + kirim peringatan. Dipanggil dari pemeriksaan latar (database sedang bangun)."""
+    n = _neon_set()
+    tambah, DB_BANGUN["detik"] = DB_BANGUN["detik"], 0.0
+    n["cu_detik"] = float(n.get("cu_detik") or 0) + tambah * NEON_CU
+    _neon_api()
+    n["hari"][today()] = round(n["cu_detik"])
+    for k in sorted(n["hari"])[:-10]:
+        n["hari"].pop(k, None)
+    d = sehat_data(ringkas=True)
+    ingat, bln, kabar = SET.setdefault("sehat_ingat", []), today()[:7], []
+    for kunci, syarat, judul, isi in (
+        (f"{bln}:neon80", d["neon"]["persen"] >= 80, "🩺 Jatah database (Neon) sudah 80%",
+         f"Terpakai {d['neon']['cu_jam']} dari {d['neon']['batas']} CU-jam bulan ini. " + (f"Perkiraan habis {d['neon']['habis']}." if d["neon"]["habis"] else "Perkiraan cukup sampai akhir bulan.")),
+        (f"{bln}:neon95", d["neon"]["persen"] >= 95, "🚨 Jatah database (Neon) hampir HABIS (95%)",
+         "Kalau habis, web tidak bisa membaca data sampai tanggal 1. Pilihan: naik paket Neon berbayar, atau kurangi pemakaian web sampai akhir bulan."),
+        (f"{today()}:ram", d["ram"]["persen"] >= 88, "🩺 RAM server hampir penuh",
+         f"RAM {d['ram']['mb']} MB dari {d['ram']['batas']} MB. Kalau penuh, Render me-restart server (web mati ±1 menit)."),
+    ):
+        if syarat and kunci not in ingat:
+            ingat.append(kunci)
+            kabar.append((judul, isi))
+    del ingat[:-30]
+    if tambah > 30 or kabar:
+        set_save()
+    for judul, isi in kabar:
+        inbox_kirim(_dev_ids(), "info", judul, isi + " Lihat: Tim & Token → Kesehatan Sistem.")
+
+
+def _ram_server():
+    def baca(p):
+        try:
+            with open(p) as f:
+                t = f.read().strip()
+            return int(t) if t.isdigit() else 0
+        except OSError:
+            return 0
+    pakai = baca("/sys/fs/cgroup/memory.current") or baca("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+    batas = baca("/sys/fs/cgroup/memory.max") or baca("/sys/fs/cgroup/memory/memory.limit_in_bytes")
+    if not pakai:
+        try:
+            with open("/proc/self/status") as f:
+                pakai = next((int(x.split()[1]) * 1024 for x in f if x.startswith("VmRSS:")), 0)
+        except OSError:
+            pakai = 0
+    if not batas or batas > 64 << 30:
+        batas = int(os.getenv("RAM_BATAS_MB", "512")) << 20
+    return pakai >> 20, batas >> 20
+
+
+def sehat_data(ringkas=False):
+    n = _neon_set()
+    cu = float(n.get("cu_detik") or 0) + DB_BANGUN["detik"] * NEON_CU
+    now = datetime.now(WIB)
+    import calendar
+    hari_bulan = calendar.monthrange(now.year, now.month)[1]
+    lewat = now.day - 1 + (now.hour * 60 + now.minute) / 1440
+    # laju: dari catatan 3 hari terakhir kalau ada, kalau tidak rata-rata sebulan
+    hr = sorted(n["hari"].items())
+    laju = cu / lewat if lewat > 0.5 else 0.0
+    if len(hr) >= 2:
+        k0, v0 = hr[max(0, len(hr) - 4)]
+        try:
+            selang = (now.replace(tzinfo=None) - datetime.strptime(k0, "%Y-%m-%d").replace(hour=23, minute=59)).total_seconds() / 86400
+            if selang >= 0.75 and cu > v0:
+                laju = (cu - v0) / selang
+        except ValueError:
+            pass
+    batas_dt = NEON_BATAS_CU_JAM * 3600
+    sisa_hari = (batas_dt - cu) / laju if laju > 0 else 999
+    habis = ""
+    if cu >= batas_dt:
+        habis = "sudah habis"
+    elif lewat + sisa_hari < hari_bulan:
+        h = now + timedelta(days=sisa_hari)
+        habis = f"sekitar {h.day} {BULAN_ID[h.month - 1] if 'BULAN_ID' in globals() else h.strftime('%b')}"
+    ram, ram_batas = _ram_server()
+    out = {"neon": {"cu_jam": round(cu / 3600, 1), "batas": round(NEON_BATAS_CU_JAM), "persen": min(100, round(cu / batas_dt * 100)), "habis": habis,
+                    "per_hari": round(laju / 3600, 2), "aman_per_hari": round(max(0.0, batas_dt - cu) / 3600 / max(0.5, hari_bulan - lewat), 2),
+                    "sumber": n.get("sumber") or "perkiraan", "bulan": n["bulan"], "postgres": PG},
+           "ram": {"mb": ram, "batas": ram_batas, "persen": min(100, round(ram / ram_batas * 100)) if ram_batas else 0, "puncak_3d": M3D_RAM_PUNCAK[0], "batas_3d": M3D_RAM_MB}}
+    if ringkas:
+        return out
+    batas_ai = int(SET.get("argon_anggaran") or 0)
+    biaya = argon_biaya_bulan()
+    out["ai"] = {"terpakai": round(biaya), "anggaran": batas_ai, "persen": min(100, round(biaya / batas_ai * 100)) if batas_ai else 0, "habis": argon_habis(), "mesin": mesin_kode(),
+                 "token_hari": usage_today_total(), "batas_token": DAILY_LIMIT or 0}
+    out["cadangan"] = {"groq": bool(mesin_kunci("groq")), **CADANGAN_STAT}
+    out["server"] = {"nyala_jam": round((time.time() - START) / 3600, 1), "antre_3d": _M3D_ANTRE.locked()}
+    try:
+        with db() as c:
+            if PG:
+                out["db"] = {"mb": round(int(sql(c, "SELECT pg_database_size(current_database())").fetchone()[0]) / 1048576, 1), "batas": int(os.getenv("DB_BATAS_MB", "512"))}
+            else:
+                out["db"] = {"mb": round(os.path.getsize(DB_PATH) / 1048576, 1), "batas": 0}
+    except Exception:
+        out["db"] = {"mb": 0, "batas": 0}
+    return out
 
 
 # ---------- WEB ----------
@@ -2954,6 +3113,28 @@ def index():
 @app.route("/healthz")
 def healthz():
     return "ok"
+
+
+@app.route("/api/sehat", methods=["GET", "POST"])
+def api_sehat():
+    r = role()
+    if not r:
+        abort(401)
+    if not is_admin(r):
+        abort(403)
+    if request.method == "POST":   # kalibrasi: Dev menyalin angka "Compute" dari console.neon.tech (CU-jam)
+        try:
+            v = float(str((request.get_json(silent=True) or {}).get("cu_jam") or "").replace(",", "."))
+        except ValueError:
+            return jsonify({"error": "Isi angka CU-jam, contoh 87,5"}), 400
+        if not 0 <= v <= 5000:
+            return jsonify({"error": "Angka tidak masuk akal"}), 400
+        n = _neon_set()
+        DB_BANGUN["detik"] = 0.0
+        n.update(cu_detik=v * 3600, sumber="kalibrasi")
+        n["hari"] = {today(): round(v * 3600)}
+        set_save()
+    return jsonify(sehat_data())
 
 
 @app.route("/api/me")
@@ -5555,7 +5736,7 @@ for _k in ("manager", "pj", "designer", "dokumentasi"):
 # Mesin AI tambahan: semuanya memakai format API "kompatibel OpenAI", jadi satu fungsi (_kompatibel) melayani semua.
 # Menyalakan: isi kuncinya di environment Render (mis. GROQ_API_KEY). Model bisa diganti lewat <NAMA>_MODEL tanpa mengubah kode.
 MESIN_LAIN = {
-    "groq": {"nama": "Groq", "url": "https://api.groq.com/openai/v1/chat/completions", "kunci": "GROQ_API_KEY", "model": os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")},
+    "groq": {"nama": "Groq", "url": "https://api.groq.com/openai/v1/chat/completions", "kunci": "GROQ_API_KEY", "model": os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")},
     "cerebras": {"nama": "Cerebras", "url": "https://api.cerebras.ai/v1/chat/completions", "kunci": "CEREBRAS_API_KEY", "model": os.getenv("CEREBRAS_MODEL", "llama-3.3-70b")},
     "openrouter": {"nama": "OpenRouter", "url": "https://openrouter.ai/api/v1/chat/completions", "kunci": "OPENROUTER_API_KEY",
                    "model": os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free")},
@@ -5674,9 +5855,10 @@ def mesin_kode():
     return "claude" if ANTHROPIC_KEY and not argon_habis() else "gemini"   # Claude juga berhenti saat anggaran AI berbayar habis
 
 
-def _kompatibel(k, sistem, prompt, maks=8000, json_mode=False):
+def _kompatibel(k, sistem, prompt, maks=8000, json_mode=False, pesan=None):
+    """pesan: daftar [{"role","content"}] (riwayat obrolan) menggantikan prompt tunggal."""
     m = MESIN_LAIN[k]
-    body = {"model": m["model"], "max_tokens": maks, "temperature": 0.2, "messages": [{"role": "system", "content": sistem}, {"role": "user", "content": prompt}]}
+    body = {"model": m["model"], "max_tokens": maks, "temperature": 0.2, "messages": [{"role": "system", "content": sistem}] + (pesan or [{"role": "user", "content": prompt}])}
     if json_mode:
         body["response_format"] = {"type": "json_object"}
     import urllib.request, urllib.error
@@ -5695,6 +5877,58 @@ def _kompatibel(k, sistem, prompt, maks=8000, json_mode=False):
     except Exception:
         pass
     return teks
+
+
+# ---------- GROQ: cadangan otomatis saat Gemini kena batas + Whisper (suara -> teks) ----------
+GROQ_WHISPER = os.getenv("GROQ_WHISPER_MODEL", "whisper-large-v3-turbo")
+CADANGAN_STAT = {"dipakai": 0, "terakhir": "", "gagal": 0}   # tampil di Kesehatan Sistem
+_GEMINI_PENUH = ("429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE", "overloaded", "quota")
+
+
+def cadangan_bisa(e, schema, fungsi, parts):
+    """Boleh pindah ke Groq? Hanya saat Gemini penuh/sibuk, tanpa alat data (takut mengarang) dan tanpa gambar/suara."""
+    return bool(mesin_kunci("groq")) and not fungsi and not parts and any(t in str(e) for t in _GEMINI_PENUH)
+
+
+def cadangan_groq(sysp, contents, schema):
+    pesan = []
+    for c in contents:
+        teks = "".join(getattr(p, "text", None) or "" for p in (getattr(c, "parts", None) or []))
+        if teks:
+            pesan.append({"role": "assistant" if getattr(c, "role", "user") == "model" else "user", "content": teks})
+    if schema is not None:
+        try:
+            sysp += "\n\nFORMAT JAWABAN: keluarkan HANYA satu objek JSON valid yang sesuai JSON Schema ini:\n" + json.dumps(schema.model_json_schema(), ensure_ascii=False)
+        except Exception:
+            sysp += "\n\nFORMAT JAWABAN: keluarkan HANYA satu objek JSON valid."
+    try:
+        out = _kompatibel("groq", sysp[:24000], "", 4000, schema is not None, pesan[-12:])
+    except Exception:
+        CADANGAN_STAT["gagal"] += 1
+        raise
+    CADANGAN_STAT["dipakai"] += 1
+    CADANGAN_STAT["terakhir"] = _now()
+    return out
+
+
+def groq_whisper(data, mime):
+    """Suara -> teks lewat Whisper di Groq (multipart/form-data, tanpa pustaka tambahan)."""
+    import urllib.request, urllib.error, uuid
+    ext = {"audio/webm": "webm", "audio/ogg": "ogg", "audio/mp4": "m4a", "audio/mpeg": "mp3", "audio/wav": "wav", "audio/x-wav": "wav", "audio/aac": "m4a", "audio/x-m4a": "m4a", "audio/flac": "flac"}.get(mime, "ogg")
+    b = uuid.uuid4().hex
+    isi = b""
+    for k, v in (("model", GROQ_WHISPER), ("language", "id"), ("response_format", "json"), ("temperature", "0")):
+        isi += f'--{b}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode()
+    isi += f'--{b}\r\nContent-Disposition: form-data; name="file"; filename="rekaman.{ext}"\r\nContent-Type: {mime}\r\n\r\n'.encode() + data + f"\r\n--{b}--\r\n".encode()
+    req = urllib.request.Request("https://api.groq.com/openai/v1/audio/transcriptions", method="POST", data=isi,
+                                 headers={"Authorization": f"Bearer {mesin_kunci('groq')}", "Content-Type": f"multipart/form-data; boundary={b}", "User-Agent": "MCI-HQ/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=90) as f:
+            d = json.loads(f.read().decode())
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"Whisper menolak ({e.code}): {e.read().decode(errors='replace')[:200]}") from None
+    usage_add(f"groq:{GROQ_WHISPER}", 0, 0, 0)
+    return str(d.get("text") or "").strip()
 
 
 def _claude(sistem, prompt, maks=16000, parts=None, schema=None):
@@ -5853,7 +6087,7 @@ def _resep_dari(teks):
     return d
 
 
-DB_CEK_SEPI = int(os.getenv("DB_CEK_SEPI", "3600"))   # detik antar pemeriksaan latar saat web sepi
+DB_CEK_SEPI = int(os.getenv("DB_CEK_SEPI", "14400"))   # detik antar pemeriksaan latar saat web sepi
 
 
 M3D_TINJAU = os.getenv("STUDIO3D_TINJAU", "1").strip().lower() not in ("0", "false", "tidak")
@@ -6723,6 +6957,11 @@ def api_studio():
 M3D_BATAS_DETIK = int(os.getenv("STUDIO3D_BATAS_DETIK", "600"))
 
 
+M3D_RAM_MB = int(os.getenv("STUDIO3D_RAM_MB", "260"))   # batas memori satu hitungan model 3D
+_M3D_ANTRE = threading.Lock()
+M3D_RAM_PUNCAK = [0]   # MB tertinggi yang pernah dipakai pekerja 3D sejak server menyala (tampil di Kesehatan Sistem)
+
+
 def m3d_bangun(resep, png=False):
     """Hitung model 3D di PROSES TERPISAH berprioritas rendah (nice 19).
     Dulu dihitung di dalam server: model rumit (kapal tanker 40 bagian) memakan CPU 100% belasan menit -> web lag & dianggap down."""
@@ -6733,14 +6972,39 @@ def m3d_bangun(resep, png=False):
     cmd = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "studio3d.py")]
     if shutil.which("nice"):
         cmd = ["nice", "-n", "19"] + cmd
-    try:
-        p = subprocess.run(cmd, input=json.dumps({"resep": resep, "png": png}).encode("utf-8"), capture_output=True, timeout=M3D_BATAS_DETIK)
-    except subprocess.TimeoutExpired:
-        raise ValueError(f"Model terlalu rumit: hitungannya lebih dari {M3D_BATAS_DETIK // 60} menit. Kurangi jumlah bagian atau detail kecil (pipa, baut, lubang).")
-    if p.returncode != 0 or not p.stdout:
-        log.error("pekerja studio3d gagal (kode %s): %s", p.returncode, p.stderr.decode("utf-8", "replace")[-600:])
+    # Antre satu per satu: dua model rumit bersamaan = RAM dobel -> server 512 MB bisa di-restart Render.
+    with _M3D_ANTRE:
+        p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        boros = [0]
+
+        def jaga():   # satpam RAM: pekerja yang melewati batas dimatikan, server web tetap hidup
+            while p.poll() is None:
+                try:
+                    with open(f"/proc/{p.pid}/status") as f:
+                        kb = next((int(x.split()[1]) for x in f if x.startswith("VmRSS:")), 0)
+                except (OSError, ValueError):
+                    kb = 0
+                M3D_RAM_PUNCAK[0] = max(M3D_RAM_PUNCAK[0], kb // 1024)
+                if kb > M3D_RAM_MB * 1024:
+                    boros[0] = kb // 1024
+                    p.kill()
+                    return
+                time.sleep(0.25)
+
+        threading.Thread(target=jaga, daemon=True).start()
+        try:
+            out, err = p.communicate(json.dumps({"resep": resep, "png": png}).encode("utf-8"), timeout=M3D_BATAS_DETIK)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            p.communicate()
+            raise ValueError(f"Model terlalu rumit: hitungannya lebih dari {M3D_BATAS_DETIK // 60} menit. Kurangi jumlah bagian atau detail kecil (pipa, baut, lubang).")
+    if boros[0]:
+        log.warning("pekerja studio3d dimatikan: RAM %s MB > batas %s MB", boros[0], M3D_RAM_MB)
+        raise ValueError(f"Model terlalu berat untuk server (butuh lebih dari {M3D_RAM_MB} MB memori). Kurangi jumlah bagian, lubang, atau bentuk lengkung, lalu coba lagi.")
+    if p.returncode != 0 or not out:
+        log.error("pekerja studio3d gagal (kode %s): %s", p.returncode, err.decode("utf-8", "replace")[-600:])
         raise ValueError("Mesin 3D gagal menghitung model ini (kemungkinan kehabisan memori). Coba sederhanakan modelnya.")
-    ok, a, b, gbr = pickle.loads(p.stdout)
+    ok, a, b, gbr = pickle.loads(out)
     if not ok:
         raise ValueError(a)
     return (a, b, gbr) if png else (a, b)
@@ -10613,6 +10877,13 @@ def api_catatan_rapikan():
 
 
 async def transkrip_async(data, mime):
+    if mesin_kunci("groq"):   # Whisper: lebih cepat & hemat jatah Gemini; gagal -> Gemini seperti biasa
+        try:
+            teks = await asyncio.to_thread(groq_whisper, data, mime)
+            if teks:
+                return teks[:5000]
+        except Exception as e:
+            log.warning("Whisper gagal (%s), pakai Gemini", str(e)[:120])
     raw = await ai_murah("Tuliskan kata per kata apa yang diucapkan di rekaman ini dalam bahasa Indonesia (tulisan biasa, beri tanda baca). "
                          "Jangan menambah atau merangkum. Kalau tidak ada ucapan, balas kosong.",
                          parts=[types.Part.from_bytes(data=data, mime_type=mime)], act="Menulis catatan suara")
