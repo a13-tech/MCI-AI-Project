@@ -589,7 +589,7 @@ button.ng{font-size:12px;letter-spacing:.02em;text-transform:none;font-weight:50
  #sd .brand img{width:34px;height:34px}
  #sd .brand b{font:600 21px/1 var(--serif);letter-spacing:.1em;color:var(--judul)}
  #sd .brand small,#sd .nv:not(.ut),#sd button.ng,#sd .ng,#sd #nvMenu,#sd #nvCari,#sd #hpJudul,#sd #cariBuka .ct,#sd .nv.inst{display:none!important}
- #sd .nv.ut{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:8px;border:0;color:var(--mute);font-size:13.5px;font-weight:500;white-space:nowrap}
+ #sd .nv.ut{display:inline-flex;align-items:center;gap:6px;margin:0;padding:7px 11px;border-radius:8px;border:0;color:var(--mute);font-size:13.5px;font-weight:500;white-space:nowrap}
  #sd .nv.ut[style*="display: none"],#sd .nv.ut[style*="display:none"],#sd .nv.ut[hidden]{display:none!important}
  #sd .nv.ut:hover{background:var(--hov);color:var(--ink)}
  #sd .nv.ut.on{background:var(--hov);color:var(--judul);font-weight:600;border-radius:8px}
@@ -7258,6 +7258,9 @@ addEventListener("hashchange", bukaHash);
     let acuan = $("#nvCari");
     $$("#sd .nv[data-p]").filter(b => b.style.display !== "none" && !b.hidden).sort((a, b) => ix(a) - ix(b))
       .forEach(b => { b.classList.add("ut"); acuan.after(b); acuan = b; });
+    const pj = document.createElement("a");   // form Pesan Jasa publik (/pesan) untuk tamu
+    pj.className = "nv ut"; pj.href = "/pesan"; pj.textContent = "Pesan Jasa";
+    ($('#sd .nv[data-p="produk"]') || acuan).after(pj); if (acuan.dataset.p === "produk") acuan = pj;
     acuan.after($("#pasangApp"));   // tombol Pasang aplikasi ikut di daftar datar, bukan di bawah judul "Lainnya"
     $("#sd").classList.add("vw");
   }
