@@ -728,6 +728,11 @@ def usage_add(model, masuk, keluar, pikir):
             threading.Thread(target=argon_cek_peringatan, daemon=True).start()
         except Exception:
             pass
+    elif d["panggilan"] % 10 == 0:   # cek sisa jatah tiap 10 panggilan, bukan tiap panggilan
+        try:
+            threading.Thread(target=kuota_cek, args=(model,), daemon=True).start()
+        except Exception:
+            pass
 
 
 def gaya_model(model):
@@ -934,6 +939,9 @@ async def ask(key, text, history=None, parts=None, schema=None, model=None, act=
             model, kunci = HYDROGEN_MODEL, kunci_hydrogen()
         elif mt == "argon" and kunci_argon() and ARGON_AKTIF:
             model, kunci = ARGON_MODEL, kunci_argon()
+        elif not fungsi and not schema and not parts and rute_ringan(text):   # router pintar: pesan pendek & sederhana cukup Flash Lite
+            model = MODEL_LITE
+            STATS["router_hemat"] += 1
     cl = client_kunci(kunci) if kunci else client(key)   # kunci: API key khusus (mis. tier 1 untuk Argon, gratis untuk Hydrogen)
     if not cl:
         raise RuntimeError(f"Key Gemini untuk {AGENTS[key]['nama']} belum diisi (GEMINI_{key.upper()} atau GEMINI_API_KEY).")
@@ -1011,6 +1019,7 @@ async def ask(key, text, history=None, parts=None, schema=None, model=None, act=
                 log.warning("Model %s menolak pengaturan thinking, dimatikan untuk model ini", model)
                 return await call(tools, think=False)
             if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
+                kuota_penuh_tandai(model)
                 log.warning("Kena batas Gemini (429), tunggu 12 detik lalu ulangi sekali")
                 await asyncio.sleep(12)
                 return await call(tools)
@@ -2533,8 +2542,11 @@ async def laporan_jadwal():
         # sehingga database TIDAK PERNAH tidur (jatah 100 jam/bulan habis di pertengahan bulan). Sekarang: kalau database sedang bangun
         # karena ada yang membuka web, periksa tiap 5 menit (gratis, toh sudah bangun); kalau sepi, cukup tiap DB_CEK_SEPI detik.
         wib = datetime.now(WIB)
-        jam_penting = wib.minute < 2 and wib.hour in {0, 7, 8, 22, 23, LAP_JAM, PAGI_JAM} and time.time() - terakhir > 300   # jadwal tetap tepat waktu
-        if PG and time.time() - DB_AKTIF[0] > 240 and time.time() - terakhir < DB_CEK_SEPI and not jam_penting:
+        malam = fitur_on("kerja_malam")   # Panel Dev: laporan menumpang jadwal bangun yang sudah ada, dini hari tidak membangunkan database
+        jam_set = {0, 7, 8, 22, 23} if malam else {0, 7, 8, 22, 23, LAP_JAM, PAGI_JAM}
+        jam_penting = wib.minute < 2 and wib.hour in jam_set and time.time() - terakhir > 300   # jadwal tetap tepat waktu
+        sepi_malam = malam and 1 <= wib.hour < 7
+        if PG and time.time() - DB_AKTIF[0] > 240 and (time.time() - terakhir < DB_CEK_SEPI or sepi_malam) and not jam_penting:
             await asyncio.sleep(60)
             continue
         terakhir = time.time()
@@ -5923,6 +5935,8 @@ MESIN_LAIN = {
     # NVIDIA NIM (build.nvidia.com): gratis untuk anggota NVIDIA Developer Program, kunci diawali nvapi-
     "nvidia": {"nama": "NVIDIA NIM", "url": "https://integrate.api.nvidia.com/v1/chat/completions", "kunci": "NVIDIA_API_KEY",
                "model": os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3-ultra-550b-a55b")},
+    # Cloudflare Workers AI (jatah gratis harian); alamatnya memakai CF_ACCOUNT_ID, diisi saat dipanggil
+    "cloudflare": {"nama": "Cloudflare Workers AI", "url": "", "kunci": "CF_API_TOKEN", "model": os.getenv("CF_TEKS_MODEL", "@cf/meta/llama-3.3-70b-instruct-fp8-fast")},
 }
 # Gemini 4 Argon: model terkuat Google (rilis umum 13 Okt 2026), BERBAYAR saja (tidak ada di paket gratis).
 # Aktif hanya kalau ARGON_AKTIF=1 (tanda billing Gemini sudah dinyalakan). Gagal/ditolak -> otomatis jatuh ke mesin biasa.
@@ -6041,11 +6055,18 @@ def _kompatibel(k, sistem, prompt, maks=8000, json_mode=False, pesan=None):
     if json_mode:
         body["response_format"] = {"type": "json_object"}
     import urllib.request, urllib.error
-    req = urllib.request.Request(m["url"], method="POST", data=json.dumps(body).encode(),
+    url = m["url"] or f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT}/ai/v1/chat/completions"
+    req = urllib.request.Request(url, method="POST", data=json.dumps(body).encode(),
                                  headers={"Authorization": f"Bearer {mesin_kunci(k)}", "Content-Type": "application/json", "User-Agent": "MCI-HQ/1.0"})   # User-Agent bawaan urllib ditolak sebagian penyedia
     try:
         with urllib.request.urlopen(req, timeout=240) as f:   # model "reasoning" besar bisa berpikir lama
             d = json.loads(f.read().decode())
+            try:   # sisa jatah asli dari header (Groq dkk.) untuk meteran kuota di Panel Dev
+                sisa, batas = f.headers.get("x-ratelimit-remaining-requests"), f.headers.get("x-ratelimit-limit-requests")
+                if sisa and batas and str(sisa).isdigit() and str(batas).isdigit():
+                    KUOTA_HDR[k] = {"sisa": int(sisa), "batas": int(batas), "t": time.time()}
+            except Exception:
+                pass
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"{m['nama']} menolak ({e.code}): {e.read().decode(errors='replace')[:300]}") from None
     teks = str(d["choices"][0]["message"]["content"] or "")
@@ -6066,7 +6087,7 @@ _GEMINI_PENUH = ("429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE", "overloaded"
 
 def cadangan_bisa(e, schema, fungsi, parts):
     """Boleh pindah ke Groq? Hanya saat Gemini penuh/sibuk, tanpa alat data (takut mengarang) dan tanpa gambar/suara."""
-    return bool(mesin_kunci("groq")) and not fungsi and not parts and any(t in str(e) for t in _GEMINI_PENUH)
+    return bool(cadangan_daftar()) and not fungsi and not parts and any(t in str(e) for t in _GEMINI_PENUH)
 
 
 def cadangan_groq(sysp, contents, schema):
@@ -6080,13 +6101,8 @@ def cadangan_groq(sysp, contents, schema):
             sysp += "\n\nFORMAT JAWABAN: keluarkan HANYA satu objek JSON valid yang sesuai JSON Schema ini:\n" + json.dumps(schema.model_json_schema(), ensure_ascii=False)
         except Exception:
             sysp += "\n\nFORMAT JAWABAN: keluarkan HANYA satu objek JSON valid."
-    try:
-        out = _kompatibel("groq", sysp[:24000], "", 4000, schema is not None, pesan[-12:])
-    except Exception:
-        CADANGAN_STAT["gagal"] += 1
-        raise
-    CADANGAN_STAT["dipakai"] += 1
-    CADANGAN_STAT["terakhir"] = _now()
+    out, k = cadangan_jalan(sysp, pesan, 4000, schema is not None)   # Groq -> Mistral -> NVIDIA -> Cloudflare (urutan dari Panel Dev)
+    log.info("Jawaban cadangan dari %s", k)
     return out
 
 
@@ -9988,22 +10004,37 @@ def pi_konteks():
 
 
 def pi_tanya(q, riwayat):
-    sysp = PI_SISTEM + IDENTITAS_AI + "\n\n=== DATA PUBLIK MCI ===\n" + pi_konteks() + "\n=== AKHIR DATA ===" + GAYA_JAWAB + TANPA_LATEX
+    lokal = pi_lokal(q, riwayat)   # router pintar: pertanyaan yang jawabannya pasti dijawab tanpa AI
+    if lokal:
+        PI_CACHE_STAT["lokal"] += 1
+        STATS["router_hemat"] += 1
+        return lokal, 0
+    konteks = pi_konteks()
+    ver = hashlib.sha256(konteks.encode()).hexdigest()[:16]   # data publik berubah -> cache lama otomatis tidak dipakai
+    vec = None
+    if not riwayat:
+        hit, vec = pi_cache_cari(q, ver)
+        if hit:
+            PI_CACHE_STAT["kena"] += 1
+            STATS["cache_hit"] += 1
+            return hit, 0
+    sysp = PI_SISTEM + IDENTITAS_AI + "\n\n=== DATA PUBLIK MCI ===\n" + konteks + "\n=== AKHIR DATA ===" + GAYA_JAWAB + TANPA_LATEX
     langsung_groq = model_tugas("pusat_info") == "groq" and mesin_kunci("groq")
     try:
         if langsung_groq:
             raise RuntimeError("503 dipilih di Panel Dev: Groq")
-        return _pi_gemini(sysp, q, riwayat)
+        jawab, tok = _pi_gemini(sysp, q, riwayat)
     except Exception as e:
-        # Gemini penuh/sibuk (atau Groq dipilih di Panel Dev) -> Groq menjawab supaya tamu tidak melihat pesan error
-        if not mesin_kunci("groq") or not (langsung_groq or any(x in str(e) for x in _GEMINI_PENUH)):
+        # Gemini penuh/sibuk (atau Groq dipilih di Panel Dev) -> antrean cadangan menjawab supaya tamu tidak melihat pesan error
+        if not cadangan_daftar() or not (langsung_groq or any(x in str(e) for x in _GEMINI_PENUH)):
             raise
-        log.warning("Pusat Info: Gemini penuh (%s), dijawab Groq", str(e)[:80])
+        log.warning("Pusat Info: Gemini penuh (%s), dijawab cadangan", str(e)[:80])
         pesan = [{"role": "assistant" if x["role"] == "model" else "user", "content": x["text"]} for x in riwayat] + [{"role": "user", "content": q}]
-        out = _kompatibel("groq", sysp[:24000], "", 1500, False, pesan[-12:])
-        CADANGAN_STAT["dipakai"] += 1
-        CADANGAN_STAT["terakhir"] = _now()
-        return latex_bersih(out), 0
+        out, _k = cadangan_jalan(sysp, pesan, 1500, False, "groq" if langsung_groq else None)
+        jawab, tok = latex_bersih(out), 0
+    if not riwayat:
+        pi_cache_simpan(q, vec, jawab, ver)
+    return jawab, tok
 
 
 def _pi_gemini(sysp, q, riwayat):
@@ -10023,6 +10054,8 @@ def _pi_gemini(sysp, q, riwayat):
                 r = pi_client(vx).models.generate_content(model=mdl, contents=contents, config=types.GenerateContentConfig(**kw))
             except Exception as e:
                 last, msg = e, str(e)
+                if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
+                    kuota_penuh_tandai(mdl)
                 if "404" in msg or "NOT_FOUND" in msg:
                     continue   # model ini tidak tersedia untuk key ini: coba model berikutnya
                 if len(modes) > 1 and any(x in msg for x in ("API key", "API_KEY", "401", "403", "UNAUTHENTICATED", "PERMISSION_DENIED", "INVALID_ARGUMENT")):
@@ -10032,6 +10065,10 @@ def _pi_gemini(sysp, q, riwayat):
                 _PI_MODE[0] = vx
                 log.info("Pusat Info memakai %s, model %s", "Vertex AI" if vx else "Gemini API", mdl)
             u = r.usage_metadata
+            try:   # ikut dihitung di meteran kuota
+                usage_add(mdl, int(getattr(u, "prompt_token_count", 0) or 0), int(getattr(u, "candidates_token_count", 0) or 0), int(getattr(u, "thoughts_token_count", 0) or 0))
+            except Exception:
+                pass
             return latex_bersih((r.text or "").strip()), int(getattr(u, "total_token_count", 0) or 0)
     raise last or RuntimeError("Tidak ada model yang bisa dipakai")
 
@@ -11495,7 +11532,8 @@ async def pagi_cek():
     if not fitur_on("laporan_pagi"):
         return
     now = datetime.now(WIB)
-    if not SET.get("pagi_on", True) or now.hour < PAGI_JAM or now.hour >= 21 or SET.get("pagi_terakhir") == today():
+    jam = min(PAGI_JAM, 8) if fitur_on("kerja_malam") else PAGI_JAM   # kerja malam: ikut bangun jam 08.00 (bersama pengingat kas)
+    if not SET.get("pagi_on", True) or now.hour < jam or now.hour >= 21 or SET.get("pagi_terakhir") == today():
         return
     SET["pagi_terakhir"] = today()   # tandai dulu supaya tidak dobel
     await asyncio.to_thread(set_save)
@@ -12166,7 +12204,7 @@ KUNCI_DAFTAR = [   # (nama env, label, kelompok, cara uji). Token login, SECRET_
     ("GROQ_API_KEY", "Groq", "Lainnya", "groq"),
     ("NVIDIA_API_KEY", "NVIDIA NIM", "Lainnya", "nvidia"),
     ("MISTRAL_API_KEY", "Mistral", "Lainnya", "mistral"),
-    ("CF_ACCOUNT_ID", "Cloudflare: Account ID", "Studio Gambar", ""),
+    ("CF_ACCOUNT_ID", "Cloudflare: Account ID (gambar + cadangan)", "Studio Gambar", ""),
     ("CF_API_TOKEN", "Cloudflare: API Token", "Studio Gambar", "cloudflare"),
 ]
 TEKS_DAFTAR = [("GROQ_MODEL", "ID model Groq"), ("NVIDIA_MODEL", "ID model NVIDIA"), ("MISTRAL_MODEL", "ID model Mistral")]   # bukan rahasia
@@ -12182,6 +12220,8 @@ FITUR_DAFTAR = [
     ("rapor", "Rapor bulanan", "Rapor otomatis tiap tanggal 1"),
     ("alarm_kapal", "Alarm kapal", "Kabar keluar area, baterai lemah, sinyal hilang"),
     ("telegram", "Balasan bot Telegram", "Bot menjawab anggota (Dev tetap dijawab)"),
+    ("router_pintar", "Router pintar & cache", "Pesan sederhana dijawab Flash Lite atau tanpa AI; pertanyaan Pusat Info yang mirip memakai jawaban tersimpan"),
+    ("kerja_malam", "Kerja malam (hemat Neon)", "Laporan digabung ke jadwal bangun yang sudah ada dan database tidak dibangunkan jam 01.00–07.00. Bangun terjadwal 5x sehari, sebelumnya 7x"),
 ]
 FITUR_HAL = {"absen": ["absen"], "pusat_info": ["info"], "studio_gambar": ["gambar"]}   # halaman yang ikut hilang saat fiturnya dimatikan
 
@@ -12415,7 +12455,11 @@ def panel_data():
               "pilihan": [{"id": p, "nama": n, "harga": h, "siap": _model_siap(t, p)} for p, n, h in m["pilihan"]]} for t, m in MODEL_TUGAS.items()]
     return {"fitur": [{"id": k, "nama": n, "ket": ket, "aktif": fitur_on(k)} for k, n, ket in FITUR_DAFTAR], "hal_mati": SET.get("hal_mati") or [],
             "kunci": kunci, "teks": teks, "model": model, "riwayat": list(reversed(SET.get("panel_log") or []))[:60],
-            "sidik_cocok": rh.get("sidik", _sidik()) == _sidik(), "pin_menit": PANEL_PIN_MENIT}
+            "sidik_cocok": rh.get("sidik", _sidik()) == _sidik(), "pin_menit": PANEL_PIN_MENIT,
+            "cadangan": {"urut": cadangan_urut(), "semua": [{"id": k, "nama": n, "siap": cadangan_siap(k), "stat": CAD_PER.get(k, {}),
+                                                             "istirahat": max(0, int(_CAD_ISTIRAHAT.get(k, 0) - time.time()))} for k, n in CADANGAN_SEMUA]},
+            "hemat": {"router": STATS.get("router_hemat", 0), "cache": STATS.get("cache_hit", 0), "pi_cache": PI_CACHE_STAT["kena"], "pi_lokal": PI_CACHE_STAT["lokal"]},
+            **kuota_data()}
 
 
 @app.route("/api/panel", methods=["GET", "POST"])
@@ -12453,6 +12497,16 @@ def api_panel():
             else:
                 SET.setdefault("model_tugas", {})[t] = p
             panel_catat(f"Model {MODEL_TUGAS[t]['judul']}: {dict((a, b) for a, b, _ in MODEL_TUGAS[t]['pilihan'])[p]}")
+        elif aksi == "cadangan":
+            u = [k for k in dict.fromkeys(d.get("urut") or []) if k in dict(CADANGAN_SEMUA)]
+            SET["cadangan_urut"] = u
+            panel_catat("Urutan cadangan: " + (" → ".join(dict(CADANGAN_SEMUA)[k] for k in u) or "semua dimatikan"))
+        elif aksi == "kuota_batas":
+            e, b = str(d.get("id") or ""), int(d.get("batas") or 0)
+            if e not in dict((a, n) for a, n, _ in KUOTA_JENIS) or not 0 < b <= 1_000_000:
+                return jsonify({"error": "Batas tidak valid"}), 400
+            SET.setdefault("kuota_batas", {})[e] = b
+            panel_catat(f"Batas harian {dict((a, n) for a, n, _ in KUOTA_JENIS)[e]}: {b}")
         elif aksi in ("kunci", "kunci_hapus"):
             k = str(d.get("env") or "")
             if k not in KUNCI_NAMA:
@@ -12485,6 +12539,520 @@ def api_panel():
             return jsonify({"error": "Permintaan tidak dikenal"}), 400
         set_save()
     return jsonify(panel_data())
+
+
+# =================== AI PLUS: cadangan berlapis, router pintar, cache makna, meteran kuota, adu model, usulan Apex, peta & grafik ===================
+from array import array as _array
+
+# ---------- 1. Antrean cadangan berlapis: Gemini penuh -> penyedia gratis berikutnya (urutan diatur di Panel Dev) ----------
+CADANGAN_SEMUA = [("groq", "Groq"), ("mistral", "Mistral"), ("nvidia", "NVIDIA NIM"), ("cloudflare", "Cloudflare Workers AI")]
+_CAD_ISTIRAHAT = {}   # penyedia -> waktu boleh dicoba lagi (habis kena batas / error)
+CAD_PER = {}          # penyedia -> {"dipakai", "gagal", "terakhir"} sejak server menyala
+
+
+def cadangan_urut():
+    u = SET.get("cadangan_urut")
+    if not isinstance(u, list):
+        u = [k for k, _ in CADANGAN_SEMUA]
+    return [k for k in u if k in dict(CADANGAN_SEMUA)]
+
+
+def cadangan_siap(k):
+    if k == "cloudflare":
+        return bool(CF_ACCOUNT and CF_TOKEN)
+    return k in MESIN_LAIN and bool(mesin_kunci(k))
+
+
+def cadangan_daftar():
+    now = time.time()
+    return [k for k in cadangan_urut() if cadangan_siap(k) and now >= _CAD_ISTIRAHAT.get(k, 0)]
+
+
+def cadangan_jalan(sysp, pesan, maks=4000, json_mode=False, utamakan=None):
+    """Coba penyedia satu per satu sesuai urutan. Balik (teks, penyedia). Yang kena batas diistirahatkan 2 menit."""
+    urut = cadangan_daftar()
+    if utamakan and utamakan in urut:
+        urut = [utamakan] + [k for k in urut if k != utamakan]
+    if not urut:
+        raise RuntimeError("Tidak ada AI cadangan yang siap (isi kuncinya di Panel Dev)")
+    last = None
+    for k in urut:
+        st = CAD_PER.setdefault(k, {"dipakai": 0, "gagal": 0, "terakhir": ""})
+        try:
+            out = _kompatibel(k, sysp[:24000], "", maks, json_mode, pesan[-12:])
+            if not out:
+                raise RuntimeError("jawaban kosong")
+        except Exception as e:
+            last = e
+            st["gagal"] += 1
+            CADANGAN_STAT["gagal"] += 1
+            penuh = any(x in str(e) for x in ("429", "rate", "limit", "quota", "503", "overloaded"))
+            _CAD_ISTIRAHAT[k] = time.time() + (120 if penuh else 30)
+            if penuh:
+                kuota_penuh_tandai(k)
+            log.warning("Cadangan %s gagal (%s), coba berikutnya", k, str(e)[:120])
+            continue
+        st["dipakai"] += 1
+        st["terakhir"] = _now()
+        CADANGAN_STAT["dipakai"] += 1
+        CADANGAN_STAT["terakhir"] = _now()
+        return out, k
+    raise last or RuntimeError("Semua AI cadangan gagal")
+
+
+# ---------- 5. Meteran kuota per penyedia (diagram batang di Panel Dev) ----------
+KUOTA_JENIS = [   # (id, nama, batas bawaan per hari = PERKIRAAN, bisa diubah di panel)
+    ("gemini", "Gemini Flash", 250), ("lite", "Gemini Flash Lite", 1000), ("hydrogen", "Gemini 4 Hydrogen", 500),
+    ("groq", "Groq", 1000), ("mistral", "Mistral", 500), ("nvidia", "NVIDIA NIM", 1000), ("cloudflare", "Cloudflare", 300),
+]
+KUOTA_HDR = {}     # penyedia -> {"sisa", "batas", "t"} dari header rate limit (angka asli kalau penyedia mengirimnya)
+_KUOTA_PENUH = {}  # penyedia -> waktu terakhir ditolak karena batas
+
+
+def kuota_ember(model):
+    m = str(model or "").lower()
+    for k in ("groq", "mistral", "nvidia", "cloudflare"):
+        if m.startswith(k + ":"):
+            return k
+    if "argon" in m:
+        return "argon"
+    if "hydrogen" in m:
+        return "hydrogen"
+    if "lite" in m:
+        return "lite"
+    if m.startswith("claude"):
+        return "claude"
+    if m.startswith("gemini"):
+        return "gemini"
+    return ""
+
+
+def kuota_penuh_tandai(model_atau_ember):
+    e = model_atau_ember if model_atau_ember in dict((a, b) for a, b, _ in KUOTA_JENIS) else kuota_ember(model_atau_ember)
+    if e:
+        _KUOTA_PENUH[e] = time.time()
+
+
+def kuota_batas(e):
+    b = (SET.get("kuota_batas") or {}).get(e)
+    return int(b) if b else dict((a, c) for a, _, c in KUOTA_JENIS).get(e, 0)
+
+
+def kuota_data():
+    per = {}
+    for m, v in (USAGE.get(today()) or {}).items():
+        e = kuota_ember(m)
+        if e:
+            per[e] = per.get(e, 0) + int(v.get("panggilan") or 0)
+    out = []
+    for e, nama, _ in KUOTA_JENIS:
+        h = KUOTA_HDR.get(e)
+        asli = bool(h and h.get("batas") and time.time() - h.get("t", 0) < 86400)
+        batas = int(h["batas"]) if asli else kuota_batas(e)
+        pakai = (int(h["batas"]) - int(h["sisa"])) if asli else per.get(e, 0)
+        penuh = time.time() - _KUOTA_PENUH.get(e, 0) < 3600
+        siap = {"gemini": bool(client("canvas")), "lite": bool(client("canvas")), "hydrogen": bool(kunci_hydrogen())}.get(e, cadangan_siap(e))
+        out.append({"id": e, "nama": nama, "pakai": pakai, "batas": batas, "persen": min(100, round(pakai * 100 / batas)) if batas else 0,
+                    "asli": asli, "penuh": penuh, "siap": siap})
+    berbayar = {"argon": per.get("argon", 0), "claude": per.get("claude", 0)}
+    hari = []
+    try:   # 7 hari terakhir per penyedia (untuk diagram batang bertumpuk)
+        dari = (datetime.now(WIB) - timedelta(days=6)).strftime("%Y-%m-%d")
+        with db() as c:
+            rows = sql(c, "SELECT tanggal, model, panggilan FROM pemakaian WHERE tanggal>=? ORDER BY tanggal", (dari,)).fetchall()
+        tmp = {}
+        for t, m, n in rows:
+            e = kuota_ember(m) or "lain"
+            tmp.setdefault(t, {})
+            tmp[t][e] = tmp[t].get(e, 0) + int(n or 0)
+        hari = [{"tanggal": t, "per": tmp[t]} for t in sorted(tmp)]
+    except Exception:
+        log.exception("riwayat kuota gagal")
+    return {"kuota": out, "berbayar": berbayar, "hari": hari, "anggaran": {"pakai": round(argon_biaya_bulan()), "batas": int(SET.get("argon_anggaran") or 0)}}
+
+
+def kuota_cek(model):
+    """Kabari Dev sekali sehari per penyedia saat sisa jatah tinggal 20% atau kurang."""
+    e = kuota_ember(model)
+    if not e or e in ("argon", "claude"):
+        return
+    try:
+        k = next((x for x in kuota_data()["kuota"] if x["id"] == e), None)
+        if not k or not k["batas"] or k["persen"] < 80:
+            return
+        tanda = SET.setdefault("kuota_kabar", {})
+        if tanda.get(e) == today():
+            return
+        tanda[e] = today()
+        set_save()
+        inbox_kirim(_dev_ids(), "info", f"Jatah {k['nama']} tinggal {100 - k['persen']}%",
+                    f"Hari ini sudah {k['pakai']} dari {k['batas']} panggilan{'' if k['asli'] else ' (perkiraan)'}. "
+                    "Kalau habis, AI otomatis pindah ke cadangan berikutnya sesuai urutan di Panel Dev.")
+    except Exception:
+        log.exception("cek kuota gagal")
+
+
+# ---------- 2. Router pintar ----------
+_RUTE_BERAT = re.compile(r"```|\d+\s*[-+*/x×:]\s*\d+|\b(kode|code|script|program|hitung|rumus|rangkaian|wiring|analisis|analisa|jelaskan|kenapa|mengapa|bagaimana|gimana|bandingkan|rencana|strategi|buatkan|bikinin|tulis|essay|esai|laporan)\b", re.I)
+
+
+def rute_ringan(text):
+    """Pesan pendek dan sederhana cukup dijawab Gemini Flash Lite."""
+    t = str(text or "")
+    return fitur_on("router_pintar") and len(t) <= 140 and not _RUTE_BERAT.search(t)
+
+
+_PI_SALAM = re.compile(r"^\s*(halo+|hai+|hi+|hello|hey|p+|permisi|assalamu.?alaikum|selamat\s+(pagi|siang|sore|malam)|pagi|siang|sore|malam)\s*(min|kak|bang|admin|mci)?\s*[!.?]*\s*$", re.I)
+_PI_MAKASIH = re.compile(r"^\s*(terima\s*kasih|makasih|thanks?|thank\s*you|tq|thx|oke+\s*(makasih|thanks)?|ok+|siap)\s*(ya|yah|min|kak|banyak)?\s*[!.]*\s*$", re.I)
+_PI_KONTAK = re.compile(r"\b(kontak|hubungi|instagram|ig|tiktok|sosmed|media\s+sosial|whatsapp|wa|nomor|dm)\b", re.I)
+_PI_PESAN = re.compile(r"\b(cara\s+(pesan|order|memesan)|mau\s+(pesan|order)|pesan\s+jasa|order\s+jasa|bisa\s+pesan)\b", re.I)
+
+
+def pi_lokal(q, riwayat):
+    """Jawaban tanpa AI untuk pertanyaan yang jawabannya pasti. None = serahkan ke AI."""
+    if not fitur_on("router_pintar") or len(q) > 120:
+        return None
+    k = kontak_mci()
+    if _PI_SALAM.match(q):
+        return "Halo! 👋 Aku asisten Pusat Info MCI (Mahardika Cakrawala Indonesia). Mau tahu tentang MCI, divisi, proyek, produk, atau cara pesan jasa? Tanya aja."
+    if _PI_MAKASIH.match(q):
+        return "Sama-sama! Kalau ada pertanyaan lain tentang MCI, tanya aja ya. 🙌"
+    if _PI_PESAN.search(q) and fitur_on("pesan_jasa") and len(q) <= 60:
+        return (f"Bisa! Isi formulir di {SITE_URL}/pesan untuk jasa rakit elektronika/IoT atau pemrograman/website. "
+                "Tim MCI akan menghubungimu setelah pesanan masuk.")
+    if _PI_KONTAK.search(q) and len(q) <= 60 and not riwayat:
+        bag = [f"Instagram {k['ig']}" if k.get("ig") else "", f"TikTok {k['tt']}" if k.get("tt") else "", PI_TANDA_WA if k.get("wa") else ""]
+        return "Kamu bisa menghubungi MCI lewat " + ", ".join(x for x in bag if x) + "."
+    return None
+
+
+# ---------- 3. Cache Pusat Info yang paham makna ----------
+EMBED_MODEL = os.getenv("EMBED_MODEL", "gemini-embedding-001")
+_PI_CACHE = []                # [{kata, vec, jawab, t, ver}]
+_PI_CACHE_MAKS, _PI_CACHE_DETIK = 300, 6 * 3600
+_EMBED_MATI = [0.0]
+PI_CACHE_STAT = {"kena": 0, "lokal": 0}
+_PI_HENTI = set("aku saya gw gue kamu anda kak min bang admin dong deh sih ya yah nih tuh itu ini yang di ke dari dan atau apa apakah kah ada adalah tolong mau ingin bisa boleh gak ga nggak tidak the a an of to is".split())
+_PI_SINONIM = {"gimana": "bagaimana", "gmn": "bagaimana", "brp": "berapa", "dimana": "mana", "kapan": "kapan", "siapa": "siapa", "org": "orang", "ketuanya": "ketua",
+               "pendiri": "founder", "didirikan": "berdiri", "dibuat": "berdiri", "mci": "", "mahardika": "", "cakrawala": "", "indonesia": ""}
+
+
+def _pi_kata(q):
+    out = set()
+    for w in re.findall(r"[a-z0-9]+", str(q).lower()):
+        w = re.sub(r"(nya|kah|lah|pun)$", "", w) if len(w) > 5 else w
+        w = _PI_SINONIM.get(w, w)
+        if w and w not in _PI_HENTI:
+            out.add(w)
+    return out
+
+
+def _pi_vec(q):
+    if time.time() < _EMBED_MATI[0]:
+        return None
+    try:
+        cl = pi_client(_PI_MODE[0] or False)
+        r = cl.models.embed_content(model=EMBED_MODEL, contents=q, config=types.EmbedContentConfig(output_dimensionality=256))
+        v = list(r.embeddings[0].values)
+        n = sum(x * x for x in v) ** .5 or 1.0
+        return _array("f", [x / n for x in v])
+    except Exception as e:
+        _EMBED_MATI[0] = time.time() + 600   # embedding gagal: pakai pencocokan kata saja selama 10 menit
+        log.warning("Embedding Pusat Info gagal (%s), pakai pencocokan kata", str(e)[:100])
+        return None
+
+
+def pi_cache_cari(q, ver):
+    if not fitur_on("router_pintar"):
+        return None, None
+    kata, now = _pi_kata(q), time.time()
+    _PI_CACHE[:] = [x for x in _PI_CACHE if now - x["t"] < _PI_CACHE_DETIK and x["ver"] == ver]
+    if len(kata) >= 2:
+        for x in _PI_CACHE:
+            if x["kata"] and len(kata & x["kata"]) / len(kata | x["kata"]) >= 0.8:
+                return x["jawab"], None
+    vec = _pi_vec(q)
+    if vec is not None:
+        best, skor = None, 0.0
+        for x in _PI_CACHE:
+            if x["vec"] is not None:
+                s = sum(a * b for a, b in zip(vec, x["vec"]))
+                if s > skor:
+                    best, skor = x, s
+        if best and skor >= 0.93:
+            return best["jawab"], vec
+    return None, vec
+
+
+def pi_cache_simpan(q, vec, jawab, ver):
+    if not fitur_on("router_pintar") or not jawab:
+        return
+    _PI_CACHE.append({"kata": _pi_kata(q), "vec": vec, "jawab": jawab, "t": time.time(), "ver": ver})
+    del _PI_CACHE[:-_PI_CACHE_MAKS]
+
+
+# ---------- 6. Adu model (A/B) di Panel Dev ----------
+ADU_MESIN = [("flash", "Gemini Flash"), ("lite", "Gemini Flash Lite"), ("hydrogen", "Gemini 4 Hydrogen"), ("argon", "Gemini 4 Argon"), ("claude", "Claude"),
+             ("groq", "Groq"), ("mistral", "Mistral"), ("nvidia", "NVIDIA NIM"), ("cloudflare", "Cloudflare")]
+ADU_SISTEM = "Kamu asisten AI MCI (Mahardika Cakrawala Indonesia). Jawab dalam Bahasa Indonesia yang jelas dan ringkas."
+
+
+def adu_siap(m):
+    if m in ("flash", "lite"):
+        return bool(client("canvas"))
+    if m == "hydrogen":
+        return bool(kunci_hydrogen())
+    if m == "argon":
+        return bool(kunci_argon()) and ARGON_AKTIF
+    if m == "claude":
+        return bool(ANTHROPIC_KEY)
+    return cadangan_siap(m)
+
+
+def adu_satu(m, prompt):
+    t0 = time.time()
+    try:
+        if m in ("flash", "lite", "hydrogen", "argon"):
+            model = {"flash": MODEL, "lite": MODEL_LITE, "hydrogen": HYDROGEN_MODEL, "argon": ARGON_MODEL}[m]
+            cl = client_kunci(kunci_hydrogen()) if m == "hydrogen" else client_kunci(kunci_argon()) if m == "argon" else client("canvas")
+            r = cl.models.generate_content(model=model, contents=prompt, config=types.GenerateContentConfig(system_instruction=ADU_SISTEM, max_output_tokens=1500))
+            u = r.usage_metadata
+            masuk, keluar = int(getattr(u, "prompt_token_count", 0) or 0), int(getattr(u, "candidates_token_count", 0) or 0)
+            usage_add(model, masuk, keluar, int(getattr(u, "thoughts_token_count", 0) or 0))
+            teks = (r.text or "").strip()
+            biaya = ""
+            if m == "argon":
+                hm, hk = SET.get("argon_harga") or [2, 10]
+                biaya = f"≈Rp{(masuk * hm + keluar * hk) / 1e6 * float(SET.get('kurs_usd') or 16500):,.0f}".replace(",", ".")
+        elif m == "claude":
+            teks, biaya = _claude(ADU_SISTEM, prompt, 1500), "berbayar"
+        else:
+            teks, biaya = _kompatibel(m, ADU_SISTEM, prompt, 1500), "gratis"
+        return {"mesin": m, "ok": True, "teks": latex_bersih(teks)[:6000], "detik": round(time.time() - t0, 1), "biaya": biaya or "gratis/sangat murah"}
+    except Exception as e:
+        return {"mesin": m, "ok": False, "teks": str(e)[:300], "detik": round(time.time() - t0, 1), "biaya": ""}
+
+
+@app.route("/api/panel/adu", methods=["GET", "POST"])
+def api_panel_adu():
+    need_panel()
+    skor = SET.get("adu_skor") or {}
+    if request.method == "GET":
+        return jsonify({"mesin": [{"id": k, "nama": n, "siap": adu_siap(k)} for k, n in ADU_MESIN], "skor": skor})
+    d = request.get_json(silent=True) or {}
+    if d.get("pilih"):
+        m = str(d["pilih"])
+        if m not in dict(ADU_MESIN):
+            return jsonify({"error": "Mesin tidak dikenal"}), 400
+        skor[m] = int(skor.get(m, 0)) + 1
+        SET["adu_skor"] = skor
+        panel_catat(f"Adu model: {dict(ADU_MESIN)[m]} dipilih paling bagus")
+        set_save()
+        return jsonify({"skor": skor})
+    prompt = str(d.get("prompt") or "").strip()[:3000]
+    pilih = [m for m in dict.fromkeys(d.get("mesin") or []) if m in dict(ADU_MESIN) and adu_siap(m)][:3]
+    if not prompt or len(pilih) < 2:
+        return jsonify({"error": "Tulis pertanyaan dan pilih 2–3 model yang siap"}), 400
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        hasil = list(ex.map(lambda m: adu_satu(m, prompt), pilih))
+    for h in hasil:
+        h["nama"] = dict(ADU_MESIN)[h["mesin"]]
+    return jsonify({"hasil": hasil, "skor": skor})
+
+
+# ---------- 7. Apex bertindak dengan persetujuan Dev ----------
+def _usul_tambah(jenis, data, ringkas):
+    lst = SET.setdefault("apex_usul", [])
+    if sum(1 for x in lst if x["status"] == "menunggu") >= 30:
+        return {"status": "ditolak sistem", "alasan": "Terlalu banyak usulan yang belum diputuskan Dev"}
+    uid = max([x["id"] for x in lst] or [0]) + 1
+    lst.append({"id": uid, "jenis": jenis, "data": data, "ringkas": ringkas[:200], "status": "menunggu", "waktu": _now()})
+    del lst[:-100]
+    set_save()
+    return {"status": "MENUNGGU PERSETUJUAN DEV (belum dijalankan)", "id": uid, "ringkas": ringkas}
+
+
+def usulkan_kas(jenis: str, jumlah: int, keterangan: str, kategori: str = "Lainnya", tanggal: str = "") -> dict:
+    """USULKAN catatan kas MCI baru. TIDAK langsung tercatat: muncul sebagai kartu Setujui/Tolak untuk Dev. jenis = masuk | keluar; jumlah = rupiah (angka bulat > 0); tanggal = YYYY-MM-DD (kosong = hari ini)."""
+    _alat("usulkan_kas", jenis=jenis, jumlah=jumlah)
+    jenis = str(jenis or "").lower().strip()
+    try:
+        jumlah = int(float(jumlah))
+    except (TypeError, ValueError):
+        jumlah = 0
+    if jenis not in ("masuk", "keluar") or jumlah <= 0 or jumlah > 100_000_000 or not str(keterangan or "").strip():
+        return {"status": "tidak valid", "alasan": "jenis harus masuk/keluar, jumlah > 0, keterangan wajib"}
+    tgl = str(tanggal or "")[:10] if re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(tanggal or "")[:10]) else today()
+    data = {"tanggal": tgl, "keterangan": str(keterangan).strip()[:200], "kategori": str(kategori or "Lainnya").strip()[:40] or "Lainnya",
+            "masuk": jumlah if jenis == "masuk" else 0, "keluar": jumlah if jenis == "keluar" else 0}
+    return _usul_tambah("kas", data, f"Kas {jenis} Rp{jumlah:,} · {data['keterangan']} [{data['kategori']}]".replace(",", "."))
+
+
+def usulkan_tugas(judul: str, dikerjakan_oleh: str, tenggat: str = "", prioritas: str = "normal", rincian: str = "") -> dict:
+    """USULKAN tugas baru untuk seorang anggota. TIDAK langsung dibuat: muncul sebagai kartu Setujui/Tolak untuk Dev. dikerjakan_oleh = nama anggota; tenggat = YYYY-MM-DD; prioritas = normal | tinggi | rendah."""
+    _alat("usulkan_tugas", judul=judul, oleh=dikerjakan_oleh)
+    nm = str(dikerjakan_oleh or "").strip().lower()
+    cocok = [m for m in MEMBERS.values() if m.get("aktif") and nm and nm in m["nama"].lower()]
+    if len(cocok) != 1 or not str(judul or "").strip():
+        return {"status": "tidak valid", "alasan": "judul wajib dan nama anggota harus cocok dengan tepat satu anggota aktif",
+                "kandidat": [m["nama"] for m in cocok][:8]}
+    m = cocok[0]
+    tg = str(tenggat or "")[:10] if re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(tenggat or "")[:10]) else ""
+    pr = prioritas if prioritas in ("normal", "tinggi", "rendah") else "normal"
+    data = {"judul": str(judul).strip()[:200], "pj": m["id"], "tenggat": tg, "prioritas": pr, "status": "belum", "deskripsi": str(rincian or "")[:2000]}
+    return _usul_tambah("tugas", data, f"Tugas untuk {m['nama']}: {data['judul']}" + (f" (tenggat {tg})" if tg else ""))
+
+
+def usulkan_catatan(judul: str, isi: str) -> dict:
+    """USULKAN catatan pribadi baru untuk Dev. TIDAK langsung disimpan: muncul sebagai kartu Setujui/Tolak."""
+    _alat("usulkan_catatan", judul=judul)
+    if not str(isi or "").strip():
+        return {"status": "tidak valid", "alasan": "isi wajib"}
+    data = {"judul": str(judul or "Catatan dari Apex").strip()[:120], "isi": str(isi).strip()[:5000]}
+    return _usul_tambah("catatan", data, f"Catatan: {data['judul']}")
+
+
+APEX_ALAT += [usulkan_kas, usulkan_tugas, usulkan_catatan]
+APEX_SISTEM += (" Kamu juga bisa MENGUSULKAN aksi lewat alat usulkan_kas, usulkan_tugas, dan usulkan_catatan bila Dev memintanya. "
+                "Usulan TIDAK langsung dijalankan: Dev harus menekan Setujui di kartu yang muncul. Setelah mengusulkan, bilang jelas bahwa aksinya menunggu persetujuan, jangan bilang sudah tercatat.")
+
+
+def usul_jalankan(u, r):
+    d = u["data"]
+    if u["jenis"] == "kas":
+        kas_add([d], "Apex (disetujui Dev)")
+    elif u["jenis"] == "tugas":
+        data, err = rk_bersih("tugas", dict(d))
+        if not err:
+            err = rk_cek("tugas", data, None, r)
+        if err:
+            raise ValueError(err)
+        sid = rk_simpan_raw("tugas", data, r)
+        rk_setelah("tugas", rk_get("tugas", sid), None, r)
+    elif u["jenis"] == "catatan":
+        catatan_simpan(r, d["judul"], d["isi"])
+    else:
+        raise ValueError("jenis usulan tidak dikenal")
+
+
+@app.route("/api/apex/usul", methods=["GET", "POST"])
+def api_apex_usul():
+    r = _apex_siap()
+    lst = SET.setdefault("apex_usul", [])
+    if request.method == "POST":
+        d = request.get_json(silent=True) or {}
+        u = next((x for x in lst if x["id"] == int(d.get("id") or 0)), None)
+        if not u or u["status"] != "menunggu":
+            return jsonify({"error": "Usulan tidak ditemukan atau sudah diputuskan"}), 404
+        if d.get("aksi") == "setujui":
+            try:
+                usul_jalankan(u, r)
+            except Exception as e:
+                log.exception("usulan Apex gagal dijalankan")
+                return jsonify({"error": f"Gagal dijalankan: {e}"}), 400
+            u["status"] = "disetujui"
+        elif d.get("aksi") == "tolak":
+            u["status"] = "ditolak"
+        else:
+            return jsonify({"error": "aksi harus setujui atau tolak"}), 400
+        u["diputus"] = _now()
+        set_save()
+    return jsonify({"menunggu": [x for x in lst if x["status"] == "menunggu"], "terakhir": [x for x in lst if x["status"] != "menunggu"][-8:][::-1]})
+
+
+# ---------- Graphify: peta jaringan data + dashboard grafik (khusus Dev) ----------
+@app.route("/api/graf")
+def api_graf():
+    need("admin")
+    nodes, edges, ada = [], [], set()
+
+    def n(i, label, grup, info=""):
+        if i not in ada:
+            ada.add(i)
+            nodes.append({"id": i, "label": str(label)[:40], "grup": grup, "info": str(info)[:200]})
+
+    def e(a, b, label=""):
+        if a in ada and b in ada:
+            edges.append({"a": a, "b": b, "label": label})
+
+    for k, v in DIVISI.items():
+        n(f"d:{k}", v, "divisi")
+    for m in MEMBERS.values():
+        if not m.get("aktif"):
+            continue
+        n(f"m:{m['id']}", m["nama"], "anggota", ", ".join(JABATAN.get(j, j) for j in m.get("jabatan") or []))
+        for dv in m.get("divisi") or []:
+            e(f"m:{m['id']}", f"d:{dv}", "divisi")
+    try:
+        for p in rk_rows("proyek")[:80]:
+            pid = f"p:{p['id']}"
+            n(pid, p.get("nama") or "Proyek", "proyek", f"{p.get('status', '')} · progres {p.get('progres') or 0}%")
+            if p.get("pj"):
+                e(f"m:{p['pj']}", pid, "pemilik")
+            for t in p.get("tim") or []:
+                e(f"m:{t}", pid, "tim")
+        for t in rk_rows("tugas")[:150]:
+            if t.get("status") == "selesai":
+                continue
+            tid = f"t:{t['id']}"
+            n(tid, t.get("judul") or "Tugas", "tugas", f"{t.get('status', '')} · tenggat {t.get('tenggat') or '-'}")
+            if t.get("pj"):
+                e(f"m:{t['pj']}", tid, "mengerjakan")
+            if t.get("divisi"):
+                e(tid, f"d:{t['divisi']}", "divisi")
+        for a in rk_rows("alat")[:120]:
+            if a.get("peminjam"):
+                aid = f"a:{a['id']}"
+                n(aid, a.get("nama") or "Alat", "alat", f"harus kembali {a.get('tenggat') or '-'}")
+                e(f"m:{a['peminjam']}", aid, "meminjam")
+        for jn in ("sidang", "putusan"):
+            for s in rk_rows(jn)[:80]:
+                if jn == "putusan" and s.get("rahasia"):
+                    continue
+                ps = str(s.get("pasal") or "").strip()
+                if not ps:
+                    continue
+                uid = f"u:{ps}"
+                n(uid, f"Pasal {ps}" if not ps.lower().startswith("pasal") else ps, "uu")
+                if s.get("terlapor"):
+                    e(f"m:{s['terlapor']}", uid, jn)
+    except Exception:
+        log.exception("peta data gagal sebagian")
+    return jsonify({"nodes": nodes, "edges": edges})
+
+
+@app.route("/api/grafik")
+def api_grafik():
+    need("admin")
+    out = {}
+    with db() as c:
+        dari = (datetime.now(WIB).replace(day=1) - timedelta(days=150)).strftime("%Y-%m")
+        rows = sql(c, "SELECT SUBSTR(tanggal,1,7), COALESCE(SUM(masuk),0), COALESCE(SUM(keluar),0) FROM kas WHERE tanggal>=? GROUP BY SUBSTR(tanggal,1,7) ORDER BY 1", (dari + "-01",)).fetchall()
+        out["kas"] = [{"bulan": b, "masuk": int(m), "keluar": int(k)} for b, m, k in rows]
+        try:
+            d14 = (datetime.now(WIB) - timedelta(days=27)).strftime("%Y-%m-%d")
+            rows = sql(c, "SELECT tanggal, COUNT(*) FROM absen WHERE tanggal>=? GROUP BY tanggal ORDER BY tanggal", (d14,)).fetchall()
+            out["absen"] = [{"tanggal": t, "hadir": int(x)} for t, x in rows]
+        except Exception:
+            out["absen"] = []
+        rows = sql(c, "SELECT nama, jumlah, minimum FROM stok ORDER BY (CASE WHEN minimum>0 THEN jumlah*1.0/minimum ELSE 999 END), jumlah LIMIT 10").fetchall()
+        out["stok"] = [{"nama": a, "jumlah": int(b or 0), "minimum": int(m or 0)} for a, b, m in rows]
+        d14 = (datetime.now(WIB) - timedelta(days=13)).strftime("%Y-%m-%d")
+        rows = sql(c, "SELECT tanggal, model, panggilan FROM pemakaian WHERE tanggal>=? ORDER BY tanggal", (d14,)).fetchall()
+    ai = {}
+    for t, m, x in rows:
+        e = kuota_ember(m) or "lain"
+        ai.setdefault(t, {})
+        ai[t][e] = ai[t].get(e, 0) + int(x or 0)
+    out["ai"] = [{"tanggal": t, "per": ai[t]} for t in sorted(ai)]
+    try:
+        tg = rk_rows("tugas")
+        out["tugas"] = {s: sum(1 for t in tg if t.get("status") == s) for s in ("belum", "proses", "selesai")}
+    except Exception:
+        out["tugas"] = {}
+    out["absen_mati"] = not fitur_on("absen")
+    return jsonify(out)
 
 
 def run_flask():

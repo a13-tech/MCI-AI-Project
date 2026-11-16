@@ -760,6 +760,43 @@ details.cara p{line-height:1.65}
 #p-panel .pnHal{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 16px}
 #p-panel .pnHal .pnR{border-top:0;padding:6px 0}
 .nv .mt{font-size:10.5px;font-weight:600;color:#B5483A;margin-left:4px}
+/* ===== AI Plus: meteran, cadangan, adu model, usulan Apex, peta & grafik ===== */
+.mtr{display:grid;gap:10px;margin-top:10px}
+.mtr .r{display:grid;grid-template-columns:150px 1fr 104px;gap:10px;align-items:center;font-size:13px}
+.mtr .r>span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mtr .tr{height:14px;border-radius:99px;background:var(--line);overflow:hidden}
+.mtr .bt2{height:100%;border-radius:99px;background:#2E8B57;transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.mtr .bt2.k{background:#C9962B}.mtr .bt2.m{background:#B5483A}
+.mtr .r.off{opacity:.45}
+.mtr .n{text-align:right;font-variant-numeric:tabular-nums;color:var(--mute)}
+.mtr .n button{all:unset;cursor:pointer;border-bottom:1px dashed var(--line2)}
+.mtr .n button:focus-visible{outline:2px solid var(--gold)}
+@media (max-width:600px){.mtr .r{grid-template-columns:96px 1fr 84px}}
+.gbar{width:100%;height:auto;display:block;margin-top:6px}
+.gbar text{fill:var(--mute);font:11px var(--sans)}
+.gbar .ax{stroke:var(--line);stroke-width:1}
+.lgd{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--mute);margin-top:6px}
+.lgd i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.cdg{display:grid;gap:6px;margin-top:8px}
+.cdg .r{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px}
+.cdg .r b{flex:1;font-weight:500}
+.cdg .r small{color:var(--mute);font-size:12px}
+.cdg .r.off b{color:var(--mute);text-decoration:line-through}
+.cdg .nm{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--hov);font-size:12px;font-weight:600}
+.cdg button.ud{all:unset;cursor:pointer;padding:2px 6px;border-radius:6px;color:var(--mute)}
+.cdg button.ud:hover{background:var(--hov);color:var(--ink)}
+.cdg button.ud:disabled{opacity:.25;cursor:default}
+.adu{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:12px}
+.adu .cd{margin:0;display:flex;flex-direction:column;gap:8px}
+.adu .tx{white-space:pre-wrap;font-size:13.5px;line-height:1.55;max-height:340px;overflow:auto}
+.apu{display:grid;gap:8px;margin:0 0 12px}
+.apu .cd{margin:0;border-left:3px solid var(--gold);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.apu .cd span{flex:1;min-width:200px;font-size:14px}
+#grafKanvas{width:100%;height:560px;display:block;border:1px solid var(--line);border-radius:14px;background:var(--paper);touch-action:none;cursor:grab}
+#grafKanvas.seret{cursor:grabbing}
+#grafInfo{min-height:1.4em;font-size:13px;margin-top:8px}
+.grafG{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+@media (max-width:600px){#grafKanvas{height:440px}}
 </style>
 </head>
 <body>
@@ -820,6 +857,7 @@ details.cara p{line-height:1.65}
  <button class="nv" data-p="iot">Lab IoT</button>
  <button class="nv" data-p="panduan">Buku Panduan Rakit</button>
  <button class="nv" data-p="laporan">Laporan</button>
+ <button class="nv" data-p="graf" id="nvGraf">Peta &amp; Grafik</button>
  <button class="nv" data-p="memori">Memori</button>
  <button class="nv" data-p="skills">Skills</button>
  <button class="nv" data-p="tim">Tim &amp; Token</button>
@@ -1239,6 +1277,20 @@ details.cara p{line-height:1.65}
   <div id="pfBox"><p class="mu">Memuat…</p></div>
  </section>
 
+
+ <section id="p-graf" class="pg" hidden>
+  <h1>Peta &amp; Grafik</h1>
+  <p class="mu" style="max-width:720px">Khusus Dev. Peta menunjukkan siapa terhubung ke apa: anggota, divisi, proyek, tugas yang belum selesai, alat yang sedang dipinjam, dan pasal di sidang/putusan. Geser titik untuk merapikan, seret latar untuk menggeser, gulir atau cubit untuk zoom, klik titik untuk melihat detailnya.</p>
+  <div class="seg" id="grafSeg" style="margin:0 0 14px;background:#EFECE4"><button type="button" class="on" data-gf="peta">Peta data</button><button type="button" data-gf="grafik">Grafik</button></div>
+  <div id="grafPeta"><canvas id="grafKanvas" aria-label="Peta jaringan data MCI"></canvas><div class="lgd" id="grafLgd"></div><div id="grafInfo" class="mu"></div></div>
+  <div id="grafGrafik" hidden><div class="grafG">
+   <div class="cd"><b>Kas per bulan</b><div id="gKas"></div></div>
+   <div class="cd"><b>Pemakaian AI 14 hari</b><div id="gAi"></div></div>
+   <div class="cd"><b>Stok paling menipis</b><div id="gStok"></div></div>
+   <div class="cd"><b>Tugas</b><div id="gTugas"></div></div>
+   <div class="cd"><b>Kehadiran (absen) 4 minggu</b><div id="gAbsen"></div></div>
+  </div></div>
+ </section>
  <section id="p-panel" class="pg" hidden>
   <h1>Panel Dev</h1>
   <div id="pnKunci" class="cd pnK">
@@ -1261,6 +1313,18 @@ details.cara p{line-height:1.65}
     <div class="cd"><b>Fitur</b><div class="mu" style="font-size:12.5px;margin:2px 0 6px">Mematikan fitur juga menghentikan pengingat dan hitungan otomatisnya.</div><div id="pnFitur"></div></div>
     <div class="cd"><b>Model AI per tugas</b><div class="mu" style="font-size:12.5px;margin:2px 0 2px">Tombol redup berarti kuncinya belum diisi.</div><div id="pnModel"></div></div>
    </div>
+   <div class="cd" style="margin-top:16px"><b>Meteran jatah AI hari ini</b><div class="mu" style="font-size:12.5px;margin:2px 0 0">Jumlah panggilan per penyedia. Angka berlabel "perkiraan" memakai batas yang bisa kamu ubah (klik angkanya); "asli" berasal langsung dari penyedia. Peringatan masuk Inbox saat sisa 20%.</div>
+    <div class="mtr" id="pnMeter"></div><div id="pnBayar" class="mu" style="font-size:12.5px;margin-top:10px"></div>
+    <b style="display:block;margin-top:18px;font-size:13.5px">7 hari terakhir</b><div id="pnMeter7"></div></div>
+   <div class="pnG" style="margin-top:16px">
+    <div class="cd"><b>Antrean cadangan</b><div class="mu" style="font-size:12.5px;margin:2px 0 0">Saat Gemini penuh, AI dioper ke penyedia berikutnya sesuai urutan ini. Yang kena batas diistirahatkan 2 menit.</div><div class="cdg" id="pnCad"></div><div class="mu" id="pnHemat" style="font-size:12.5px;margin-top:10px"></div></div>
+    <div class="cd"><b>Adu model</b><div class="mu" style="font-size:12.5px;margin:2px 0 8px">Satu pertanyaan ke 2–3 model sekaligus. Model berbayar (Argon, Claude) memakai saldo sungguhan.</div>
+     <textarea id="aduIn" rows="3" maxlength="3000" placeholder="contoh: Jelaskan beda ESP32 dan Arduino Nano untuk proyek kapal" style="width:100%" aria-label="Pertanyaan adu model"></textarea>
+     <div class="pnM" id="aduPil"></div>
+     <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="bt g" type="button" id="aduJalan">Adu sekarang</button><span class="mu" id="aduMsg" style="font-size:12.5px"></span></div>
+     <div id="aduSkor" class="mu" style="font-size:12.5px;margin-top:8px"></div></div>
+   </div>
+   <div class="adu" id="aduHasil"></div>
    <div class="cd" style="margin-top:16px"><b>Kunci AI</b><div class="mu" style="font-size:12.5px;margin:2px 0 4px">Disimpan terenkripsi, tidak ikut backup, dan tidak pernah ditampilkan utuh. Kunci dari panel mengalahkan nilai di Render; "Pakai nilai Render" menghapus isian panel.</div><div id="pnKey"></div></div>
    <div class="cd" style="margin-top:16px"><b>Halaman</b><div class="mu" style="font-size:12.5px;margin:2px 0 8px">Halaman yang dimatikan hilang dari menu semua orang kecuali Dev (Dev melihat tanda "mati").</div><div class="pnHal" id="pnHal"></div></div>
    <div class="cd" style="margin-top:16px"><b>Riwayat perubahan</b><div class="pnH" id="pnRiwayat"></div></div>
@@ -1422,9 +1486,10 @@ details.cara p{line-height:1.65}
 
  <section id="p-apex" class="pg" hidden>
   <h1>Tanya Apex</h1>
-  <p class="mu">Khusus kamu (token admin). Apex bisa <b>membaca</b> data MCI lewat alat: stok gudang, produk, kas, invoice, hutang, iuran, anggota, blacklist, catatan, perpustakaan, sensor IoT, dan status bot. Dia cek datanya dulu baru menjawab, dan label di bawah jawaban menunjukkan apa saja yang dia cek. Apex <b>tidak mengubah</b> data dan tidak pernah membuka token atau foto bukti.</p>
+  <p class="mu">Khusus kamu (token admin). Apex bisa <b>membaca</b> data MCI lewat alat: stok gudang, produk, kas, invoice, hutang, iuran, anggota, blacklist, catatan, perpustakaan, sensor IoT, dan status bot. Dia cek datanya dulu baru menjawab, dan label di bawah jawaban menunjukkan apa saja yang dia cek. Apex tidak pernah membuka token atau foto bukti. Apex bisa <b>mengusulkan</b> catatan kas, tugas, atau catatan pribadi; usulannya muncul sebagai kartu dan baru dijalankan setelah kamu menekan Setujui.</p>
   <div class="cd">
    <div class="seg" id="apxModel" role="radiogroup" aria-label="Model AI" style="margin:0 0 12px;background:#EFECE4;flex-wrap:wrap"></div>
+   <div class="apu" id="apxUsul" aria-live="polite"></div>
    <div class="apx" id="apxLog" aria-live="polite"></div>
    <div class="apxs" id="apxSaran"></div>
    <div class="bar" style="margin:12px 0 0;align-items:flex-end"><textarea id="apxIn" rows="2" maxlength="1500" placeholder="Tanya apa saja, misal: LED sisa berapa?" style="flex:1 1 60%;min-width:220px" aria-label="Pertanyaan untuk Apex"></textarea>
@@ -1927,7 +1992,8 @@ function show(p) {
   if (p === "invoice") loadInvoice();
   if (p === "info") piBuka();
   if (p === "absen") abMuat();
-  if (p === "apex") { apxRender(); apxMuat(); setTimeout(() => $("#apxIn").focus(), 50); }
+  if (p === "apex") { apxRender(); apxMuat(); apxUsul(); setTimeout(() => $("#apxIn").focus(), 50); }
+  if (p === "graf") grafMuat();
   if (p === "hutang") loadHutang();
   if (p === "anggota") loadAnggota();
   if (p === "panel") pnMuat();
@@ -3864,8 +3930,16 @@ async function apxTanya(teks) {
       catch (e2) { Object.assign(jwb, {text: "⚠️ " + e2.message, galat: true, alir: false}); }
     } else jwb.alir = false;
   }
-  APX_BUSY = false; apxRender(); $("#apxIn").focus();
+  APX_BUSY = false; apxRender(); $("#apxIn").focus(); apxUsul();
 }
+async function apxUsul() {
+  try { const d = await api("/api/apex/usul"); const ik = {kas: "💰", tugas: "📋", catatan: "📝"};
+    $("#apxUsul").innerHTML = d.menunggu.map(u => `<div class="cd"><span>${ik[u.jenis] || "•"} <b>Usulan Apex:</b> ${esc(u.ringkas)}</span><button class="bt g" type="button" data-usul="${u.id}" data-a="setujui">Setujui</button><button class="bt o" type="button" data-usul="${u.id}" data-a="tolak">Tolak</button></div>`).join(""); }
+  catch (e) {}
+}
+$("#apxUsul").onclick = async e => { const b = e.target.closest("[data-usul]"); if (!b) return; b.disabled = true;
+  try { await api("/api/apex/usul", {json: {id: +b.dataset.usul, aksi: b.dataset.a}}); pesan(b.dataset.a === "setujui" ? "Disetujui dan dijalankan" : "Usulan ditolak"); }
+  catch (er) { alert(er.message); } apxUsul(); };
 $("#apxModel").onclick = e => { const b = e.target.closest("[data-apm]"); if (!b || b.disabled) return; APX_PILIH = b.dataset.apm; try { localStorage.setItem("apxModel", APX_PILIH); } catch (er) {} apxRender(); };
 $("#apxSaran").innerHTML = APX_SARAN.map(q => `<button type="button">${esc(q)}</button>`).join("");
 $$("#apxSaran button").forEach(b => b.onclick = () => apxTanya(b.textContent));
@@ -7395,6 +7469,7 @@ function pnRender() {
   const mati = new Set(d.hal_mati || []), fh = new Set(); d.fitur.filter(f => !f.aktif).forEach(f => (FITUR_HAL[f.id] || []).forEach(p => fh.add(p)));
   const hal = $$("#sd .nv[data-p]").filter(b => !["panel", "beranda"].includes(b.dataset.p)).map(b => ({p: b.dataset.p, nama: (b.childNodes[0] || b).textContent.trim()}));
   $("#pnHal").innerHTML = hal.map(h => `<div class="pnR"><div class="tx">${esc(h.nama)}${fh.has(h.p) ? '<small>mati karena fiturnya dimatikan</small>' : ""}</div>${pnSk(!mati.has(h.p) && !fh.has(h.p), `data-pnh="${h.p}" data-nama="${esc(h.nama)}" aria-label="${esc(h.nama)}" ${fh.has(h.p) ? "disabled" : ""}`)}</div>`).join("");
+  pnMeter(d); pnCad(d); if (!ADU.mesin.length) aduMuat();
   $("#pnRiwayat").innerHTML = d.riwayat.map(r => `<div><span class="mu">${esc(String(r.t || "").slice(0, 16).replace("T", " "))}</span> · ${esc(r.aksi)}</div>`).join("") || '<span class="mu">Belum ada perubahan.</span>';
 }
 $("#p-panel").addEventListener("click", async e => {
@@ -7417,6 +7492,174 @@ $("#pnGanti").onclick = async () => {
   try { await api("/api/panel/pin", {json: {pin: lama, pin_baru: baru}}); pesan("PIN diganti"); PND = await api("/api/panel"); pnRender(); } catch (e) { alert(e.message); }
 };
 
+
+/* ================= AI PLUS: meteran, cadangan, adu model ================= */
+const WRN = {gemini: "#3B6FD8", lite: "#7FA3EE", hydrogen: "#2BA39B", argon: "#8A5CD1", claude: "#C27C4E", groq: "#E0533D", mistral: "#E8A33A", nvidia: "#76B900", cloudflare: "#F38020", lain: "#9AA3B2"};
+const NMA = {gemini: "Gemini Flash", lite: "Flash Lite", hydrogen: "Hydrogen", argon: "Argon", claude: "Claude", groq: "Groq", mistral: "Mistral", nvidia: "NVIDIA", cloudflare: "Cloudflare", lain: "Lainnya"};
+const rpx = n => "Rp" + Math.round(n || 0).toLocaleString("id-ID");
+const tglPendek = t => { const d = new Date(t + "T00:00:00"); return isNaN(d) ? t : d.toLocaleDateString("id-ID", {day: "numeric", month: "short"}); };
+function svgBatang(data, kunci, o = {}) {   // diagram batang (bertumpuk bila kunci > 1). data: [{label, nilai:{k:n}}]
+  const W = o.w || 560, H = o.h || 200, kiri = 40, bawah = 26, atas = 10, n = data.length || 1;
+  const maks = Math.max(1, ...data.map(d => o.berdampingan ? Math.max(...kunci.map(k => d.nilai[k] || 0)) : kunci.reduce((a, k) => a + (d.nilai[k] || 0), 0)));
+  const sk = v => (H - bawah - atas) * v / maks, lw = (W - kiri) / n, bw = Math.min(46, lw * .62);
+  const nice = maks >= 1e6 ? v => (v / 1e6).toFixed(1).replace(".0", "") + "jt" : maks >= 1e3 ? v => Math.round(v / 1e3) + "rb" : v => Math.round(v);
+  let g = [0, .5, 1].map(f => `<line class="ax" x1="${kiri}" x2="${W}" y1="${H - bawah - sk(maks * f)}" y2="${H - bawah - sk(maks * f)}"/><text x="${kiri - 6}" y="${H - bawah - sk(maks * f) + 4}" text-anchor="end">${nice(maks * f)}</text>`).join("");
+  data.forEach((d, i) => {
+    const x0 = kiri + lw * i + (lw - bw) / 2; let y = H - bawah;
+    if (o.berdampingan) { const w2 = bw / kunci.length; kunci.forEach((k, j) => { const h = sk(d.nilai[k] || 0); g += `<rect x="${x0 + j * w2}" y="${H - bawah - h}" width="${w2 - 2}" height="${h}" rx="3" fill="${o.warna[k]}"><title>${esc(d.label)} · ${esc(o.nama[k])}: ${(d.nilai[k] || 0).toLocaleString("id-ID")}</title></rect>`; }); }
+    else kunci.forEach(k => { const v = d.nilai[k] || 0; if (!v) return; const h = sk(v); y -= h; g += `<rect x="${x0}" y="${y}" width="${bw}" height="${h}" fill="${o.warna[k]}"><title>${esc(d.label)} · ${esc(o.nama[k])}: ${v.toLocaleString("id-ID")}</title></rect>`; });
+    if (n <= 16 || i % 2 === 0) g += `<text x="${kiri + lw * i + lw / 2}" y="${H - 8}" text-anchor="middle">${esc(d.label)}</text>`;
+  });
+  const lg = o.legenda === false ? "" : `<div class="lgd">${kunci.map(k => `<span><i style="background:${o.warna[k]}"></i>${esc(o.nama[k])}</span>`).join("")}</div>`;
+  return `<svg class="gbar" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.judul || "Diagram batang")}">${g}</svg>${lg}`;
+}
+function pnMeter(d) {
+  if (!d.kuota) return;
+  $("#pnMeter").innerHTML = d.kuota.map(k => { const kl = k.penuh || k.persen >= 80 ? "m" : k.persen >= 60 ? "k" : "";
+    return `<div class="r ${k.siap ? "" : "off"}"><span title="${esc(k.nama)}">${esc(k.nama)}${k.penuh ? ' <span class="ch r">penuh</span>' : ""}</span><div class="tr" role="meter" aria-valuemin="0" aria-valuemax="${k.batas}" aria-valuenow="${k.pakai}" aria-label="${esc(k.nama)}"><div class="bt2 ${kl}" style="width:${k.persen}%"></div></div>
+      <span class="n">${k.pakai.toLocaleString("id-ID")} / ${k.asli ? k.batas.toLocaleString("id-ID") + " <small>asli</small>" : `<button type="button" data-kb="${k.id}" data-v="${k.batas}" title="Ubah batas perkiraan">${k.batas.toLocaleString("id-ID")}</button>`}</span></div>`; }).join("");
+  const a = d.anggaran || {}, b = d.berbayar || {};
+  $("#pnBayar").innerHTML = `Berbayar hari ini: Argon ${b.argon || 0}× · Claude ${b.claude || 0}× · Anggaran bulan ini ${rpx(a.pakai)}${a.batas ? " dari " + rpx(a.batas) : ""}`;
+  const hari = d.hari || [], ks = Object.keys(WRN).filter(k => hari.some(h => h.per[k]));
+  $("#pnMeter7").innerHTML = hari.length ? svgBatang(hari.map(h => ({label: tglPendek(h.tanggal), nilai: h.per})), ks, {warna: WRN, nama: NMA, judul: "Panggilan AI 7 hari terakhir"}) : '<p class="mu" style="font-size:13px">Belum ada data.</p>';
+}
+function pnCad(d) {
+  if (!d.cadangan) return;
+  const on = d.cadangan.urut, semua = d.cadangan.semua, urut = [...on.map(k => semua.find(x => x.id === k)).filter(Boolean), ...semua.filter(x => !on.includes(x.id))];
+  $("#pnCad").innerHTML = urut.map((x, i) => { const aktif = on.includes(x.id), st = x.stat || {};
+    return `<div class="r ${aktif ? "" : "off"}"><span class="nm">${aktif ? on.indexOf(x.id) + 1 : "–"}</span><b>${esc(x.nama)}<br><small>${!x.siap ? "kunci belum diisi" : x.istirahat ? `istirahat ${x.istirahat} dtk` : "siap"}${st.dipakai ? ` · dipakai ${st.dipakai}×` : ""}${st.gagal ? ` · gagal ${st.gagal}×` : ""}</small></b>
+      <button type="button" class="ud" data-cu="${x.id}" data-d="-1" ${!aktif || on.indexOf(x.id) === 0 ? "disabled" : ""} aria-label="Naikkan ${esc(x.nama)}">▲</button><button type="button" class="ud" data-cu="${x.id}" data-d="1" ${!aktif || on.indexOf(x.id) === on.length - 1 ? "disabled" : ""} aria-label="Turunkan ${esc(x.nama)}">▼</button>${pnSk(aktif, `data-cs="${x.id}" aria-label="${esc(x.nama)}"`)}</div>`; }).join("");
+  const h = d.hemat || {};
+  $("#pnHemat").textContent = `Sejak server menyala: ${h.router || 0} pesan dialihkan ke model hemat/tanpa AI, ${h.cache || 0} jawaban diambil dari cache (Pusat Info: ${h.pi_cache || 0} cache, ${h.pi_lokal || 0} tanpa AI).`;
+}
+let ADU = {mesin: [], skor: {}, pilih: []};
+async function aduMuat() { try { ADU = Object.assign(ADU, await api("/api/panel/adu")); ADU.pilih = ADU.pilih.length ? ADU.pilih : ADU.mesin.filter(m => m.siap).slice(0, 2).map(m => m.id); aduRender(); } catch (e) {} }
+function aduRender() {
+  $("#aduPil").innerHTML = ADU.mesin.map(m => `<button type="button" class="${ADU.pilih.includes(m.id) ? "on" : ""}" data-adm="${m.id}" ${m.siap ? "" : "disabled title=\"Kunci belum diisi\""}>${esc(m.nama)}</button>`).join("");
+  const sk = Object.entries(ADU.skor || {}).sort((a, b) => b[1] - a[1]);
+  $("#aduSkor").textContent = sk.length ? "Paling sering menang: " + sk.map(([k, v]) => `${(ADU.mesin.find(m => m.id === k) || {}).nama || k} ${v}×`).join(" · ") : "";
+}
+$("#aduPil").onclick = e => { const b = e.target.closest("[data-adm]"); if (!b || b.disabled) return; const m = b.dataset.adm;
+  ADU.pilih = ADU.pilih.includes(m) ? ADU.pilih.filter(x => x !== m) : [...ADU.pilih, m].slice(-3); aduRender(); };
+$("#aduJalan").onclick = async () => {
+  const q = $("#aduIn").value.trim(); if (!q) return $("#aduIn").focus(); if (ADU.pilih.length < 2) return $("#aduMsg").textContent = "Pilih 2–3 model.";
+  $("#aduJalan").disabled = true; $("#aduMsg").textContent = "Menunggu jawaban…"; $("#aduHasil").innerHTML = "";
+  try { const d = await api("/api/panel/adu", {json: {prompt: q, mesin: ADU.pilih}}); $("#aduMsg").textContent = "";
+    $("#aduHasil").innerHTML = d.hasil.map(h => `<div class="cd"><div><b>${esc(h.nama)}</b> <span class="mu" style="font-size:12px">${h.detik} dtk${h.biaya ? " · " + esc(h.biaya) : ""}</span></div><div class="tx ${h.ok ? "" : "er"}">${esc(h.teks)}</div>${h.ok ? `<button class="bt o" type="button" data-adp="${h.mesin}">Paling bagus</button>` : ""}</div>`).join(""); }
+  catch (e) { if (e.kunci) return pnKunciTampil(false); $("#aduMsg").textContent = e.message; }
+  $("#aduJalan").disabled = false;
+};
+$("#aduHasil").onclick = async e => { const b = e.target.closest("[data-adp]"); if (!b) return;
+  try { const d = await api("/api/panel/adu", {json: {pilih: b.dataset.adp}}); ADU.skor = d.skor; aduRender(); $$("#aduHasil [data-adp]").forEach(x => x.disabled = true); b.textContent = "✓ Dipilih"; } catch (er) { alert(er.message); } };
+$("#pnCad").onclick = async e => {
+  const b = e.target.closest("button"); if (!b || b.disabled || !PND) return; let u = [...PND.cadangan.urut];
+  if (b.dataset.cu) { const i = u.indexOf(b.dataset.cu), j = i + +b.dataset.d; if (i < 0 || j < 0 || j >= u.length) return; [u[i], u[j]] = [u[j], u[i]]; }
+  else if (b.dataset.cs) { const k = b.dataset.cs; u = u.includes(k) ? u.filter(x => x !== k) : [...u, k]; }
+  else return;
+  b.disabled = true; await pnKirim({aksi: "cadangan", urut: u}, "Urutan cadangan disimpan");
+};
+$("#pnMeter").onclick = async e => { const b = e.target.closest("[data-kb]"); if (!b) return;
+  const v = prompt("Batas panggilan per hari (perkiraan) untuk penyedia ini:", b.dataset.v); if (!v) return;
+  const n = parseInt(v, 10); if (!(n > 0)) return alert("Isi angka lebih dari 0."); await pnKirim({aksi: "kuota_batas", id: b.dataset.kb, batas: n}, "Batas disimpan"); };
+
+/* ================= PETA & GRAFIK ================= */
+const GRUP = {anggota: ["#3B6FD8", "Anggota"], divisi: ["#C9962B", "Divisi"], proyek: ["#2E8B57", "Proyek"], tugas: ["#8A5CD1", "Tugas aktif"], alat: ["#E07A3D", "Alat dipinjam"], uu: ["#B5483A", "Pasal UU"]};
+let GF = null;
+function grafMuat() { if (!ADM()) return; if ($("#grafGrafik").hidden) petaMuat(); else grafikMuat(); }
+$("#grafSeg").onclick = e => { const b = e.target.closest("[data-gf]"); if (!b) return; $$("#grafSeg button").forEach(x => x.classList.toggle("on", x === b));
+  $("#grafPeta").hidden = b.dataset.gf !== "peta"; $("#grafGrafik").hidden = b.dataset.gf !== "grafik"; grafMuat(); };
+async function petaMuat() {
+  try { const d = await api("/api/graf"); petaMulai(d); } catch (e) { $("#grafInfo").textContent = e.message; }
+}
+function petaMulai(d) {
+  const cv = $("#grafKanvas"), dpr = window.devicePixelRatio || 1;
+  if (GF) cancelAnimationFrame(GF.raf);
+  const W = cv.clientWidth, H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr;
+  const idx = {}, N = d.nodes.map((n, i) => { const a = i / Math.max(1, d.nodes.length) * Math.PI * 2, r = 80 + (n.grup === "divisi" ? 0 : 140 + Math.random() * 60);
+    return idx[n.id] = Object.assign({}, n, {x: Math.cos(a) * r, y: Math.sin(a) * r, vx: 0, vy: 0, r: n.grup === "divisi" ? 13 : n.grup === "anggota" ? 9 : 6}); });
+  const E = d.edges.map(e => ({a: idx[e.a], b: idx[e.b], label: e.label})).filter(e => e.a && e.b);
+  N.forEach(n => n.deg = E.filter(e => e.a === n || e.b === n).length);
+  GF = {N, E, cam: {x: W / 2, y: H / 2, k: 1}, pilih: null, panas: 1, raf: 0, cv, W, H, dpr};
+  $("#grafLgd").innerHTML = Object.entries(GRUP).filter(([g]) => N.some(n => n.grup === g)).map(([g, [w, nm]]) => `<span><i style="background:${w};border-radius:50%"></i>${nm} (${N.filter(n => n.grup === g).length})</span>`).join("");
+  $("#grafInfo").textContent = N.length ? "Klik titik untuk melihat koneksinya." : "Belum ada data untuk dipetakan.";
+  const gerak = !RINGAN && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+  for (let i = 0; i < (gerak ? 220 : 400); i++) petaLangkah();   // susun dulu, lalu pas-kan ke layar
+  if (!gerak) GF.panas = 0;
+  petaPas();
+  const loop = () => { if (GF.panas > .02) petaLangkah(); petaGambar(); GF.raf = requestAnimationFrame(loop); };
+  loop();
+}
+function petaPas() {   // zoom & geser supaya seluruh peta pas di kanvas
+  const {N, W, H} = GF; if (!N.length) return;
+  const xs = N.map(n => n.x), ys = N.map(n => n.y), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const k = Math.max(.35, Math.min(1.6, Math.min((W - 80) / Math.max(1, x1 - x0), (H - 80) / Math.max(1, y1 - y0))));
+  GF.cam = {k, x: W / 2 - (x0 + x1) / 2 * k, y: H / 2 - (y0 + y1) / 2 * k};
+}
+function petaLangkah() {
+  const {N, E} = GF, t = GF.panas;
+  for (let i = 0; i < N.length; i++) for (let j = i + 1; j < N.length; j++) {
+    const a = N[i], b = N[j]; let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy || .01; if (d2 > 250000) continue;
+    const f = 2600 / d2, d = Math.sqrt(d2); dx /= d; dy /= d; a.vx += dx * f; a.vy += dy * f; b.vx -= dx * f; b.vy -= dy * f; }
+  E.forEach(e => { const dx = e.b.x - e.a.x, dy = e.b.y - e.a.y, d = Math.sqrt(dx * dx + dy * dy) || .01, f = (d - 105) * .02;
+    e.a.vx += dx / d * f; e.a.vy += dy / d * f; e.b.vx -= dx / d * f; e.b.vy -= dy / d * f; });
+  N.forEach(n => { n.vx -= n.x * .004; n.vy -= n.y * .004; if (n.tahan) { n.vx = n.vy = 0; return; }
+    n.x += Math.max(-12, Math.min(12, n.vx * t)); n.y += Math.max(-12, Math.min(12, n.vy * t)); n.vx *= .6; n.vy *= .6; });
+  GF.panas *= .992;
+}
+function petaGambar() {
+  const {cv, N, E, cam, dpr, pilih} = GF, c = cv.getContext("2d"), gelap = document.documentElement.dataset.tema === "gelap";
+  c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, GF.W, GF.H); c.translate(cam.x, cam.y); c.scale(cam.k, cam.k);
+  const dekat = pilih ? new Set([pilih, ...E.filter(e => e.a === pilih || e.b === pilih).flatMap(e => [e.a, e.b])]) : null;
+  E.forEach(e => { const on = !dekat || (dekat.has(e.a) && dekat.has(e.b) && (e.a === pilih || e.b === pilih));
+    c.strokeStyle = gelap ? `rgba(200,210,230,${on ? .45 : .06})` : `rgba(20,30,60,${on ? .35 : .05})`; c.lineWidth = on && pilih ? 1.6 / cam.k : 1 / cam.k;
+    c.beginPath(); c.moveTo(e.a.x, e.a.y); c.lineTo(e.b.x, e.b.y); c.stroke(); });
+  N.forEach(n => { const on = !dekat || dekat.has(n); c.globalAlpha = on ? 1 : .18; c.fillStyle = (GRUP[n.grup] || ["#999"])[0];
+    c.beginPath(); c.arc(n.x, n.y, n.r + Math.min(6, n.deg * .4), 0, Math.PI * 2); c.fill();
+    if (n === pilih) { c.lineWidth = 3 / cam.k; c.strokeStyle = gelap ? "#fff" : "#0B1730"; c.stroke(); }
+    if (on && (cam.k > .8 || n.grup === "divisi" || n.grup === "anggota" || n === pilih)) { c.fillStyle = gelap ? "#E6E9EF" : "#141B2B"; c.font = `${n.grup === "divisi" ? 600 : 400} ${12 / Math.max(.7, cam.k)}px Inter, system-ui, sans-serif`; c.textAlign = "center"; c.fillText(n.label, n.x, n.y + n.r + 14 / Math.max(.7, cam.k)); }
+    c.globalAlpha = 1; });
+}
+(function petaInput() {
+  const cv = $("#grafKanvas"); let seret = null, geser = null, jauh = 0, cubit = null;
+  const titik = ev => { const r = cv.getBoundingClientRect(); return {x: (ev.clientX - r.left - GF.cam.x) / GF.cam.k, y: (ev.clientY - r.top - GF.cam.y) / GF.cam.k, sx: ev.clientX, sy: ev.clientY}; };
+  const cari = p => GF.N.slice().reverse().find(n => (n.x - p.x) ** 2 + (n.y - p.y) ** 2 <= (n.r + 6) ** 2);
+  const ptr = new Map();
+  cv.addEventListener("pointerdown", ev => { if (!GF) return; cv.setPointerCapture(ev.pointerId); ptr.set(ev.pointerId, ev);
+    if (ptr.size === 2) { const [a, b] = [...ptr.values()]; cubit = {d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), k: GF.cam.k}; seret = geser = null; return; }
+    const p = titik(ev), n = cari(p); jauh = 0;
+    if (n) { seret = n; n.tahan = true; GF.panas = Math.max(GF.panas, .3); } else geser = {x: ev.clientX - GF.cam.x, y: ev.clientY - GF.cam.y}; cv.classList.add("seret"); });
+  cv.addEventListener("pointermove", ev => { if (!GF) return; if (ptr.has(ev.pointerId)) ptr.set(ev.pointerId, ev);
+    if (cubit && ptr.size === 2) { const [a, b] = [...ptr.values()]; GF.cam.k = Math.max(.3, Math.min(3, cubit.k * Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) / cubit.d)); return; }
+    jauh += Math.abs(ev.movementX || 0) + Math.abs(ev.movementY || 0);
+    if (seret) { const p = titik(ev); seret.x = p.x; seret.y = p.y; } else if (geser) { GF.cam.x = ev.clientX - geser.x; GF.cam.y = ev.clientY - geser.y; } });
+  const lepas = ev => { if (!GF) return; ptr.delete(ev.pointerId); if (ptr.size < 2) cubit = null; cv.classList.remove("seret");
+    if (seret) { seret.tahan = false; if (jauh < 5) petaPilih(seret); seret = null; } else if (geser && jauh < 5) petaPilih(null); geser = null; };
+  cv.addEventListener("pointerup", lepas); cv.addEventListener("pointercancel", lepas);
+  cv.addEventListener("wheel", ev => { if (!GF) return; ev.preventDefault(); const r = cv.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top, k0 = GF.cam.k;
+    const k = Math.max(.3, Math.min(3, k0 * (ev.deltaY < 0 ? 1.12 : 1 / 1.12))); GF.cam.x = mx - (mx - GF.cam.x) * k / k0; GF.cam.y = my - (my - GF.cam.y) * k / k0; GF.cam.k = k; }, {passive: false});
+  addEventListener("resize", () => { if (GF && !$("#p-graf").hidden && !$("#grafPeta").hidden) { const dpr = window.devicePixelRatio || 1; GF.W = cv.clientWidth; GF.H = cv.clientHeight; cv.width = GF.W * dpr; cv.height = GF.H * dpr; } });
+})();
+function petaPilih(n) {
+  GF.pilih = n;
+  if (!n) return $("#grafInfo").textContent = "Klik titik untuk melihat koneksinya.";
+  const kn = GF.E.filter(e => e.a === n || e.b === n).map(e => { const o = e.a === n ? e.b : e.a; return `${o.label} (${e.label})`; });
+  $("#grafInfo").innerHTML = `<b>${esc(n.label)}</b> · ${esc((GRUP[n.grup] || [, n.grup])[1])}${n.info ? " · " + esc(n.info) : ""}<br>${kn.length ? "Terhubung ke: " + esc(kn.slice(0, 14).join(", ")) + (kn.length > 14 ? ` dan ${kn.length - 14} lainnya` : "") : "Belum terhubung ke apa pun."}`;
+}
+async function grafikMuat() {
+  let d; try { d = await api("/api/grafik"); } catch (e) { $("#gKas").innerHTML = `<p class="er">${esc(e.message)}</p>`; return; }
+  const kosong = '<p class="mu" style="font-size:13px">Belum ada data.</p>';
+  const bln = b => { const [y, m] = b.split("-"); return new Date(+y, +m - 1, 1).toLocaleDateString("id-ID", {month: "short"}); };
+  $("#gKas").innerHTML = d.kas.length ? svgBatang(d.kas.map(k => ({label: bln(k.bulan), nilai: {masuk: k.masuk, keluar: k.keluar}})), ["masuk", "keluar"], {berdampingan: true, warna: {masuk: "#2E8B57", keluar: "#B5483A"}, nama: {masuk: "Masuk", keluar: "Keluar"}, judul: "Kas per bulan"}) : kosong;
+  const ks = Object.keys(WRN).filter(k => d.ai.some(h => h.per[k]));
+  $("#gAi").innerHTML = d.ai.length ? svgBatang(d.ai.map(h => ({label: tglPendek(h.tanggal), nilai: h.per})), ks, {warna: WRN, nama: NMA, judul: "Pemakaian AI 14 hari"}) : kosong;
+  $("#gStok").innerHTML = d.stok.length ? `<div class="mtr">${d.stok.map(s => { const ref = Math.max(s.minimum * 2, s.jumlah, 1), p = Math.round(s.jumlah * 100 / ref), kl = s.minimum && s.jumlah <= s.minimum ? "m" : s.minimum && s.jumlah <= s.minimum * 1.5 ? "k" : "";
+      return `<div class="r"><span title="${esc(s.nama)}">${esc(s.nama)}</span><div class="tr"><div class="bt2 ${kl}" style="width:${p}%"></div></div><span class="n">${s.jumlah}${s.minimum ? " / min " + s.minimum : ""}</span></div>`; }).join("")}</div>` : kosong;
+  const tg = d.tugas || {}, tot = (tg.belum || 0) + (tg.proses || 0) + (tg.selesai || 0);
+  $("#gTugas").innerHTML = tot ? svgBatang([{label: "Belum", nilai: {n: tg.belum || 0}}, {label: "Proses", nilai: {n: tg.proses || 0}}, {label: "Selesai", nilai: {n: tg.selesai || 0}}], ["n"], {warna: {n: "#8A5CD1"}, nama: {n: "Tugas"}, legenda: false, h: 180, judul: "Status tugas"}) : kosong;
+  $("#gAbsen").innerHTML = (d.absen_mati ? '<p class="mu" style="font-size:12.5px;margin:4px 0">Fitur absen sedang dimatikan; data lama tetap ditampilkan.</p>' : "")
+    + (d.absen.length ? svgBatang(d.absen.map(a => ({label: tglPendek(a.tanggal), nilai: {n: a.hadir}})), ["n"], {warna: {n: "#3B6FD8"}, nama: {n: "Hadir"}, legenda: false, judul: "Kehadiran harian"}) : kosong);
+}
+
 /* ================= MULAI ================= */
 (async () => {
   if (DEMO) { $("#demoBanner").hidden = false; $("#csv").removeAttribute("href"); $("#csv").onclick = e => { e.preventDefault(); alert("Ekspor CSV aktif di versi server."); }; }
@@ -7427,7 +7670,7 @@ $("#pnGanti").onclick = async () => {
   if (RINGAN) { const vw = $("#voWrap"); if (vw) vw.hidden = true; const sl = $("#sl"); if (sl) sl.insertAdjacentHTML("beforebegin", '<p class="cd mu" id="voRingan" style="margin:0 0 12px">📱 <b>Mode HP Ringan</b> aktif: gedung 3D dimatikan supaya HP tidak berat. Status semua bot tetap tampil di bawah.</p>'); }
   $$(".nv").forEach(b => { const p = PAGE_PERM[b.dataset.p]; if (p && !can(p)) b.style.display = "none"; });
   if (!PUNYA_INBOX()) ["inbox", "bayarkas"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // viewer tidak punya inbox & iuran
-  if (!ADM()) $("#nvPanel").style.display = "none";   // Panel Dev khusus Dev
+  if (!ADM()) { $("#nvPanel").style.display = "none"; $("#nvGraf").style.display = "none"; }   // Panel Dev & Peta khusus Dev
   if (ME.role !== "viewer" && !(ME.fitur_mati || []).includes("absen")) api("/api/absen").then(d => { AB = d; const nb = $("#nbAbsen"); if (nb) nb.hidden = !(d.status === "belum"); }).catch(() => {});   // tanda "!" kalau belum absen
   if (!ADM()) $("#nvApex").style.display = "none";   // Tanya Apex khusus token admin
   inboxBadge(); setInterval(() => { if (!document.hidden && !layarDiam()) inboxBadge(); }, 20000);
