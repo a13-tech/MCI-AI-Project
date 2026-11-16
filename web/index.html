@@ -1848,10 +1848,13 @@ function kpRender() {
   if (!el.dataset.siap || el.dataset.siap !== KP.dev) {
     el.dataset.siap = KP.dev; KP.peta = null;
     el.innerHTML = `<div class="bar" style="margin:0;justify-content:space-between;flex-wrap:wrap"><b>🚢 Dashboard kapal</b>${kapal.length > 1 ? `<select id="kpPilih" style="width:auto">${kapal.map(k => `<option ${k.perangkat === KP.dev ? "selected" : ""}>${esc(k.perangkat)}</option>`).join("")}</select>` : `<span class="ch n">${esc(KP.dev)}</span>`}</div>
-      <div class="kpWrap"><div id="kpPeta">${RINGAN ? "" : '<p class="mu" style="padding:12px">Memuat peta…</p>'}</div><div id="kpPanel"></div></div>
+      <div class="kpWrap"><div id="kpPeta">${RINGAN ? "" : '<p class="mu" style="padding:12px">Memuat peta…</p>'}</div><div id="kpPanel"></div></div><div id="kpAlarm"></div>
       <p class="mu" style="font-size:12px;margin:8px 0 0">Kirim dari ESP32 (atau Home Station yang menerima LoRa lalu meneruskan lewat WiFi): <code>lat</code>, <code>lon</code>, <code>kecepatan</code>, <code>arah</code>, <code>baterai</code>, <code>rssi</code>, <code>suhu</code>, <code>jarak</code>, <code>api</code>, <code>pir</code>. Lokasi hanya terlihat oleh Dev.</p>`;
     const pl = $("#kpPilih"); if (pl) pl.onchange = e => { KP.dev = e.target.value; kpRender(); };
+    kpAlarmForm();
   }
+  const al = (IOTA.alarm || {})[KP.dev], sa = al && al.st || {}, ringkas = $("#kpAlSt");
+  if (ringkas) ringkas.innerHTML = !al || !al.aktif ? '<span class="ch n">Alarm mati</span>' : [sa.luar ? '<span class="ch r">🚨 Di luar area</span>' : al.lat != null ? '<span class="ch g">Dalam area</span>' : "", sa.bat ? '<span class="ch r">🔋 Baterai lemah</span>' : "", sa.hilang ? '<span class="ch r">📡 Sinyal hilang</span>' : ""].join(" ") || '<span class="ch g">Alarm aktif</span>';
   $("#kpPanel").innerHTML = `<div class="kpG kpS"><span>${d.online ? "🟢 Online" : "⚪ Offline"}</span><b style="font-size:15px">${ago(d.ts)}</b></div>`
     + kotak("📍", "Posisi", `${lat.toFixed(5)}, ${lon.toFixed(5)}`) + kotak("⚡", "Kecepatan", spd, "knot") + kotak("🧭", "Arah", hdg, "°")
     + kotak("🔋", "Baterai", bat, typeof bat === "number" && bat <= 15 ? "V" : "%", typeof bat === "number" && bat < (bat <= 15 ? 3.4 : 20) ? "color:#C0392B" : "")
@@ -1868,8 +1871,27 @@ function kpRender() {
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 19, attribution: "© OpenStreetMap"}).addTo(KP.peta);
       KP.jejak = L.polyline(jejak, {color: "#D4AF5A", weight: 4, opacity: .85}).addTo(KP.peta); KP.penanda = L.marker([lat, lon], {icon: ikon}).addTo(KP.peta);
     } else { KP.jejak.setLatLngs(jejak); KP.penanda.setLatLng([lat, lon]).setIcon(ikon); }
+    if (KP.lingkar) { KP.lingkar.remove(); KP.lingkar = null; }   // lingkaran batas area (geofence)
+    if (al && al.aktif && al.lat != null && al.lon != null) KP.lingkar = L.circle([al.lat, al.lon], {radius: al.radius_m, color: sa.luar ? "#C0392B" : "#2E8B57", weight: 2, fillOpacity: .07}).addTo(KP.peta);
   }).catch(e => { $("#kpPeta").innerHTML = `<p class="er" style="padding:12px">${esc(e.message)}</p>`; });
   el.hidden = false;
+}
+function kpAlarmForm() {   // setelan alarm kapal (Dev): keluar area, baterai lemah, sinyal hilang -> Inbox + notifikasi HP + Telegram
+  const el = $("#kpAlarm"), a = (IOTA.alarm || {})[KP.dev] || {}; if (!el) return;
+  el.innerHTML = `<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="font-size:13.5px">🔔 Alarm kapal</b><span id="kpAlSt"></span></div>`
+    + (ADM() ? `<details style="margin-top:6px"><summary class="mu" style="cursor:pointer;font-size:13px">Atur alarm (kabar ke Inbox, notifikasi HP, dan Telegram Dev)</summary>
+      <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-weight:600"><input type="checkbox" id="kaOn" style="width:20px;height:20px;flex:none" ${a.aktif ? "checked" : ""}> Nyalakan alarm untuk ${esc(KP.dev)}</label>
+      <div class="fl" style="margin-top:8px"><label>Titik pusat area: lintang<input type="text" inputmode="decimal" id="kaLat" value="${a.lat ?? ""}" placeholder="-6.20000"></label>
+        <label>Bujur<input type="text" inputmode="decimal" id="kaLon" value="${a.lon ?? ""}" placeholder="106.80000"></label>
+        <label>Batas area (meter dari titik pusat)<input type="text" inputmode="numeric" id="kaR" value="${a.radius_m ?? 200}"></label>
+        <label>Baterai lemah di bawah (%)<input type="text" inputmode="numeric" id="kaB" value="${a.baterai ?? 20}"></label>
+        <label>Sinyal dianggap hilang setelah (menit)<input type="text" inputmode="numeric" id="kaH" value="${a.hilang_menit ?? 10}"></label></div>
+      <div class="bar" style="margin:10px 0 0"><button class="bt o" id="kaSini" type="button">📍 Pakai posisi kapal sekarang</button><button class="bt g" id="kaS" type="button">Simpan alarm</button><span class="mu" id="kaMsg"></span></div>
+      <p class="mu" style="font-size:12px;margin:8px 0 0">Kabar hanya dikirim saat keadaan berubah (keluar area, kembali, baterai lemah, sinyal hilang, sinyal kembali), jadi HP tidak dibanjiri. Kosongkan lintang dan bujur kalau tidak mau memakai batas area.</p></details>` : "");
+  if (!ADM()) return;
+  $("#kaSini").onclick = () => { const d = IOTA.devices.find(x => x.perangkat === KP.dev); if (!d) return; $("#kaLat").value = (+kpCari(d.data, "lat")).toFixed(6); $("#kaLon").value = (+kpCari(d.data, "lon", "lng")).toFixed(6); };
+  $("#kaS").onclick = async () => { try { const r = await api("/api/iot/alarm", {json: {perangkat: KP.dev, aktif: $("#kaOn").checked, lat: $("#kaLat").value, lon: $("#kaLon").value, radius_m: $("#kaR").value, baterai: $("#kaB").value, hilang_menit: $("#kaH").value}});
+      (IOTA.alarm = IOTA.alarm || {})[KP.dev] = r.alarm; $("#kaMsg").textContent = "Tersimpan"; kpRender(); } catch (e) { $("#kaMsg").textContent = e.message; } setTimeout(() => { const m = $("#kaMsg"); if (m) m.textContent = ""; }, 3000); };
 }
 $("#iotAdd").onclick = () => { $("#iotRules").insertAdjacentHTML("beforeend", ruleRow()); bindRules(); };
 $("#iotSave").onclick = async () => {

@@ -1634,6 +1634,101 @@ def iot_rules_check(pr, d):
                 asyncio.run_coroutine_threadsafe(iot_alert(pr, r, d[r["metrik"]]), LOOP)
 
 
+# ---------- ALARM KAPAL: keluar area (geofence), baterai lemah, sinyal hilang -> Inbox + push + Telegram ----------
+# Hanya dikirim saat keadaan BERUBAH (aman -> bahaya, bahaya -> aman), bukan tiap data masuk, supaya HP tidak dibanjiri.
+KAPAL_BAWAAN = {"aktif": False, "lat": None, "lon": None, "radius_m": 200, "baterai": 20, "baterai_volt": 3.4, "hilang_menit": 10, "st": {}}
+
+
+def kapal_alarm(pr):
+    semua = SET.setdefault("kapal_alarm", {})
+    a = semua.get(pr)
+    if a is None:
+        return dict(KAPAL_BAWAAN, st={})
+    for k, v in KAPAL_BAWAAN.items():
+        a.setdefault(k, {} if k == "st" else v)
+    return a
+
+
+def _kp_nilai(d, *awalan):
+    for k, v in (d or {}).items():
+        if any(k.startswith(x) for x in awalan) and isinstance(v, (int, float)) and not isinstance(v, bool):
+            return float(v)
+    return None
+
+
+def _jarak_m(lat1, lon1, lat2, lon2):
+    import math
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    a = math.sin((p2 - p1) / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(math.radians(lon2 - lon1) / 2) ** 2
+    return 6371000 * 2 * math.asin(min(1.0, math.sqrt(a)))
+
+
+def _kapal_kabar(pr, judul, isi):
+    def kirim():
+        try:
+            inbox_kirim(_dev_ids(), "info", judul, isi + "\nBuka web → Lab IoT → Dashboard kapal.")
+            set_save()
+        except Exception:
+            log.exception("kabar alarm kapal gagal")
+    threading.Thread(target=kirim, daemon=True).start()   # jangan menahan jawaban ke ESP32
+
+
+def kapal_alarm_cek(pr, data):
+    """Dipanggil tiap data masuk. data = nilai terakhir semua metrik perangkat."""
+    a = (SET.get("kapal_alarm") or {}).get(pr)
+    if not a or not a.get("aktif"):
+        return
+    a = kapal_alarm(pr)
+    st = a["st"]
+    if st.get("hilang"):
+        st["hilang"] = False
+        _kapal_kabar(pr, f"📶 {pr}: sinyal kembali", "Data dari kapal masuk lagi.")
+    lat, lon = _kp_nilai(data, "lat"), _kp_nilai(data, "lon", "lng")
+    if lat is not None and lon is not None and a.get("lat") is not None and a.get("lon") is not None and a.get("radius_m"):
+        j, r = _jarak_m(float(a["lat"]), float(a["lon"]), lat, lon), float(a["radius_m"])
+        if j > r and not st.get("luar"):
+            st["luar"] = True
+            _kapal_kabar(pr, f"🚨 {pr} KELUAR AREA", f"Posisi {lat:.5f}, {lon:.5f} berjarak {j:,.0f} m dari titik pusat (batas {r:,.0f} m).".replace(",", ".")
+                         + f"\nPeta: https://www.google.com/maps?q={lat},{lon}")
+        elif j < r * 0.9 and st.get("luar"):
+            st["luar"] = False
+            _kapal_kabar(pr, f"✅ {pr} kembali ke dalam area", f"Jarak dari titik pusat {j:,.0f} m.".replace(",", "."))
+    kb = next((k for k in data if k.startswith(("baterai", "battery", "batt", "volt")) and isinstance(data[k], (int, float)) and not isinstance(data[k], bool)), None)
+    bat = float(data[kb]) if kb else None
+    if bat is not None:
+        volt = kb.startswith("volt") or (bat <= 5.5 and bat != int(bat))   # metrik "volt..." atau angka kecil berkoma (3,7) = volt; selain itu persen
+        batas, pulih = (float(a["baterai_volt"]), 0.2) if volt else (float(a["baterai"]), 5)
+        if batas and bat < batas and not st.get("bat"):
+            st["bat"] = True
+            _kapal_kabar(pr, f"🔋 {pr}: baterai lemah", f"Baterai {bat:g}{' V' if volt else '%'} (batas {batas:g}{' V' if volt else '%'}). Segera tarik kapal atau ganti baterai.")
+        elif bat > batas + pulih and st.get("bat"):
+            st["bat"] = False
+
+
+def kapal_hilang_cek():
+    """Tiap menit (tanpa menyentuh database): perangkat ber-alarm yang diam lebih dari batas -> kabar 'sinyal hilang' sekali."""
+    while True:
+        time.sleep(60)
+        try:
+            for pr, a in list((SET.get("kapal_alarm") or {}).items()):
+                last = IOT_LAST.get(pr)
+                if not a.get("aktif") or not last or not a.get("hilang_menit"):
+                    continue
+                diam = (time.time() - last["ts"]) / 60
+                st = kapal_alarm(pr)["st"]
+                if diam > float(a["hilang_menit"]) and not st.get("hilang") and diam < 24 * 60:
+                    st["hilang"] = True
+                    d = last.get("data") or {}
+                    lat, lon = _kp_nilai(d, "lat"), _kp_nilai(d, "lon", "lng")
+                    _kapal_kabar(pr, f"📡 {pr}: SINYAL HILANG", f"Tidak ada data selama {diam:.0f} menit."
+                                 + (f"\nPosisi terakhir: https://www.google.com/maps?q={lat},{lon}" if lat is not None and lon is not None else ""))
+        except Exception:
+            log.exception("cek sinyal kapal gagal")
+
+
+threading.Thread(target=kapal_hilang_cek, daemon=True, name="alarm-kapal").start()
+
+
 # ---------- HUTANG ANGGOTA (khusus Bendahara + admin) ----------
 # Aturan: maks HUTANG_MAX per anggota per bulan kalender, jatuh tempo H+HUTANG_HARI.
 # Lewat jatuh tempo tanpa konfirmasi tambahan dari Bendahara -> anggota otomatis tercatat DIKELUARKAN.
@@ -3526,15 +3621,46 @@ def api_iot():
         except Exception:
             log.exception("Gagal simpan data IoT")
         iot_rules_check(pr, data)
+        try:
+            kapal_alarm_cek(pr, IOT_LAST[pr]["data"])
+        except Exception:
+            log.exception("alarm kapal gagal")
         return jsonify({"ok": True})
     need("viewer")
     if role() == "viewer":   # data sensor khusus anggota
         abort(403)
     adm = is_admin(role())
-    out = {"devices": iot_public(adm, full=True), "aktif": bool(IOT_KEY)}
+    out = {"devices": iot_public(adm, full=True), "aktif": bool(IOT_KEY), "alarm": {pr: kapal_alarm(pr) for pr in IOT_LAST}}
     if adm:
         out.update(rules=IOT_RULES, key=IOT_KEY, endpoint=request.host_url.rstrip("/") + "/api/iot", hari=IOT_DAYS)
     return jsonify(out)
+
+
+@app.route("/api/iot/alarm", methods=["POST"])
+def api_iot_alarm():
+    """Setelan alarm kapal per perangkat: {perangkat, aktif, lat, lon, radius_m, baterai, hilang_menit}."""
+    need("admin")
+    d = request.get_json(silent=True) or {}
+    pr = str(d.get("perangkat") or "").lower()
+    if pr not in IOT_LAST:
+        return jsonify({"error": "Perangkat tidak dikenal"}), 404
+
+    def angka(k, lo, hi, kosong=None):
+        v = d.get(k)
+        if v in (None, ""):
+            return kosong
+        v = float(str(v).replace(",", "."))
+        if not lo <= v <= hi:
+            raise ValueError(k)
+        return v
+    try:
+        baru = {"aktif": bool(d.get("aktif")), "lat": angka("lat", -90, 90), "lon": angka("lon", -180, 180), "radius_m": angka("radius_m", 10, 100000, 200),
+                "baterai": angka("baterai", 0, 100, 20), "baterai_volt": angka("baterai_volt", 0, 15, 3.4), "hilang_menit": angka("hilang_menit", 0, 1440, 10), "st": {}}
+    except ValueError as e:
+        return jsonify({"error": f"Nilai tidak masuk akal: {e}"}), 400
+    SET.setdefault("kapal_alarm", {})[pr] = baru   # st dikosongkan: keadaan dinilai ulang dari data berikutnya
+    set_save()
+    return jsonify({"alarm": baru})
 
 
 @app.route("/api/iot/rules", methods=["POST"])
