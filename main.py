@@ -2534,6 +2534,7 @@ async def laporan_jadwal():
         terakhir = time.time()
         try:
             await asyncio.to_thread(sehat_catat)
+            await asyncio.to_thread(groq_ingat_cek)
         except Exception:
             log.exception("Catat kesehatan sistem gagal")
         try:
@@ -2614,6 +2615,22 @@ def _neon_api():
             n.update(cu_detik=float(d.get("compute_time_seconds") or 0), sumber="neon")
     except Exception as e:
         log.warning("Neon API gagal: %s", str(e)[:120])
+
+
+def groq_ingat_cek():
+    """Kunci Groq kedaluwarsa 22 Nov 2026 (kata Dev): ingatkan Dev sekali mulai 20 Nov. Tanggal bisa diganti lewat env GROQ_KEDALUWARSA."""
+    batas = os.getenv("GROQ_KEDALUWARSA", "2026-11-22")
+    try:
+        hari = (datetime.strptime(batas, "%Y-%m-%d").date() - datetime.now(WIB).date()).days
+    except ValueError:
+        return
+    if not mesin_kunci("groq") or hari > 2 or hari < -3 or SET.get("groq_ingat") == batas:
+        return
+    SET["groq_ingat"] = batas
+    set_save()
+    inbox_kirim(_dev_ids(), "info", "🔑 Kunci Groq hampir kedaluwarsa" if hari >= 0 else "🔑 Kunci Groq sudah kedaluwarsa",
+                f"Kunci Groq berlaku sampai {batas}. Buat kunci baru di console.groq.com (pilih masa berlaku paling lama), lalu ganti isi GROQ_API_KEY di Render → Environment. "
+                "Selama belum diganti, web tetap jalan memakai Gemini saja; yang berhenti hanya cadangan Groq dan Whisper.")
 
 
 def sehat_catat():
