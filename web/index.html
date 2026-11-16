@@ -728,6 +728,38 @@ details.cara p{line-height:1.65}
 :root[data-tema=gelap] .seg[style*="EFECE4"] button:not(.on){color:#C8BFB2}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media print{#hpNav{display:none!important}}
+/* ===== Panel Dev ===== */
+#p-panel .pnK{max-width:380px;margin:40px auto;text-align:center}
+#p-panel .pnK input::placeholder{letter-spacing:normal;font-size:15px;font-weight:400}
+#p-panel .pnK input{font:600 26px/1 var(--sans);letter-spacing:.5em;text-align:center;padding:12px 10px 12px 22px;max-width:260px}
+#p-panel .pnG{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start}
+#p-panel .pnR{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+#p-panel .pnR:first-of-type{border-top:0}
+#p-panel .pnR .tx{flex:1;min-width:0}
+#p-panel .pnR .tx small{display:block;color:var(--mute);font-size:12.5px;line-height:1.4;margin-top:2px}
+.sk{position:relative;flex:none;width:44px;height:26px;border-radius:99px;background:var(--line2);border:0;cursor:pointer;transition:background .2s}
+.sk::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .2s}
+.sk[aria-checked=true]{background:#2E8B57}
+.sk[aria-checked=true]::after{transform:translateX(18px)}
+.sk:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.sk:disabled{opacity:.5;cursor:wait}
+#p-panel .pnM{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px}
+#p-panel .pnM button{all:unset;box-sizing:border-box;cursor:pointer;padding:8px 12px;border-radius:10px;border:1px solid var(--line2);font-size:13.5px;line-height:1.25;color:var(--ink);background:var(--paper)}
+#p-panel .pnM button small{display:block;color:var(--mute);font-size:11.5px}
+#p-panel .pnM button:hover{border-color:var(--judul)}
+#p-panel .pnM button.on{border-color:var(--judul);box-shadow:inset 0 0 0 1px var(--judul);font-weight:600}
+#p-panel .pnM button.on::before{content:"✓ "}
+#p-panel .pnM button:disabled{opacity:.45;cursor:not-allowed}
+#p-panel .pnM button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+#p-panel .pnKy{display:grid;grid-template-columns:1fr;gap:6px;padding:12px 0;border-top:1px solid var(--line)}
+#p-panel .pnKy .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#p-panel .pnKy input{flex:1;min-width:160px}
+#p-panel .pnH{max-height:320px;overflow:auto;font-size:13px}
+#p-panel .pnH div{padding:6px 0;border-top:1px solid var(--line)}
+#p-panel .pnH div:first-child{border-top:0}
+#p-panel .pnHal{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 16px}
+#p-panel .pnHal .pnR{border-top:0;padding:6px 0}
+.nv .mt{font-size:10.5px;font-weight:600;color:#B5483A;margin-left:4px}
 </style>
 </head>
 <body>
@@ -755,7 +787,6 @@ details.cara p{line-height:1.65}
  <button class="nv" data-p="alat">Peminjaman Alat</button>
  <button class="nv" data-p="stok">Stok Komponen</button>
  <button class="nv" data-p="mitra">Database Mitra</button>
- <button class="nv" data-p="anggota">Anggota</button>
  <button class="nv" data-p="struktur">Struktur &amp; Divisi</button>
  <button class="nv" data-p="surat">Surat Penerimaan</button>
  <button class="nv" data-p="polling">Voting</button>
@@ -793,6 +824,7 @@ details.cara p{line-height:1.65}
  <button class="nv" data-p="skills">Skills</button>
  <button class="nv" data-p="tim">Tim &amp; Token</button>
  <button class="ng" type="button">Lainnya</button>
+ <button class="nv" data-p="panel" id="nvPanel">Panel Dev</button>
  <button class="nv" data-p="berita">Berita Hari Ini</button>
  <button class="nv" data-p="tentang">Tentang Kami</button>
  <button class="nv inst" id="pasangApp" hidden>Pasang aplikasi</button>
@@ -1205,6 +1237,34 @@ details.cara p{line-height:1.65}
   <p class="mu" style="margin:6px 0 20px;max-width:760px">Proyek yang sedang dikerjakan dan yang sudah diselesaikan anggota MCI. Proyek Selesai yang dicentang "Tampilkan di Portofolio publik" otomatis punya halaman sendiri yang bisa ditemukan di Google: <a href="/portofolio" target="_blank" rel="noopener">buka halaman publik ↗</a></p>
   <div id="pfSorot"></div>
   <div id="pfBox"><p class="mu">Memuat…</p></div>
+ </section>
+
+ <section id="p-panel" class="pg" hidden>
+  <h1>Panel Dev</h1>
+  <div id="pnKunci" class="cd pnK">
+   <b id="pnKJudul">Masukkan PIN</b>
+   <p class="mu" id="pnKKet" style="font-size:13px;margin:6px 0 14px">PIN 6 angka khusus Dev. Panel terkunci lagi otomatis setelah 15 menit tidak dipakai.</p>
+   <input type="password" id="pnPin" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="PIN 6 angka">
+   <input type="password" id="pnPin2" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="Ulangi PIN" placeholder="ulangi PIN" hidden style="margin-top:10px">
+   <div style="margin-top:14px"><button class="bt g" id="pnBuka" type="button">Buka panel</button></div>
+   <p class="er" id="pnKMsg" style="min-height:1.2em;margin-top:10px"></p>
+  </div>
+  <div id="pnIsi" hidden>
+   <div class="bar" style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px">
+    <button class="bt o" id="pnAnggota" type="button">Anggota &amp; token</button>
+    <button class="bt o" id="pnGanti" type="button">Ganti PIN</button>
+    <button class="bt o" id="pnTutup" type="button">Kunci panel</button>
+    <span class="mu" id="pnMsg" style="align-self:center;font-size:13px"></span>
+   </div>
+   <p class="cd er" id="pnSidik" hidden style="font-size:13px">SECRET_KEY di Render berubah sejak kunci AI terakhir disimpan, jadi kunci yang diisi lewat panel tidak bisa dibuka lagi. Isi ulang kuncinya di bawah.</p>
+   <div class="pnG">
+    <div class="cd"><b>Fitur</b><div class="mu" style="font-size:12.5px;margin:2px 0 6px">Mematikan fitur juga menghentikan pengingat dan hitungan otomatisnya.</div><div id="pnFitur"></div></div>
+    <div class="cd"><b>Model AI per tugas</b><div class="mu" style="font-size:12.5px;margin:2px 0 2px">Tombol redup berarti kuncinya belum diisi.</div><div id="pnModel"></div></div>
+   </div>
+   <div class="cd" style="margin-top:16px"><b>Kunci AI</b><div class="mu" style="font-size:12.5px;margin:2px 0 4px">Disimpan terenkripsi, tidak ikut backup, dan tidak pernah ditampilkan utuh. Kunci dari panel mengalahkan nilai di Render; "Pakai nilai Render" menghapus isian panel.</div><div id="pnKey"></div></div>
+   <div class="cd" style="margin-top:16px"><b>Halaman</b><div class="mu" style="font-size:12.5px;margin:2px 0 8px">Halaman yang dimatikan hilang dari menu semua orang kecuali Dev (Dev melihat tanda "mati").</div><div class="pnHal" id="pnHal"></div></div>
+   <div class="cd" style="margin-top:16px"><b>Riwayat perubahan</b><div class="pnH" id="pnRiwayat"></div></div>
+  </div>
  </section>
  <section id="p-backup" class="pg" hidden>
   <div class="ey">Keamanan data</div><h1>Backup Data</h1>
@@ -1819,7 +1879,7 @@ async function api(u, o = {}) {
   if (r.headers.get("X-Offline")) offBanner();
   if (r.status === 401) { location = "/"; throw new Error("login"); }
   let d = {}; try { d = await r.json(); } catch (e) {}
-  if (!r.ok) { const er = new Error(d.error || "Error " + r.status); if (d.kurang) er.kurang = d.kurang; throw er; }
+  if (!r.ok) { const er = new Error(d.error || "Error " + r.status); if (d.kurang) er.kurang = d.kurang; if (d.kunci) er.kunci = true; throw er; }
   { const p = u.split("?")[0], lama = APIC[p];   // untuk fitur Ekspor: GET disimpan; POST/DELETE ke path yang sama ikut memperbarui bila bentuknya sama
     if (d && typeof d === "object" && !Array.isArray(d) && ((!o.method || o.method === "GET") || (lama && Object.keys(lama).every(k => k in d)))) APIC[p] = d; }
   return d;
@@ -1870,6 +1930,7 @@ function show(p) {
   if (p === "apex") { apxRender(); apxMuat(); setTimeout(() => $("#apxIn").focus(), 50); }
   if (p === "hutang") loadHutang();
   if (p === "anggota") loadAnggota();
+  if (p === "panel") pnMuat();
   if (p === "catatan") { loadCatatan(); ctTab(CT_TAB); }
   if (p === "blacklist") loadBlacklist();
   if (p === "sp") loadSP();
@@ -2359,7 +2420,7 @@ function renderAnggota() {
 }
 async function loadAnggota() {
   if (!ADM()) return;
-  try { AGD = await api("/api/anggota"); agForm(); renderAnggota(); } catch (e) { $("#agList").innerHTML = '<tr><td colspan="5" class="er">' + esc(e.message) + "</td></tr>"; }
+  try { AGD = await api("/api/anggota"); agForm(); renderAnggota(); } catch (e) { if (e.kunci) return show("panel"); $("#agList").innerHTML = '<tr><td colspan="5" class="er">' + esc(e.message) + "</td></tr>"; }
   loadHpRingan();
   try { SXD = await api("/api/struktur"); sxForm(); renderSx(); } catch (e) { $("#sxList").innerHTML = '<tr><td colspan="5" class="er">' + esc(e.message) + "</td></tr>"; }
 }
@@ -7276,6 +7337,86 @@ function sorotItem(sel, n = 0) {   // tunggu daftar termuat, lalu gulir ke item 
 }
 addEventListener("hashchange", bukaHash);
 
+
+/* ================= PANEL DEV ================= */
+const FITUR_HAL = {absen: ["absen"], pusat_info: ["info"], studio_gambar: ["gambar"]};
+function halMati() { const m = new Set(ME.hal_mati || []); (ME.fitur_mati || []).forEach(f => (FITUR_HAL[f] || []).forEach(p => m.add(p))); return m; }
+function halMatiAtur() {   // non-Dev: halaman mati hilang dari menu; Dev: tetap ada dengan tanda "mati"
+  const m = halMati();
+  $$("#sd .nv[data-p]").forEach(b => {
+    const p = b.dataset.p, t = b.querySelector(".mt");
+    if (ADM()) { if (m.has(p) && !t) b.insertAdjacentHTML("beforeend", '<span class="mt">mati</span>'); if (!m.has(p) && t) t.remove(); }
+    else if (m.has(p)) b.style.display = "none";
+  });
+  const nb = $("#nbAbsen"); if (nb && m.has("absen")) nb.hidden = true;
+}
+let PND = null, PN_BARU = false;
+const pnSk = (on, attr) => `<button type="button" class="sk" role="switch" aria-checked="${on}" ${attr}></button>`;
+async function pnMuat() {
+  if (!ADM()) return;
+  try {
+    const st = await api("/api/panel/pin");
+    if (!st.terbuka) return pnKunciTampil(!st.ada_pin);
+    PND = await api("/api/panel"); pnRender();
+  } catch (e) { if (e.kunci) return pnKunciTampil(false); $("#pnKMsg").textContent = e.message; }
+}
+function pnKunciTampil(baru) {
+  PN_BARU = baru; $("#pnIsi").hidden = true; $("#pnKunci").hidden = false;
+  $("#pnKJudul").textContent = baru ? "Buat PIN panel" : "Masukkan PIN";
+  $("#pnKKet").textContent = baru ? "Belum ada PIN. Buat PIN 6 angka; simpan baik-baik, karena PIN ini membuka kunci AI dan data anggota." : "PIN 6 angka khusus Dev. Panel terkunci lagi otomatis setelah 15 menit tidak dipakai.";
+  $("#pnPin2").hidden = !baru; $("#pnBuka").textContent = baru ? "Simpan PIN" : "Buka panel";
+  $("#pnPin").value = $("#pnPin2").value = ""; $("#pnKMsg").textContent = ""; setTimeout(() => $("#pnPin").focus(), 50);
+}
+async function pnBuka() {
+  const pin = $("#pnPin").value.trim();
+  if (!/^\d{6}$/.test(pin)) return $("#pnKMsg").textContent = "PIN harus 6 angka.";
+  if (PN_BARU && pin !== $("#pnPin2").value.trim()) return $("#pnKMsg").textContent = "Dua PIN tidak sama.";
+  try { await api("/api/panel/pin", {json: {pin}}); $("#pnKunci").hidden = true; PND = await api("/api/panel"); pnRender(); }
+  catch (e) { $("#pnKMsg").textContent = e.message; $("#pnPin").value = ""; $("#pnPin").focus(); }
+}
+$("#pnBuka").onclick = pnBuka;
+["#pnPin", "#pnPin2"].forEach(q => $(q).onkeydown = e => { if (e.key === "Enter") pnBuka(); });
+async function pnKirim(body, ok) {
+  try { PND = await api("/api/panel", {json: body}); pnRender(); if (ok) pesan(ok); return PND; }
+  catch (e) { if (e.kunci) { pnKunciTampil(false); return; } alert(e.message); pnRender(); }
+}
+function pnRender() {
+  const d = PND; if (!d) return;
+  $("#pnKunci").hidden = true; $("#pnIsi").hidden = false; $("#pnSidik").hidden = d.sidik_cocok !== false;
+  ME.fitur_mati = d.fitur.filter(f => !f.aktif).map(f => f.id); ME.hal_mati = d.hal_mati; halMatiAtur();
+  $("#pnFitur").innerHTML = d.fitur.map(f => `<div class="pnR"><div class="tx"><b>${esc(f.nama)}</b><small>${esc(f.ket)}</small></div>${pnSk(f.aktif, `data-pnf="${f.id}" aria-label="${esc(f.nama)}"`)}</div>`).join("");
+  $("#pnModel").innerHTML = d.model.map(m => `<div class="pnR" style="display:block"><b>${esc(m.judul)}</b><small class="mu" style="display:block;font-size:12.5px">${esc(m.ket)}</small><div class="pnM">${m.pilihan.map(x =>
+      `<button type="button" class="${x.id === m.dipakai ? "on" : ""}" data-pnm="${m.id}" data-id="${esc(x.id)}" ${x.siap ? "" : "disabled title=\"Kunci belum diisi\""}>${esc(x.nama)}<small>${esc(x.harga)}</small></button>`).join("")}</div></div>`).join("");
+  const sumber = s => s === "panel" ? '<span class="ch g">dari panel</span>' : s === "render" ? '<span class="ch">dari Render</span>' : "";
+  $("#pnKey").innerHTML = d.kunci.map(k => `<div class="pnKy"><div><b>${esc(k.label)}</b> <span class="mu" style="font-size:12px">${esc(k.env)}</span> ${sumber(k.sumber)} ${k.terisi ? `<span class="mu" style="font-size:12.5px">${esc(k.ujung)}</span>` : '<span class="ch n">kosong</span>'} <span data-pnu-hasil="${k.env}" style="font-size:12.5px"></span></div>
+      <div class="bar"><input type="password" autocomplete="off" spellcheck="false" placeholder="${k.terisi ? "Tempel kunci baru untuk mengganti" : "Tempel kunci"}" data-pnk-in="${k.env}" aria-label="${esc(k.label)}">
+      <button class="bt g" type="button" data-pnk="${k.env}">Simpan</button>${k.uji ? `<button class="bt o" type="button" data-pnu="${k.env}" ${k.terisi ? "" : "disabled"}>Uji</button>` : ""}${k.sumber === "panel" ? `<button class="bt o" type="button" data-pnkh="${k.env}">Pakai nilai Render</button>` : ""}</div></div>`).join("")
+    + d.teks.map(t => `<div class="pnKy"><div><b>${esc(t.label)}</b> <span class="mu" style="font-size:12px">${esc(t.env)}</span> ${sumber(t.sumber)}</div><div class="bar"><input type="text" value="${esc(t.nilai)}" placeholder="kosong = model bawaan" data-pnk-in="${t.env}" spellcheck="false" aria-label="${esc(t.label)}"><button class="bt g" type="button" data-pnk="${t.env}">Simpan</button>${t.sumber === "panel" ? `<button class="bt o" type="button" data-pnkh="${t.env}">Pakai nilai Render</button>` : ""}</div></div>`).join("");
+  const mati = new Set(d.hal_mati || []), fh = new Set(); d.fitur.filter(f => !f.aktif).forEach(f => (FITUR_HAL[f.id] || []).forEach(p => fh.add(p)));
+  const hal = $$("#sd .nv[data-p]").filter(b => !["panel", "beranda"].includes(b.dataset.p)).map(b => ({p: b.dataset.p, nama: (b.childNodes[0] || b).textContent.trim()}));
+  $("#pnHal").innerHTML = hal.map(h => `<div class="pnR"><div class="tx">${esc(h.nama)}${fh.has(h.p) ? '<small>mati karena fiturnya dimatikan</small>' : ""}</div>${pnSk(!mati.has(h.p) && !fh.has(h.p), `data-pnh="${h.p}" data-nama="${esc(h.nama)}" aria-label="${esc(h.nama)}" ${fh.has(h.p) ? "disabled" : ""}`)}</div>`).join("");
+  $("#pnRiwayat").innerHTML = d.riwayat.map(r => `<div><span class="mu">${esc(String(r.t || "").slice(0, 16).replace("T", " "))}</span> · ${esc(r.aksi)}</div>`).join("") || '<span class="mu">Belum ada perubahan.</span>';
+}
+$("#p-panel").addEventListener("click", async e => {
+  const b = e.target.closest("button"); if (!b || b.disabled) return;
+  if (b.dataset.pnf) { b.disabled = true; const on = b.getAttribute("aria-checked") !== "true"; await pnKirim({aksi: "fitur", id: b.dataset.pnf, aktif: on}, on ? "Dinyalakan" : "Dimatikan"); }
+  else if (b.dataset.pnh) { b.disabled = true; const on = b.getAttribute("aria-checked") !== "true"; await pnKirim({aksi: "halaman", id: b.dataset.pnh, nama: b.dataset.nama, aktif: on}, on ? "Halaman dinyalakan" : "Halaman dimatikan"); }
+  else if (b.dataset.pnm) { if (b.classList.contains("on")) return; await pnKirim({aksi: "model", tugas: b.dataset.pnm, id: b.dataset.id}, "Model diganti"); }
+  else if (b.dataset.pnk) { const i = $(`[data-pnk-in="${b.dataset.pnk}"]`), v = i.value.trim(); if (!v) return i.focus(); b.disabled = true; const r = await pnKirim({aksi: "kunci", env: b.dataset.pnk, nilai: v}, "Tersimpan"); if (!r) b.disabled = false; }
+  else if (b.dataset.pnkh) { if (!confirm("Hapus isian panel untuk " + b.dataset.pnkh + " dan pakai nilai dari Render lagi?")) return; await pnKirim({aksi: "kunci_hapus", env: b.dataset.pnkh}, "Kembali ke nilai Render"); }
+  else if (b.dataset.pnu) { const env = b.dataset.pnu; b.disabled = true; b.textContent = "Menguji…";
+    const r = await pnKirim({aksi: "uji", env}); const h = $(`[data-pnu-hasil="${env}"]`);
+    if (r && r.uji && h) { h.className = r.uji.ok ? "ch g" : "ch r"; h.textContent = (r.uji.ok ? "✓ " : "✗ ") + r.uji.pesan; } }
+});
+$("#pnAnggota").onclick = () => show("anggota");
+$("#pnTutup").onclick = async () => { try { await api("/api/panel/pin", {method: "DELETE"}); } catch (e) {} PND = null; pnKunciTampil(false); };
+$("#pnGanti").onclick = async () => {
+  const lama = prompt("PIN lama (6 angka):"); if (!lama) return;
+  const baru = prompt("PIN baru (6 angka):"); if (!baru) return;
+  if (baru !== prompt("Ulangi PIN baru:")) return alert("PIN baru tidak sama.");
+  try { await api("/api/panel/pin", {json: {pin: lama, pin_baru: baru}}); pesan("PIN diganti"); PND = await api("/api/panel"); pnRender(); } catch (e) { alert(e.message); }
+};
+
 /* ================= MULAI ================= */
 (async () => {
   if (DEMO) { $("#demoBanner").hidden = false; $("#csv").removeAttribute("href"); $("#csv").onclick = e => { e.preventDefault(); alert("Ekspor CSV aktif di versi server."); }; }
@@ -7286,7 +7427,8 @@ addEventListener("hashchange", bukaHash);
   if (RINGAN) { const vw = $("#voWrap"); if (vw) vw.hidden = true; const sl = $("#sl"); if (sl) sl.insertAdjacentHTML("beforebegin", '<p class="cd mu" id="voRingan" style="margin:0 0 12px">📱 <b>Mode HP Ringan</b> aktif: gedung 3D dimatikan supaya HP tidak berat. Status semua bot tetap tampil di bawah.</p>'); }
   $$(".nv").forEach(b => { const p = PAGE_PERM[b.dataset.p]; if (p && !can(p)) b.style.display = "none"; });
   if (!PUNYA_INBOX()) ["inbox", "bayarkas"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // viewer tidak punya inbox & iuran
-  if (ME.role !== "viewer") api("/api/absen").then(d => { AB = d; const nb = $("#nbAbsen"); if (nb) nb.hidden = !(d.status === "belum"); }).catch(() => {});   // tanda "!" kalau belum absen
+  if (!ADM()) $("#nvPanel").style.display = "none";   // Panel Dev khusus Dev
+  if (ME.role !== "viewer" && !(ME.fitur_mati || []).includes("absen")) api("/api/absen").then(d => { AB = d; const nb = $("#nbAbsen"); if (nb) nb.hidden = !(d.status === "belum"); }).catch(() => {});   // tanda "!" kalau belum absen
   if (!ADM()) $("#nvApex").style.display = "none";   // Tanya Apex khusus token admin
   inboxBadge(); setInterval(() => { if (!document.hidden && !layarDiam()) inboxBadge(); }, 20000);
   pasangAI();
@@ -7315,6 +7457,7 @@ addEventListener("hashchange", bukaHash);
     acuan.after($("#pasangApp"));   // tombol Pasang aplikasi ikut di daftar datar, bukan di bawah judul "Lainnya"
     $("#sd").classList.add("vw");
   }
+  halMatiAtur();
   $("#fabCatat").hidden = ME.role === "viewer" || !can("catatan");   // tombol ＋ catat cepat
   navGrup();
   renderKuota();

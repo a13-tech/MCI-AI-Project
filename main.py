@@ -928,6 +928,12 @@ async def mcp_tools():
 async def ask(key, text, history=None, parts=None, schema=None, model=None, act="Memproses permintaan",
               use_mcp=True, skill=None, brief=False, cache=True, show=None, room=None, fungsi=None, sistem=None, kunci=None, alir=None):
     """alir: fungsi(teks) dipanggil untuk tiap potongan jawaban (streaming). Gagal streaming -> otomatis jawaban utuh."""
+    if model is None and not kunci and key != "apex":   # model bawaan bot dipilih di Panel Dev
+        mt = model_tugas("bot")
+        if mt == "hydrogen" and kunci_hydrogen():
+            model, kunci = HYDROGEN_MODEL, kunci_hydrogen()
+        elif mt == "argon" and kunci_argon() and ARGON_AKTIF:
+            model, kunci = ARGON_MODEL, kunci_argon()
     cl = client_kunci(kunci) if kunci else client(key)   # kunci: API key khusus (mis. tier 1 untuk Argon, gratis untuk Hydrogen)
     if not cl:
         raise RuntimeError(f"Key Gemini untuk {AGENTS[key]['nama']} belum diisi (GEMINI_{key.upper()} atau GEMINI_API_KEY).")
@@ -1676,7 +1682,7 @@ def _kapal_kabar(pr, judul, isi):
 def kapal_alarm_cek(pr, data):
     """Dipanggil tiap data masuk. data = nilai terakhir semua metrik perangkat."""
     a = (SET.get("kapal_alarm") or {}).get(pr)
-    if not a or not a.get("aktif"):
+    if not a or not a.get("aktif") or not fitur_on("alarm_kapal"):
         return
     a = kapal_alarm(pr)
     st = a["st"]
@@ -1712,7 +1718,7 @@ def kapal_hilang_cek():
         try:
             for pr, a in list((SET.get("kapal_alarm") or {}).items()):
                 last = IOT_LAST.get(pr)
-                if not a.get("aktif") or not last or not a.get("hilang_menit"):
+                if not a.get("aktif") or not last or not a.get("hilang_menit") or not fitur_on("alarm_kapal"):
                     continue
                 diam = (time.time() - last["ts"]) / 60
                 st = kapal_alarm(pr)["st"]
@@ -3261,6 +3267,10 @@ def api_sehat():
     return jsonify(sehat_data())
 
 
+SET_PRIVAT = {"kuota", "tg_users", "tg_izin", "iuran", "berita_ringkas", "hp_ringan", "argon_anggaran", "argon_harga", "argon_kabar", "vapid",
+              "backup_kunci", "kapal_alarm", "neon", "sehat_ingat", "panel_log", "groq_ingat", "model_tugas", "tutup_ingat", "cadangan_absen_2026-11-15"}   # tidak dikirim ke browser lewat /api/me
+
+
 @app.route("/api/me")
 def api_me():
     need("viewer")
@@ -3275,7 +3285,7 @@ def _api_me_isi(r, m):
     return jsonify({"role": "admin" if is_admin(r) else ("anggota" if m else r), "nama_peran": nama_peran(r), "izin": sorted(perms_of(r)), "kuota": kuota_info(r),
                     "anggota": {"id": m["id"], "nama": m["nama"], "divisi": [DIVISI[x] for x in m["divisi"]], "jabatan": [JABATAN[x] for x in m["jabatan"]],
                                 "divisi_key": m["divisi"], "iuran": tingkat_of(m["id"]), "sp": sp_status().get(m["id"], 0)} if m else None, "daftar_divisi": DIVISI,
-                    **{k: v for k, v in SET.items() if k not in ("kuota", "tg_users", "tg_izin", "iuran", "berita_ringkas", "hp_ringan", "argon_anggaran", "argon_harga", "argon_kabar", "vapid")}, "ringan": hp_ringan(r), "mcp_siap": bool(MCP_SERVERS and ClientSession), "db_permanen": PG, "lantai": LANTAI,
+                    **{k: v for k, v in SET.items() if k not in SET_PRIVAT}, "ringan": hp_ringan(r), "mcp_siap": bool(MCP_SERVERS and ClientSession), "db_permanen": PG, "lantai": LANTAI,
                     "gambar": img_status()})
 
 
@@ -3320,7 +3330,7 @@ def hp_ringan(r):
 
 @app.route("/api/hp-ringan", methods=["GET", "POST"])
 def api_hp_ringan():
-    need("admin")
+    need_panel()
     if request.method == "POST":
         d = request.get_json(silent=True) or {}
         try:
@@ -3551,6 +3561,8 @@ def api_gambar():
     r = need_perm("gambar_lihat")
     if request.method == "GET":
         return jsonify({"items": img_list(), **img_status(), "kuota": kuota_info(r).get("gambar")})
+    if not fitur_on("studio_gambar"):
+        return jsonify({"error": "Studio Gambar sedang dinonaktifkan Dev."}), 403
     if not can("gambar_buat", r):
         return jsonify({"error": "Divisi kamu hanya bisa melihat galeri."}), 403
     if not kuota_pakai(r, "gambar", cek_saja=True):
@@ -3759,8 +3771,8 @@ def _member_out(m, token=False):
 
 @app.route("/api/anggota", methods=["GET", "POST"])
 def api_anggota():
-    """Khusus admin/dev: daftar anggota + token pribadi. POST {id?, nama, divisi[], jabatan[], aktif}."""
-    need("admin")
+    """Khusus admin/dev: daftar anggota + token pribadi. POST {id?, nama, divisi[], jabatan[], aktif}. Hanya dari Panel Dev (PIN)."""
+    need_panel()
     if request.method == "POST":
         try:
             member_simpan(request.get_json(silent=True) or {})
@@ -3793,7 +3805,7 @@ def api_struktur_del(jenis, key):
 
 @app.route("/api/anggota/<int:i>/token", methods=["POST"])
 def api_anggota_token(i):
-    need("admin")
+    need_panel()
     try:
         member_token_ulang(i)
     except ValueError as e:
@@ -3803,7 +3815,7 @@ def api_anggota_token(i):
 
 @app.route("/api/anggota/<int:i>", methods=["DELETE"])
 def api_anggota_del(i):
-    need("admin")
+    need_panel()
     with db() as c:
         sql(c, "DELETE FROM anggota WHERE id=?", (i,))
     members_load()
@@ -4977,6 +4989,12 @@ def _absen_kebal(mid):
 
 
 def absen_cek():
+    if not fitur_on("absen"):   # absen dimatikan di Panel Dev: tidak ada pengingat, hitungan bolos, atau dikeluarkan karena bolos
+        return []
+    return _absen_cek()
+
+
+def _absen_cek():
     """Dijalankan berkala: peringatan bolos ke-4 & ke-5, keluarkan otomatis jika bolos > 5 (Pasal 19)."""
     hari = today()
     warn = SET.setdefault("absen_warn", {})
@@ -5094,6 +5112,8 @@ def api_absen():
 @app.route("/api/absen/hadir", methods=["POST"])
 @app.route("/api/absen/jawab", methods=["POST"])   # alamat lama (halaman yang masih tersimpan di cache HP) tetap berfungsi
 def api_absen_jawab():
+    if not fitur_on("absen"):
+        return jsonify({"error": "Absen sedang dinonaktifkan."}), 403
     r = role()
     _absen_need(r)
     me = mid_of(r) if member_of(r) else None
@@ -5136,6 +5156,8 @@ def _bulan_label(d):
 
 @app.route("/api/absen/izin", methods=["POST"])
 def api_absen_izin():
+    if not fitur_on("absen"):
+        return jsonify({"error": "Absen sedang dinonaktifkan."}), 403
     """Anggota mengajukan izin (menunggu persetujuan). Pengurus (absen_kelola) bisa langsung mencatat izin untuk anggota lain."""
     r = role()
     _absen_need(r)
@@ -5390,7 +5412,7 @@ def skor_semua():
         mulai = max(awal, absen_mulai(), (SET.get("absen_dari") or {}).get(str(i), ""), gab.get(i, ""))
         wajib = [t for t in (_hari_wajib(mulai, kemarin) if mulai <= kemarin else []) if t not in I.get(i, set())]
         komp = {}
-        if wajib:
+        if wajib and fitur_on("absen"):
             komp["absen"] = sum(1 for t in wajib if t in H.get(i, set())) / len(wajib)
         selesai = sum(1 for x in tugas if x.get("pj") == i and x.get("status") == "selesai" and (x.get("diubah") or "")[:10] >= awal)
         punya_tugas = any(x.get("pj") == i and ((x.get("diubah") or "")[:10] >= awal or x.get("status") != "selesai") for x in tugas)
@@ -5469,6 +5491,8 @@ def rapor_buat(bulan=None, kirim=True):
 
 def rapor_cek():
     """Dipanggil berkala: tanggal 1 mulai jam 08.00, buat rapor bulan lalu sekali saja."""
+    if not fitur_on("rapor"):
+        return
     now = datetime.now(WIB)
     kode, _ = _bulan_lalu()
     if now.day != 1 or now.hour < 8 or SET.get("rapor_terakhir") == kode:
@@ -7069,6 +7093,8 @@ def api_studio():
     jenis, minta = str(d.get("jenis") or "3d"), str(d.get("permintaan") or "").strip()[:2000]
     if jenis not in ("3d", "svg"):
         return jsonify({"error": "Jenis tidak dikenal"}), 400
+    if jenis == "3d" and not fitur_on("studio3d"):
+        return jsonify({"error": "Studio 3D sedang dinonaktifkan Dev."}), 403
     sketsa = None
     f = request.files.get("sketsa")
     if f and jenis == "3d":
@@ -7795,6 +7821,8 @@ def backup_zip():
                 cur = sql(c, f"SELECT * FROM {t}")
                 kol = [d[0] for d in cur.description]
                 rows = [dict(zip(kol, [v.isoformat() if hasattr(v, "isoformat") else v for v in row])) for row in cur.fetchall()]
+                if t == "pengaturan":   # kunci AI terenkripsi & hash PIN panel tidak pernah ikut backup
+                    rows = [x for x in rows if x.get("k") != RAHASIA_K]
                 info["tabel"][t] = len(rows)
                 z.writestr(f"{t}.json", json.dumps(rows, ensure_ascii=False, default=str))
             z.writestr("_info.json", json.dumps(info, ensure_ascii=False, indent=1))
@@ -9630,6 +9658,10 @@ def pesan_layanan():
 @app.route("/pesan")
 def halaman_pesan():
     e = lambda v: _esc_html(str(v or ""))
+    if not fitur_on("pesan_jasa"):
+        k = kontak_mci()
+        return _pf_halaman("Pesan Jasa MCI | Mahardika Cakrawala Indonesia", "Pemesanan jasa MCI sedang ditutup sementara.", "/pesan",
+                           f'<section><p class="lead">Pemesanan jasa lewat formulir sedang ditutup sementara. Untuk pertanyaan, hubungi MCI lewat Instagram {e(k["ig"])}.</p></section>', None)
     k = kontak_mci()
     opsi = "".join(f"<option>{e(x)}</option>" for x in pesan_layanan())
     body = (
@@ -9657,6 +9689,8 @@ def halaman_pesan():
 
 @app.route("/api/publik/pesan", methods=["POST"])
 def api_publik_pesan():
+    if not fitur_on("pesan_jasa"):
+        return jsonify({"error": "Pemesanan jasa sedang ditutup sementara."}), 403
     d = request.get_json(silent=True) or {}
     if str(d.get("situs") or "").strip():   # kolom jebakan: manusia tidak melihatnya, bot spam mengisinya
         return jsonify({"ok": True, "pesan": "Pesanan terkirim. Tim MCI akan menghubungi kamu."})
@@ -9955,11 +9989,14 @@ def pi_konteks():
 
 def pi_tanya(q, riwayat):
     sysp = PI_SISTEM + IDENTITAS_AI + "\n\n=== DATA PUBLIK MCI ===\n" + pi_konteks() + "\n=== AKHIR DATA ===" + GAYA_JAWAB + TANPA_LATEX
+    langsung_groq = model_tugas("pusat_info") == "groq" and mesin_kunci("groq")
     try:
+        if langsung_groq:
+            raise RuntimeError("503 dipilih di Panel Dev: Groq")
         return _pi_gemini(sysp, q, riwayat)
     except Exception as e:
-        # Gemini penuh/sibuk -> Groq menjawab supaya tamu tidak melihat pesan error
-        if not mesin_kunci("groq") or not any(x in str(e) for x in _GEMINI_PENUH):
+        # Gemini penuh/sibuk (atau Groq dipilih di Panel Dev) -> Groq menjawab supaya tamu tidak melihat pesan error
+        if not mesin_kunci("groq") or not (langsung_groq or any(x in str(e) for x in _GEMINI_PENUH)):
             raise
         log.warning("Pusat Info: Gemini penuh (%s), dijawab Groq", str(e)[:80])
         pesan = [{"role": "assistant" if x["role"] == "model" else "user", "content": x["text"]} for x in riwayat] + [{"role": "user", "content": q}]
@@ -9973,7 +10010,8 @@ def _pi_gemini(sysp, q, riwayat):
     contents = [types.Content(role=x["role"], parts=[types.Part(text=x["text"])]) for x in riwayat]
     contents.append(types.Content(role="user", parts=[types.Part(text=q)]))
     modes = [_PI_MODE[0]] if _PI_MODE[0] is not None else [False, True]
-    models = list(dict.fromkeys(m for m in (os.getenv("PUSAT_INFO_MODEL", "").strip(), MODEL_LITE, MODEL) if m))
+    pil = {"flash": MODEL, "hydrogen": HYDROGEN_MODEL, "lite": MODEL_LITE}.get(model_tugas("pusat_info"), "")   # pilihan Panel Dev duluan
+    models = list(dict.fromkeys(m for m in (pil, os.getenv("PUSAT_INFO_MODEL", "").strip(), MODEL_LITE, MODEL) if m))
     last = None
     for vx in modes:
         for mdl in models:
@@ -10024,6 +10062,8 @@ def pi_terpakai(c, ih):
 
 @app.route("/api/pusat-info", methods=["GET", "POST"])
 def api_pusat_info():
+    if not fitur_on("pusat_info"):
+        return jsonify({"error": "Pusat Info sedang dinonaktifkan. Hubungi MCI lewat Instagram atau halaman Pesan Jasa."}), 503
     """GET: status & sisa jatah. POST {pesan, riwayat:[{role,text}]}: jawaban AI dari data publik saja."""
     if not role():
         abort(401)
@@ -10997,6 +11037,15 @@ def cek_status_bot() -> dict:
 
 # ---------- AI MURAH: Hydrogen (kunci gratis) dulu, kalau gagal model biasa ----------
 async def ai_murah(prompt, schema=None, parts=None, sistem=None, act="Membantu mencatat"):
+    mt = model_tugas("ringan")
+    if mt == "groq" and not parts and mesin_kunci("groq"):   # Groq hanya teks; foto/suara tetap lewat Gemini
+        try:
+            sysp = (sistem or AGENTS["scribe"]["prompt"]) + IDENTITAS_AI
+            return await asyncio.to_thread(cadangan_groq, sysp, [types.Content(role="user", parts=[types.Part(text=prompt)])], schema)
+        except Exception as e:
+            log.warning("Groq (catatan) gagal (%s), pakai Gemini", str(e)[:120])
+    if mt == "flash":
+        return await ask("scribe", prompt, parts=parts, schema=schema, model=MODEL, act=act, use_mcp=False, cache=False, sistem=sistem)
     try:
         return await ask("scribe", prompt, parts=parts, schema=schema, model=HYDROGEN_MODEL, kunci=kunci_hydrogen(), act=act, use_mcp=False, cache=False, sistem=sistem)
     except Exception as e:
@@ -11443,6 +11492,8 @@ async def pagi_buat(kirim=True, sumber="otomatis"):
 
 
 async def pagi_cek():
+    if not fitur_on("laporan_pagi"):
+        return
     now = datetime.now(WIB)
     if not SET.get("pagi_on", True) or now.hour < PAGI_JAM or now.hour >= 21 or SET.get("pagi_terakhir") == today():
         return
@@ -12094,7 +12145,346 @@ def api_settings():
     if str(d.get("mem_tg", "")) in SIMPAN:
         SET["mem_tg"] = str(d["mem_tg"])
     set_save()
-    return jsonify(SET)
+    return jsonify({k: v for k, v in SET.items() if k not in SET_PRIVAT})
+
+
+# ---------- PANEL DEV: PIN khusus, sakelar halaman/fitur, kunci AI terenkripsi, pilih model, riwayat ----------
+# Kunci & hash PIN disimpan di baris pengaturan "rahasia" yang TERPISAH dari SET: tidak pernah dikirim ke browser dan tidak ikut file backup.
+# Analogi: SET itu papan pengumuman kantor; "rahasia" itu brankas di ruang Bos yang kuncinya (SECRET_KEY) tidak ikut difotokopi.
+RAHASIA_K = "rahasia"
+PANEL_PIN_MENIT = 15                       # panel terkunci lagi setelah 15 menit tidak dipakai
+PANEL_SALAH_MAKS, PANEL_KUNCI_MENIT = 5, 15
+_PANEL_BUKA, _PANEL_SALAH = {}, {"n": 0, "sampai": 0.0}
+ENV_ASLI = {}                               # nilai dari Render, dipakai lagi kalau kunci di panel dihapus
+
+KUNCI_DAFTAR = [   # (nama env, label, kelompok, cara uji). Token login, SECRET_KEY, DATABASE_URL & token bot sengaja tidak ada di sini.
+    ("GEMINI_API_KEY", "Gemini utama (Flash)", "Gemini", "gemini"),
+    ("GEMINI_KEY_TIER1", "Gemini 4 Argon (berbayar, tier 1)", "Gemini", "gemini"),
+    ("GEMINI_KEY_FREE", "Gemini 4 Hydrogen (gratis)", "Gemini", "gemini"),
+    ("GEMINI_PUSAT_INFO", "Pusat Info (tamu)", "Gemini", "gemini"),
+    ("ANTHROPIC_API_KEY", "Claude (Sonnet / Opus)", "Lainnya", "claude"),
+    ("GROQ_API_KEY", "Groq", "Lainnya", "groq"),
+    ("NVIDIA_API_KEY", "NVIDIA NIM", "Lainnya", "nvidia"),
+    ("MISTRAL_API_KEY", "Mistral", "Lainnya", "mistral"),
+    ("CF_ACCOUNT_ID", "Cloudflare: Account ID", "Studio Gambar", ""),
+    ("CF_API_TOKEN", "Cloudflare: API Token", "Studio Gambar", "cloudflare"),
+]
+TEKS_DAFTAR = [("GROQ_MODEL", "ID model Groq"), ("NVIDIA_MODEL", "ID model NVIDIA"), ("MISTRAL_MODEL", "ID model Mistral")]   # bukan rahasia
+KUNCI_NAMA = {k for k, *_ in KUNCI_DAFTAR} | {k for k, _ in TEKS_DAFTAR}
+
+FITUR_DAFTAR = [
+    ("absen", "Absen", "Menu Absen, pengingat, hitungan bolos, dikeluarkan otomatis karena bolos, nilai absen di Skor, kuis absen"),
+    ("pusat_info", "Pusat Info publik", "Tanya-jawab AI untuk tamu"),
+    ("pesan_jasa", "Pesan Jasa", "Form /pesan untuk orang luar"),
+    ("studio3d", "Studio 3D", "Membuat model 3D baru (web dan Telegram)"),
+    ("studio_gambar", "Studio Gambar", "Membuat gambar AI baru"),
+    ("laporan_pagi", "Laporan Pagi", "Laporan otomatis tiap pagi"),
+    ("rapor", "Rapor bulanan", "Rapor otomatis tiap tanggal 1"),
+    ("alarm_kapal", "Alarm kapal", "Kabar keluar area, baterai lemah, sinyal hilang"),
+    ("telegram", "Balasan bot Telegram", "Bot menjawab anggota (Dev tetap dijawab)"),
+]
+FITUR_HAL = {"absen": ["absen"], "pusat_info": ["info"], "studio_gambar": ["gambar"]}   # halaman yang ikut hilang saat fiturnya dimatikan
+
+MODEL_TUGAS = {   # pilihan model per tugas (tombol di panel)
+    "studio": {"judul": "Studio 3D dan Panduan Rakit", "ket": "Tugas berat: menyusun resep model 3D dan panduan merakit.",
+               "pilihan": [("argon", "Gemini 4 Argon", "$2/$10, naik $4/$20 mulai 1 Des"), ("claude:claude-sonnet-5-5", "Claude Sonnet 5.5", "$2/$10"),
+                           ("claude:claude-opus-5-5", "Claude Opus 5.5", "$4/$20"), ("gemini", "Gemini Flash", "gratis / sangat murah"),
+                           ("groq", "Groq", "gratis"), ("nvidia", "NVIDIA NIM", "gratis"), ("mistral", "Mistral", "gratis (data dipakai latihan)")]},
+    "bot": {"judul": "Bot Telegram dan asisten anggota", "ket": "Obrolan sehari-hari bot. Hanya keluarga Gemini, karena bot memakai alat data (cek kas, stok, dll).",
+            "pilihan": [("flash", "Gemini Flash", "sangat murah"), ("hydrogen", "Gemini 4 Hydrogen", "gratis"), ("argon", "Gemini 4 Argon", "$2/$10, mahal")]},
+    "pusat_info": {"judul": "Pusat Info (tamu)", "ket": "Menjawab pertanyaan pengunjung tentang MCI.",
+                   "pilihan": [("lite", "Gemini Flash Lite", "paling hemat"), ("flash", "Gemini Flash", "lebih pintar"), ("hydrogen", "Gemini 4 Hydrogen", "gratis"), ("groq", "Groq", "gratis")]},
+    "ringan": {"judul": "Catatan, rekam suara, Laporan Pagi", "ket": "Merapikan catatan, menyalin rekaman, laporan harian.",
+               "pilihan": [("hydrogen", "Gemini 4 Hydrogen", "gratis"), ("flash", "Gemini Flash", "sangat murah"), ("groq", "Groq", "gratis, hanya teks")]},
+}
+
+
+def fitur_on(k):
+    return k not in (SET.get("fitur_mati") or [])
+
+
+def model_tugas(t):
+    v = (SET.get("model_tugas") or {}).get(t)
+    if t == "studio":
+        k = ai_kode() or ("claude" if ANTHROPIC_KEY else "gemini")
+        return f"claude:{claude_model()}" if k == "claude" else k
+    return v or MODEL_TUGAS[t]["pilihan"][0][0]
+
+
+def _model_siap(t, pid):
+    if pid in ("flash", "lite", "gemini"):
+        return bool(client("canvas")) if t != "pusat_info" else bool(pi_key() or os.getenv("GEMINI_API_KEY"))
+    if pid == "hydrogen":
+        return bool(kunci_hydrogen())
+    if pid == "argon":
+        return bool(KUNCI_TIER1) and ARGON_AKTIF
+    if pid.startswith("claude"):
+        return bool(ANTHROPIC_KEY)
+    if pid in MESIN_LAIN:
+        return bool(mesin_kunci(pid))
+    return False
+
+
+def _rahasia_baca():
+    with db() as c:
+        a = sql(c, "SELECT v FROM pengaturan WHERE k=?", (RAHASIA_K,)).fetchone()
+    try:
+        return json.loads(a[0]) if a else {}
+    except ValueError:
+        return {}
+
+
+def _rahasia_tulis(d):
+    with db() as c:
+        sql(c, "INSERT INTO pengaturan (k,v) VALUES (?,?) ON CONFLICT (k) DO UPDATE SET v=excluded.v", (RAHASIA_K, json.dumps(d)))
+
+
+def _sandi():
+    from cryptography.fernet import Fernet
+    dasar = os.getenv("SECRET_KEY") or os.getenv("ADMIN_TOKEN") or "mci"
+    return Fernet(base64.urlsafe_b64encode(hashlib.sha256(("mci-panel-kunci:" + dasar).encode()).digest()))
+
+
+def _sidik():   # penanda kunci enkripsi (bukan kuncinya): ketahuan kalau SECRET_KEY diganti
+    return hashlib.sha256(("sidik:" + (os.getenv("SECRET_KEY") or os.getenv("ADMIN_TOKEN") or "mci")).encode()).hexdigest()[:12]
+
+
+def kunci_terapkan():
+    """Pasang kunci dari panel ke os.environ dan ke variabel yang sudah dibaca saat server menyala."""
+    global ANTHROPIC_KEY, KUNCI_TIER1, KUNCI_FREE, ARGON_AKTIF, CF_ACCOUNT, CF_TOKEN
+    for k in KUNCI_NAMA:
+        ENV_ASLI.setdefault(k, os.environ.get(k, ""))
+    try:
+        rh = _rahasia_baca()
+    except Exception:
+        log.exception("baca rahasia gagal")
+        rh = {}
+    simpan, f = rh.get("kunci") or {}, None
+    for k in KUNCI_NAMA:
+        v = ENV_ASLI.get(k, "")
+        if k in simpan:
+            try:
+                f = f or _sandi()
+                v = f.decrypt(simpan[k].encode()).decode()
+            except Exception:
+                log.warning("kunci %s di panel tidak bisa dibuka (SECRET_KEY berubah?), pakai nilai Render", k)
+        if v:
+            os.environ[k] = v
+        else:
+            os.environ.pop(k, None)
+    ANTHROPIC_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
+    KUNCI_TIER1 = os.getenv("GEMINI_KEY_TIER1", "").strip()
+    KUNCI_FREE = os.getenv("GEMINI_KEY_FREE", "").strip()
+    ARGON_AKTIF = bool(KUNCI_TIER1) or os.getenv("ARGON_AKTIF", "").strip() in ("1", "true", "ya")
+    CF_ACCOUNT = os.getenv("CF_ACCOUNT_ID", "").strip()
+    CF_TOKEN = os.getenv("CF_API_TOKEN", "").strip()
+    for nm, env in (("groq", "GROQ_MODEL"), ("nvidia", "NVIDIA_MODEL"), ("mistral", "MISTRAL_MODEL")):
+        if os.getenv(env):
+            MESIN_LAIN[nm]["model"] = os.getenv(env).strip()
+    _cl.clear()
+    _PI_CL.clear()
+
+
+def panel_catat(aksi):
+    lg = SET.setdefault("panel_log", [])
+    lg.append({"t": _now(), "aksi": aksi[:200]})
+    del lg[:-120]
+
+
+def _panel_sesi():
+    return hashlib.sha256(("panel:" + request.cookies.get("mci_auth", "")).encode()).hexdigest()
+
+
+def panel_terbuka():
+    s, now = _panel_sesi(), time.time()
+    if _PANEL_BUKA.get(s, 0) > now:
+        _PANEL_BUKA[s] = now + PANEL_PIN_MENIT * 60   # tiap dipakai, waktu kunci diperpanjang
+        return True
+    _PANEL_BUKA.pop(s, None)
+    return False
+
+
+def need_panel():
+    r = role()
+    if not r:
+        abort(401)
+    if not is_admin(r):
+        abort(403)
+    if not panel_terbuka():
+        abort(make_response(jsonify({"error": "Panel terkunci. Masukkan PIN dulu.", "kunci": True}), 423))
+    return r
+
+
+def _pin_hash(pin, garam):
+    return hashlib.pbkdf2_hmac("sha256", pin.encode(), bytes.fromhex(garam), 240000).hex()
+
+
+def _panel_reset_cek():
+    if os.getenv("PANEL_PIN_RESET", "").strip().lower() in ("1", "ya", "yes", "true"):
+        rh = _rahasia_baca()
+        if rh.get("pin"):
+            rh.pop("pin", None)
+            _rahasia_tulis(rh)
+            log.warning("PIN Panel Dev dihapus karena PANEL_PIN_RESET. Hapus variabel itu di Render setelah membuat PIN baru.")
+
+
+@app.route("/api/panel/pin", methods=["GET", "POST", "DELETE"])
+def api_panel_pin():
+    """GET: status. POST {pin}: buka (atau buat PIN pertama kali). POST {pin, pin_baru}: ganti PIN. DELETE: kunci sekarang."""
+    r = role()
+    if not r:
+        abort(401)
+    if not is_admin(r):
+        abort(403)
+    rh = _rahasia_baca()
+    if request.method == "GET":
+        return jsonify({"ada_pin": bool(rh.get("pin")), "terbuka": panel_terbuka(), "reset_aktif": bool(os.getenv("PANEL_PIN_RESET"))})
+    if request.method == "DELETE":
+        _PANEL_BUKA.pop(_panel_sesi(), None)
+        return jsonify({"ok": True})
+    now = time.time()
+    if _PANEL_SALAH["sampai"] > now:
+        return jsonify({"error": f"Terlalu banyak PIN salah. Coba lagi {int((_PANEL_SALAH['sampai'] - now) // 60) + 1} menit lagi."}), 429
+    d = request.get_json(silent=True) or {}
+    pin, baru = str(d.get("pin") or ""), d.get("pin_baru")
+    if not re.fullmatch(r"\d{6}", pin):
+        return jsonify({"error": "PIN harus 6 angka"}), 400
+    if not rh.get("pin"):   # pertama kali: PIN ini jadi PIN panel
+        garam = secrets.token_hex(16)
+        rh["pin"] = {"garam": garam, "hash": _pin_hash(pin, garam)}
+        _rahasia_tulis(rh)
+        panel_catat("PIN panel dibuat")
+        set_save()
+    elif not _eq(_pin_hash(pin, rh["pin"]["garam"]), rh["pin"]["hash"]):
+        _PANEL_SALAH["n"] += 1
+        if _PANEL_SALAH["n"] >= PANEL_SALAH_MAKS:
+            _PANEL_SALAH.update(n=0, sampai=now + PANEL_KUNCI_MENIT * 60)
+            panel_catat(f"PIN salah {PANEL_SALAH_MAKS} kali, panel dikunci {PANEL_KUNCI_MENIT} menit")
+            set_save()
+            try:
+                inbox_kirim(_dev_ids(), "info", "🔒 PIN Panel Dev salah 5 kali", f"Panel dikunci {PANEL_KUNCI_MENIT} menit. Kalau bukan kamu, segera ganti token login Dev di Render.")
+            except Exception:
+                pass
+            return jsonify({"error": f"PIN salah {PANEL_SALAH_MAKS} kali. Panel dikunci {PANEL_KUNCI_MENIT} menit."}), 429
+        return jsonify({"error": f"PIN salah. Sisa {PANEL_SALAH_MAKS - _PANEL_SALAH['n']} percobaan."}), 403
+    elif baru is not None:
+        if not re.fullmatch(r"\d{6}", str(baru)):
+            return jsonify({"error": "PIN baru harus 6 angka"}), 400
+        garam = secrets.token_hex(16)
+        rh["pin"] = {"garam": garam, "hash": _pin_hash(str(baru), garam)}
+        _rahasia_tulis(rh)
+        panel_catat("PIN panel diganti")
+        set_save()
+    _PANEL_SALAH["n"] = 0
+    _PANEL_BUKA[_panel_sesi()] = now + PANEL_PIN_MENIT * 60
+    return jsonify({"ok": True, "terbuka": True})
+
+
+def _uji_kunci(cara, nilai):
+    """Panggilan kecil ke penyedia untuk memastikan kunci hidup. Tidak memakai token AI (hanya daftar model / verifikasi)."""
+    import urllib.request, urllib.error
+    if cara == "gemini":
+        req = urllib.request.Request(f"https://generativelanguage.googleapis.com/v1beta/models?pageSize=1&key={quote(nilai)}")
+    elif cara == "claude":
+        req = urllib.request.Request("https://api.anthropic.com/v1/models?limit=1", headers={"x-api-key": nilai, "anthropic-version": "2023-06-01"})
+    elif cara in MESIN_LAIN:
+        req = urllib.request.Request(MESIN_LAIN[cara]["url"].replace("/chat/completions", "/models"), headers={"Authorization": f"Bearer {nilai}", "User-Agent": "MCI-HQ/1.0"})
+    elif cara == "cloudflare":
+        req = urllib.request.Request("https://api.cloudflare.com/client/v4/user/tokens/verify", headers={"Authorization": f"Bearer {nilai}"})
+    else:
+        return True, "tidak perlu diuji"
+    try:
+        with urllib.request.urlopen(req, timeout=15) as f:
+            return 200 <= f.status < 300, "berhasil"
+    except urllib.error.HTTPError as e:
+        return False, {400: "kunci tidak valid", 401: "kunci ditolak", 403: "kunci ditolak / tanpa izin", 429: "kunci benar, tapi sedang kena batas"}.get(e.code, f"gagal ({e.code})")
+    except Exception as e:
+        return False, f"tidak bisa dihubungi ({str(e)[:60]})"
+
+
+def panel_data():
+    rh = _rahasia_baca()
+    simpan = rh.get("kunci") or {}
+    kunci = []
+    for k, label, grup, cara in KUNCI_DAFTAR:
+        v = os.getenv(k, "")
+        kunci.append({"env": k, "label": label, "grup": grup, "uji": bool(cara), "terisi": bool(v), "ujung": ("••••" + v[-4:]) if len(v) > 8 else ("••••" if v else ""),
+                      "sumber": "panel" if k in simpan else ("render" if ENV_ASLI.get(k) else "")})
+    teks = [{"env": k, "label": label, "nilai": os.getenv(k, ""), "sumber": "panel" if k in simpan else ("render" if ENV_ASLI.get(k) else "")} for k, label in TEKS_DAFTAR]
+    model = [{"id": t, "judul": m["judul"], "ket": m["ket"], "dipakai": model_tugas(t),
+              "pilihan": [{"id": p, "nama": n, "harga": h, "siap": _model_siap(t, p)} for p, n, h in m["pilihan"]]} for t, m in MODEL_TUGAS.items()]
+    return {"fitur": [{"id": k, "nama": n, "ket": ket, "aktif": fitur_on(k)} for k, n, ket in FITUR_DAFTAR], "hal_mati": SET.get("hal_mati") or [],
+            "kunci": kunci, "teks": teks, "model": model, "riwayat": list(reversed(SET.get("panel_log") or []))[:60],
+            "sidik_cocok": rh.get("sidik", _sidik()) == _sidik(), "pin_menit": PANEL_PIN_MENIT}
+
+
+@app.route("/api/panel", methods=["GET", "POST"])
+def api_panel():
+    need_panel()
+    if request.method == "POST":
+        d = request.get_json(silent=True) or {}
+        aksi = str(d.get("aksi") or "")
+        if aksi == "fitur":
+            k, on = str(d.get("id") or ""), bool(d.get("aktif"))
+            if k not in dict((a, b) for a, b, _ in FITUR_DAFTAR):
+                return jsonify({"error": "Fitur tidak dikenal"}), 400
+            mati = [x for x in (SET.get("fitur_mati") or []) if x != k] + ([] if on else [k])
+            SET["fitur_mati"] = mati
+            if k == "absen" and on:   # dinyalakan lagi: hitungan mulai hari ini, hari-hari selama mati tidak dihitung bolos
+                SET["absen_mulai"] = today()
+            panel_catat(f"{dict((a, b) for a, b, _ in FITUR_DAFTAR)[k]} {'dinyalakan' if on else 'dimatikan'}")
+        elif aksi == "halaman":
+            p, on = str(d.get("id") or ""), bool(d.get("aktif"))
+            if not re.fullmatch(r"[a-z0-9]{2,20}", p) or p in ("panel", "beranda"):
+                return jsonify({"error": "Halaman ini tidak bisa dimatikan"}), 400
+            SET["hal_mati"] = [x for x in (SET.get("hal_mati") or []) if x != p] + ([] if on else [p])
+            panel_catat(f"Halaman {str(d.get('nama') or p)[:40]} {'dinyalakan' if on else 'dimatikan'}")
+        elif aksi == "model":
+            t, p = str(d.get("tugas") or ""), str(d.get("id") or "")
+            if t not in MODEL_TUGAS or p not in [x[0] for x in MODEL_TUGAS[t]["pilihan"]]:
+                return jsonify({"error": "Pilihan tidak dikenal"}), 400
+            if not _model_siap(t, p):
+                return jsonify({"error": "Kunci untuk model ini belum diisi"}), 400
+            if t == "studio":
+                if p.startswith("claude:"):
+                    SET["ai_kode"], SET["claude_model"] = "claude", p.split(":", 1)[1]
+                else:
+                    SET["ai_kode"] = p
+            else:
+                SET.setdefault("model_tugas", {})[t] = p
+            panel_catat(f"Model {MODEL_TUGAS[t]['judul']}: {dict((a, b) for a, b, _ in MODEL_TUGAS[t]['pilihan'])[p]}")
+        elif aksi in ("kunci", "kunci_hapus"):
+            k = str(d.get("env") or "")
+            if k not in KUNCI_NAMA:
+                return jsonify({"error": "Kunci tidak dikenal"}), 400
+            rh = _rahasia_baca()
+            simpan = rh.setdefault("kunci", {})
+            if aksi == "kunci_hapus":
+                simpan.pop(k, None)
+                panel_catat(f"{k} dikembalikan ke nilai Render")
+            else:
+                v = str(d.get("nilai") or "").strip()
+                if not v or len(v) > 400 or re.search(r"\s", v):
+                    return jsonify({"error": "Isi kunci tidak valid"}), 400
+                simpan[k] = _sandi().encrypt(v.encode()).decode()
+                panel_catat(f"{k} diganti")
+            rh["sidik"] = _sidik()
+            _rahasia_tulis(rh)
+            kunci_terapkan()
+        elif aksi == "uji":
+            k = str(d.get("env") or "")
+            cara = next((c for e, _, _, c in KUNCI_DAFTAR if e == k), None)
+            if cara is None:
+                return jsonify({"error": "Kunci tidak dikenal"}), 400
+            v = os.getenv(k, "")
+            if not v:
+                return jsonify({"uji": {"env": k, "ok": False, "pesan": "belum diisi"}, **panel_data()})
+            ok, pesan = _uji_kunci(cara, v)
+            return jsonify({"uji": {"env": k, "ok": ok, "pesan": pesan}, **panel_data()})
+        else:
+            return jsonify({"error": "Permintaan tidak dikenal"}), 400
+        set_save()
+    return jsonify(panel_data())
 
 
 def run_flask():
@@ -12352,6 +12742,8 @@ async def tg_suara(u, c):
 
 
 async def tg_studio(m, c, jenis, teks, r, sketsa=None):
+    if jenis == "3d" and not fitur_on("studio3d"):
+        return await m.reply_text("Studio 3D sedang dinonaktifkan Dev.")
     """Permintaan gambar / model 3D / buku panduan dari chat Telegram: mulai di latar belakang, balas link sekarang dan kabar saat selesai."""
     nama = {"gambar": "🎨 Studio Gambar", "3d": "🧊 Studio 3D", "panduan": "🔧 Buku Panduan Rakit"}[jenis]
 
@@ -12472,6 +12864,8 @@ def make_handlers(key):
     async def chat(u, c):
         m = u.message
         if not m or not m.text or not _addressed(u, c):
+            return
+        if not fitur_on("telegram") and tg_role(u.effective_user) != "admin":   # bot dimatikan di Panel Dev (Dev tetap dijawab)
             return
         _PENANYA.set(tg_role(u.effective_user))
         text = m.text.replace(f"@{c.bot.username}", "").strip() if c.bot.username else m.text
@@ -12606,6 +13000,8 @@ def make_handlers(key):
 
     async def photo(u, c):
         m = u.message
+        if not fitur_on("telegram") and tg_role(u.effective_user) != "admin":   # bot dimatikan di Panel Dev (Dev tetap dijawab)
+            return
         _PENANYA.set(tg_role(u.effective_user))
         cap = (m.caption or "").strip()
         if re.match(r"/gambar(@\w+)?(\s|$)", cap, re.I):  # foto + caption /gambar = edit foto, semua bot
@@ -12820,6 +13216,12 @@ if __name__ == "__main__":
         stok_load()
         struktur_load()
         members_load()
+        _panel_reset_cek()
+        kunci_terapkan()   # kunci AI dari Panel Dev mengalahkan nilai Render
+        if "fitur_mati" not in SET:   # pertama kali Panel Dev aktif: absen langsung dimatikan (permintaan Dev, 16 Nov 2026)
+            SET["fitur_mati"] = ["absen"]
+            panel_catat("Absen dimatikan (awal Panel Dev)")
+            set_save()
     except Exception:
         log.exception("Database gagal diinisialisasi (cek DATABASE_URL)")
     threading.Thread(target=run_flask, daemon=True).start()
