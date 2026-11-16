@@ -985,6 +985,7 @@ details.cara{margin:6px 0 18px;max-width:760px}details.cara summary{cursor:point
   <div class="ey">Keamanan data</div><h1>Backup Data</h1>
   <p class="mu" style="margin:6px 0 20px;max-width:760px">Salinan seluruh data MCI (kas, iuran, anggota, proyek, absen, UU, dan lainnya) dalam satu file .zip. Backup otomatis dikirim ke Telegram admin setiap Minggu pukul 22.00 WIB. Simpan file-nya di tempat aman, misalnya Google Drive pribadi. Galeri gambar AI tidak ikut karena bisa dibuat ulang.</p>
   <div class="cd"><div id="buInfo" class="mu">Memuat…</div><div class="bar" style="margin:12px 0 0"><a class="bt g" href="/api/backup.zip" id="buDl" download>Unduh backup sekarang</a></div></div>
+  <div class="cd" id="buDrive"></div>
  </section>
  <section id="p-konten" class="pg" hidden><div id="rk-konten"></div></section>
  <section id="p-sidang" class="pg" hidden><div id="rk-sidang"></div></section>
@@ -3647,7 +3648,46 @@ async function pfMuat() {
 /* ===== Backup ===== */
 async function buMuat() {
   try { const d = await api("/api/backup/info"); $("#buInfo").innerHTML = `Jadwal: ${esc(d.jadwal)}.<br>Terakhir dikirim otomatis: <b>${d.terakhir_kirim ? esc(tglID(d.terakhir_kirim, true)) + " " + esc(d.terakhir_kirim.slice(11, 16)) : "belum pernah"}</b>. Terakhir diunduh manual: <b>${d.terakhir_unduh ? esc(tglID(d.terakhir_unduh, true)) : "belum pernah"}</b>.`; }
-  catch (e) { $("#buInfo").textContent = e.message; }
+  catch (e) { $("#buInfo").textContent = e.message; return; }
+  buDrive();
+}
+async function buDrive(opt) {   // backup otomatis ke Google Drive lewat skrip kecil di akun Google Dev (Apps Script)
+  const el = $("#buDrive"); if (!el) return;
+  let d; try { d = await api("/api/backup/info", opt); } catch (e) { el.innerHTML = '<p class="er">' + esc(e.message) + "</p>"; return; }
+  const skrip = d.drive ? `// Backup MCI HQ -> Google Drive. Tempel di script.google.com, lalu jalankan pasangJadwal() SATU kali.
+const MCI_URL = "${d.url}";
+const MCI_KUNCI = "${d.kunci}";   // rahasia: jangan dibagikan
+const FOLDER = "Backup MCI HQ", SIMPAN = 8;   // simpan 8 backup terbaru
+
+function backupMCI() {
+  const r = UrlFetchApp.fetch(MCI_URL, {headers: {"X-Backup-Key": MCI_KUNCI}, muteHttpExceptions: true});
+  if (r.getResponseCode() !== 200) throw new Error("Backup gagal: " + r.getResponseCode() + " " + r.getContentText().slice(0, 200));
+  const it = DriveApp.getFoldersByName(FOLDER), folder = it.hasNext() ? it.next() : DriveApp.createFolder(FOLDER);
+  folder.createFile(r.getBlob().setName("MCI-backup-" + Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy-MM-dd") + ".zip"));
+  const semua = [], f = folder.getFiles();
+  while (f.hasNext()) semua.push(f.next());
+  semua.sort((a, b) => b.getDateCreated() - a.getDateCreated()).slice(SIMPAN).forEach(x => x.setTrashed(true));
+}
+
+function pasangJadwal() {   // tiap Minggu sekitar pukul 23.00, lalu langsung coba sekali sekarang
+  ScriptApp.getProjectTriggers().forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger("backupMCI").timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(23).inTimezone("Asia/Jakarta").create();
+  backupMCI();
+}` : "";
+  el.innerHTML = `<b>☁️ Backup otomatis ke Google Drive</b>
+    <p class="mu" style="font-size:13px;margin:4px 0 10px">Salinan ketiga selain database dan SSD. Tiap Minggu malam Google Drive kamu mengambil file backup sendiri, tanpa perlu MacBook menyala. Server MCI tidak menyimpan kata sandi Google apa pun.</p>
+    <label style="display:flex;gap:10px;align-items:center;font-weight:600"><input type="checkbox" id="bdOn" style="width:20px;height:20px;flex:none" ${d.drive ? "checked" : ""}> Izinkan backup ditarik ke Google Drive</label>`
+    + (d.drive ? `<p style="font-size:13.5px;margin:10px 0 4px">Terakhir ditarik: <b>${d.drive_terakhir ? esc(tglID(d.drive_terakhir, true)) + " " + esc(d.drive_terakhir.slice(11, 16)) : "belum pernah"}</b></p>
+      <ol style="font-size:13.5px;margin:8px 0;padding-left:20px;line-height:1.6"><li>Buka <a href="https://script.google.com" target="_blank" rel="noopener">script.google.com</a> dengan akun Google tempat backup disimpan, lalu klik <b>Proyek baru</b>.</li>
+        <li>Hapus isi yang ada, klik <b>Salin skrip</b> di bawah, lalu tempel.</li><li>Di bagian atas pilih fungsi <b>pasangJadwal</b>, klik <b>Jalankan</b>, lalu izinkan akses (Drive dan koneksi keluar).</li>
+        <li>Cek Google Drive: muncul folder <b>Backup MCI HQ</b> berisi file zip. Selesai, selanjutnya otomatis tiap Minggu malam.</li></ol>
+      <div class="bar" style="margin:8px 0"><button class="bt g" id="bdCp" type="button">Salin skrip</button><button class="bt o" id="bdBaru" type="button">Ganti kunci</button><span class="mu" id="bdMsg"></span></div>
+      <p class="mu" style="font-size:12px;margin:0">Skrip berisi kunci rahasia yang hanya bisa mengambil backup (tidak bisa login). Simpan hanya di akun Google milikmu. Kalau bocor, klik Ganti kunci lalu tempel ulang skripnya. File backup berisi token anggota dan data keuangan, jadi jangan bagikan foldernya.</p>` : "");
+  $("#bdOn").onchange = e => buDrive({json: {drive: e.target.checked}});
+  if (d.drive) {
+    $("#bdCp").onclick = async () => { try { await navigator.clipboard.writeText(skrip); $("#bdMsg").textContent = "Tersalin. Tempel di script.google.com"; } catch (e) { $("#bdMsg").textContent = "Gagal menyalin: " + e.message; } };
+    $("#bdBaru").onclick = () => { if (confirm("Ganti kunci? Skrip lama langsung tidak berlaku dan harus ditempel ulang.")) buDrive({json: {kunci_baru: true}}); };
+  }
 }
 
 /* ===== Proyeksi kas (Rekap Kas) ===== */

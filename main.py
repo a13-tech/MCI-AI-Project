@@ -2654,6 +2654,15 @@ def _ram_server():
         except OSError:
             return 0
     pakai = baca("/sys/fs/cgroup/memory.current") or baca("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+    try:   # kurangi cache berkas yang bisa dilepas kapan saja (cara hitung "working set" seperti di dasbor Render)
+        for jalur in ("/sys/fs/cgroup/memory.stat", "/sys/fs/cgroup/memory/memory.stat"):
+            if os.path.exists(jalur):
+                with open(jalur) as f:
+                    cache = next((int(x.split()[1]) for x in f if x.startswith(("inactive_file ", "total_inactive_file "))), 0)
+                pakai = max(0, pakai - cache)
+                break
+    except (OSError, ValueError):
+        pass
     batas = baca("/sys/fs/cgroup/memory.max") or baca("/sys/fs/cgroup/memory/memory.limit_in_bytes")
     if not pakai:
         try:
@@ -7785,11 +7794,53 @@ def api_backup():
     return Response(data, mimetype="application/zip", headers={"Content-Disposition": f'attachment; filename="MCI-backup-{today()}.zip"', "Cache-Control": "no-store"})
 
 
-@app.route("/api/backup/info")
+# Backup otomatis ke Google Drive: skrip kecil di akun Google Dev (Apps Script) MENARIK file backup tiap minggu memakai kunci khusus.
+# Server tidak perlu menyimpan kata sandi Google apa pun. Kunci hanya bisa mengambil backup, tidak bisa login ke web.
+_TARIK = {"salah": [], "ambil": []}
+
+
+def backup_kunci(baru=False):
+    if baru or not SET.get("backup_kunci"):
+        SET["backup_kunci"] = secrets.token_urlsafe(32)
+        set_save()
+    return SET["backup_kunci"]
+
+
+@app.route("/api/backup/tarik")
+def api_backup_tarik():
+    now = time.time()
+    _TARIK["salah"] = [t for t in _TARIK["salah"] if now - t < 3600]
+    _TARIK["ambil"] = [t for t in _TARIK["ambil"] if now - t < 86400]
+    if len(_TARIK["salah"]) >= 10:
+        return jsonify({"error": "Terlalu banyak percobaan salah. Coba lagi 1 jam lagi."}), 429
+    if not SET.get("backup_drive") or not _eq(request.headers.get("X-Backup-Key", ""), SET.get("backup_kunci") or ""):
+        _TARIK["salah"].append(now)
+        return jsonify({"error": "Kunci backup salah atau backup Drive belum dinyalakan"}), 401
+    if len(_TARIK["ambil"]) >= 4:
+        return jsonify({"error": "Backup sudah diambil 4 kali dalam 24 jam terakhir"}), 429
+    _TARIK["ambil"].append(now)
+    data, _ = backup_zip()
+    SET["backup_drive_terakhir"] = _now()
+    set_save()
+    return Response(data, mimetype="application/zip", headers={"Content-Disposition": f'attachment; filename="MCI-backup-{today()}.zip"', "Cache-Control": "no-store"})
+
+
+@app.route("/api/backup/info", methods=["GET", "POST"])
 def api_backup_info():
     if not is_admin(role()):
         abort(403)
-    return jsonify({"terakhir_kirim": SET.get("backup_terakhir_waktu"), "terakhir_unduh": SET.get("backup_unduh"), "jadwal": "Setiap Minggu pukul 22.00 WIB, dikirim ke Telegram admin"})
+    if request.method == "POST":   # {drive: true/false} nyalakan/matikan; {kunci_baru: true} ganti kunci (skrip lama langsung tidak berlaku)
+        d = request.get_json(silent=True) or {}
+        if "drive" in d:
+            SET["backup_drive"] = bool(d["drive"])
+            set_save()
+        if d.get("kunci_baru"):
+            backup_kunci(True)
+    out = {"terakhir_kirim": SET.get("backup_terakhir_waktu"), "terakhir_unduh": SET.get("backup_unduh"), "jadwal": "Setiap Minggu pukul 22.00 WIB, dikirim ke Telegram admin",
+           "drive": bool(SET.get("backup_drive")), "drive_terakhir": SET.get("backup_drive_terakhir")}
+    if out["drive"]:
+        out.update(kunci=backup_kunci(), url=SITE_URL.rstrip("/") + "/api/backup/tarik")
+    return jsonify(out)
 
 
 async def backup_jadwal_cek():
