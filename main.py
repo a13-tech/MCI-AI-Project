@@ -9904,17 +9904,26 @@ def pi_client(vertex):
 
 def pi_konteks():
     """Rangkuman data PUBLIK saja. Jangan pernah menambahkan data internal ke sini."""
-    t = tentang_get()
-    out = ["Nama organisasi: Mahardika Cakrawala Indonesia (MCI)."]
+    t = tentang_get()   # seluruh isi halaman Tentang Kami (publik) diberikan UTUH, tanpa dipotong
+    out = [f"Nama organisasi: {SEO['nama']} (MCI), juga dikenal sebagai {', '.join(SEO['alternatif'])}. Slogan web: {SEO['slogan']}.",
+           f"Berdiri {SEO['berdiri_teks']}, didirikan tiga pendiri yang dipimpin {SEO['pendiri']}. Berbasis di {SEO['kota']}, {SEO['provinsi']}, Indonesia.",
+           f"Bidang: {SEO['deskripsi']}"]
+    if t.get("judul"):
+        out.append(f"Judul halaman Tentang Kami: {t['judul']}")
     if t.get("semboyan"):
         out.append(f"Semboyan: {t['semboyan']}")
     if t.get("deskripsi"):
-        out.append(f"Tentang MCI: {t['deskripsi'][:2500]}")
+        out.append(f"Tentang MCI (dari halaman Tentang Kami):\n{t['deskripsi']}")
     if t.get("sejarah"):
-        out.append("Sejarah:\n" + "\n".join(f"- {x.get('tahun', '')} {x.get('judul', '')}: {x.get('isi', '')[:300]}".strip() for x in t["sejarah"][:30]))
+        out.append("Sejarah / perjalanan MCI:\n" + "\n".join(f"- {x.get('tahun', '')} {x.get('judul', '')}: {x.get('isi', '')}".strip() for x in t["sejarah"]))
     if t.get("anggota"):
         out.append("Tim yang diperkenalkan di halaman Tentang Kami:\n" + "\n".join(
-            f"- {x.get('nama', '')}{' (' + x['peran'] + ')' if x.get('peran') else ''}{': ' + x['bio'][:200] if x.get('bio') else ''}" for x in t["anggota"][:40]))
+            f"- {x.get('nama', '')}{' (' + x['peran'] + ')' if x.get('peran') else ''}{': ' + x['bio'] if x.get('bio') else ''}" for x in t["anggota"]))
+    out.append("Sistem AI MCI (seri, dari yang pertama sampai sekarang):\n" + "\n".join(
+        f"- Seri {i + 1}: {x['seri']}{' (dipakai sekarang)' if i == len(AI_SERI) - 1 else ''}. {x.get('ket', '')}".strip() for i, x in enumerate(AI_SERI))
+        + f"\nNama lengkap sistem yang dipakai sekarang: {AI_SERI[-1]['seri']} AI. Pusat Info ini juga bagian dari sistem itu.")
+    if PROYEK_SOROT:
+        out.append("Proyek yang sedang dikerjakan MCI:\n" + "\n".join(f"- {x['nama']}: {x.get('sub', '')} ({x.get('status', '')})" for x in PROYEK_SOROT))
     out.append("Divisi: " + ", ".join(DIVISI.values()) + ". Ada juga Mahapatih, yaitu kelompok pejabat tinggi (high command) MCI.")
     pr = produk_list()
     if pr:
@@ -9928,6 +9937,8 @@ def pi_konteks():
         out.append("Jasa yang ditawarkan untuk umum:\n" + "\n".join(f"- {x['nama']}: {x['harga'] or 'harga dibicarakan dengan admin'}" + (f". {x['deskripsi'][:160]}" if x["deskripsi"] else "") for x in jp[:30]))
     jk = jam_kerja()
     out.append(f"Jam kerja admin: {jk['teks']}. Pembelian dan pertanyaan produk bisa lewat halaman /produk.")
+    out.append("Pesan jasa: pengunjung bisa memesan jasa (" + ", ".join(x for x in pesan_layanan() if x != "Lainnya") + ", atau lainnya) lewat formulir di halaman /pesan "
+               "(menu Pesan Jasa). Tim MCI akan menghubungi lewat kontak yang ditulis. MCI tidak menerima jasa cetak 3D dan gambar teknik untuk umum.")
     k = t["kontak"]   # nomor WA sengaja TIDAK dimasukkan; server yang menyisipkan kalau obrolan aman
     sos = [f"Instagram {k['ig']} (instagram.com/{k['ig'][1:]})" if k.get("ig") else "", f"TikTok {k['tt']} (tiktok.com/{k['tt']})" if k.get("tt") else ""]
     out.append(f"Media sosial resmi MCI: {', '.join(x for x in sos if x) or 'belum ada'}. "
@@ -9943,7 +9954,22 @@ def pi_konteks():
 
 
 def pi_tanya(q, riwayat):
-    sysp = PI_SISTEM + "\n\n=== DATA PUBLIK MCI ===\n" + pi_konteks() + "\n=== AKHIR DATA ===" + GAYA_JAWAB + TANPA_LATEX
+    sysp = PI_SISTEM + IDENTITAS_AI + "\n\n=== DATA PUBLIK MCI ===\n" + pi_konteks() + "\n=== AKHIR DATA ===" + GAYA_JAWAB + TANPA_LATEX
+    try:
+        return _pi_gemini(sysp, q, riwayat)
+    except Exception as e:
+        # Gemini penuh/sibuk -> Groq menjawab supaya tamu tidak melihat pesan error
+        if not mesin_kunci("groq") or not any(x in str(e) for x in _GEMINI_PENUH):
+            raise
+        log.warning("Pusat Info: Gemini penuh (%s), dijawab Groq", str(e)[:80])
+        pesan = [{"role": "assistant" if x["role"] == "model" else "user", "content": x["text"]} for x in riwayat] + [{"role": "user", "content": q}]
+        out = _kompatibel("groq", sysp[:24000], "", 1500, False, pesan[-12:])
+        CADANGAN_STAT["dipakai"] += 1
+        CADANGAN_STAT["terakhir"] = _now()
+        return latex_bersih(out), 0
+
+
+def _pi_gemini(sysp, q, riwayat):
     contents = [types.Content(role=x["role"], parts=[types.Part(text=x["text"])]) for x in riwayat]
     contents.append(types.Content(role="user", parts=[types.Part(text=q)]))
     modes = [_PI_MODE[0]] if _PI_MODE[0] is not None else [False, True]
