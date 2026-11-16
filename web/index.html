@@ -792,11 +792,52 @@ details.cara p{line-height:1.65}
 .apu{display:grid;gap:8px;margin:0 0 12px}
 .apu .cd{margin:0;border-left:3px solid var(--gold);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .apu .cd span{flex:1;min-width:200px;font-size:14px}
-#grafKanvas{width:100%;height:560px;display:block;border:1px solid var(--line);border-radius:14px;background:var(--paper);touch-action:none;cursor:grab}
+.obs{position:relative;height:660px;border-radius:20px;overflow:hidden;color:#DFE5F2;isolation:isolate;
+  background:radial-gradient(1100px 680px at 42% 46%,#131D3A 0%,#0A1022 55%,#060914 100%);box-shadow:0 24px 60px rgba(6,9,20,.28)}
+.obs::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;z-index:0;
+  background-image:radial-gradient(1px 1px at 12% 18%,#fff8 50%,transparent 51%),radial-gradient(1px 1px at 72% 12%,#fff6 50%,transparent 51%),radial-gradient(1px 1px at 33% 78%,#fff5 50%,transparent 51%),radial-gradient(1px 1px at 88% 66%,#fff6 50%,transparent 51%),radial-gradient(1px 1px at 55% 40%,#fff4 50%,transparent 51%),radial-gradient(1px 1px at 20% 55%,#fff5 50%,transparent 51%)}
+#grafKanvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab;z-index:1}
 #grafKanvas.seret{cursor:grabbing}
-#grafInfo{min-height:1.4em;font-size:13px;margin-top:8px}
+.obsTop{position:absolute;left:22px;right:22px;top:18px;display:flex;gap:10px;align-items:center;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;z-index:2;padding-bottom:4px}
+.obsTop::-webkit-scrollbar{display:none}
+.obsTop>*{flex:none}
+.obsTop b{font:600 17px/1 Georgia,"Times New Roman",serif;letter-spacing:.05em;color:#F3EAD6;margin-right:6px}
+.obsTop input{all:unset;box-sizing:border-box;width:210px;max-width:100%;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#E6E9EF;font-size:13px}
+.obsTop input::placeholder{color:#7F8AA3}
+.obsTop input:focus-visible{border-color:rgba(214,183,122,.6)}
+.obsChip{all:unset;cursor:pointer;padding:5px 11px;border-radius:99px;border:1px solid rgba(255,255,255,.14);color:#AAB3C8;font-size:12px;transition:background .2s,border-color .2s,color .2s}
+.obsChip i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.obsChip[aria-pressed=false]{opacity:.45}
+.obsChip.semua[aria-pressed=true]{background:rgba(214,183,122,.16);border-color:rgba(214,183,122,.5);color:#F0D9A6}
+.obsChip:focus-visible,.obsBtn:focus-visible,.obsSide button:focus-visible,.obsIns button:focus-visible{outline:2px solid #D2B77A;outline-offset:2px}
+.obsBtn{all:unset;cursor:pointer;padding:6px 11px;border-radius:10px;border:1px solid rgba(255,255,255,.14);color:#C8D0E2;font-size:12px}
+.obsBtn:hover,.obsChip:hover{border-color:rgba(214,183,122,.5)}
+.obsSide{position:absolute;right:18px;top:70px;bottom:96px;width:300px;z-index:3;overflow:auto;padding:20px;border-radius:18px;background:rgba(13,19,37,.74);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.09);transform:translateX(0);transition:transform .35s cubic-bezier(.2,.8,.2,1),opacity .35s}
+.obsSide[hidden]{display:block;transform:translateX(calc(100% + 30px));opacity:0;pointer-events:none}
+.obsSide .k{color:#8E98B0;font-size:11.5px;letter-spacing:.02em}
+.obsSide h3{font:600 21px/1.2 Georgia,"Times New Roman",serif;color:#fff;margin:6px 0 4px}
+.obsSide .tx{color:#AAB3C8;font-size:12.5px;line-height:1.5}
+.obsSide .row{all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:flex;justify-content:space-between;gap:10px;padding:9px 2px;border-top:1px solid rgba(255,255,255,.07);font-size:13px;color:#DFE5F2}
+.obsSide .row:hover{color:#F0D9A6}
+.obsSide .row i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px}
+.obsSide .row small{color:#8E98B0;font-size:11.5px;white-space:nowrap}
+.obsSide .tutup{all:unset;cursor:pointer;position:absolute;right:14px;top:12px;color:#8E98B0;font-size:18px;line-height:1;padding:4px}
+.obsLacak{margin-top:16px;padding:12px;border-radius:12px;background:rgba(214,183,122,.09);border:1px solid rgba(214,183,122,.25)}
+.obsLacak label{display:block;color:#F0D9A6;font-size:12.5px;margin-bottom:8px}
+.obsLacak input{all:unset;box-sizing:border-box;width:100%;padding:7px 10px;border-radius:8px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.12);color:#E6E9EF;font-size:13px}
+.obsLacak .hasil{margin-top:10px;font-size:12.5px;color:#F0D9A6;line-height:1.6}
+.obsIns{position:absolute;left:18px;bottom:16px;right:18px;display:flex;gap:10px;z-index:2;overflow-x:auto;scrollbar-width:none}
+.obsIns button{all:unset;cursor:pointer;flex:none;min-width:150px;max-width:260px;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);transition:border-color .2s,background .2s}
+.obsIns button:hover{border-color:rgba(214,183,122,.45);background:rgba(255,255,255,.08)}
+.obsIns small{display:block;color:#8E98B0;font-size:11.5px;margin-bottom:2px}
+.obsIns b{display:block;color:#F3EAD6;font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.obsHint{position:absolute;right:22px;bottom:92px;z-index:2;color:#6F7A93;font-size:11.5px;pointer-events:none}
+.obsSide:not([hidden])~.obsHint{display:none}
+.obsTop .obsChip,.obsTop .obsBtn{flex:none;white-space:nowrap}
+@media (max-width:900px){.obs{height:600px}.obsSide{left:12px;right:12px;width:auto;top:auto;bottom:12px;max-height:58%}.obsSide[hidden]{transform:translateY(calc(100% + 30px))}.obsTop input{width:170px}.obsHint{display:none}}
 .grafG{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
-@media (max-width:600px){#grafKanvas{height:440px}}
+
 </style>
 </head>
 <body>
@@ -1280,9 +1321,16 @@ details.cara p{line-height:1.65}
 
  <section id="p-graf" class="pg" hidden>
   <h1>Peta &amp; Grafik</h1>
-  <p class="mu" style="max-width:720px">Khusus Dev. Peta menunjukkan siapa terhubung ke apa: anggota, divisi, proyek, tugas yang belum selesai, alat yang sedang dipinjam, dan pasal di sidang/putusan. Geser titik untuk merapikan, seret latar untuk menggeser, gulir atau cubit untuk zoom, klik titik untuk melihat detailnya.</p>
+  <p class="mu" style="max-width:720px">Khusus Dev. Peta pengetahuan ala Graphify: siapa terhubung ke apa (anggota, divisi, proyek, tugas aktif, alat dipinjam, rapat, konten, dan pasal), dikelompokkan otomatis menjadi komunitas, lengkap dengan titik pusat, koneksi mengejutkan, anggota terisolasi, dan pelacak jalur. Apex juga membaca peta ini lewat alat cek_peta, sehingga cukup satu panggilan untuk pertanyaan seperti "Budi lagi pegang apa?".</p>
   <div class="seg" id="grafSeg" style="margin:0 0 14px;background:#EFECE4"><button type="button" class="on" data-gf="peta">Peta data</button><button type="button" data-gf="grafik">Grafik</button></div>
-  <div id="grafPeta"><canvas id="grafKanvas" aria-label="Peta jaringan data MCI"></canvas><div class="lgd" id="grafLgd"></div><div id="grafInfo" class="mu"></div></div>
+  <div id="grafPeta" class="obs">
+   <canvas id="grafKanvas" aria-label="Peta jaringan data MCI. Klik titik untuk detail."></canvas>
+   <div class="obsTop"><b>MCI · Peta</b><input id="grafCari" type="search" list="grafDaftar" placeholder="Cari anggota, proyek, pasal…" aria-label="Cari titik di peta"><datalist id="grafDaftar"></datalist>
+    <span id="grafChip" style="display:contents"></span><button class="obsBtn" type="button" id="grafPas">Pas ke layar</button></div>
+   <aside class="obsSide" id="grafSide" hidden aria-live="polite"></aside>
+   <div class="obsHint" id="grafInfo">Geser titik · seret latar untuk menggeser · gulir atau cubit untuk zoom</div>
+   <div class="obsIns" id="grafIns"></div>
+  </div>
   <div id="grafGrafik" hidden><div class="grafG">
    <div class="cd"><b>Kas per bulan</b><div id="gKas"></div></div>
    <div class="cd"><b>Pemakaian AI 14 hari</b><div id="gAi"></div></div>
@@ -7530,7 +7578,9 @@ function pnCad(d) {
     return `<div class="r ${aktif ? "" : "off"}"><span class="nm">${aktif ? on.indexOf(x.id) + 1 : "–"}</span><b>${esc(x.nama)}<br><small>${!x.siap ? "kunci belum diisi" : x.istirahat ? `istirahat ${x.istirahat} dtk` : "siap"}${st.dipakai ? ` · dipakai ${st.dipakai}×` : ""}${st.gagal ? ` · gagal ${st.gagal}×` : ""}</small></b>
       <button type="button" class="ud" data-cu="${x.id}" data-d="-1" ${!aktif || on.indexOf(x.id) === 0 ? "disabled" : ""} aria-label="Naikkan ${esc(x.nama)}">▲</button><button type="button" class="ud" data-cu="${x.id}" data-d="1" ${!aktif || on.indexOf(x.id) === on.length - 1 ? "disabled" : ""} aria-label="Turunkan ${esc(x.nama)}">▼</button>${pnSk(aktif, `data-cs="${x.id}" aria-label="${esc(x.nama)}"`)}</div>`; }).join("");
   const h = d.hemat || {};
-  $("#pnHemat").textContent = `Sejak server menyala: ${h.router || 0} pesan dialihkan ke model hemat/tanpa AI, ${h.cache || 0} jawaban diambil dari cache (Pusat Info: ${h.pi_cache || 0} cache, ${h.pi_lokal || 0} tanpa AI).`;
+  const g = h.graf || {}, hm = g.tanpa_peta ? Math.round((1 - g.kirim / g.tanpa_peta) * 100) : 0;
+  $("#pnHemat").innerHTML = `Sejak server menyala: ${h.router || 0} pesan dialihkan ke model hemat/tanpa AI, ${h.cache || 0} jawaban diambil dari cache (Pusat Info: ${h.pi_cache || 0} cache, ${h.pi_lokal || 0} tanpa AI).`
+    + (g.tanya ? `<br><b>Graphify:</b> ${g.jalur} dari ${g.tanya} pertanyaan Pusat Info memakai jalur data; data yang dikirim ke AI ≈${Math.round(g.kirim / 4).toLocaleString("id-ID")} token dari ≈${Math.round(g.tanpa_peta / 4).toLocaleString("id-ID")} token tanpa peta (<b>hemat ${hm}%</b>).` : "<br>Graphify: belum ada pertanyaan Pusat Info sejak server menyala.");
 }
 let ADU = {mesin: [], skor: {}, pilih: []};
 async function aduMuat() { try { ADU = Object.assign(ADU, await api("/api/panel/adu")); ADU.pilih = ADU.pilih.length ? ADU.pilih : ADU.mesin.filter(m => m.siap).slice(0, 2).map(m => m.id); aduRender(); } catch (e) {} }
@@ -7562,89 +7612,163 @@ $("#pnMeter").onclick = async e => { const b = e.target.closest("[data-kb]"); if
   const v = prompt("Batas panggilan per hari (perkiraan) untuk penyedia ini:", b.dataset.v); if (!v) return;
   const n = parseInt(v, 10); if (!(n > 0)) return alert("Isi angka lebih dari 0."); await pnKirim({aksi: "kuota_batas", id: b.dataset.kb, batas: n}, "Batas disimpan"); };
 
-/* ================= PETA & GRAFIK ================= */
-const GRUP = {anggota: ["#3B6FD8", "Anggota"], divisi: ["#C9962B", "Divisi"], proyek: ["#2E8B57", "Proyek"], tugas: ["#8A5CD1", "Tugas aktif"], alat: ["#E07A3D", "Alat dipinjam"], uu: ["#B5483A", "Pasal UU"]};
+/* ================= PETA & GRAFIK (Graphify · Observatorium) ================= */
+const GRUP = {anggota: ["#7FA7FF", "Anggota"], divisi: ["#E9C987", "Divisi"], proyek: ["#6FD6A8", "Proyek"], tugas: ["#B59BFF", "Tugas"], alat: ["#FF9F6E", "Alat"], agenda: ["#7FE3F0", "Rapat"], konten: ["#FF8FC8", "Konten"], uu: ["#FF7A7A", "Pasal"]};
+const HALO = ["#4F6BD8", "#D8B25F", "#3FBF8F", "#9B7BFF", "#3FC6D8", "#E06F9E", "#E08A4F"];
 let GF = null;
 function grafMuat() { if (!ADM()) return; if ($("#grafGrafik").hidden) petaMuat(); else grafikMuat(); }
 $("#grafSeg").onclick = e => { const b = e.target.closest("[data-gf]"); if (!b) return; $$("#grafSeg button").forEach(x => x.classList.toggle("on", x === b));
   $("#grafPeta").hidden = b.dataset.gf !== "peta"; $("#grafGrafik").hidden = b.dataset.gf !== "grafik"; grafMuat(); };
-async function petaMuat() {
-  try { const d = await api("/api/graf"); petaMulai(d); } catch (e) { $("#grafInfo").textContent = e.message; }
-}
+async function petaMuat() { try { petaMulai(await api("/api/graf")); } catch (e) { $("#grafInfo").textContent = e.message; } }
+function petaUkur() { const cv = $("#grafKanvas"), dpr = window.devicePixelRatio || 1; GF.W = cv.clientWidth; GF.H = cv.clientHeight; GF.dpr = dpr; cv.width = GF.W * dpr; cv.height = GF.H * dpr; }
 function petaMulai(d) {
-  const cv = $("#grafKanvas"), dpr = window.devicePixelRatio || 1;
   if (GF) cancelAnimationFrame(GF.raf);
-  const W = cv.clientWidth, H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr;
-  const idx = {}, N = d.nodes.map((n, i) => { const a = i / Math.max(1, d.nodes.length) * Math.PI * 2, r = 80 + (n.grup === "divisi" ? 0 : 140 + Math.random() * 60);
-    return idx[n.id] = Object.assign({}, n, {x: Math.cos(a) * r, y: Math.sin(a) * r, vx: 0, vy: 0, r: n.grup === "divisi" ? 13 : n.grup === "anggota" ? 9 : 6}); });
+  const idx = {}, N = d.nodes.map((n, i) => { const a = i * 2.39996, r = 60 + Math.sqrt(i) * 38;
+    return idx[n.id] = Object.assign({}, n, {x: Math.cos(a) * r, y: Math.sin(a) * r, vx: 0, vy: 0}); });
+  N.forEach(n => n.r = (n.grup === "divisi" ? 10 : n.grup === "anggota" ? 7 : 4.5) + Math.min(8, (n.derajat || 0) * .7));
   const E = d.edges.map(e => ({a: idx[e.a], b: idx[e.b], label: e.label})).filter(e => e.a && e.b);
-  N.forEach(n => n.deg = E.filter(e => e.a === n || e.b === n).length);
-  GF = {N, E, cam: {x: W / 2, y: H / 2, k: 1}, pilih: null, panas: 1, raf: 0, cv, W, H, dpr};
-  $("#grafLgd").innerHTML = Object.entries(GRUP).filter(([g]) => N.some(n => n.grup === g)).map(([g, [w, nm]]) => `<span><i style="background:${w};border-radius:50%"></i>${nm} (${N.filter(n => n.grup === g).length})</span>`).join("");
-  $("#grafInfo").textContent = N.length ? "Klik titik untuk melihat koneksinya." : "Belum ada data untuk dipetakan.";
-  const gerak = !RINGAN && !matchMedia("(prefers-reduced-motion: reduce)").matches;
-  for (let i = 0; i < (gerak ? 220 : 400); i++) petaLangkah();   // susun dulu, lalu pas-kan ke layar
-  if (!gerak) GF.panas = 0;
-  petaPas();
-  const loop = () => { if (GF.panas > .02) petaLangkah(); petaGambar(); GF.raf = requestAnimationFrame(loop); };
+  const T = {}; N.forEach(n => T[n.id] = []); E.forEach(e => { T[e.a.id].push({o: e.b, e}); T[e.b.id].push({o: e.a, e}); });
+  GF = {N, E, T, idx, w: d.wawasan || {}, cam: {x: 0, y: 0, k: 1}, tuju: null, pilih: null, sorot: null, jalur: null, sembunyi: new Set(), panas: 1, raf: 0, muncul: 0, kom: -1};
+  petaUkur();
+  const gerak = !RINGAN && !matchMedia("(prefers-reduced-motion: reduce)").matches; GF.gerak = gerak;
+  for (let i = 0; i < 260; i++) petaLangkah();
+  petaPas(false); GF.muncul = gerak ? 0 : 1; if (!gerak) GF.panas = 0;
+  $("#grafDaftar").innerHTML = N.map(n => `<option value="${esc(n.label)}">`).join("");
+  $("#grafChip").innerHTML = `<button type="button" class="obsChip semua" data-gc="" aria-pressed="true">Semua</button>` + Object.entries(GRUP).filter(([g]) => N.some(n => n.grup === g))
+    .map(([g, [w, nm]]) => `<button type="button" class="obsChip" data-gc="${g}" aria-pressed="true"><i style="background:${w}"></i>${nm} ${N.filter(n => n.grup === g).length}</button>`).join("");
+  petaWawasan(); petaSamping(null);
+  const loop = () => { if (GF.panas > .02) petaLangkah(); if (GF.muncul < 1) GF.muncul = Math.min(1, GF.muncul + .025);
+    if (GF.tuju) { const c = GF.cam, t = GF.tuju; c.x += (t.x - c.x) * .12; c.y += (t.y - c.y) * .12; c.k += (t.k - c.k) * .12; if (Math.abs(t.k - c.k) < .002 && Math.abs(t.x - c.x) < .5) GF.tuju = null; }
+    petaGambar(); GF.raf = requestAnimationFrame(loop); };
   loop();
-}
-function petaPas() {   // zoom & geser supaya seluruh peta pas di kanvas
-  const {N, W, H} = GF; if (!N.length) return;
-  const xs = N.map(n => n.x), ys = N.map(n => n.y), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
-  const k = Math.max(.35, Math.min(1.6, Math.min((W - 80) / Math.max(1, x1 - x0), (H - 80) / Math.max(1, y1 - y0))));
-  GF.cam = {k, x: W / 2 - (x0 + x1) / 2 * k, y: H / 2 - (y0 + y1) / 2 * k};
 }
 function petaLangkah() {
   const {N, E} = GF, t = GF.panas;
   for (let i = 0; i < N.length; i++) for (let j = i + 1; j < N.length; j++) {
     const a = N[i], b = N[j]; let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy || .01; if (d2 > 250000) continue;
     const f = 2600 / d2, d = Math.sqrt(d2); dx /= d; dy /= d; a.vx += dx * f; a.vy += dy * f; b.vx -= dx * f; b.vy -= dy * f; }
-  E.forEach(e => { const dx = e.b.x - e.a.x, dy = e.b.y - e.a.y, d = Math.sqrt(dx * dx + dy * dy) || .01, f = (d - 105) * .02;
+  E.forEach(e => { const dx = e.b.x - e.a.x, dy = e.b.y - e.a.y, d = Math.sqrt(dx * dx + dy * dy) || .01, f = (d - (e.a.grup === "divisi" || e.b.grup === "divisi" ? 130 : 90)) * .02;
     e.a.vx += dx / d * f; e.a.vy += dy / d * f; e.b.vx -= dx / d * f; e.b.vy -= dy / d * f; });
-  N.forEach(n => { n.vx -= n.x * .004; n.vy -= n.y * .004; if (n.tahan) { n.vx = n.vy = 0; return; }
+  N.forEach(n => { n.vx -= n.x * .004; n.vy -= n.y * .005; if (n.tahan) { n.vx = n.vy = 0; return; }
     n.x += Math.max(-12, Math.min(12, n.vx * t)); n.y += Math.max(-12, Math.min(12, n.vy * t)); n.vx *= .6; n.vy *= .6; });
   GF.panas *= .992;
 }
+function petaPas(halus = true, ids = null) {
+  const L = GF.N.filter(n => !GF.sembunyi.has(n.grup) && (!ids || ids.has(n.id))); if (!L.length) return;
+  const xs = L.map(n => n.x), ys = L.map(n => n.y), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const ruangKanan = !$("#grafSide").hidden && GF.W > 900 ? 330 : 0, w = GF.W - 90 - ruangKanan, h = GF.H - 200;
+  const k = Math.max(.35, Math.min(ids ? 2 : 1.5, Math.min(w / Math.max(60, x1 - x0), h / Math.max(60, y1 - y0))));
+  const t = {k, x: (GF.W - ruangKanan) / 2 - (x0 + x1) / 2 * k, y: GF.H / 2 + 10 - (y0 + y1) / 2 * k};
+  if (halus && GF.gerak) GF.tuju = t; else GF.cam = t;
+}
+function petaTerlihat(n) { return !GF.sembunyi.has(n.grup); }
 function petaGambar() {
-  const {cv, N, E, cam, dpr, pilih} = GF, c = cv.getContext("2d"), gelap = document.documentElement.dataset.tema === "gelap";
+  const cv = $("#grafKanvas"), c = cv.getContext("2d"), {N, E, cam, dpr, pilih, jalur} = GF, al = GF.muncul;
   c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, GF.W, GF.H); c.translate(cam.x, cam.y); c.scale(cam.k, cam.k);
-  const dekat = pilih ? new Set([pilih, ...E.filter(e => e.a === pilih || e.b === pilih).flatMap(e => [e.a, e.b])]) : null;
-  E.forEach(e => { const on = !dekat || (dekat.has(e.a) && dekat.has(e.b) && (e.a === pilih || e.b === pilih));
-    c.strokeStyle = gelap ? `rgba(200,210,230,${on ? .45 : .06})` : `rgba(20,30,60,${on ? .35 : .05})`; c.lineWidth = on && pilih ? 1.6 / cam.k : 1 / cam.k;
-    c.beginPath(); c.moveTo(e.a.x, e.a.y); c.lineTo(e.b.x, e.b.y); c.stroke(); });
-  N.forEach(n => { const on = !dekat || dekat.has(n); c.globalAlpha = on ? 1 : .18; c.fillStyle = (GRUP[n.grup] || ["#999"])[0];
-    c.beginPath(); c.arc(n.x, n.y, n.r + Math.min(6, n.deg * .4), 0, Math.PI * 2); c.fill();
-    if (n === pilih) { c.lineWidth = 3 / cam.k; c.strokeStyle = gelap ? "#fff" : "#0B1730"; c.stroke(); }
-    if (on && (cam.k > .8 || n.grup === "divisi" || n.grup === "anggota" || n === pilih)) { c.fillStyle = gelap ? "#E6E9EF" : "#141B2B"; c.font = `${n.grup === "divisi" ? 600 : 400} ${12 / Math.max(.7, cam.k)}px Inter, system-ui, sans-serif`; c.textAlign = "center"; c.fillText(n.label, n.x, n.y + n.r + 14 / Math.max(.7, cam.k)); }
+  const fokus = pilih ? new Set([pilih.id, ...GF.T[pilih.id].map(x => x.o.id)]) : null;
+  // kabut warna per komunitas
+  const kel = {}; N.forEach(n => { if (n.kom >= 0 && petaTerlihat(n)) (kel[n.kom] = kel[n.kom] || []).push(n); });
+  Object.entries(kel).forEach(([k, L]) => { if (L.length < 3) return; const cx = L.reduce((a, n) => a + n.x, 0) / L.length, cy = L.reduce((a, n) => a + n.y, 0) / L.length;
+    const r = Math.max(80, Math.max(...L.map(n => Math.hypot(n.x - cx, n.y - cy))) + 50), g = c.createRadialGradient(cx, cy, 0, cx, cy, r), w = HALO[k % HALO.length];
+    const kuat = GF.kom == k ? .34 : .17; g.addColorStop(0, w + Math.round(kuat * al * 255).toString(16).padStart(2, "0")); g.addColorStop(1, w + "00");
+    c.fillStyle = g; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill(); });
+  // garis melengkung
+  E.forEach(e => { if (!petaTerlihat(e.a) || !petaTerlihat(e.b)) return;
+    const diJalur = jalur && jalur.e.has(e), diFokus = fokus && (e.a === pilih || e.b === pilih), on = diJalur || diFokus;
+    const mx = (e.a.x + e.b.x) / 2, my = (e.a.y + e.b.y) / 2, dx = e.b.x - e.a.x, dy = e.b.y - e.a.y;
+    c.strokeStyle = on ? `rgba(240,217,166,${.9 * al})` : `rgba(159,176,216,${(fokus || jalur ? .06 : .17) * al})`; c.lineWidth = (on ? 1.8 : 1) / cam.k;
+    c.beginPath(); c.moveTo(e.a.x, e.a.y); c.quadraticCurveTo(mx - dy * .12, my + dx * .12, e.b.x, e.b.y); c.stroke(); });
+  // titik bercahaya
+  N.forEach(n => { if (!petaTerlihat(n)) return;
+    const redup = (fokus && !fokus.has(n.id)) || (jalur && !jalur.n.has(n.id)) || (!fokus && !jalur && GF.kom >= 0 && n.kom !== GF.kom), w = (GRUP[n.grup] || ["#9AA3B2"])[0], r = n.r * (.6 + .4 * al);
+    c.globalAlpha = (redup ? .28 : 1) * al;
+    const g = c.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 2.6); g.addColorStop(0, "#ffffff"); g.addColorStop(.18, w); g.addColorStop(.45, w + "66"); g.addColorStop(1, w + "00");
+    c.fillStyle = g; c.beginPath(); c.arc(n.x, n.y, r * 2.6, 0, Math.PI * 2); c.fill();
+    if (n === pilih || n === GF.sorot) { c.strokeStyle = "#F0D9A6"; c.lineWidth = 1.3 / cam.k; c.beginPath(); c.arc(n.x, n.y, r + 7, 0, Math.PI * 2); c.stroke(); }
+    const label = n === pilih || n === GF.sorot || (jalur && jalur.n.has(n.id)) || (fokus && fokus.has(n.id)) || (!fokus && !jalur && (n.grup === "divisi" || n.grup === "anggota" || cam.k > 1.15));
+    if (label) { const fs = (n.grup === "divisi" ? 12.5 : 11.5) / Math.max(.75, cam.k);
+      c.font = `${n.grup === "divisi" || n === pilih ? 600 : 400} ${fs}px Inter, system-ui, sans-serif`; c.textAlign = "center";
+      c.fillStyle = n.grup === "divisi" ? "#F3EAD6" : redup ? "#7F8AA3" : "#C8D0E2"; c.fillText(n.label, n.x, n.y + r + (n === pilih || n === GF.sorot ? 22 : 14) / Math.max(.75, cam.k)); }
     c.globalAlpha = 1; });
 }
+function petaWawasan() {
+  const w = GF.w, p = (w.pusat || [])[0], k = w.kejut || [], s = w.sendiri || [];
+  $("#grafIns").innerHTML = [
+    p ? `<button type="button" data-gi="pusat"><small>Titik pusat</small><b>${esc(p.label)} · ${p.derajat} koneksi</b></button>` : "",
+    `<button type="button" data-gi="kom"><small>Komunitas</small><b>${(w.komunitas || []).length} kelompok${(w.komunitas || [])[0] ? " · " + esc(w.komunitas[0].nama) : ""}</b></button>`,
+    k.length ? `<button type="button" data-gi="kejut"><small>Koneksi mengejutkan · ${k.length}</small><b>${esc(k[0].teks)}</b></button>` : "",
+    `<button type="button" data-gi="sendiri"><small>Anggota terisolasi</small><b>${s.length ? s.length + " orang · " + esc(s.map(x => x.label).join(", ")) : "Tidak ada"}</b></button>`
+  ].join("");
+}
+function petaPilih(n, pusatkan = false) {
+  GF.pilih = n; GF.jalur = null; GF.kom = n ? n.kom : -1; petaSamping(n);
+  if (n && pusatkan) petaPas(true, new Set([n.id, ...GF.T[n.id].map(x => x.o.id)]));
+}
+function petaSamping(n, isi) {
+  const sd = $("#grafSide");
+  if (!n && !isi) { sd.hidden = true; return; }
+  sd.hidden = false;
+  if (isi) { sd.innerHTML = `<button class="tutup" type="button" data-gx aria-label="Tutup">×</button>` + isi; return; }
+  const kom = (GF.w.komunitas || []).find(k => k.id === n.kom), kn = GF.T[n.id];
+  sd.innerHTML = `<button class="tutup" type="button" data-gx aria-label="Tutup">×</button>
+    <div class="k">${esc(((GRUP[n.grup] || [, n.grup])[1] || "").toUpperCase())}${kom ? " · " + esc(kom.nama) : ""}</div><h3>${esc(n.label)}</h3>
+    <div class="tx">${n.info ? esc(n.info) + " · " : ""}${kn.length} koneksi</div><div style="margin-top:12px">
+    ${kn.map(x => `<button class="row" type="button" data-gid="${esc(x.o.id)}"><span><i style="background:${(GRUP[x.o.grup] || ["#999"])[0]}"></i>${esc(x.o.label)}</span><small>${esc(x.e.label || x.o.grup)}</small></button>`).join("") || '<div class="tx">Belum terhubung ke apa pun.</div>'}</div>
+    <div class="obsLacak"><label for="grafKe">↯ Lacak jalur ke…</label><input id="grafKe" list="grafDaftar" placeholder="ketik nama titik lain"><div class="hasil" id="grafJalur"></div></div>`;
+  $("#grafKe").onchange = () => petaLacak(n, $("#grafKe").value);
+}
+function petaCari(q) { q = String(q || "").trim().toLowerCase(); if (!q) return null;
+  const L = GF.N.filter(n => n.label.toLowerCase() === q); const M = L.length ? L : GF.N.filter(n => n.label.toLowerCase().includes(q));
+  return M.sort((a, b) => (b.derajat || 0) - (a.derajat || 0))[0] || null; }
+function petaLacak(a, q) {
+  const b = petaCari(q), out = $("#grafJalur"); if (!b) return out.textContent = "Titik tidak ditemukan.";
+  const asal = new Map([[a.id, null]]), antre = [a.id];
+  while (antre.length && !asal.has(b.id)) { const i = antre.shift(); GF.T[i].forEach(x => { if (!asal.has(x.o.id)) { asal.set(x.o.id, {dari: i, e: x.e}); antre.push(x.o.id); } }); }
+  if (!asal.has(b.id)) { GF.jalur = null; return out.textContent = `${a.label} dan ${b.label} tidak terhubung.`; }
+  const n = new Set(), e = new Set(), urut = []; let i = b.id;
+  while (i) { n.add(i); urut.unshift(GF.idx[i].label); const s = asal.get(i); if (s) e.add(s.e); i = s ? s.dari : null; }
+  GF.jalur = {n, e}; out.innerHTML = esc(urut.join("  →  ")) + `<br><span style="color:#8E98B0">${urut.length - 1} langkah</span>`;
+  petaPas(true, n);
+}
+$("#grafChip").onclick = e => { const b = e.target.closest("[data-gc]"); if (!b || !GF) return; const g = b.dataset.gc;
+  if (!g) GF.sembunyi.clear(); else GF.sembunyi.has(g) ? GF.sembunyi.delete(g) : GF.sembunyi.add(g);
+  $$("#grafChip [data-gc]").forEach(x => x.setAttribute("aria-pressed", x.dataset.gc ? String(!GF.sembunyi.has(x.dataset.gc)) : String(!GF.sembunyi.size)));
+  if (GF.pilih && GF.sembunyi.has(GF.pilih.grup)) petaPilih(null); };
+$("#grafPas").onclick = () => { if (!GF) return; GF.jalur = null; petaPilih(null); petaPas(true); };
+$("#grafCari").onchange = () => { if (!GF) return; const n = petaCari($("#grafCari").value); if (n) { GF.sembunyi.delete(n.grup); petaPilih(n, true); } };
+$("#grafSide").onclick = e => { if (e.target.closest("[data-gx]")) { petaPilih(null); return; } const b = e.target.closest("[data-gid]"); if (b) petaPilih(GF.idx[b.dataset.gid], true); };
+$("#grafIns").onclick = e => { const b = e.target.closest("[data-gi]"); if (!b || !GF) return; const w = GF.w;
+  if (b.dataset.gi === "pusat" && w.pusat[0]) petaPilih(GF.idx[w.pusat[0].id], true);
+  if (b.dataset.gi === "kom") { const K = w.komunitas || []; if (!K.length) return; const nx = K[(K.findIndex(k => k.id === GF.kom) + 1) % K.length]; GF.pilih = null; GF.jalur = null; GF.kom = nx.id;
+    const ids = new Set(GF.N.filter(n => n.kom === nx.id).map(n => n.id)); petaPas(true, ids);
+    petaSamping(null, `<div class="k">KOMUNITAS ${K.indexOf(nx) + 1} DARI ${K.length}</div><h3>${esc(nx.nama)}</h3><div class="tx">${nx.jumlah} titik. Klik "Komunitas" lagi untuk kelompok berikutnya.</div><div style="margin-top:12px">${GF.N.filter(n => n.kom === nx.id).sort((a, b) => b.derajat - a.derajat).map(n => `<button class="row" type="button" data-gid="${esc(n.id)}"><span><i style="background:${GRUP[n.grup][0]}"></i>${esc(n.label)}</span><small>${esc(GRUP[n.grup][1])}</small></button>`).join("")}</div>`); }
+  if (b.dataset.gi === "kejut" && (w.kejut || []).length) { petaSamping(null, `<div class="k">KONEKSI MENGEJUTKAN</div><h3>${w.kejut.length} temuan</h3><div style="margin-top:12px">${w.kejut.map((k, i) => `<button class="row" type="button" data-gkj="${i}"><span>${esc(k.teks)}</span></button>`).join("")}</div>`);
+    $$("#grafSide [data-gkj]").forEach(x => x.onclick = ev => { ev.stopPropagation(); const k = w.kejut[+x.dataset.gkj], a = GF.idx[k.a], bb = GF.idx[k.b]; const ed = GF.E.find(e => (e.a === a && e.b === bb) || (e.a === bb && e.b === a));
+      GF.pilih = null; GF.jalur = {n: new Set([k.a, k.b]), e: new Set(ed ? [ed] : [])}; petaPas(true, GF.jalur.n); }); }
+  if (b.dataset.gi === "sendiri") petaSamping(null, `<div class="k">ANGGOTA TERISOLASI</div><h3>${(w.sendiri || []).length ? w.sendiri.length + " anggota" : "Tidak ada"}</h3><div class="tx">Anggota aktif yang belum terhubung ke proyek, tugas, alat, rapat, maupun konten.</div><div style="margin-top:12px">${(w.sendiri || []).map(x => `<button class="row" type="button" data-gid="${esc(x.id)}"><span>${esc(x.label)}</span></button>`).join("")}</div>`);
+};
 (function petaInput() {
-  const cv = $("#grafKanvas"); let seret = null, geser = null, jauh = 0, cubit = null;
-  const titik = ev => { const r = cv.getBoundingClientRect(); return {x: (ev.clientX - r.left - GF.cam.x) / GF.cam.k, y: (ev.clientY - r.top - GF.cam.y) / GF.cam.k, sx: ev.clientX, sy: ev.clientY}; };
-  const cari = p => GF.N.slice().reverse().find(n => (n.x - p.x) ** 2 + (n.y - p.y) ** 2 <= (n.r + 6) ** 2);
-  const ptr = new Map();
-  cv.addEventListener("pointerdown", ev => { if (!GF) return; cv.setPointerCapture(ev.pointerId); ptr.set(ev.pointerId, ev);
+  const cv = $("#grafKanvas"), ptr = new Map(); let seret = null, geser = null, jauh = 0, cubit = null;
+  const titik = ev => { const r = cv.getBoundingClientRect(); return {x: (ev.clientX - r.left - GF.cam.x) / GF.cam.k, y: (ev.clientY - r.top - GF.cam.y) / GF.cam.k}; };
+  const cari = p => GF.N.slice().reverse().find(n => petaTerlihat(n) && (n.x - p.x) ** 2 + (n.y - p.y) ** 2 <= (n.r + 8 / GF.cam.k) ** 2);
+  cv.addEventListener("pointerdown", ev => { if (!GF) return; GF.tuju = null; cv.setPointerCapture(ev.pointerId); ptr.set(ev.pointerId, ev);
     if (ptr.size === 2) { const [a, b] = [...ptr.values()]; cubit = {d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), k: GF.cam.k}; seret = geser = null; return; }
-    const p = titik(ev), n = cari(p); jauh = 0;
-    if (n) { seret = n; n.tahan = true; GF.panas = Math.max(GF.panas, .3); } else geser = {x: ev.clientX - GF.cam.x, y: ev.clientY - GF.cam.y}; cv.classList.add("seret"); });
+    const n = cari(titik(ev)); jauh = 0;
+    if (n) { seret = n; n.tahan = true; GF.panas = Math.max(GF.panas, .25); } else geser = {x: ev.clientX - GF.cam.x, y: ev.clientY - GF.cam.y}; cv.classList.add("seret"); });
   cv.addEventListener("pointermove", ev => { if (!GF) return; if (ptr.has(ev.pointerId)) ptr.set(ev.pointerId, ev);
     if (cubit && ptr.size === 2) { const [a, b] = [...ptr.values()]; GF.cam.k = Math.max(.3, Math.min(3, cubit.k * Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) / cubit.d)); return; }
+    if (!seret && !geser) { const n = cari(titik(ev)); GF.sorot = n || null; cv.style.cursor = n ? "pointer" : ""; return; }
     jauh += Math.abs(ev.movementX || 0) + Math.abs(ev.movementY || 0);
-    if (seret) { const p = titik(ev); seret.x = p.x; seret.y = p.y; } else if (geser) { GF.cam.x = ev.clientX - geser.x; GF.cam.y = ev.clientY - geser.y; } });
+    if (seret) { const p = titik(ev); seret.x = p.x; seret.y = p.y; } else { GF.cam.x = ev.clientX - geser.x; GF.cam.y = ev.clientY - geser.y; } });
   const lepas = ev => { if (!GF) return; ptr.delete(ev.pointerId); if (ptr.size < 2) cubit = null; cv.classList.remove("seret");
     if (seret) { seret.tahan = false; if (jauh < 5) petaPilih(seret); seret = null; } else if (geser && jauh < 5) petaPilih(null); geser = null; };
   cv.addEventListener("pointerup", lepas); cv.addEventListener("pointercancel", lepas);
-  cv.addEventListener("wheel", ev => { if (!GF) return; ev.preventDefault(); const r = cv.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top, k0 = GF.cam.k;
+  cv.addEventListener("pointerleave", () => { if (GF) GF.sorot = null; });
+  cv.addEventListener("wheel", ev => { if (!GF) return; ev.preventDefault(); GF.tuju = null; const r = cv.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top, k0 = GF.cam.k;
     const k = Math.max(.3, Math.min(3, k0 * (ev.deltaY < 0 ? 1.12 : 1 / 1.12))); GF.cam.x = mx - (mx - GF.cam.x) * k / k0; GF.cam.y = my - (my - GF.cam.y) * k / k0; GF.cam.k = k; }, {passive: false});
-  addEventListener("resize", () => { if (GF && !$("#p-graf").hidden && !$("#grafPeta").hidden) { const dpr = window.devicePixelRatio || 1; GF.W = cv.clientWidth; GF.H = cv.clientHeight; cv.width = GF.W * dpr; cv.height = GF.H * dpr; } });
+  let rz = 0; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (GF && !$("#p-graf").hidden && !$("#grafPeta").hidden) { petaUkur(); petaPas(false); } }, 150); });
+  addEventListener("keydown", ev => { if (ev.key === "Escape" && GF && !$("#p-graf").hidden) petaPilih(null); });
 })();
-function petaPilih(n) {
-  GF.pilih = n;
-  if (!n) return $("#grafInfo").textContent = "Klik titik untuk melihat koneksinya.";
-  const kn = GF.E.filter(e => e.a === n || e.b === n).map(e => { const o = e.a === n ? e.b : e.a; return `${o.label} (${e.label})`; });
-  $("#grafInfo").innerHTML = `<b>${esc(n.label)}</b> · ${esc((GRUP[n.grup] || [, n.grup])[1])}${n.info ? " · " + esc(n.info) : ""}<br>${kn.length ? "Terhubung ke: " + esc(kn.slice(0, 14).join(", ")) + (kn.length > 14 ? ` dan ${kn.length - 14} lainnya` : "") : "Belum terhubung ke apa pun."}`;
-}
 async function grafikMuat() {
   let d; try { d = await api("/api/grafik"); } catch (e) { $("#gKas").innerHTML = `<p class="er">${esc(e.message)}</p>`; return; }
   const kosong = '<p class="mu" style="font-size:13px">Belum ada data.</p>';

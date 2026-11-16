@@ -10018,7 +10018,17 @@ def pi_tanya(q, riwayat):
             PI_CACHE_STAT["kena"] += 1
             STATS["cache_hit"] += 1
             return hit, 0
-    sysp = PI_SISTEM + IDENTITAS_AI + "\n\n=== DATA PUBLIK MCI ===\n" + konteks + "\n=== AKHIR DATA ===" + GAYA_JAWAB + TANPA_LATEX
+    try:   # Graphify: kirim hanya jalur data yang relevan, bukan seluruh data
+        jalur = pi_jalur(q, riwayat, ver, konteks)
+    except Exception:
+        log.exception("Graphify Pusat Info gagal, pakai data lengkap")
+        jalur = None
+    kirim = jalur or konteks
+    GRAF_HEMAT["tanya"] += 1
+    GRAF_HEMAT["jalur" if jalur else "penuh"] += 1
+    GRAF_HEMAT["kirim"] += len(kirim)
+    GRAF_HEMAT["tanpa_peta"] += len(konteks)
+    sysp = PI_SISTEM + IDENTITAS_AI + "\n\n=== DATA PUBLIK MCI" + (" (potongan yang relevan dengan pertanyaan)" if jalur else "") + " ===\n" + kirim + "\n=== AKHIR DATA ===" + GAYA_JAWAB + TANPA_LATEX
     langsung_groq = model_tugas("pusat_info") == "groq" and mesin_kunci("groq")
     try:
         if langsung_groq:
@@ -12221,6 +12231,7 @@ FITUR_DAFTAR = [
     ("alarm_kapal", "Alarm kapal", "Kabar keluar area, baterai lemah, sinyal hilang"),
     ("telegram", "Balasan bot Telegram", "Bot menjawab anggota (Dev tetap dijawab)"),
     ("router_pintar", "Router pintar & cache", "Pesan sederhana dijawab Flash Lite atau tanpa AI; pertanyaan Pusat Info yang mirip memakai jawaban tersimpan"),
+    ("graphify", "Graphify (cari jalur data)", "Pusat Info hanya mengirim potongan data yang relevan ke AI, bukan seluruh data. Tidak cocok = otomatis kirim lengkap"),
     ("kerja_malam", "Kerja malam (hemat Neon)", "Laporan digabung ke jadwal bangun yang sudah ada dan database tidak dibangunkan jam 01.00–07.00. Bangun terjadwal 5x sehari, sebelumnya 7x"),
 ]
 FITUR_HAL = {"absen": ["absen"], "pusat_info": ["info"], "studio_gambar": ["gambar"]}   # halaman yang ikut hilang saat fiturnya dimatikan
@@ -12458,7 +12469,8 @@ def panel_data():
             "sidik_cocok": rh.get("sidik", _sidik()) == _sidik(), "pin_menit": PANEL_PIN_MENIT,
             "cadangan": {"urut": cadangan_urut(), "semua": [{"id": k, "nama": n, "siap": cadangan_siap(k), "stat": CAD_PER.get(k, {}),
                                                              "istirahat": max(0, int(_CAD_ISTIRAHAT.get(k, 0) - time.time()))} for k, n in CADANGAN_SEMUA]},
-            "hemat": {"router": STATS.get("router_hemat", 0), "cache": STATS.get("cache_hit", 0), "pi_cache": PI_CACHE_STAT["kena"], "pi_lokal": PI_CACHE_STAT["lokal"]},
+            "hemat": {"router": STATS.get("router_hemat", 0), "cache": STATS.get("cache_hit", 0), "pi_cache": PI_CACHE_STAT["kena"], "pi_lokal": PI_CACHE_STAT["lokal"],
+                      "graf": dict(GRAF_HEMAT)},
             **kuota_data()}
 
 
@@ -12962,66 +12974,6 @@ def api_apex_usul():
 
 
 # ---------- Graphify: peta jaringan data + dashboard grafik (khusus Dev) ----------
-@app.route("/api/graf")
-def api_graf():
-    need("admin")
-    nodes, edges, ada = [], [], set()
-
-    def n(i, label, grup, info=""):
-        if i not in ada:
-            ada.add(i)
-            nodes.append({"id": i, "label": str(label)[:40], "grup": grup, "info": str(info)[:200]})
-
-    def e(a, b, label=""):
-        if a in ada and b in ada:
-            edges.append({"a": a, "b": b, "label": label})
-
-    for k, v in DIVISI.items():
-        n(f"d:{k}", v, "divisi")
-    for m in MEMBERS.values():
-        if not m.get("aktif"):
-            continue
-        n(f"m:{m['id']}", m["nama"], "anggota", ", ".join(JABATAN.get(j, j) for j in m.get("jabatan") or []))
-        for dv in m.get("divisi") or []:
-            e(f"m:{m['id']}", f"d:{dv}", "divisi")
-    try:
-        for p in rk_rows("proyek")[:80]:
-            pid = f"p:{p['id']}"
-            n(pid, p.get("nama") or "Proyek", "proyek", f"{p.get('status', '')} · progres {p.get('progres') or 0}%")
-            if p.get("pj"):
-                e(f"m:{p['pj']}", pid, "pemilik")
-            for t in p.get("tim") or []:
-                e(f"m:{t}", pid, "tim")
-        for t in rk_rows("tugas")[:150]:
-            if t.get("status") == "selesai":
-                continue
-            tid = f"t:{t['id']}"
-            n(tid, t.get("judul") or "Tugas", "tugas", f"{t.get('status', '')} · tenggat {t.get('tenggat') or '-'}")
-            if t.get("pj"):
-                e(f"m:{t['pj']}", tid, "mengerjakan")
-            if t.get("divisi"):
-                e(tid, f"d:{t['divisi']}", "divisi")
-        for a in rk_rows("alat")[:120]:
-            if a.get("peminjam"):
-                aid = f"a:{a['id']}"
-                n(aid, a.get("nama") or "Alat", "alat", f"harus kembali {a.get('tenggat') or '-'}")
-                e(f"m:{a['peminjam']}", aid, "meminjam")
-        for jn in ("sidang", "putusan"):
-            for s in rk_rows(jn)[:80]:
-                if jn == "putusan" and s.get("rahasia"):
-                    continue
-                ps = str(s.get("pasal") or "").strip()
-                if not ps:
-                    continue
-                uid = f"u:{ps}"
-                n(uid, f"Pasal {ps}" if not ps.lower().startswith("pasal") else ps, "uu")
-                if s.get("terlapor"):
-                    e(f"m:{s['terlapor']}", uid, jn)
-    except Exception:
-        log.exception("peta data gagal sebagian")
-    return jsonify({"nodes": nodes, "edges": edges})
-
-
 @app.route("/api/grafik")
 def api_grafik():
     need("admin")
@@ -13053,6 +13005,347 @@ def api_grafik():
         out["tugas"] = {}
     out["absen_mati"] = not fitur_on("absen")
     return jsonify(out)
+
+
+# =================== GRAPHIFY MCI: peta pengetahuan + cari jalur (hemat token) ===================
+# Prinsip: AI tidak disuapi SEMUA data. Pertanyaan dicocokkan ke simpul peta, lalu ditelusuri 1 langkah ke tetangganya;
+# hanya potongan itu (+ inti identitas + daftar isi) yang dikirim. Tidak cocok / terlalu umum -> data lengkap (jaring pengaman).
+GRAF_HEMAT = {"tanya": 0, "jalur": 0, "penuh": 0, "kirim": 0, "tanpa_peta": 0}   # karakter; token ~ karakter/4
+_PI_PETA = {"ver": "", "simpul": [], "tetangga": {}, "idf": {}}
+_PI_UMUM = re.compile(r"\b(semua|seluruh|lengkap|ceritakan|jelaskan\s+tentang\s+mci|tentang\s+mci|profil|apa\s+itu\s+mci|mci\s+itu\s+apa|siapa\s+mci|ringkas|rangkum)\b", re.I)
+
+
+def _kata_peta(t):
+    return {w for w in _pi_kata(t) if len(w) > 1}
+
+
+def pi_simpul():
+    """Data publik yang sama dengan pi_konteks(), tetapi dipecah menjadi simpul-simpul kecil. inti=True selalu ikut dikirim."""
+    t = tentang_get()
+    S = []
+
+    def s(i, grup, judul, teks, inti=False):
+        S.append({"id": i, "grup": grup, "judul": judul, "teks": teks.strip(), "inti": inti})
+
+    s("inti:nama", "inti", "Identitas MCI", f"Nama organisasi: {SEO['nama']} (MCI), juga dikenal sebagai {', '.join(SEO['alternatif'])}. Slogan web: {SEO['slogan']}. "
+      f"Berdiri {SEO['berdiri_teks']}, didirikan tiga pendiri yang dipimpin {SEO['pendiri']}. Berbasis di {SEO['kota']}, {SEO['provinsi']}, Indonesia.", True)
+    s("inti:bidang", "inti", "Bidang MCI", f"Bidang: {SEO['deskripsi']}", True)
+    if t.get("semboyan"):
+        s("inti:semboyan", "inti", "Semboyan", f"Semboyan: {t['semboyan']}", True)
+    s("inti:divisi", "inti", "Divisi", "Divisi: " + ", ".join(DIVISI.values()) + ". Ada juga Mahapatih, yaitu kelompok pejabat tinggi (high command) MCI.", True)
+    k = t["kontak"]
+    sos = [f"Instagram {k['ig']} (instagram.com/{k['ig'][1:]})" if k.get("ig") else "", f"TikTok {k['tt']} (tiktok.com/{k['tt']})" if k.get("tt") else ""]
+    s("inti:kontak", "inti", "Kontak", f"Media sosial resmi MCI: {', '.join(x for x in sos if x) or 'belum ada'}. Nomor WhatsApp admin: tidak ditulis di sini; pakai penanda {PI_TANDA_WA} sesuai aturan 7.", True)
+    if t.get("deskripsi"):
+        for j, par in enumerate([p for p in re.split(r"\n\s*\n", t["deskripsi"]) if p.strip()][:20]):
+            s(f"tentang:{j}", "tentang", "Tentang MCI", par, j == 0 or len(t["deskripsi"]) <= 1500)   # Tentang Kami pendek: selalu ikut utuh
+    if t.get("judul"):
+        s("tentang:judul", "tentang", "Judul halaman Tentang Kami", t["judul"])
+    for j, x in enumerate(t.get("sejarah") or []):
+        s(f"sejarah:{j}", "sejarah", f"Sejarah {x.get('tahun', '')} {x.get('judul', '')}".strip(), f"- {x.get('tahun', '')} {x.get('judul', '')}: {x.get('isi', '')}")
+    for j, x in enumerate(t.get("anggota") or []):
+        s(f"tim:{j}", "tim", f"Tim: {x.get('nama', '')}", f"- {x.get('nama', '')}{' (' + x['peran'] + ')' if x.get('peran') else ''}{': ' + x['bio'] if x.get('bio') else ''}")
+    for j, x in enumerate(AI_SERI):
+        s(f"ai:{j}", "ai", f"Sistem AI seri {x['seri']}", f"- Seri {j + 1}: {x['seri']}{' (dipakai sekarang)' if j == len(AI_SERI) - 1 else ''}. {x.get('ket', '')}"
+          + (f" Nama lengkap sistem yang dipakai sekarang: {x['seri']} AI. Pusat Info ini juga bagian dari sistem itu." if j == len(AI_SERI) - 1 else ""))
+    for j, x in enumerate(PROYEK_SOROT):
+        s(f"proyek:{j}", "proyek", f"Proyek {x['nama']}", f"- Proyek yang sedang dikerjakan: {x['nama']}: {x.get('sub', '')} ({x.get('status', '')})")
+    for x in produk_list()[:60]:
+        s(f"produk:{x['id']}", "produk", f"Produk {x['nama']}", f"- {x['nama']} [{x['kategori']}] Rp{format(x['harga'], ',').replace(',', '.')}/{x['satuan']}, {x['sedia_label']}"
+          + (f". {x['deskripsi'][:160]}" if x["deskripsi"] else ""))
+    for j, x in enumerate(jasa_publik()[:30]):
+        s(f"jasa:{j}", "jasa", f"Jasa {x['nama']}", f"- {x['nama']}: {x['harga'] or 'harga dibicarakan dengan admin'}" + (f". {x['deskripsi'][:160]}" if x["deskripsi"] else ""))
+    jk = jam_kerja()
+    s("info:jam", "info", "Jam kerja admin", f"Jam kerja admin: {jk['teks']}. Pembelian dan pertanyaan produk bisa lewat halaman /produk.")
+    s("info:pesan", "info", "Pesan jasa", "Pesan jasa: pengunjung bisa memesan jasa (" + ", ".join(x for x in pesan_layanan() if x != "Lainnya") + ", atau lainnya) lewat formulir di halaman /pesan "
+      "(menu Pesan Jasa). Tim MCI akan menghubungi lewat kontak yang ditulis. MCI tidak menerima jasa cetak 3D dan gambar teknik untuk umum.")
+    for j, x in enumerate(portofolio()[:30]):
+        s(f"porto:{j}", "porto", f"Portofolio {x['nama']}", f"- Portofolio (selesai) {x['nama']} ({x['tahun']}): {x['ringkasan'][:300]}")
+    for x in perpus_list("viewer")[:50]:
+        s(f"buku:{x['id']}", "buku", f"Buku {x['judul']}", f"- Buku di Perpustakaan: {x['judul']}{' oleh ' + x['penulis'] if x['penulis'] else ''} [{x['kategori']}]"
+          + (f": {x['ringkasan'][:150]}" if x["ringkasan"] else ""))
+    return S
+
+
+_GRUP_KATA = {"produk": "produk jual harga beli katalog barang", "jasa": "jasa layanan pesan order harga", "sejarah": "sejarah perjalanan berdiri awal dulu tahun",
+              "tim": "tim anggota pendiri founder orang siapa pengurus", "ai": "ai sistem seri bot model kecerdasan genesis vertex cipher",
+              "proyek": "proyek project kerjakan sedang berjalan", "porto": "portofolio proyek selesai karya hasil", "buku": "buku perpustakaan bacaan modul datasheet",
+              "info": "jam buka admin kerja pesan order", "tentang": "tentang mci profil"}
+
+
+def pi_peta(ver):
+    """Bangun peta sekali per versi data: kata kunci tiap simpul, bobot kelangkaan kata (idf), dan tetangga."""
+    if _PI_PETA["ver"] == ver and _PI_PETA["simpul"]:
+        return _PI_PETA
+    S = pi_simpul()
+    for x in S:
+        x["kata"] = _kata_peta(x["judul"] + " " + x["teks"])
+        x["nama"] = {w.lower() for w in re.findall(r"\b[A-Z][A-Za-z0-9.\-]{2,}", x["judul"] + " " + x["teks"])}   # nama diri: penghubung antarsimpul
+    df = {}
+    for x in S:
+        for w in x["kata"]:
+            df[w] = df.get(w, 0) + 1
+    n = len(S) or 1
+    idf = {w: math.log(1 + n / c) for w, c in df.items()}
+    tet = {x["id"]: set() for x in S}
+    umum = {w for w, c in df.items() if c > max(4, n * .25)}
+    for i, a in enumerate(S):
+        for b in S[i + 1:]:
+            if a["grup"] == b["grup"] and a["grup"] in ("produk", "buku"):
+                continue
+            if (a["nama"] & b["nama"]) - umum:
+                tet[a["id"]].add(b["id"])
+                tet[b["id"]].add(a["id"])
+    _PI_PETA.update(ver=ver, simpul=S, tetangga=tet, idf=idf)
+    return _PI_PETA
+
+
+def pi_jalur(q, riwayat, ver, penuh):
+    """Kembalikan konteks hemat (str) atau None kalau harus memakai data lengkap."""
+    if not fitur_on("graphify") or _PI_UMUM.search(q):
+        return None
+    P = pi_peta(ver)
+    S, idf = P["simpul"], P["idf"]
+    qk = _kata_peta(q + " " + " ".join(x["text"] for x in riwayat[-2:] if x["role"] == "user"))
+    if not qk:
+        return None
+    skor = []
+    for x in S:
+        if x["inti"]:
+            continue
+        sc = sum(idf.get(w, 0) for w in qk & x["kata"])
+        sc += sum(1.2 for w in qk if w in _GRUP_KATA.get(x["grup"], "").split()) * .4
+        if sc > 0:
+            skor.append((sc, x))
+    if not skor:
+        return None
+    skor.sort(key=lambda z: -z[0])
+    top = skor[0][0]
+    if top < 1.0:
+        return None
+    pilih = [x for sc, x in skor if sc >= top * .45][:8]
+    ids = {x["id"] for x in pilih}
+    for x in list(pilih):   # telusuri 1 langkah ke tetangga
+        for t in list(P["tetangga"].get(x["id"], ()))[:4]:
+            ids.add(t)
+    grup_kena = {g for g in _GRUP_KATA if any(w in _GRUP_KATA[g].split() for w in qk) and g in ("produk", "jasa", "sejarah", "ai", "tim", "proyek", "porto")}
+    for x in S:   # pertanyaan tentang satu kelompok ("produk apa saja?") -> seluruh anggota kelompok itu
+        if x["grup"] in grup_kena and sum(1 for y in S if y["grup"] == x["grup"]) <= 25:
+            ids.add(x["id"])
+    isi = [x for x in S if x["inti"] or x["id"] in ids]
+    daftar = {}
+    for x in S:
+        if not x["inti"] and x["id"] not in ids and x["grup"] != "tentang":
+            daftar.setdefault(x["grup"], []).append(re.sub(r"^(Produk|Buku|Jasa|Portofolio|Proyek|Tim:|Sistem AI seri|Sejarah)\s*", "", x["judul"]).strip())
+    nama_grup = {"produk": "produk", "jasa": "jasa", "sejarah": "catatan sejarah", "tim": "anggota tim", "ai": "seri AI", "proyek": "proyek berjalan", "porto": "portofolio",
+                 "buku": "buku perpustakaan", "tentang": "paragraf Tentang Kami", "info": "info layanan"}
+    di = "; ".join(f"{nama_grup.get(g, g)}: {', '.join(v[:12])}{' dan lainnya' if len(v) > 12 else ''}" for g, v in daftar.items())
+    teks = "\n".join(x["teks"] for x in isi)
+    if di:
+        teks += ("\n\nDAFTAR ISI DATA LAIN (tidak dikirim lengkap karena tidak terkait pertanyaan ini): " + di +
+                 ". Kalau pengunjung menanyakan salah satunya, jawab yang kamu tahu dari daftar ini lalu sarankan bertanya lebih spesifik.")
+    if len(teks) >= len(penuh) * .75:
+        return None   # hematnya kecil, kirim lengkap saja
+    return teks
+
+
+# ---------- Peta data internal (khusus Dev) + wawasan ala Graphify ----------
+def graf_bangun():
+    nodes, edges, ada = [], [], {}
+
+    def n(i, label, grup, info=""):
+        if i not in ada:
+            ada[i] = {"id": i, "label": str(label)[:40], "grup": grup, "info": str(info)[:200]}
+            nodes.append(ada[i])
+
+    def e(a, b, label=""):
+        if a in ada and b in ada and a != b:
+            edges.append({"a": a, "b": b, "label": label})
+
+    for k, v in DIVISI.items():
+        n(f"d:{k}", v, "divisi", "Divisi MCI")
+    for m in MEMBERS.values():
+        if m.get("aktif"):
+            n(f"m:{m['id']}", m["nama"], "anggota", ", ".join(JABATAN.get(j, j) for j in m.get("jabatan") or []))
+            for dv in m.get("divisi") or []:
+                e(f"m:{m['id']}", f"d:{dv}", "divisi")
+    try:
+        for p in rk_rows("proyek")[:80]:
+            pid = f"p:{p['id']}"
+            n(pid, p.get("nama") or "Proyek", "proyek", f"{p.get('status', '')} · progres {p.get('progres') or 0}%")
+            if p.get("pj"):
+                e(f"m:{p['pj']}", pid, "pemilik")
+            for t in p.get("tim") or []:
+                if t != p.get("pj"):
+                    e(f"m:{t}", pid, "tim")
+        for t in rk_rows("tugas")[:150]:
+            if t.get("status") == "selesai":
+                continue
+            tid = f"t:{t['id']}"
+            n(tid, t.get("judul") or "Tugas", "tugas", f"{t.get('status', '')} · tenggat {t.get('tenggat') or '-'}")
+            if t.get("pj"):
+                e(f"m:{t['pj']}", tid, "mengerjakan")
+            if t.get("divisi"):
+                e(tid, f"d:{t['divisi']}", "divisi")
+        for a in rk_rows("alat")[:120]:
+            if a.get("peminjam"):
+                aid = f"a:{a['id']}"
+                n(aid, a.get("nama") or "Alat", "alat", f"harus kembali {a.get('tenggat') or '-'}")
+                e(f"m:{a['peminjam']}", aid, "meminjam")
+        for g in rk_rows("agenda")[:20]:
+            gid = f"g:{g['id']}"
+            n(gid, (g.get("agenda") or "Rapat")[:40].split("\n")[0], "agenda", f"{g.get('tanggal', '')} {g.get('jam', '')}")
+            if g.get("divisi"):
+                e(gid, f"d:{g['divisi']}", "divisi")
+            for h in g.get("hadir") or []:
+                e(f"m:{h}", gid, "hadir")
+        for kn in rk_rows("konten")[:40]:
+            if kn.get("status") in ("tayang", "selesai"):
+                continue
+            kid = f"k:{kn['id']}"
+            n(kid, (kn.get("caption") or kn.get("platform") or "Konten")[:40].split("\n")[0], "konten", f"{kn.get('platform', '')} · {kn.get('tanggal', '')}")
+            if kn.get("pj"):
+                e(f"m:{kn['pj']}", kid, "PJ konten")
+        for jn in ("sidang", "putusan"):
+            for sd in rk_rows(jn)[:80]:
+                if jn == "putusan" and sd.get("rahasia"):
+                    continue
+                ps = str(sd.get("pasal") or "").strip()
+                if ps:
+                    uid = f"u:{ps}"
+                    n(uid, ps if ps.lower().startswith("pasal") else f"Pasal {ps}", "uu", "Pasal UU MCI")
+                    if sd.get("terlapor"):
+                        e(f"m:{sd['terlapor']}", uid, jn)
+    except Exception:
+        log.exception("peta data gagal sebagian")
+    return nodes, edges
+
+
+def graf_wawasan(nodes, edges):
+    """Komunitas (label propagation), titik pusat, koneksi mengejutkan, anggota terisolasi."""
+    tet = {x["id"]: [] for x in nodes}
+    for ed in edges:
+        tet[ed["a"]].append(ed["b"])
+        tet[ed["b"]].append(ed["a"])
+    by = {x["id"]: x for x in nodes}
+    kom = {x["id"]: x["id"] for x in nodes}
+    urut = sorted(by, key=lambda i: -len(tet[i]))
+    for _ in range(15):
+        ubah = False
+        for i in urut:
+            if not tet[i]:
+                continue
+            hit = {}
+            for j in tet[i]:
+                w = 1.0 if by[j]["grup"] != "divisi" else .6   # divisi terlalu umum: bobot lebih kecil supaya proyek membentuk kelompok sendiri
+                w += 1.5 if by[j]["grup"] == "proyek" else 0
+                hit[kom[j]] = hit.get(kom[j], 0) + w
+            best = max(hit.items(), key=lambda z: (z[1], z[0]))[0]
+            if best != kom[i]:
+                kom[i], ubah = best, True
+        if not ubah:
+            break
+    grup = {}
+    for i, c in kom.items():
+        grup.setdefault(c, []).append(i)
+    komunitas = []
+    for c, ids in sorted(grup.items(), key=lambda z: -len(z[1])):
+        if len(ids) < 3:
+            continue
+        pr = [by[i] for i in ids if by[i]["grup"] == "proyek"]
+        dv = [by[i] for i in ids if by[i]["grup"] == "divisi"]
+        nama = f"Tim {max(pr, key=lambda x: len(tet[x['id']]))['label']}" if pr else (f"Kelompok {dv[0]['label']}" if dv else
+                                                                                       f"Lingkar {max((by[i] for i in ids), key=lambda x: len(tet[x['id']]))['label']}")
+        komunitas.append({"id": len(komunitas), "nama": nama, "anggota": ids})
+    kid = {}
+    for k in komunitas:
+        for i in k["anggota"]:
+            kid[i] = k["id"]
+    for x in nodes:
+        x["kom"] = kid.get(x["id"], -1)
+        x["derajat"] = len(tet[x["id"]])
+    pusat = [{"id": x["id"], "label": x["label"], "grup": x["grup"], "derajat": x["derajat"]} for x in sorted(nodes, key=lambda x: -x["derajat"]) if x["grup"] != "divisi"][:5]
+    kejut = []
+    mdiv = {f"m:{m['id']}": set(m.get("divisi") or []) for m in MEMBERS.values()}
+    for ed in edges:
+        a, b = by[ed["a"]], by[ed["b"]]
+        m, o = (a, b) if a["grup"] == "anggota" else (b, a) if b["grup"] == "anggota" else (None, None)
+        if not m or o["grup"] not in ("tugas", "agenda"):
+            continue
+        od = {by[j]["id"][2:] for j in tet[o["id"]] if by[j]["grup"] == "divisi"}
+        if od and mdiv.get(m["id"]) and not (od & mdiv[m["id"]]):
+            kejut.append({"a": m["id"], "b": o["id"], "teks": f"{m['label']} ikut {o['label']} di luar divisinya"})
+    for ed in edges:
+        a, b = by[ed["a"]], by[ed["b"]]
+        if a["kom"] >= 0 and b["kom"] >= 0 and a["kom"] != b["kom"] and "divisi" not in (a["grup"], b["grup"]) and len(kejut) < 8:
+            kejut.append({"a": a["id"], "b": b["id"], "teks": f"{a['label']} menghubungkan dua kelompok lewat {b['label']}"})
+    sendiri = [{"id": x["id"], "label": x["label"]} for x in nodes if x["grup"] == "anggota" and all(by[j]["grup"] == "divisi" for j in tet[x["id"]])]
+    return {"komunitas": [{"id": k["id"], "nama": k["nama"], "jumlah": len(k["anggota"])} for k in komunitas], "pusat": pusat, "kejut": kejut[:8], "sendiri": sendiri}
+
+
+def cek_peta(nama: str, ke: str = "") -> dict:
+    """Telusuri PETA DATA MCI (anggota, divisi, proyek, tugas aktif, alat dipinjam, rapat, konten, pasal). nama = anggota/proyek/tugas/alat yang dicari:
+    hasilnya semua yang terhubung langsung dan 2 langkah. Isi 'ke' untuk melacak jalur terpendek dari nama ke titik lain (misal hubungan Budi dengan JalaDhipa-1).
+    Pakai ini untuk pertanyaan 'X lagi pegang apa', 'siapa yang terlibat di Y', 'siapa paling sibuk', karena satu panggilan menggantikan banyak alat lain."""
+    _alat("cek_peta", cari=nama, ke=ke)
+    nodes, edges = graf_bangun()
+    by = {x["id"]: x for x in nodes}
+    tet = {x["id"]: [] for x in nodes}
+    for ed in edges:
+        tet[ed["a"]].append((ed["b"], ed["label"]))
+        tet[ed["b"]].append((ed["a"], ed["label"]))
+
+    def cari(q):
+        q = str(q or "").strip().lower()
+        if not q:
+            return None
+        sama = [x for x in nodes if x["label"].lower() == q] or [x for x in nodes if q in x["label"].lower()]
+        return max(sama, key=lambda x: len(tet[x["id"]])) if sama else None
+
+    a = cari(nama)
+    if not a:
+        pusat = sorted(nodes, key=lambda x: -len(tet[x["id"]]))[:5]
+        return {"ditemukan": False, "saran": [x["label"] for x in nodes if str(nama or "").lower()[:3] in x["label"].lower()][:8],
+                "paling_banyak_koneksi": [{"nama": x["label"], "jenis": x["grup"], "koneksi": len(tet[x["id"]])} for x in pusat]}
+    out = {"ditemukan": True, "titik": {"nama": a["label"], "jenis": a["grup"], "info": a["info"], "jumlah_koneksi": len(tet[a["id"]])},
+           "terhubung_langsung": [{"nama": by[j]["label"], "jenis": by[j]["grup"], "hubungan": lb, "info": by[j]["info"]} for j, lb in tet[a["id"]]][:40]}
+    dua = {}
+    for j, _ in tet[a["id"]]:
+        if by[j]["grup"] == "divisi":
+            continue   # lewat divisi terlalu luas
+        for k2, lb in tet[j]:
+            if k2 != a["id"] and k2 not in dict(tet[a["id"]]):
+                dua.setdefault(k2, f"lewat {by[j]['label']} ({lb})")
+    out["dua_langkah"] = [{"nama": by[k]["label"], "jenis": by[k]["grup"], "jalur": v} for k, v in list(dua.items())[:30]]
+    b = cari(ke)
+    if ke and b:
+        asal, antre = {a["id"]: None}, [a["id"]]
+        while antre and b["id"] not in asal:
+            i = antre.pop(0)
+            for j, _ in tet[i]:
+                if j not in asal:
+                    asal[j] = i
+                    antre.append(j)
+        if b["id"] in asal:
+            jl, i = [], b["id"]
+            while i:
+                jl.append(by[i]["label"])
+                i = asal[i]
+            out["jalur"] = " → ".join(reversed(jl))
+        else:
+            out["jalur"] = "tidak terhubung"
+    return out
+
+
+APEX_ALAT.insert(0, cek_peta)
+APEX_SISTEM += " Untuk pertanyaan tentang siapa memegang apa, keterlibatan orang di proyek/tugas, atau hubungan antar hal, pakai cek_peta dulu (satu panggilan, hemat)."
+
+
+@app.route("/api/graf")
+def api_graf():
+    need("admin")
+    nodes, edges = graf_bangun()
+    return jsonify({"nodes": nodes, "edges": edges, "wawasan": graf_wawasan(nodes, edges)})
 
 
 def run_flask():
