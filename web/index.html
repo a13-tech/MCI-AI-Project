@@ -327,6 +327,29 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 .ax button:focus-visible,.ax input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 :root[data-tema=gelap] .axBaru svg,:root[data-tema=gelap] .axKirim{background:#E6E9EF;color:#0B1730}
 :root[data-tema=gelap] .axKotak{box-shadow:none}
+.axDaftar{display:block}.axGrupF{display:flex;align-items:center;justify-content:space-between;padding-right:6px}
+.axGrupF button{all:unset;display:grid;place-items:center;width:24px;height:24px;border-radius:7px;font-size:17px;cursor:pointer;color:var(--mute)}.axGrupF button:hover{background:var(--hov);color:var(--ink)}
+.axFd>button:first-child::before{content:"";display:inline-block;width:14px;height:11px;margin-right:8px;vertical-align:-1px;border:1.6px solid var(--gold);border-radius:2px 2px 3px 3px;border-top-width:3px}
+.axFdNama{font-size:11px;color:var(--mute);margin-left:6px}
+.axJudul{display:flex;align-items:center;gap:6px}.axJudul>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.axJejak{all:unset;flex:none;cursor:pointer;color:var(--mute);font-size:13.5px}.axJejak:hover{color:var(--ink);text-decoration:underline}
+.axFdInfo{max-width:620px;margin:10px auto 0;font-size:14.5px;color:var(--mute)}.axFdInfo p{margin:0 0 10px}
+.axSumber{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-bottom:10px}.axSumber span{padding:4px 10px;border-radius:99px;border:1px solid var(--line);font-size:12.5px;color:var(--ink)}
+.axFdAksi{display:flex;justify-content:center;gap:4px}.axFdAksi button{all:unset;cursor:pointer;padding:5px 10px;border-radius:8px;font-size:13px;color:var(--mute)}.axFdAksi button:hover{background:var(--hov);color:var(--ink)}
+.axFdObr{display:none;margin-top:18px;border-top:1px solid var(--line)}.ax.difolder.kosong .axFdObr{display:block}.ax.difolder .axSaran{display:none!important}
+.axFdObr button{all:unset;display:flex;justify-content:space-between;gap:10px;width:calc(100% - 20px);padding:12px 10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:14px}
+.axFdObr button:hover{background:var(--hov)}.axFdObr small{color:var(--mute);flex:none}.axFdObr p{font-size:13px;color:var(--mute);text-align:center;margin:14px 0}
+.axKon{display:flex;flex-wrap:wrap;gap:4px;margin-right:auto}
+.axKon button{all:unset;cursor:pointer;padding:4px 9px;border-radius:99px;border:1px solid var(--line);font-size:12px;color:var(--mute)}
+.axKon button[aria-pressed=true]{border-color:var(--gold);color:var(--ink);background:var(--hov)}.axKon button:disabled{opacity:.4;cursor:not-allowed}
+.axDlg{border:1px solid var(--line);border-radius:18px;padding:0;width:min(520px,calc(100vw - 32px));background:var(--paper);color:var(--ink);font-family:var(--axSans,'Inter',sans-serif)}
+.axDlg::backdrop{background:rgba(10,16,28,.4)}.axDlg form{display:flex;flex-direction:column;gap:12px;padding:22px;max-height:calc(100dvh - 60px);overflow:auto}
+.axDlg h3{margin:0;font-family:'Cormorant Garamond','MCI Serif',serif;font-size:26px;font-weight:700}
+.axDlg label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:500}.axDlg fieldset{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0}
+.axDlg legend{font-size:13px;font-weight:500;padding:0 4px}.axCek2{display:flex;flex-direction:column;gap:2px;max-height:180px;overflow:auto;margin-top:6px}
+.axCek2 label{flex-direction:row;align-items:center;gap:8px;font-weight:400;font-size:13.5px;padding:5px 4px;border-radius:7px;cursor:pointer}.axCek2 label:hover{background:var(--hov)}
+.axCek2 label small{color:var(--mute);margin-left:auto}.axCek2 input{width:auto!important;margin:0}
+.axDlgMsg{margin:0;font-size:13px;color:#B42318;min-height:1em}.axDlgTombol{display:flex;justify-content:flex-end;gap:8px}
 @media (max-width:860px){
  .ax{grid-template-columns:1fr;border-radius:14px}
  .axSide{position:absolute;z-index:30;top:0;bottom:0;left:0;width:min(300px,86%);transform:translateX(-102%);transition:transform .2s ease;box-shadow:0 0 40px rgba(0,0,0,.18)}
@@ -1713,31 +1736,47 @@ details.cara p{line-height:1.65}
    <aside class="axSide" id="axSide" aria-label="Daftar obrolan">
     <button type="button" class="axBaru" id="axBaru"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>Obrolan baru</button>
     <label class="axCariW"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5"/><path d="m13 13 3.5 3.5"/></svg><input id="axCari" type="search" placeholder="Cari obrolan" aria-label="Cari obrolan"></label>
-    <nav class="axDaftar" id="axDaftar"></nav>
+    <div class="axDaftar" id="axGulir"><div class="axGrup axGrupF">Proyek<button type="button" id="axFdBaru" aria-label="Proyek baru">+</button></div><nav id="axFdList"></nav>
+     <div class="axGrup axGrupF">Obrolan</div><nav id="axDaftar"></nav></div>
     <div class="axKuota" id="axKuota"></div>
    </aside>
    <div class="axTirai" id="axTirai" hidden></div>
+   <dialog class="axDlg" id="axDlg"><form method="dialog" id="axDlgForm"><h3 id="axDlgJudul">Proyek baru</h3>
+    <label>Nama proyek<input id="axFNama" maxlength="80" required placeholder="misal: JalaDhipa-1"></label>
+    <label>Deskripsi singkat<input id="axFKet" maxlength="300" placeholder="Untuk apa folder ini"></label>
+    <label>Instruksi untuk Copilot<textarea id="axFIns" rows="3" maxlength="2000" placeholder="misal: jawab teknis, fokus ESP32 dan sensor kapal"></textarea></label>
+    <label>Hubungkan ke Proyek MCI<select id="axFPro"><option value="0">Tidak dihubungkan</option></select></label>
+    <fieldset id="axFCaW"><legend>Tempel catatan</legend><input type="search" id="axFCaCari" placeholder="Cari catatan" aria-label="Cari catatan"><div class="axCek2" id="axFCa"></div></fieldset>
+    <fieldset id="axFKoW" hidden><legend>Konektor bawaan (khusus CEO)</legend><div class="axCek2" id="axFKo"></div></fieldset>
+    <p class="axDlgMsg" id="axDlgMsg"></p>
+    <div class="axDlgTombol"><button type="button" class="bt o" id="axDlgBatal">Batal</button><button type="submit" class="bt g" id="axDlgSimpan">Simpan</button></div></form></dialog>
+   <dialog class="axDlg" id="axPindah"><form method="dialog"><h3>Pindahkan ke proyek</h3><div class="axCek2" id="axPindahList"></div>
+    <div class="axDlgTombol"><button type="button" class="bt o" id="axPindahBatal">Batal</button></div></form></dialog>
    <div class="axMain">
     <header class="axTop">
      <button type="button" class="axIk" id="axMenu" aria-label="Buka daftar obrolan" aria-controls="axSide"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13"/></svg></button>
-     <span class="axJudul" id="axJudul"></span>
+     <span class="axJudul"><button type="button" class="axJejak" id="axJejak" hidden></button><span id="axJudul"></span></span>
      <button type="button" class="axIk axBaruKecil" id="axBaru2" aria-label="Obrolan baru"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></button>
     </header>
     <div class="axLog" id="apxLog" aria-live="polite"><div class="axKolom"><div class="apu" id="apxUsul"></div><div id="axPesan"></div></div></div>
     <div class="axSapa" id="axSapa">
      <svg class="axTanda" viewBox="0 0 48 32" aria-hidden="true"><path d="M8 24a16 16 0 0 1 32 0"/><path d="M2 28h44"/><path d="M24 2v4M10.5 7.5l2.8 2.8M37.5 7.5l-2.8 2.8"/></svg>
      <h2 id="axSapaTeks">Selamat datang</h2>
+     <div class="axFdInfo" id="axFdInfo" hidden><p id="axFdKet"></p><div class="axSumber" id="axFdSumber"></div>
+      <div class="axFdAksi"><button type="button" id="axFdUbah">Atur proyek</button><button type="button" id="axFdHapus">Hapus</button></div></div>
     </div>
     <div class="axDasar">
      <form class="axKotak" id="axForm">
       <textarea id="apxIn" rows="1" maxlength="1500" placeholder="Tanya apa saja ke MCI Copilot" aria-label="Pertanyaan untuk MCI Copilot"></textarea>
       <div class="axBaris">
+       <div class="axKon" id="axKon"></div>
        <div class="axModelW"><button type="button" class="axModel" id="axModelBtn" aria-haspopup="listbox" aria-expanded="false"><span id="axModelNama">Gemini Flash</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg></button>
         <div class="axMenuModel" id="apxModel" role="listbox" aria-label="Model AI" hidden></div></div>
        <button type="submit" class="axKirim" id="apxKirim" aria-label="Kirim"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4M5 9l5-5 5 5"/></svg></button>
       </div>
      </form>
      <div class="axSaran" id="apxSaran"></div>
+     <div class="axFdObr" id="axFdObr"></div>
      <p class="axCatat" id="apxMsg">MCI Copilot bisa keliru. Cek ulang angka penting di halaman aslinya.</p>
     </div>
    </div>
@@ -4196,14 +4235,18 @@ $("#prSave").onclick = async () => {
 /* ===== Tanya Apex gaya obrolan: banyak obrolan per orang, terbuka untuk anggota (alat sesuai izin, kuota harian di server) ===== */
 const APX_LABEL = {buat_gambar: "Bikin gambar", buat_model_3d: "Bikin model 3D", buat_panduan_rakit: "Bikin panduan rakit", cek_stok: "Stok gudang", cek_produk: "Katalog produk", cek_kas: "Buku kas", cek_invoice: "Invoice", cek_hutang: "Hutang", cek_iuran: "Iuran kas", cek_anggota: "Anggota",
   cek_blacklist: "Blacklist", cek_catatan: "Catatan", cek_perpustakaan: "Perpustakaan", cek_dokumentasi_dan_voting: "Dokumentasi & voting", cek_iot: "Sensor IoT", cek_status_bot: "Status bot", cek_peta: "Peta jaringan",
-  usulkan_kas: "Usulan kas", usulkan_tugas: "Usulan tugas", usulkan_catatan: "Usulan catatan"};
+  usulkan_kas: "Usulan kas", usulkan_tugas: "Usulan tugas", usulkan_catatan: "Usulan catatan", usulkan_deploy: "Usulan deploy"};
 const APX_SARAN_CEO = ["Barang apa yang perlu restock?", "Saldo kas sekarang berapa?", "Siapa yang belum bayar kas minggu ini?", "Invoice mana yang belum lunas?"];
 const APX_SARAN_ANGGOTA = ["Ide proyek IoT sederhana pakai ESP32", "Jelaskan cara kerja relay", "Buku apa saja di perpustakaan soal Arduino?", "Bikinin panduan rakit sensor suhu"];
 const AX_IK = {salin: '<svg viewBox="0 0 20 20"><rect x="7" y="7" width="9.5" height="9.5" rx="2"/><path d="M13 7V5a1.5 1.5 0 0 0-1.5-1.5h-6A1.5 1.5 0 0 0 4 5v6.5A1.5 1.5 0 0 0 5.5 13H7"/></svg>',
-  ulang: '<svg viewBox="0 0 20 20"><path d="M16 10a6 6 0 1 1-1.8-4.3M16 3.5v3.2h-3.2"/></svg>', ubah: '<svg viewBox="0 0 20 20"><path d="m12.5 4.5 3 3L7 16H4v-3z"/></svg>',
+  ulang: '<svg viewBox="0 0 20 20"><path d="M16 10a6 6 0 1 1-1.8-4.3M16 3.5v3.2h-3.2"/></svg>', ubah: '<svg viewBox="0 0 20 20"><path d="m12.5 4.5 3 3L7 16H4v-3z"/></svg>', map: '<svg viewBox="0 0 20 20"><path d="M3 6.5V15a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-6L8.5 5H4a1 1 0 0 0-1 1.5z"/></svg>',
   hapus: '<svg viewBox="0 0 20 20"><path d="M4.5 6h11M8 6V4.5h4V6M6 6l.7 9.5h6.6L14 6"/></svg>', terbit: '<svg viewBox="0 0 30 20"><path d="M5 16a10 10 0 0 1 20 0"/><path d="M1 18.5h28"/></svg>'};
 let APX = [], APX_BUSY = false, APX_MODEL = [], APX_PILIH = "gemini", APX_MUAT = false, AX_C = "", AX_DAFTAR = [], AX_INFO = {}, AX_CARI = "";
-try { APX_PILIH = localStorage.getItem("apxModel") || "gemini"; } catch (e) {}
+let AX_FOLDER = [], AX_F = 0, AX_KONEKTOR = [], AX_KON = new Set(), AX_PILIHAN = null, AX_EDIT = 0, AX_PINDAH = "";
+try { APX_PILIH = localStorage.getItem("apxModel") || "gemini"; AX_KON = new Set(JSON.parse(localStorage.getItem("axKon") || "[]")); } catch (e) {}
+const axKonSimpan = () => { try { localStorage.setItem("axKon", JSON.stringify([...AX_KON])); } catch (e) {} };
+const axFolder = id => AX_FOLDER.find(f => f.id === id);
+const axLabelAlat = a => a.alat === "konektor_gagal" ? "⚠ " + ((a.arg || {}).konektor || "konektor gagal") : APX_LABEL[a.alat] || (a.alat.includes(".") ? (({render: "Render", neon: "Neon", github: "GitHub"})[a.alat.split(".")[0]] || a.alat.split(".")[0]) + ": " + a.alat.split(".").slice(1).join(".") : a.alat);
 
 function axInline(s) {   // s sudah di-escape
   return s.replace(/`([^`\n]+)`/g, "<code>$1</code>").replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,!?:;]|$)/g, "$1<i>$2</i>")
@@ -4244,22 +4287,34 @@ function axGrupWaktu(w) {
 function axDaftarRender() {
   const q = AX_CARI.toLowerCase(), L = AX_DAFTAR.filter(o => !q || o.judul.toLowerCase().includes(q)); let g = "", h = "";
   for (const o of L) { const gw = axGrupWaktu(o.waktu); if (gw !== g) { g = gw; h += `<div class="axGrup">${gw}</div>`; }
-    h += `<div class="axIt${o.id === AX_C ? " on" : ""}"><button type="button" data-axc="${esc(o.id)}" title="${esc(o.judul)}">${esc(o.judul)}</button><span class="axAksi"><button type="button" data-axu="${esc(o.id)}" aria-label="Ganti nama">${AX_IK.ubah}</button><button type="button" data-axh="${esc(o.id)}" aria-label="Hapus obrolan">${AX_IK.hapus}</button></span></div>`; }
+    const fo = o.folder && axFolder(o.folder);
+    h += `<div class="axIt${o.id === AX_C ? " on" : ""}"><button type="button" data-axc="${esc(o.id)}" title="${esc(o.judul)}">${esc(o.judul)}${fo ? `<span class="axFdNama">· ${esc(fo.nama)}</span>` : ""}</button><span class="axAksi"><button type="button" data-axp="${esc(o.id)}" aria-label="Pindahkan ke proyek">${AX_IK.map}</button><button type="button" data-axu="${esc(o.id)}" aria-label="Ganti nama">${AX_IK.ubah}</button><button type="button" data-axh="${esc(o.id)}" aria-label="Hapus obrolan">${AX_IK.hapus}</button></span></div>`; }
   $("#axDaftar").innerHTML = h || `<p class="axKosongDaftar">${q ? "Tidak ada obrolan yang cocok." : "Belum ada obrolan. Mulai dengan menulis pertanyaan."}</p>`;
+  $("#axFdList").innerHTML = AX_FOLDER.filter(f => !q || f.nama.toLowerCase().includes(q)).map(f => `<div class="axIt axFd${f.id === AX_F && !AX_C ? " on" : ""}"><button type="button" data-axf="${f.id}" title="${esc(f.ket || f.nama)}">${esc(f.nama)}</button></div>`).join("")
+    || (q ? "" : '<p class="axKosongDaftar">Kelompokkan obrolan per proyek. Tekan + untuk membuat.</p>');
   const k = AX_INFO.kuota;
   $("#axKuota").innerHTML = !k ? "" : k.tanpa_batas ? "Tanpa batas pesan · Cipher 7.5" : `${Math.max(0, k.batas - k.pakai)} dari ${k.batas} pesan tersisa hari ini<i><b style="width:${k.batas ? Math.min(100, k.pakai / k.batas * 100) : 100}%"></b></i>`;
 }
 function apxRender() {
   const ax = $("#ax"); if (!ax) return;
   const kosong = !APX.length; ax.classList.toggle("kosong", kosong);
-  $("#axSapaTeks").textContent = axSapaan();
+  const fd = AX_F && axFolder(AX_F); ax.classList.toggle("difolder", !!fd);
+  $("#axSapaTeks").textContent = fd ? fd.nama : axSapaan(); $("#axFdInfo").hidden = !fd;
+  if (fd) { $("#axFdKet").textContent = fd.ket || "Obrolan di folder ini otomatis membaca instruksi, proyek, dan catatan yang terhubung.";
+    const pr = (AX_PILIHAN && AX_PILIHAN.proyek || []).find(p => p.id === fd.proyek);
+    $("#axFdSumber").innerHTML = [fd.proyek ? `Proyek MCI: ${esc(pr ? pr.nama : "#" + fd.proyek)}` : "", fd.catatan.length ? `${fd.catatan.length} catatan ditempel` : "", fd.instruksi ? "Ada instruksi khusus" : "",
+      ...fd.konektor.map(k => "Konektor " + esc((AX_KONEKTOR.find(x => x.id === k) || {}).nama || k))].filter(Boolean).map(t => `<span>${t}</span>`).join("") || "<span>Belum ada sumber terhubung</span>";
+    const ob = AX_DAFTAR.filter(o => o.folder === fd.id);
+    $("#axFdObr").innerHTML = ob.length ? ob.map(o => `<button type="button" data-axc="${esc(o.id)}"><span>${esc(o.judul)}</span><small>${esc(axGrupWaktu(o.waktu))}</small></button>`).join("") : "<p>Belum ada obrolan di proyek ini. Tulis pertanyaan di atas untuk memulai.</p>"; }
+  $("#axJejak").hidden = !(fd && !kosong); if (fd) $("#axJejak").textContent = fd.nama + " ›";
+  $("#axKon").innerHTML = AX_INFO.ceo ? AX_KONEKTOR.map(k => `<button type="button" data-axk="${k.id}" aria-pressed="${AX_KON.has(k.id) && k.siap}" ${k.siap ? "" : 'disabled title="Isi kuncinya dulu di Panel CEO → Kunci AI"'}>${esc(k.nama)}</button>`).join("") : "";
   const cur = AX_DAFTAR.find(o => o.id === AX_C); $("#axJudul").textContent = kosong ? "" : (cur ? cur.judul : (APX[0] && APX[0].text || "").slice(0, 60));
   const pm = APX_MODEL.find(m => m.id === APX_PILIH); $("#axModelNama").textContent = pm ? pm.nama : "Gemini Flash";
   $("#apxModel").innerHTML = APX_MODEL.map(m => `<button type="button" role="option" data-apm="${m.id}" aria-selected="${m.id === APX_PILIH}" ${m.siap ? "" : "disabled"}>${esc(m.nama)}<small>${esc(m.ket)}${m.siap ? "" : " · belum aktif"}</small></button>`).join("");
   const akhir = APX.length - 1;
   $("#axPesan").innerHTML = APX.map((x, i) => x.role === "user" ? `<div class="axM axU"><div>${esc(x.text)}</div></div>`
     : `<div class="axM axA${x.galat ? " galat" : ""}">${x.alir && !x.text ? `<div class="axCek">${AX_IK.terbit}Copilot lagi mengecek data…</div>` : `<div class="axIsi">${axMd(x.text)}${x.alir ? '<span class="axKursor"></span>' : ""}</div>`}
-      ${x.alir ? "" : `<div class="axBawah">${x.galat ? "" : `<button type="button" data-axsalin="${i}">${AX_IK.salin}Salin</button>`}${i === akhir && AX_C ? `<button type="button" data-axulang>${AX_IK.ulang}Ulangi</button>` : ""}${(x.alat || []).map(a => `<span class="axAlat" title="${esc(JSON.stringify(a.arg || {}))}">${esc(APX_LABEL[a.alat] || a.alat)}</span>`).join("")}${x.model && apxNamaModel(x.model) ? `<span>${esc(apxNamaModel(x.model))}</span>` : ""}</div>`}</div>`).join("");
+      ${x.alir ? "" : `<div class="axBawah">${x.galat ? "" : `<button type="button" data-axsalin="${i}">${AX_IK.salin}Salin</button>`}${i === akhir && AX_C ? `<button type="button" data-axulang>${AX_IK.ulang}Ulangi</button>` : ""}${(x.alat || []).map(a => `<span class="axAlat" title="${esc(JSON.stringify(a.arg || {}))}">${esc(axLabelAlat(a))}</span>`).join("")}${x.model && apxNamaModel(x.model) ? `<span>${esc(apxNamaModel(x.model))}</span>` : ""}</div>`}</div>`).join("");
   const lg = $("#apxLog"); if (APX_BUSY || lg.dataset.bawah !== "0") lg.scrollTop = lg.scrollHeight;
   $("#apxKirim").disabled = APX_BUSY || !$("#apxIn").value.trim();
   $("#apxSaran").innerHTML = (AX_INFO.ceo ? APX_SARAN_CEO : APX_SARAN_ANGGOTA).map(q => `<button type="button">${esc(q)}</button>`).join("");
@@ -4274,13 +4329,13 @@ addEventListener("resize", () => axTinggi());
 async function apxMuat(c) {
   if (c === undefined && APX_MUAT) { axTinggi(); return; } APX_MUAT = true;
   try { const d = await api("/api/apex" + (c ? "?c=" + encodeURIComponent(c) : ""));
-    APX_MODEL = d.model; AX_DAFTAR = d.obrolan; AX_INFO = {kuota: d.kuota, ceo: d.ceo, nama: d.nama};
-    if (c) { AX_C = d.c; APX = d.riwayat.filter(x => x.role === "user" || x.role === "model").map(x => ({role: x.role, text: x.text, model: x.model})); }
+    APX_MODEL = d.model; AX_DAFTAR = d.obrolan; AX_INFO = {kuota: d.kuota, ceo: d.ceo, nama: d.nama}; AX_FOLDER = d.folder || []; AX_KONEKTOR = d.konektor || [];
+    if (c) { AX_C = d.c; AX_F = (AX_DAFTAR.find(o => o.id === d.c) || {}).folder || 0; APX = d.riwayat.filter(x => x.role === "user" || x.role === "model").map(x => ({role: x.role, text: x.text, model: x.model})); }
     if (!APX_MODEL.some(m => m.id === APX_PILIH && m.siap)) APX_PILIH = "gemini";
     apxRender(); axTinggi(); }
   catch (e) { APX_MUAT = false; $("#apxMsg").textContent = e.message; }
 }
-function axBaru() { if (APX_BUSY) return; AX_C = ""; APX = []; $("#ax").classList.remove("buka"); $("#axTirai").hidden = true; apxRender(); $("#apxIn").focus(); }
+function axBaru() { if (APX_BUSY) return; AX_C = ""; APX = []; AX_F = 0; $("#ax").classList.remove("buka"); $("#axTirai").hidden = true; apxRender(); $("#apxIn").focus(); }
 function axAutoTinggi() { const t = $("#apxIn"); t.style.height = "auto"; t.style.height = Math.min(220, t.scrollHeight) + "px"; $("#apxKirim").disabled = APX_BUSY || !t.value.trim(); }
 async function apxTanya(teks, ulang) {
   if (APX_BUSY) return;
@@ -4288,7 +4343,8 @@ async function apxTanya(teks, ulang) {
   else { teks = String(teks == null ? $("#apxIn").value : teks).trim(); if (!teks) return; APX.push({role: "user", text: teks}); $("#apxIn").value = ""; axAutoTinggi(); }
   $("#apxMsg").textContent = "MCI Copilot bisa keliru. Cek ulang angka penting di halaman aslinya."; APX_BUSY = true;
   const jwb = {role: "model", text: "", alir: true, model: APX_PILIH}; APX.push(jwb); $("#apxLog").dataset.bawah = "1"; apxRender();
-  const body = ulang ? {ulang: true, c: AX_C, model: APX_PILIH} : {pesan: teks, c: AX_C, model: APX_PILIH};
+  const body = ulang ? {ulang: true, c: AX_C, model: APX_PILIH} : {pesan: teks, c: AX_C, model: APX_PILIH, folder: AX_C ? 0 : AX_F};
+  if (AX_INFO.ceo) body.konektor = [...AX_KON].filter(k => (AX_KONEKTOR.find(x => x.id === k) || {}).siap);
   let selesai = false;
   const beres = isi => { Object.assign(jwb, {text: isi.jawaban, alat: isi.alat, model: isi.model, alir: false}); if (isi.c) AX_C = isi.c; if (isi.kuota) AX_INFO.kuota = isi.kuota; };
   try {
@@ -4319,7 +4375,7 @@ async function apxTanya(teks, ulang) {
     } else jwb.alir = false;
   }
   APX_BUSY = false; apxRender(); $("#apxIn").focus();
-  try { const d = await api("/api/apex" + (AX_C ? "?c=" + AX_C : "")); AX_DAFTAR = d.obrolan; AX_INFO.kuota = d.kuota; axDaftarRender(); const cur = AX_DAFTAR.find(o => o.id === AX_C); if (cur) $("#axJudul").textContent = cur.judul; } catch (e) {}
+  try { const d = await api("/api/apex" + (AX_C ? "?c=" + AX_C : "")); AX_DAFTAR = d.obrolan; AX_INFO.kuota = d.kuota; AX_FOLDER = d.folder || AX_FOLDER; axDaftarRender(); const cur = AX_DAFTAR.find(o => o.id === AX_C); if (cur) $("#axJudul").textContent = cur.judul; } catch (e) {}
   if (AX_INFO.ceo) apxUsul();
 }
 async function apxUsul() {
@@ -4351,11 +4407,51 @@ $("#axCari").oninput = e => { AX_CARI = e.target.value.trim(); axDaftarRender();
 $("#axDaftar").onclick = async e => {
   const b = e.target.closest("[data-axc]"), ub = e.target.closest("[data-axu]"), hb = e.target.closest("[data-axh]");
   if (b && !APX_BUSY) { $("#ax").classList.remove("buka"); $("#axTirai").hidden = true; $("#apxLog").dataset.bawah = "1"; await apxMuat(b.dataset.axc); }
+  const pb = e.target.closest("[data-axp]"); if (pb) axPindahBuka(pb.dataset.axp);
   if (ub) { const o = AX_DAFTAR.find(x => x.id === ub.dataset.axu); const j = prompt("Nama baru obrolan ini:", o ? o.judul : ""); if (j === null) return;
     try { const d = await api("/api/apex/judul", {json: {c: ub.dataset.axu, judul: j}}); AX_DAFTAR = d.obrolan; apxRender(); } catch (er) { alert(er.message); } }
   if (hb && !APX_BUSY) { if (!confirm("Hapus obrolan ini? Tidak bisa dikembalikan.")) return;
     try { const d = await api("/api/apex?c=" + encodeURIComponent(hb.dataset.axh), {method: "DELETE"}); AX_DAFTAR = d.obrolan; if (hb.dataset.axh === AX_C) { AX_C = ""; APX = []; } apxRender(); pesan("Obrolan dihapus"); } catch (er) { alert(er.message); } }
 };
+/* ----- folder proyek ----- */
+function axFolderBuka(id) { if (APX_BUSY) return; AX_F = id; AX_C = ""; APX = []; const f = axFolder(id); if (f && AX_INFO.ceo) { AX_KON = new Set(f.konektor); axKonSimpan(); }
+  $("#ax").classList.remove("buka"); $("#axTirai").hidden = true; apxRender(); $("#apxIn").focus(); if (!AX_PILIHAN) axPilihanMuat().then(apxRender); }
+async function axPilihanMuat() { try { AX_PILIHAN = await api("/api/copilot/folder"); AX_FOLDER = AX_PILIHAN.folder; } catch (e) { AX_PILIHAN = {proyek: [], catatan: [], konektor: []}; } return AX_PILIHAN; }
+function axCaRender() { const q = $("#axFCaCari").value.trim().toLowerCase(), pil = new Set([...$$("#axFCa input:checked")].map(x => +x.value).concat(AX_EDIT_CA || []));
+  AX_EDIT_CA = [...pil]; $("#axFCa").innerHTML = (AX_PILIHAN.catatan || []).filter(x => !q || x.judul.toLowerCase().includes(q) || pil.has(x.id)).map(x => `<label><input type="checkbox" value="${x.id}" ${pil.has(x.id) ? "checked" : ""}>${esc(x.judul)}<small>${esc(x.pemilik)}</small></label>`).join("") || '<p class="mu" style="font-size:12.5px;margin:4px">Tidak ada catatan.</p>'; }
+let AX_EDIT_CA = [];
+async function axFolderEdit(id) {
+  await axPilihanMuat(); AX_EDIT = id || 0; const f = id ? axFolder(id) : {nama: "", ket: "", instruksi: "", proyek: 0, catatan: [], konektor: [...AX_KON]};
+  $("#axDlgJudul").textContent = id ? "Atur proyek" : "Proyek baru"; $("#axFNama").value = f.nama; $("#axFKet").value = f.ket; $("#axFIns").value = f.instruksi; $("#axDlgMsg").textContent = "";
+  $("#axFPro").innerHTML = '<option value="0">Tidak dihubungkan</option>' + AX_PILIHAN.proyek.map(p => `<option value="${p.id}" ${p.id === f.proyek ? "selected" : ""}>${esc(p.nama)}${p.status ? " (" + esc(p.status) + ")" : ""}</option>`).join("");
+  $("#axFCaW").hidden = !AX_PILIHAN.catatan.length && !f.catatan.length; AX_EDIT_CA = [...f.catatan]; $("#axFCaCari").value = ""; $("#axFCa").innerHTML = ""; axCaRender();
+  $("#axFKoW").hidden = !AX_PILIHAN.konektor.length;
+  $("#axFKo").innerHTML = AX_PILIHAN.konektor.map(k => `<label><input type="checkbox" value="${k.id}" ${f.konektor.includes(k.id) ? "checked" : ""}>${esc(k.nama)}<small>${k.siap ? "siap" : "kunci belum diisi"}</small></label>`).join("");
+  $("#axDlg").showModal(); $("#axFNama").focus();
+}
+$("#axFCaCari").oninput = axCaRender;
+$("#axFCa").onchange = e => { const v = +e.target.value; if (e.target.checked) AX_EDIT_CA.push(v); else AX_EDIT_CA = AX_EDIT_CA.filter(x => x !== v); };
+$("#axDlgBatal").onclick = () => $("#axDlg").close();
+$("#axDlgForm").onsubmit = async e => { e.preventDefault(); $("#axDlgSimpan").disabled = true;
+  try { const d = await api("/api/copilot/folder", {json: {id: AX_EDIT, nama: $("#axFNama").value, ket: $("#axFKet").value, instruksi: $("#axFIns").value, proyek: +$("#axFPro").value,
+      catatan: [...new Set(AX_EDIT_CA)], konektor: [...$$("#axFKo input:checked")].map(x => x.value)}});
+    AX_FOLDER = d.folder; AX_PILIHAN.folder = d.folder; $("#axDlg").close(); pesan(AX_EDIT ? "Proyek disimpan" : "Proyek dibuat"); axFolderBuka(d.id); }
+  catch (er) { $("#axDlgMsg").textContent = er.message; } $("#axDlgSimpan").disabled = false; };
+$("#axFdBaru").onclick = () => axFolderEdit(0);
+$("#axFdUbah").onclick = () => AX_F && axFolderEdit(AX_F);
+$("#axFdHapus").onclick = async () => { const f = axFolder(AX_F); if (!f || !confirm(`Hapus proyek "${f.nama}"? Obrolan di dalamnya tidak ikut terhapus.`)) return;
+  try { const d = await api("/api/copilot/folder?id=" + f.id, {method: "DELETE"}); AX_FOLDER = d.folder; AX_DAFTAR.forEach(o => { if (o.folder === f.id) o.folder = 0; }); AX_F = 0; apxRender(); pesan("Proyek dihapus"); } catch (er) { alert(er.message); } };
+$("#axFdList").onclick = e => { const b = e.target.closest("[data-axf]"); if (b) axFolderBuka(+b.dataset.axf); };
+$("#axFdObr").onclick = async e => { const b = e.target.closest("[data-axc]"); if (b && !APX_BUSY) { $("#apxLog").dataset.bawah = "1"; await apxMuat(b.dataset.axc); } };
+$("#axJejak").onclick = () => AX_F && axFolderBuka(AX_F);
+function axPindahBuka(cid) { AX_PINDAH = cid; const cur = (AX_DAFTAR.find(o => o.id === cid) || {}).folder || 0;
+  $("#axPindahList").innerHTML = [{id: 0, nama: "Tanpa proyek"}, ...AX_FOLDER].map(f => `<label><input type="radio" name="axPi" value="${f.id}" ${f.id === cur ? "checked" : ""}>${esc(f.nama)}</label>`).join("")
+    + (AX_FOLDER.length ? "" : '<p class="mu" style="font-size:12.5px;margin:6px 4px">Belum ada proyek. Buat dulu lewat tombol + di bagian Proyek.</p>');
+  $("#axPindah").showModal(); }
+$("#axPindahBatal").onclick = () => $("#axPindah").close();
+$("#axPindahList").onchange = async e => { try { const d = await api("/api/copilot/pindah", {json: {c: AX_PINDAH, folder: +e.target.value}}); AX_DAFTAR = d.obrolan;
+    if (AX_PINDAH === AX_C) AX_F = +e.target.value; $("#axPindah").close(); apxRender(); pesan("Obrolan dipindahkan"); } catch (er) { alert(er.message); } };
+$("#axKon").onclick = e => { const b = e.target.closest("[data-axk]"); if (!b || b.disabled) return; const k = b.dataset.axk; AX_KON.has(k) ? AX_KON.delete(k) : AX_KON.add(k); axKonSimpan(); apxRender(); };
 apxRender();
 
 
