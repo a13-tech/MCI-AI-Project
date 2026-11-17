@@ -124,11 +124,15 @@ PROYEK_SOROT = [{"nama": "JalaDhipa-1", "sub": "The Undercover Military Cargo Sh
 AI_SERI = [{"seri": "1 Genesis", "ket": "Seri pertama sistem AI MCI. Desain web pertamanya: MCI Virtual Office, kantor isometrik berisi agen-agen AI yang bekerja dan beristirahat di meja masing-masing.",
             "gambar": "/aset/genesis-virtual-office.webp", "video": "/aset/genesis-virtual-office.mp4"},
            {"seri": "4.9 Vertex", "ket": "Seri kedua."},
-           {"seri": "7 Cipher", "ket": "Seri yang dipakai sekarang."}]
-# Nama sistem AI MCI. Jujur: 7 Cipher AI adalah sistem buatan MCI yang memakai model bahasa (LLM) dari luar; jangan mengaku LLM-nya dilatih MCI.
-IDENTITAS_AI = ("\n\nIDENTITAS: kamu bagian dari 7 Cipher AI, sistem AI yang dikembangkan MCI (Mahardika Cakrawala Indonesia) untuk web MCI HQ, katalog, dan bot MCI. "
-                "Kalau ditanya kamu AI apa, pakai AI apa, atau siapa pembuatmu, jawab: 7 Cipher AI, sistem AI yang dikembangkan MCI. "
-                "Kalau ditanya model bahasa dasarnya, jawab bahwa 7 Cipher AI menggabungkan beberapa model bahasa besar (LLM) dengan alat buatan MCI, dan detail model dasarnya tidak dipublikasikan. "
+           {"seri": "7 Cipher", "ket": "Seri ketiga."},
+           {"seri": "Cipher 7.5", "ket": "Seri yang dipakai sekarang (sejak November 2026). Dilengkapi Graphify: peta pengetahuan yang membuat AI mencari jalur ke data "
+                                       "yang dibutuhkan, bukan membaca semua data, sehingga jawaban lebih tepat dan jauh lebih hemat token. Juga membawa antrean AI "
+                                       "cadangan berlapis, router pintar, cache yang paham makna, dan Panel CEO."}]
+AI_NAMA = AI_SERI[-1]["seri"] + " AI"   # nama sistem yang dipakai sekarang, misalnya "Cipher 7.5 AI"
+# Nama sistem AI MCI. Jujur: sistem AI MCI adalah sistem buatan MCI yang memakai model bahasa (LLM) dari luar; jangan mengaku LLM-nya dilatih MCI.
+IDENTITAS_AI = (f"\n\nIDENTITAS: kamu bagian dari {AI_NAMA}, sistem AI yang dikembangkan MCI (Mahardika Cakrawala Indonesia) untuk web MCI HQ, katalog, dan bot MCI. "
+                f"Kalau ditanya kamu AI apa, pakai AI apa, atau siapa pembuatmu, jawab: {AI_NAMA}, sistem AI yang dikembangkan MCI. "
+                f"Kalau ditanya model bahasa dasarnya, jawab bahwa {AI_NAMA} menggabungkan beberapa model bahasa besar (LLM) dengan alat buatan MCI, dan detail model dasarnya tidak dipublikasikan. "
                 "Jangan mengaku model bahasanya dilatih atau dibuat sendiri oleh MCI, dan jangan menyebut nama perusahaan penyedia modelnya. "
                 "Seri sistem AI MCI, dari yang pertama: " + " → ".join(x["seri"] for x in AI_SERI) + f". Versi yang dipakai sekarang: {AI_SERI[-1]['seri']}.")
 PANGGILAN_BOS = ("\n\nLAWAN BICARAMU: Alvaro, Owner, CEO, dan General Founder MCI, atasanmu langsung. Panggil dia \"Bos\" "
@@ -14630,6 +14634,18 @@ if __name__ == "__main__":
         members_load()
         _panel_reset_cek()
         kunci_terapkan()   # kunci AI dari Panel CEO mengalahkan nilai Render
+        if not SET.get("mig_cipher75"):   # catat peluncuran Cipher 7.5 di Sejarah Tentang Kami (database), sekali saja
+            try:
+                t = tentang_get()
+                if not any("Cipher 7.5" in (x.get("judul") or "") for x in t.get("sejarah") or []):
+                    t["sejarah"] = list(t.get("sejarah") or []) + [{"tahun": "2026", "judul": "Peluncuran Cipher 7.5",
+                        "isi": "Sistem AI MCI naik ke seri Cipher 7.5 dengan Graphify: peta pengetahuan yang membuat AI mencari jalur ke data yang dibutuhkan, "
+                               "bukan membaca semua data, sehingga lebih tepat dan hemat token."}]
+                    tentang_save(t)
+                SET["mig_cipher75"] = True
+                set_save()
+            except Exception:
+                log.exception("Catat Cipher 7.5 di Tentang Kami gagal")
         if "fitur_mati" not in SET:   # pertama kali Panel CEO aktif: absen langsung dimatikan (permintaan CEO, 16 Nov 2026)
             SET["fitur_mati"] = ["absen"]
             panel_catat("Absen dimatikan (awal Panel CEO)")
