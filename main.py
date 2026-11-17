@@ -2596,6 +2596,8 @@ async def laporan_jadwal():
             await asyncio.to_thread(alat_cek_telat)
             await backup_jadwal_cek()
             await pagi_cek()
+            await kabar_cek()
+            await asyncio.to_thread(harga_ingat_cek)
             await asyncio.to_thread(rapor_cek)
             await asyncio.to_thread(indexnow_kirim)
         except Exception:
@@ -3286,7 +3288,7 @@ def api_sehat():
 
 
 SET_PRIVAT = {"kuota", "tg_users", "tg_izin", "iuran", "berita_ringkas", "hp_ringan", "argon_anggaran", "argon_harga", "argon_kabar", "vapid",
-              "backup_kunci", "kapal_alarm", "neon", "sehat_ingat", "panel_log", "groq_ingat", "model_tugas", "tutup_ingat", "cadangan_absen_2026-11-15"}   # tidak dikirim ke browser lewat /api/me
+              "backup_kunci", "kapal_alarm", "kabar", "harga", "harga_ingat", "neon", "sehat_ingat", "panel_log", "groq_ingat", "model_tugas", "tutup_ingat", "cadangan_absen_2026-11-15"}   # tidak dikirim ke browser lewat /api/me
 
 
 @app.route("/api/me")
@@ -12419,6 +12421,7 @@ FITUR_DAFTAR = [
     ("alarm_kapal", "Alarm kapal", "Kabar keluar area, baterai lemah, sinyal hilang"),
     ("telegram", "Balasan bot Telegram", "Bot menjawab anggota (CEO tetap dijawab)"),
     ("router_pintar", "Router pintar & cache", "Pesan sederhana dijawab Flash Lite atau tanpa AI; pertanyaan Pusat Info yang mirip memakai jawaban tersimpan"),
+    ("kabar", "Kabar Teknologi harian", "Berita AI, teknologi, luar angkasa/SpaceX, dan IoT/Arduino/ESP32 diperbarui otomatis tiap pagi di Panel CEO"),
     ("graphify", "Graphify (cari jalur data)", "Pusat Info hanya mengirim potongan data yang relevan ke AI, bukan seluruh data. Tidak cocok = otomatis kirim lengkap"),
     ("kerja_malam", "Kerja malam (hemat Neon)", "Laporan digabung ke jadwal bangun yang sudah ada dan database tidak dibangunkan jam 01.00–07.00. Bangun terjadwal 5x sehari, sebelumnya 7x"),
 ]
@@ -12663,6 +12666,7 @@ def panel_data():
                                                              "istirahat": max(0, int(_CAD_ISTIRAHAT.get(k, 0) - time.time()))} for k, n in CADANGAN_SEMUA]},
             "hemat": {"router": STATS.get("router_hemat", 0), "cache": STATS.get("cache_hit", 0), "pi_cache": PI_CACHE_STAT["kena"], "pi_lokal": PI_CACHE_STAT["lokal"],
                       "graf": dict(GRAF_HEMAT)},
+            "harga": harga_list(), "harga_per": HARGA_PER, "kabar": SET.get("kabar"), "kabar_kat": {k: v[0] for k, v in KABAR_KAT.items()},
             **kuota_data()}
 
 
@@ -12701,6 +12705,18 @@ def api_panel():
             else:
                 SET.setdefault("model_tugas", {})[t] = p
             panel_catat(f"Model {MODEL_TUGAS[t]['judul']}: {dict((a, b) for a, b, _ in MODEL_TUGAS[t]['pilihan'])[p]}")
+        elif aksi == "harga_simpan":
+            try:
+                panel_catat(harga_simpan(d.get("row") or {}))
+            except ValueError as e:
+                return jsonify({"error": str(e)}), 400
+        elif aksi == "harga_hapus":
+            L = harga_list()
+            x = next((x for x in L if x["id"] == d.get("id")), None)
+            if not x:
+                return jsonify({"error": "Baris tidak ditemukan"}), 404
+            L.remove(x)
+            panel_catat(f"Harga dihapus: {x['nama']}")
         elif aksi == "cadangan":
             u = [k for k in dict.fromkeys(d.get("urut") or []) if k in dict(CADANGAN_SEMUA)]
             SET["cadangan_urut"] = u
@@ -13538,6 +13554,209 @@ def api_graf():
     need("admin")
     nodes, edges = graf_bangun()
     return jsonify({"nodes": nodes, "edges": edges, "wawasan": graf_wawasan(nodes, edges)})
+
+
+# =================== PANEL CEO: KABAR TEKNOLOGI (harian) + DAFTAR HARGA & LANGGANAN ===================
+def _gn_cari(q, en=False):
+    p = "hl=en-US&gl=US&ceid=US:en" if en else "hl=id&gl=ID&ceid=ID:id"
+    return f"https://news.google.com/rss/search?q={quote(q)}+when:3d&{p}"
+
+
+KABAR_KAT = {
+    "ai": ("AI", [_gn_cari("kecerdasan buatan OR OpenAI OR Anthropic OR Gemini OR ChatGPT OR Claude"), _gn_cari("AI model OpenAI OR Anthropic OR Google DeepMind", True)]),
+    "tek": ("Teknologi", [_GN.format(p="/headlines/section/topic/TECHNOLOGY")]),
+    "angkasa": ("Luar Angkasa & SpaceX", [_gn_cari("SpaceX OR Starship OR NASA OR luar angkasa OR roket"), _gn_cari("SpaceX OR Starship OR NASA Artemis", True)]),
+    "iot": ("IoT · Arduino · ESP32", [_gn_cari("Arduino OR ESP32 OR Espressif OR \"Raspberry Pi\" OR IoT microcontroller", True), _gn_cari("IoT OR Arduino OR ESP32 OR mikrokontroler")]),
+}
+_KABAR_LOCK = threading.Lock()
+KABAR_STATUS = {"jalan": False, "terakhir_coba": 0.0, "pesan": ""}
+
+
+def _rss_items(url, maks=25):
+    r = httpx.get(url, timeout=12, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0 (MCI HQ news reader)"})
+    r.raise_for_status()
+    root = ET.fromstring(r.content[:3_000_000])
+    out = []
+    for it in root.iter("item"):
+        judul, link = (it.findtext("title") or "").strip(), (it.findtext("link") or "").strip()
+        se = it.find("source")
+        sumber = (se.text or "").strip() if se is not None else ""
+        if sumber and judul.endswith(" - " + sumber):
+            judul = judul[: -len(sumber) - 3].strip()
+        if not judul or not re.match(r"^https?://", link):
+            continue
+        try:
+            waktu = parsedate_to_datetime(it.findtext("pubDate") or "").astimezone(WIB)
+        except (TypeError, ValueError):
+            waktu = None
+        out.append({"judul": judul[:300], "link": link[:1000], "sumber": sumber[:80], "waktu": waktu.isoformat(timespec="minutes") if waktu else ""})
+        if len(out) >= maks:
+            break
+    return out
+
+
+class KabarRingkas(BaseModel):
+    id: str
+    judul: str
+    ringkas: str
+
+
+class KabarDaftar(BaseModel):
+    items: list[KabarRingkas]
+
+
+def _kabar_kumpul():
+    hasil = {}
+    for k, (_nama, urls) in KABAR_KAT.items():
+        semua, lihat = [], set()
+        for u in urls:
+            try:
+                for x in _rss_items(u):
+                    kunci = re.sub(r"\W+", "", x["judul"].lower())[:60]
+                    if kunci not in lihat:
+                        lihat.add(kunci)
+                        semua.append(x)
+            except Exception as e:
+                log.warning("Kabar %s: sumber gagal (%s)", k, str(e)[:100])
+        semua.sort(key=lambda x: x["waktu"], reverse=True)
+        hasil[k] = semua[:8]
+    return hasil
+
+
+async def kabar_buat(oleh="otomatis"):
+    """Ambil judul berita 3 hari terakhir per kategori, lalu AI hemat menulis judul + ringkasan 1 kalimat dalam bahasa Indonesia (hanya dari judul)."""
+    if not _KABAR_LOCK.acquire(blocking=False):
+        return False
+    KABAR_STATUS.update(jalan=True, terakhir_coba=time.time(), pesan="")
+    try:
+        kat = await asyncio.to_thread(_kabar_kumpul)
+        if not any(kat.values()):
+            KABAR_STATUS["pesan"] = "Sumber berita belum bisa diambil"
+            return False
+        daftar = "\n".join(f"{k}{i}: {x['judul']} ({x['sumber']})" for k, L in kat.items() for i, x in enumerate(L))
+        try:
+            raw = await ai_murah("Ini judul berita terbaru (sebagian berbahasa Inggris):\n" + daftar +
+                                 "\n\nUntuk SETIAP baris, kembalikan id yang sama, judul dalam bahasa Indonesia yang jelas (maks 14 kata), dan ringkas: 1 kalimat "
+                                 "penjelasan singkat dalam bahasa Indonesia santai untuk tim MCI (komunitas elektronika, IoT, dan AI). HANYA berdasarkan judul; "
+                                 "jangan menambah fakta, angka, atau tanggal yang tidak ada di judul.", schema=KabarDaftar, act="Menyusun kabar teknologi")
+            ring = {x["id"]: x for x in (json.loads(raw).get("items") or [])}
+        except Exception:
+            log.exception("Ringkasan kabar gagal; tampilkan judul asli")
+            ring = {}
+        out = {}
+        for k, L in kat.items():
+            out[k] = [{**x, "judul_id": (ring.get(f"{k}{i}") or {}).get("judul") or x["judul"], "ringkas": (ring.get(f"{k}{i}") or {}).get("ringkas", "")}
+                      for i, x in enumerate(L)]
+        SET["kabar"] = {"t": _now(), "tanggal": today(), "oleh": oleh, "kat": out}
+        await asyncio.to_thread(set_save)
+        return True
+    finally:
+        KABAR_STATUS["jalan"] = False
+        _KABAR_LOCK.release()
+
+
+async def kabar_cek():
+    """Dipanggil berkala: sekali sehari mulai jam 07.00 (ikut jadwal bangun pagi, hemat Neon)."""
+    if not fitur_on("kabar") or (SET.get("kabar") or {}).get("tanggal") == today():
+        return
+    if datetime.now(WIB).hour < 7 or time.time() - KABAR_STATUS["terakhir_coba"] < 3600:
+        return
+    try:
+        await kabar_buat()
+    except Exception:
+        log.exception("Kabar harian gagal")
+
+
+@app.route("/api/panel/kabar", methods=["POST"])
+def api_panel_kabar():
+    need_panel()
+    if KABAR_STATUS["jalan"]:
+        return jsonify({"error": "Sedang diperbarui, tunggu sebentar."}), 409
+    if time.time() - KABAR_STATUS["terakhir_coba"] < 600:
+        return jsonify({"error": "Baru saja diperbarui. Coba lagi beberapa menit lagi."}), 429
+    if not LOOP:
+        return jsonify({"error": "Mesin AI belum siap"}), 503
+    try:
+        ok = asyncio.run_coroutine_threadsafe(kabar_buat(nama_peran(role())), LOOP).result(150)
+    except Exception as e:
+        log.exception("Segarkan kabar gagal")
+        return jsonify({"error": f"Gagal memperbarui: {e}"}), 502
+    if not ok:
+        return jsonify({"error": KABAR_STATUS["pesan"] or "Gagal memperbarui kabar"}), 502
+    return jsonify({"kabar": SET.get("kabar")})
+
+
+# ---------- Daftar harga: langganan yang dipakai MCI + paket AI sebagai perbandingan (bisa diedit di Panel CEO) ----------
+HARGA_PER = "17 Nov 2026"
+
+
+def harga_bawaan():
+    g = os.getenv("GROQ_KEDALUWARSA", "2026-11-22")
+    R = lambda grup, nama, paket, harga, periode="", berakhir="", catatan="", link="": {
+        "id": secrets.token_hex(4), "grup": grup, "nama": nama, "paket": paket, "harga": harga, "periode": periode, "berakhir": berakhir, "catatan": catatan, "link": link}
+    return [
+        R("mci", "Domain mci-ai.my.id", "Hostinger", "Rp21.900 (tahun ke-1), perpanjang Rp29.900", "per tahun", "2027-11-18", "Perpanjangan otomatis mati: ingat perpanjang", "https://hpanel.hostinger.com"),
+        R("mci", "Server web (Render)", "Free, RAM 512 MB", "Rp0", "per bulan", "", "Tidur kalau sepi; plan berbayar kalau butuh selalu nyala", "https://dashboard.render.com"),
+        R("mci", "Database (Neon)", "Free, 100 CU-jam", "Rp0", "per bulan", "", "Jatah CU reset tiap tanggal 1", "https://console.neon.tech"),
+        R("mci", "Email @mci-ai.my.id (Zoho)", "Forever Free, maks 5 akun", "Rp0", "", "", "Tanpa IMAP/POP/SMTP", "https://mailadmin.zoho.com"),
+        R("mci", "Groq (AI cadangan)", "Kunci gratis", "Rp0", "", g, "Ganti kunci di Panel CEO sebelum berakhir", "https://console.groq.com/keys"),
+        R("mci", "Gemini API tier 1", "Bayar sesuai pemakaian", "Lihat anggaran Argon di Kesehatan Sistem", "per bulan", "", "", "https://aistudio.google.com"),
+        R("ai", "Claude Free", "Anthropic", "$0", "", "", "", "https://claude.ai/upgrade"),
+        R("ai", "Claude Pro", "Anthropic", "$20 (harga Indonesia ikut mata uang lokal)", "per bulan", "", "Tahunan lebih murah", "https://support.claude.com/en/articles/8325606-choosing-a-claude-plan"),
+        R("ai", "Claude Max 5x", "Anthropic", "$100", "per bulan", "", "", "https://support.claude.com/en/articles/11049744-how-much-does-the-max-plan-cost"),
+        R("ai", "Claude Max 20x", "Anthropic", "$200", "per bulan", "", "", "https://support.claude.com/en/articles/11049744-how-much-does-the-max-plan-cost"),
+        R("ai", "Google AI Pro", "Google (Gemini)", "±Rp320.000 ($19,99)", "per bulan", "", "Termasuk 2 TB penyimpanan", "https://gemini.google/subscriptions/?hl=id"),
+        R("ai", "Google AI Ultra", "Google (Gemini)", "$99,99–$199,99", "per bulan", "", "", "https://gemini.google/subscriptions/?hl=id"),
+        R("ai", "ChatGPT Plus", "OpenAI", "$20", "per bulan", "", "", "https://openai.com/chatgpt/pricing/"),
+        R("ai", "ChatGPT Pro", "OpenAI", "mulai $100–$200", "per bulan", "", "", "https://openai.com/chatgpt/pricing/"),
+    ]
+
+
+def harga_list():
+    if not isinstance(SET.get("harga"), list):
+        SET["harga"] = harga_bawaan()
+        set_save()
+    return SET["harga"]
+
+
+def harga_ingat_cek():
+    """Kabari CEO 30, 7, dan 1 hari sebelum tanggal berakhir (sekali per tahap)."""
+    tanda = SET.setdefault("harga_ingat", {})
+    ubah = False
+    for x in harga_list():
+        try:
+            sisa = (datetime.strptime(x.get("berakhir") or "", "%Y-%m-%d").date() - datetime.now(WIB).date()).days
+        except ValueError:
+            continue
+        batas = next((b for b in (1, 7, 30) if 0 <= sisa <= b), None)   # tahap terdekat saja, tiap tahap sekali
+        kunci = f"{x['id']}:{x['berakhir']}:{batas}"
+        if batas and kunci not in tanda:
+            tanda[kunci] = today()
+            ubah = True
+            inbox_kirim(_dev_ids(), "info", f"{x['nama']} berakhir {sisa} hari lagi" if sisa else f"{x['nama']} berakhir hari ini",
+                        f"Tanggal berakhir {x['berakhir']}. {x.get('catatan') or ''} Atur di Panel CEO → Daftar Harga.".strip())
+    if ubah:
+        set_save()
+
+
+def harga_simpan(d):
+    row = {k: str(d.get(k) or "").strip()[:200] for k in ("nama", "paket", "harga", "periode", "berakhir", "catatan", "link")}
+    row["grup"] = d.get("grup") if d.get("grup") in ("mci", "ai") else "mci"
+    if not row["nama"]:
+        raise ValueError("Nama wajib diisi")
+    if row["berakhir"] and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", row["berakhir"]):
+        raise ValueError("Tanggal berakhir harus YYYY-MM-DD")
+    if row["link"] and not re.match(r"^https://", row["link"]):
+        raise ValueError("Link harus diawali https://")
+    L = harga_list()
+    lama = next((x for x in L if x["id"] == d.get("id")), None)
+    if lama:
+        lama.update(row)
+        return f"Harga diubah: {row['nama']}"
+    if len(L) >= 60:
+        raise ValueError("Maksimal 60 baris")
+    L.append({"id": secrets.token_hex(4), **row})
+    return f"Harga ditambah: {row['nama']}"
 
 
 def run_flask():

@@ -855,6 +855,24 @@ details.cara p{line-height:1.65}
 #vdBox .tp button{all:unset;cursor:pointer;font-size:26px;line-height:1;padding:4px 8px;color:#fff}
 .dkPg{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:10px}
 .dkPg>i{display:block;height:100%;width:0;background:#2E8B57;transition:width .3s}
+/* Panel CEO: kabar & harga */
+.kbL{display:grid;gap:2px;margin-top:10px}
+.kbL a.it{display:block;padding:10px 4px;border-top:1px solid var(--line);color:var(--ink);text-decoration:none}
+.kbL a.it:first-child{border-top:0}
+.kbL a.it:hover b{text-decoration:underline}
+.kbL a.it b{display:block;font-size:14px;line-height:1.4;color:var(--judul)}
+.kbL a.it span{display:block;font-size:13px;line-height:1.5;color:var(--ink);margin-top:2px}
+.kbL a.it small{display:block;font-size:11.5px;color:var(--mute);margin-top:3px}
+.hgT{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+.hgT th{text-align:left;font-weight:500;color:var(--mute);font-size:12px;padding:6px 6px;border-bottom:1px solid var(--line)}
+.hgT td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+.hgT td a{color:inherit}
+.hgT .ak{white-space:nowrap;text-align:right}
+.hgT .ak button{all:unset;cursor:pointer;color:var(--mute);font-size:12px;padding:2px 6px;border-radius:6px}
+.hgT .ak button:hover{background:var(--hov);color:var(--ink)}
+.hgF{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:12px;padding:12px;border:1px dashed var(--line2);border-radius:12px}
+.hgF[hidden]{display:none}
+@media (max-width:700px){.hgT .sm{display:none}}
 </style>
 </head>
 <body>
@@ -1383,6 +1401,19 @@ details.cara p{line-height:1.65}
     <div class="cd"><b>Fitur</b><div class="mu" style="font-size:12.5px;margin:2px 0 6px">Mematikan fitur juga menghentikan pengingat dan hitungan otomatisnya.</div><div id="pnFitur"></div></div>
     <div class="cd"><b>Model AI per tugas</b><div class="mu" style="font-size:12.5px;margin:2px 0 2px">Tombol redup berarti kuncinya belum diisi.</div><div id="pnModel"></div></div>
    </div>
+   <div class="cd" style="margin-top:16px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><b>Kabar Teknologi</b><span><span class="mu" id="kbInfo" style="font-size:12px"></span> <button class="bt o" type="button" id="kbSegar" style="margin-left:6px">Segarkan</button></span></div>
+    <div class="seg" id="kbSeg" style="margin:10px 0 0;background:#EFECE4"></div><div class="kbL" id="kbList"></div>
+    <div class="mu" style="font-size:11.5px;margin-top:8px">Ringkasan dibuat AI hanya dari judul berita; buka link untuk isi lengkap dari sumber aslinya.</div></div>
+   <div class="cd" style="margin-top:16px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><b>Daftar Harga & Langganan</b><button class="bt o" type="button" id="hgTambah">+ Tambah baris</button></div>
+    <div class="mu" style="font-size:12.5px;margin:2px 0 0">Tanggal berakhir diingatkan otomatis ke Inbox 30, 7, dan 1 hari sebelumnya. Harga produk luar bisa berubah; cek link resminya.</div>
+    <div id="hgIsi"></div>
+    <div class="hgF" id="hgForm" hidden>
+     <label>Kelompok<select id="hgGrup"><option value="mci">Langganan MCI</option><option value="ai">Paket AI (perbandingan)</option></select></label>
+     <label>Nama<input id="hgNama" maxlength="200"></label><label>Paket<input id="hgPaket" maxlength="200"></label><label>Harga<input id="hgHarga" maxlength="200"></label>
+     <label>Periode<input id="hgPeriode" maxlength="200" placeholder="per bulan / per tahun"></label><label>Berakhir<input id="hgBerakhir" type="date"></label>
+     <label>Catatan<input id="hgCatatan" maxlength="200"></label><label>Link resmi<input id="hgLink" maxlength="200" placeholder="https://"></label>
+     <div style="display:flex;gap:8px;align-items:end"><button class="bt g" type="button" id="hgSimpan">Simpan</button><button class="bt o" type="button" id="hgBatal">Batal</button></div>
+    </div></div>
    <div class="cd" style="margin-top:16px"><b>Meteran jatah AI hari ini</b><div class="mu" style="font-size:12.5px;margin:2px 0 0">Jumlah panggilan per penyedia. Angka berlabel "perkiraan" memakai batas yang bisa kamu ubah (klik angkanya); "asli" berasal langsung dari penyedia. Peringatan masuk Inbox saat sisa 20%.</div>
     <div class="mtr" id="pnMeter"></div><div id="pnBayar" class="mu" style="font-size:12.5px;margin-top:10px"></div>
     <b style="display:block;margin-top:18px;font-size:13.5px">7 hari terakhir</b><div id="pnMeter7"></div></div>
@@ -7608,7 +7639,7 @@ function pnRender() {
   const mati = new Set(d.hal_mati || []), fh = new Set(); d.fitur.filter(f => !f.aktif).forEach(f => (FITUR_HAL[f.id] || []).forEach(p => fh.add(p)));
   const hal = $$("#sd .nv[data-p]").filter(b => !["panel", "beranda"].includes(b.dataset.p)).map(b => ({p: b.dataset.p, nama: (b.childNodes[0] || b).textContent.trim()}));
   $("#pnHal").innerHTML = hal.map(h => `<div class="pnR"><div class="tx">${esc(h.nama)}${fh.has(h.p) ? '<small>mati karena fiturnya dimatikan</small>' : ""}</div>${pnSk(!mati.has(h.p) && !fh.has(h.p), `data-pnh="${h.p}" data-nama="${esc(h.nama)}" aria-label="${esc(h.nama)}" ${fh.has(h.p) ? "disabled" : ""}`)}</div>`).join("");
-  pnMeter(d); pnCad(d); if (!ADU.mesin.length) aduMuat();
+  pnMeter(d); pnCad(d); pnKabar(d); pnHarga(d); if (!ADU.mesin.length) aduMuat();
   $("#pnRiwayat").innerHTML = d.riwayat.map(r => `<div><span class="mu">${esc(String(r.t || "").slice(0, 16).replace("T", " "))}</span> · ${esc(r.aksi)}</div>`).join("") || '<span class="mu">Belum ada perubahan.</span>';
 }
 $("#p-panel").addEventListener("click", async e => {
@@ -7874,6 +7905,42 @@ async function grafikMuat() {
   $("#gAbsen").innerHTML = (d.absen_mati ? '<p class="mu" style="font-size:12.5px;margin:4px 0">Fitur absen sedang dimatikan; data lama tetap ditampilkan.</p>' : "")
     + (d.absen.length ? svgBatang(d.absen.map(a => ({label: tglPendek(a.tanggal), nilai: {n: a.hadir}})), ["n"], {warna: {n: "#3B6FD8"}, nama: {n: "Hadir"}, legenda: false, judul: "Kehadiran harian"}) : kosong);
 }
+
+
+/* ===== Panel CEO: Kabar Teknologi & Daftar Harga ===== */
+let KB_KAT = "ai", HG_EDIT = null;
+function pnKabar(d) {
+  const kb = d.kabar, kat = d.kabar_kat || {};
+  if (!kat[KB_KAT]) KB_KAT = Object.keys(kat)[0];
+  $("#kbSeg").innerHTML = ["ai", "tek", "angkasa", "iot"].filter(k => kat[k]).map(k => [k, kat[k]]).map(([k, n]) => `<button type="button" class="${k === KB_KAT ? "on" : ""}" data-kbk="${k}">${esc(n)}</button>`).join("");
+  $("#kbInfo").textContent = kb ? "Diperbarui " + String(kb.t || "").slice(0, 16).replace("T", " ") : "Belum ada kabar. Tekan Segarkan, atau tunggu besok pagi.";
+  const L = (kb && kb.kat && kb.kat[KB_KAT]) || [];
+  $("#kbList").innerHTML = L.map(x => `<a class="it" href="${esc(x.link)}" target="_blank" rel="noopener"><b>${esc(x.judul_id || x.judul)}</b>${x.ringkas ? `<span>${esc(x.ringkas)}</span>` : ""}<small>${esc(x.sumber || "")}${x.waktu ? " · " + esc(tglPendek(x.waktu.slice(0, 10))) : ""}</small></a>`).join("")
+    || '<p class="mu" style="font-size:13px">Belum ada berita di kategori ini.</p>';
+}
+$("#kbSeg").onclick = e => { const b = e.target.closest("[data-kbk]"); if (!b || !PND) return; KB_KAT = b.dataset.kbk; pnKabar(PND); };
+$("#kbSegar").onclick = async () => { const b = $("#kbSegar"); b.disabled = true; b.textContent = "Mengambil…";
+  try { const r = await api("/api/panel/kabar", {method: "POST"}); PND.kabar = r.kabar; pnKabar(PND); pesan("Kabar diperbarui"); }
+  catch (e) { if (e.kunci) return pnKunciTampil(false); alert(e.message); }
+  b.disabled = false; b.textContent = "Segarkan"; };
+function pnHarga(d) {
+  const L = d.harga || [], hari = t => { if (!t) return ""; const n = Math.round((new Date(t + "T00:00:00") - new Date(new Date().toDateString())) / 864e5);
+    return `${esc(t)}<br><span class="ch ${n <= 7 ? "r" : n <= 30 ? "y" : "n"}">${n < 0 ? "lewat " + -n + " hari" : n === 0 ? "hari ini" : n + " hari lagi"}</span>`; };
+  const tabel = (g, judul) => { const R = L.filter(x => x.grup === g); if (!R.length) return "";
+    return `<b style="display:block;margin-top:14px;font-size:13.5px">${judul}</b><table class="hgT"><thead><tr><th>Nama</th><th class="sm">Paket</th><th>Harga</th><th class="sm">Periode</th><th>Berakhir</th><th></th></tr></thead><tbody>${R.map(x =>
+      `<tr><td>${x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.nama)}</a>` : esc(x.nama)}${x.catatan ? `<br><small class="mu">${esc(x.catatan)}</small>` : ""}</td><td class="sm">${esc(x.paket)}</td><td>${esc(x.harga)}</td><td class="sm">${esc(x.periode)}</td><td>${hari(x.berakhir)}</td>
+      <td class="ak"><button type="button" data-hge="${x.id}">Edit</button><button type="button" data-hgh="${x.id}">Hapus</button></td></tr>`).join("")}</tbody></table>`; };
+  $("#hgIsi").innerHTML = tabel("mci", "Langganan MCI") + tabel("ai", `Paket AI (perbandingan, per ${esc(d.harga_per || "")})`) || '<p class="mu">Belum ada data.</p>';
+}
+const HGF = ["grup", "nama", "paket", "harga", "periode", "berakhir", "catatan", "link"];
+function hgBuka(x) { HG_EDIT = x ? x.id : null; HGF.forEach(k => $("#hg" + k[0].toUpperCase() + k.slice(1)).value = x ? (x[k] || "") : (k === "grup" ? "mci" : "")); $("#hgForm").hidden = false; $("#hgNama").focus(); }
+$("#hgTambah").onclick = () => hgBuka(null);
+$("#hgBatal").onclick = () => { $("#hgForm").hidden = true; HG_EDIT = null; };
+$("#hgSimpan").onclick = async () => { const row = {id: HG_EDIT}; HGF.forEach(k => row[k] = $("#hg" + k[0].toUpperCase() + k.slice(1)).value);
+  const r = await pnKirim({aksi: "harga_simpan", row}, "Tersimpan"); if (r) { $("#hgForm").hidden = true; HG_EDIT = null; } };
+$("#hgIsi").onclick = async e => { const b = e.target.closest("button"); if (!b || !PND) return;
+  if (b.dataset.hge) hgBuka(PND.harga.find(x => x.id === b.dataset.hge));
+  if (b.dataset.hgh && confirm("Hapus baris ini?")) await pnKirim({aksi: "harga_hapus", id: b.dataset.hgh}, "Dihapus"); };
 
 /* ================= MULAI ================= */
 (async () => {
