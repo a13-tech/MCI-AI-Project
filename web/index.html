@@ -873,6 +873,21 @@ details.cara p{line-height:1.65}
 .hgF{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:12px;padding:12px;border:1px dashed var(--line2);border-radius:12px}
 .hgF[hidden]{display:none}
 @media (max-width:700px){.hgT .sm{display:none}}
+/* Email Zoho di Inbox */
+.zmL a{display:block;padding:12px 6px;border-top:1px solid var(--line);color:var(--ink);text-decoration:none;cursor:pointer}
+.zmL a:first-child{border-top:0}
+.zmL a:hover{background:var(--hov)}
+.zmL .dr{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--mute)}
+.zmL .sj{display:block;font-size:14.5px;margin-top:2px;color:var(--judul)}
+.zmL .rk{display:block;font-size:13px;color:var(--mute);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zmL a.baru .sj{font-weight:700}
+.zmL a.baru .dr b::before{content:"● ";color:#2E8B57}
+#zmBox{position:fixed;inset:0;z-index:300;background:rgba(5,8,18,.75);display:grid;place-items:center;padding:16px}
+#zmBox[hidden]{display:none}
+#zmBox .in{width:min(900px,100%);height:min(86vh,900px);background:var(--paper);border-radius:14px;display:flex;flex-direction:column;overflow:hidden}
+#zmBox .tp{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line)}
+#zmBox .tp button{all:unset;cursor:pointer;font-size:24px;line-height:1;padding:2px 8px}
+#zmBox iframe{flex:1;border:0;background:#fff;width:100%}
 </style>
 </head>
 <body>
@@ -1427,6 +1442,13 @@ details.cara p{line-height:1.65}
    </div>
    <div class="adu" id="aduHasil"></div>
    <div class="cd" style="margin-top:16px"><b>Kunci AI</b><div class="mu" style="font-size:12.5px;margin:2px 0 4px">Disimpan terenkripsi, tidak ikut backup, dan tidak pernah ditampilkan utuh. Kunci dari panel mengalahkan nilai di Render; "Pakai nilai Render" menghapus isian panel.</div><div id="pnKey"></div></div>
+   <div class="cd" style="margin-top:16px"><b>Hubungkan Email Zoho ke Inbox web</b> <span id="zhSt"></span>
+    <ol class="mu" style="font-size:13px;line-height:1.7;margin:8px 0 0 18px;padding:0">
+     <li>Buka <a href="https://api-console.zoho.com" target="_blank" rel="noopener">api-console.zoho.com</a> → <b>Self Client</b> → Create. Salin <b>Client ID</b> dan <b>Client Secret</b>, tempel di bagian Kunci AI → kelompok "Email Zoho", lalu Simpan.</li>
+     <li>Di Self Client buka tab <b>Generate Code</b>. Scope: <code id="zhScope"></code>, Time Duration: 10 minutes, Description bebas → Create. Pilih portal/organisasi kalau ditanya.</li>
+     <li>Salin kode yang muncul, tempel di bawah, lalu tekan Hubungkan (kode cepat kedaluwarsa).</li>
+    </ol>
+    <div class="bar" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><input id="zhKode" type="password" autocomplete="off" placeholder="Tempel kode dari Zoho" style="flex:1;min-width:200px" aria-label="Kode Zoho"><button class="bt g" type="button" id="zhHubung">Hubungkan</button></div></div>
    <div class="cd" style="margin-top:16px"><b>Halaman</b><div class="mu" style="font-size:12.5px;margin:2px 0 8px">Halaman yang dimatikan hilang dari menu semua orang kecuali CEO (CEO melihat tanda "mati").</div><div class="pnHal" id="pnHal"></div></div>
    <div class="cd" style="margin-top:16px"><b>Riwayat perubahan</b><div class="pnH" id="pnRiwayat"></div></div>
   </div>
@@ -1489,8 +1511,12 @@ details.cara p{line-height:1.65}
   <h1>Inbox</h1>
   <p class="mu">Notifikasi untukmu: permintaan konfirmasi bayar kas, hasil konfirmasi, dan info dari Bendahara. Kalau akun Telegram kamu sudah terhubung, notifikasi juga dikirim lewat bot Ledger.</p>
   <div class="cd" id="pushBox" style="background:#F3F0FF;border-color:#D9D0F5" hidden></div>
-  <div class="bar"><button class="bt o" id="ibAll">Tandai semua dibaca</button><span class="mu" id="ibInfo"></span></div>
-  <div id="ibList"></div>
+  <div class="seg" id="ibSeg" hidden style="margin:0 0 12px;background:#EFECE4"><button type="button" class="on" data-ibm="notif">Notifikasi</button><button type="button" data-ibm="zoho">Email @mci-ai.my.id</button></div>
+  <div id="ibNotif"><div class="bar"><button class="bt o" id="ibAll">Tandai semua dibaca</button><span class="mu" id="ibInfo"></span></div>
+  <div id="ibList"></div></div>
+  <div id="ibZoho" hidden><div class="bar"><button class="bt o" type="button" id="zmSegar">Segarkan</button><a class="bt o" href="https://mail.zoho.com" target="_blank" rel="noopener">Buka Zoho Mail</a><span class="mu" id="zmInfo" style="font-size:13px"></span></div>
+   <div class="cd"><div class="zmL" id="zmList"></div></div></div>
+  <div id="zmBox" hidden role="dialog" aria-modal="true" aria-label="Baca email"><div class="in"><div class="tp"><div><b id="zmJudul"></b><div class="mu" id="zmDari" style="font-size:12.5px;margin-top:2px"></div></div><button type="button" id="zmTutup" aria-label="Tutup">×</button></div><iframe id="zmIsi" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" title="Isi email"></iframe></div></div>
  </section>
 
  <section id="p-berita" class="pg" hidden>
@@ -2086,7 +2112,7 @@ function show(p) {
   if (p === "laporan") loadLaporan();
   if (p === "stok") loadStok();
   if (p === "perpus") loadPerpus();
-  if (p === "inbox") { loadInbox(); pushKartu(); }
+  if (p === "inbox") { loadInbox(); pushKartu(); $("#ibSeg").hidden = !ADM(); if (ADM() && !$("#ibZoho").hidden) zmMuat(); }
   if (p === "berita") loadBerita();
   if (p === "bayarkas") loadBayarKas();
   if (p === "produk") loadProduk();
@@ -7639,7 +7665,7 @@ function pnRender() {
   const mati = new Set(d.hal_mati || []), fh = new Set(); d.fitur.filter(f => !f.aktif).forEach(f => (FITUR_HAL[f.id] || []).forEach(p => fh.add(p)));
   const hal = $$("#sd .nv[data-p]").filter(b => !["panel", "beranda"].includes(b.dataset.p)).map(b => ({p: b.dataset.p, nama: (b.childNodes[0] || b).textContent.trim()}));
   $("#pnHal").innerHTML = hal.map(h => `<div class="pnR"><div class="tx">${esc(h.nama)}${fh.has(h.p) ? '<small>mati karena fiturnya dimatikan</small>' : ""}</div>${pnSk(!mati.has(h.p) && !fh.has(h.p), `data-pnh="${h.p}" data-nama="${esc(h.nama)}" aria-label="${esc(h.nama)}" ${fh.has(h.p) ? "disabled" : ""}`)}</div>`).join("");
-  pnMeter(d); pnCad(d); pnKabar(d); pnHarga(d); if (!ADU.mesin.length) aduMuat();
+  pnMeter(d); pnCad(d); pnKabar(d); pnHarga(d); pnZoho(d); if (!ADU.mesin.length) aduMuat();
   $("#pnRiwayat").innerHTML = d.riwayat.map(r => `<div><span class="mu">${esc(String(r.t || "").slice(0, 16).replace("T", " "))}</span> · ${esc(r.aksi)}</div>`).join("") || '<span class="mu">Belum ada perubahan.</span>';
 }
 $("#p-panel").addEventListener("click", async e => {
@@ -7928,9 +7954,9 @@ function pnHarga(d) {
     return `${esc(t)}<br><span class="ch ${n <= 7 ? "r" : n <= 30 ? "y" : "n"}">${n < 0 ? "lewat " + -n + " hari" : n === 0 ? "hari ini" : n + " hari lagi"}</span>`; };
   const tabel = (g, judul) => { const R = L.filter(x => x.grup === g); if (!R.length) return ""; const tk = g === "token";
     return `<b style="display:block;margin-top:14px;font-size:13.5px">${judul}</b><table class="hgT"><thead><tr><th>${tk ? "Model" : "Nama"}</th><th class="sm">${tk ? "Penyedia / dipakai di" : "Paket"}</th><th>${tk ? "Input" : "Harga"}</th><th${tk ? "" : ' class="sm"'}>${tk ? "Output" : "Periode"}</th><th>${tk ? "Promo s.d." : "Berakhir"}</th><th></th></tr></thead><tbody>${R.map(x =>
-      `<tr><td>${x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.nama)}</a>` : esc(x.nama)}${x.catatan ? `<br><small class="mu">${esc(x.catatan)}</small>` : ""}</td><td class="sm">${esc(x.paket)}</td><td>${esc(x.harga)}</td><td${tk ? "" : ' class="sm"'}>${esc(x.periode)}</td><td>${hari(x.berakhir)}</td>
+      `<tr><td>${x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.nama)}</a>` : esc(x.nama)}${x.catatan ? `<br><small class="mu">${esc(x.catatan)}</small>` : ""}</td><td class="sm">${esc(x.paket)}</td><td>${rpUsd(x.harga, d.kurs || 16500)}</td><td${tk ? "" : ' class="sm"'}>${rpUsd(x.periode, d.kurs || 16500)}</td><td>${hari(x.berakhir)}</td>
       <td class="ak"><button type="button" data-hge="${x.id}">Edit</button><button type="button" data-hgh="${x.id}">Hapus</button></td></tr>`).join("")}</tbody></table>`; };
-  $("#hgIsi").innerHTML = tabel("mci", "Langganan MCI") + tabel("token", `Harga token AI per model (USD per 1 juta token, per ${esc(d.harga_per || "")})`) || '<p class="mu">Belum ada data.</p>';
+  $("#hgIsi").innerHTML = tabel("mci", "Langganan MCI") + tabel("token", `Harga token AI per model (USD per 1 juta token, per ${esc(d.harga_per || "")} · kurs Rp${(d.kurs || 16500).toLocaleString("id-ID")}/USD)`) || '<p class="mu">Belum ada data.</p>';
 }
 const HGF = ["grup", "nama", "paket", "harga", "periode", "berakhir", "catatan", "link"];
 function hgBuka(x) { HG_EDIT = x ? x.id : null; HGF.forEach(k => $("#hg" + k[0].toUpperCase() + k.slice(1)).value = x ? (x[k] || "") : (k === "grup" ? "mci" : "")); $("#hgForm").hidden = false; $("#hgNama").focus(); }
@@ -7941,6 +7967,38 @@ $("#hgSimpan").onclick = async () => { const row = {id: HG_EDIT}; HGF.forEach(k 
 $("#hgIsi").onclick = async e => { const b = e.target.closest("button"); if (!b || !PND) return;
   if (b.dataset.hge) hgBuka(PND.harga.find(x => x.id === b.dataset.hge));
   if (b.dataset.hgh && confirm("Hapus baris ini?")) await pnKirim({aksi: "harga_hapus", id: b.dataset.hgh}, "Dihapus"); };
+
+
+/* ===== Email Zoho di Inbox (khusus CEO) ===== */
+let ZMD = [];
+$("#ibSeg").onclick = e => { const b = e.target.closest("[data-ibm]"); if (!b) return; $$("#ibSeg button").forEach(x => x.classList.toggle("on", x === b));
+  $("#ibNotif").hidden = b.dataset.ibm !== "notif"; $("#ibZoho").hidden = b.dataset.ibm !== "zoho"; if (b.dataset.ibm === "zoho") zmMuat(); };
+async function zmMuat(segar) {
+  $("#zmInfo").textContent = "Memuat…";
+  try { const d = await api("/api/zoho/inbox" + (segar ? "?segar=1" : ""));
+    if (!d.siap) { $("#zmInfo").textContent = ""; $("#zmList").innerHTML = '<p class="mu" style="font-size:13px">Email Zoho belum dihubungkan. Buka Panel CEO → "Hubungkan Email Zoho ke Inbox web".</p>'; return; }
+    ZMD = d.items; $("#zmInfo").textContent = d.error ? d.error : `${ZMD.length} email terbaru`; zmRender(); }
+  catch (e) { $("#zmInfo").textContent = e.message; if (!ZMD.length) $("#zmList").innerHTML = ""; }
+}
+function zmRender() {
+  $("#zmList").innerHTML = ZMD.map((x, i) => `<a class="${x.baru ? "baru" : ""}" data-zm="${i}" role="button" tabindex="0"><span class="dr"><b>${esc(x.dari || x.email)}</b><span>${esc(String(x.waktu).slice(0, 16).replace("T", " "))}</span></span><span class="sj">${esc(x.subjek)}</span><span class="rk">${esc(x.ringkas)}</span></a>`).join("")
+    || '<p class="mu" style="font-size:13px">Belum ada email.</p>';
+}
+$("#zmList").onclick = async e => { const a = e.target.closest("[data-zm]"); if (!a) return; const x = ZMD[+a.dataset.zm];
+  $("#zmJudul").textContent = x.subjek; $("#zmDari").textContent = `${x.dari} <${x.email}> · ${String(x.waktu).slice(0, 16).replace("T", " ")}`;
+  if ($("#zmBox").parentNode !== document.body) document.body.appendChild($("#zmBox"));
+  $("#zmIsi").srcdoc = '<p style="font:14px system-ui;color:#666;padding:16px">Memuat…</p>'; $("#zmBox").hidden = false;
+  try { const d = await api(`/api/zoho/pesan?folder=${encodeURIComponent(x.folder)}&id=${encodeURIComponent(x.id)}`);
+    $("#zmIsi").srcdoc = '<base target="_blank"><meta charset="utf-8"><style>body{font:14px/1.55 system-ui,sans-serif;color:#141B2B;padding:16px;margin:0;word-wrap:break-word}img{max-width:100%;height:auto}</style>' + d.html;
+    x.baru = false; zmRender(); }
+  catch (er) { $("#zmIsi").srcdoc = '<p style="font:14px system-ui;color:#B5483A;padding:16px">' + esc(er.message) + "</p>"; } };
+$("#zmTutup").onclick = () => { $("#zmBox").hidden = true; $("#zmIsi").srcdoc = ""; };
+$("#zmBox").onclick = e => { if (e.target.id === "zmBox") $("#zmTutup").click(); };
+$("#zmSegar").onclick = () => zmMuat(true);
+$("#zhHubung").onclick = async () => { const k = $("#zhKode").value.trim(); if (!k) return $("#zhKode").focus(); $("#zhHubung").disabled = true;
+  const r = await pnKirim({aksi: "zoho_hubung", kode: k}, "Email Zoho terhubung"); $("#zhHubung").disabled = false; if (r) $("#zhKode").value = ""; };
+function pnZoho(d) { const z = d.zoho || {}; $("#zhScope").textContent = z.scope || ""; $("#zhSt").innerHTML = z.siap ? '<span class="ch g">terhubung</span>' : '<span class="ch n">belum terhubung</span>'; }
+const rpUsd = (t, kurs) => esc(t).replace(/\$(\d+(?:[.,]\d+)?)/g, (m, n) => { const v = parseFloat(n.replace(",", ".")) * kurs; return `${m} <small class="mu" style="white-space:nowrap">(≈Rp${Math.round(v).toLocaleString("id-ID")})</small>`; });
 
 /* ================= MULAI ================= */
 (async () => {

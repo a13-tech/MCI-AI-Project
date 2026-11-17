@@ -12404,10 +12404,13 @@ KUNCI_DAFTAR = [   # (nama env, label, kelompok, cara uji). Token login, SECRET_
     ("MISTRAL_API_KEY", "Mistral", "Lainnya", "mistral"),
     ("CF_ACCOUNT_ID", "Cloudflare: Account ID (gambar + cadangan)", "Studio Gambar", ""),
     ("CF_API_TOKEN", "Cloudflare: API Token", "Studio Gambar", "cloudflare"),
+    ("ZOHO_CLIENT_ID", "Zoho: Client ID", "Email Zoho", ""),
+    ("ZOHO_CLIENT_SECRET", "Zoho: Client Secret", "Email Zoho", ""),
+    ("ZOHO_REFRESH_TOKEN", "Zoho: Refresh token (terisi otomatis lewat tombol Hubungkan)", "Email Zoho", "zoho"),
     ("R2_ACCESS_KEY_ID", "R2 Access Key ID", "Dokumentasi Video", ""),
     ("R2_SECRET_ACCESS_KEY", "R2 Secret Access Key", "Dokumentasi Video", "r2"),
 ]
-TEKS_DAFTAR = [("R2_BUCKET", "Nama bucket R2 (kosong = mci-dokumentasi)"), ("GROQ_MODEL", "ID model Groq"), ("NVIDIA_MODEL", "ID model NVIDIA"), ("MISTRAL_MODEL", "ID model Mistral")]   # bukan rahasia
+TEKS_DAFTAR = [("ZOHO_DC", "Pusat data Zoho (com / in / eu, kosong = com)"), ("R2_BUCKET", "Nama bucket R2 (kosong = mci-dokumentasi)"), ("GROQ_MODEL", "ID model Groq"), ("NVIDIA_MODEL", "ID model NVIDIA"), ("MISTRAL_MODEL", "ID model Mistral")]   # bukan rahasia
 KUNCI_NAMA = {k for k, *_ in KUNCI_DAFTAR} | {k for k, _ in TEKS_DAFTAR}
 
 FITUR_DAFTAR = [
@@ -12633,6 +12636,13 @@ def _uji_kunci(cara, nilai):
         req = urllib.request.Request(MESIN_LAIN[cara]["url"].replace("/chat/completions", "/models"), headers={"Authorization": f"Bearer {nilai}", "User-Agent": "MCI-HQ/1.0"})
     elif cara == "cloudflare":
         req = urllib.request.Request("https://api.cloudflare.com/client/v4/user/tokens/verify", headers={"Authorization": f"Bearer {nilai}"})
+    elif cara == "zoho":
+        try:
+            _ZOHO.update(token="", habis=0, akun="")
+            zoho_akun()
+            return True, "tersambung ke Zoho Mail"
+        except Exception as e:
+            return False, str(e)[:160]
     elif cara == "r2":   # coba daftar 1 isi bucket memakai Account ID + Access Key ID + Secret yang sekarang terpasang
         if not r2_siap():
             return False, "Account ID, Access Key ID, dan Secret harus terisi semua"
@@ -12666,7 +12676,7 @@ def panel_data():
                                                              "istirahat": max(0, int(_CAD_ISTIRAHAT.get(k, 0) - time.time()))} for k, n in CADANGAN_SEMUA]},
             "hemat": {"router": STATS.get("router_hemat", 0), "cache": STATS.get("cache_hit", 0), "pi_cache": PI_CACHE_STAT["kena"], "pi_lokal": PI_CACHE_STAT["lokal"],
                       "graf": dict(GRAF_HEMAT)},
-            "harga": harga_list(), "harga_per": HARGA_PER, "kabar": SET.get("kabar"), "kabar_kat": {k: v[0] for k, v in KABAR_KAT.items()},
+            "harga": harga_list(), "harga_per": HARGA_PER, "kurs": int(SET.get("kurs_usd") or 16500), "zoho": {"siap": zoho_siap(), "scope": ZOHO_SCOPE}, "kabar": SET.get("kabar"), "kabar_kat": {k: v[0] for k, v in KABAR_KAT.items()},
             **kuota_data()}
 
 
@@ -12705,6 +12715,17 @@ def api_panel():
             else:
                 SET.setdefault("model_tugas", {})[t] = p
             panel_catat(f"Model {MODEL_TUGAS[t]['judul']}: {dict((a, b) for a, b, _ in MODEL_TUGAS[t]['pilihan'])[p]}")
+        elif aksi == "zoho_hubung":
+            kode = str(d.get("kode") or "").strip()
+            if not re.fullmatch(r"[\w.\-]{20,300}", kode):
+                return jsonify({"error": "Kode tidak valid. Salin kode dari Zoho API Console (Self Client → Generate Code)."}), 400
+            if not (os.getenv("ZOHO_CLIENT_ID") and os.getenv("ZOHO_CLIENT_SECRET")):
+                return jsonify({"error": "Simpan Client ID dan Client Secret dulu."}), 400
+            try:
+                zoho_hubung(kode)
+            except Exception as e:
+                return jsonify({"error": str(e)[:300]}), 400
+            panel_catat("Email Zoho dihubungkan")
         elif aksi == "harga_simpan":
             try:
                 panel_catat(harga_simpan(d.get("row") or {}))
@@ -13770,6 +13791,112 @@ def harga_simpan(d):
         raise ValueError("Maksimal 60 baris")
     L.append({"id": secrets.token_hex(4), **row})
     return f"Harga ditambah: {row['nama']}"
+
+
+# =================== EMAIL ZOHO di Inbox web (khusus CEO): dibaca lewat API Zoho Mail, tidak disimpan di database ===================
+ZOHO_SCOPE = "ZohoMail.accounts.READ,ZohoMail.messages.READ"
+_ZOHO = {"token": "", "habis": 0.0, "akun": "", "daftar": None, "t_daftar": 0.0}
+
+
+def _zoho_dc():
+    return (os.getenv("ZOHO_DC", "") or "com").strip().lstrip(".") or "com"
+
+
+def _zoho_post_token(params):
+    r = httpx.post(f"https://accounts.zoho.{_zoho_dc()}/oauth/v2/token", data=params, timeout=15)
+    d = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+    if r.status_code >= 400 or d.get("error"):
+        raise RuntimeError(f"Zoho menolak: {d.get('error') or r.status_code}")
+    return d
+
+
+def zoho_siap():
+    return all(os.getenv(k, "").strip() for k in ("ZOHO_CLIENT_ID", "ZOHO_CLIENT_SECRET", "ZOHO_REFRESH_TOKEN"))
+
+
+def zoho_token():
+    if _ZOHO["token"] and time.time() < _ZOHO["habis"]:
+        return _ZOHO["token"]
+    d = _zoho_post_token({"client_id": os.getenv("ZOHO_CLIENT_ID", "").strip(), "client_secret": os.getenv("ZOHO_CLIENT_SECRET", "").strip(),
+                          "grant_type": "refresh_token", "refresh_token": os.getenv("ZOHO_REFRESH_TOKEN", "").strip()})
+    _ZOHO["token"], _ZOHO["habis"] = d["access_token"], time.time() + int(d.get("expires_in") or 3600) - 120
+    return _ZOHO["token"]
+
+
+def zoho_api(path, params=None):
+    r = httpx.get(f"https://mail.zoho.{_zoho_dc()}/api{path}", params=params, timeout=15,
+                  headers={"Authorization": f"Zoho-oauthtoken {zoho_token()}", "Accept": "application/json"})
+    try:
+        d = r.json()
+    except ValueError:
+        d = {}
+    if r.status_code >= 400:
+        st = (d.get("status") or {}) if isinstance(d, dict) else {}
+        raise RuntimeError(f"API Zoho Mail menolak ({r.status_code}): {st.get('description') or st.get('message') or 'tidak diizinkan'}")
+    return d.get("data")
+
+
+def zoho_akun():
+    if not _ZOHO["akun"]:
+        akun = zoho_api("/accounts") or []
+        if not akun:
+            raise RuntimeError("Akun Zoho Mail tidak ditemukan")
+        _ZOHO["akun"] = str(akun[0].get("accountId"))
+    return _ZOHO["akun"]
+
+
+def zoho_hubung(kode):
+    """Tukar kode (dari Self Client, berlaku beberapa menit) dengan refresh token, lalu simpan terenkripsi di brankas panel."""
+    d = _zoho_post_token({"client_id": os.getenv("ZOHO_CLIENT_ID", "").strip(), "client_secret": os.getenv("ZOHO_CLIENT_SECRET", "").strip(),
+                          "grant_type": "authorization_code", "code": kode})
+    rt = d.get("refresh_token")
+    if not rt:
+        raise RuntimeError("Zoho tidak memberi refresh token. Buat kode baru lalu langsung tempel (kode cepat kedaluwarsa).")
+    rh = _rahasia_baca()
+    rh.setdefault("kunci", {})["ZOHO_REFRESH_TOKEN"] = _sandi().encrypt(rt.encode()).decode()
+    rh["sidik"] = _sidik()
+    _rahasia_tulis(rh)
+    kunci_terapkan()
+    _ZOHO.update(token="", habis=0, akun="", daftar=None)
+    zoho_akun()   # langsung uji: kalau API diblokir untuk paket gratis, ketahuan sekarang
+
+
+@app.route("/api/zoho/inbox")
+def api_zoho_inbox():
+    need("admin")
+    if not zoho_siap():
+        return jsonify({"siap": False, "items": []})
+    if _ZOHO["daftar"] is not None and time.time() - _ZOHO["t_daftar"] < 90 and not request.args.get("segar"):
+        return jsonify({"siap": True, "items": _ZOHO["daftar"], "akun": os.getenv("ZOHO_EMAIL", "")})
+    try:
+        rows = zoho_api(f"/accounts/{zoho_akun()}/messages/view", {"limit": 30, "sortorder": "false"}) or []
+    except Exception as e:
+        log.warning("Zoho inbox gagal: %s", str(e)[:200])
+        return jsonify({"siap": True, "error": str(e)[:300], "items": _ZOHO["daftar"] or []}), 502
+    out = []
+    for x in rows:
+        try:
+            waktu = datetime.fromtimestamp(int(x.get("receivedTime") or 0) / 1000, WIB).isoformat(timespec="minutes")
+        except (TypeError, ValueError):
+            waktu = ""
+        out.append({"id": str(x.get("messageId")), "folder": str(x.get("folderId")), "subjek": (x.get("subject") or "(tanpa subjek)")[:300],
+                    "dari": (x.get("sender") or "")[:120], "email": (x.get("fromAddress") or "")[:200], "ringkas": (x.get("summary") or "")[:300],
+                    "waktu": waktu, "baru": str(x.get("status")) == "0"})
+    _ZOHO["daftar"], _ZOHO["t_daftar"] = out, time.time()
+    return jsonify({"siap": True, "items": out})
+
+
+@app.route("/api/zoho/pesan")
+def api_zoho_pesan():
+    need("admin")
+    f, m = request.args.get("folder", ""), request.args.get("id", "")
+    if not (f.isdigit() and m.isdigit()) or not zoho_siap():
+        return jsonify({"error": "Permintaan tidak valid"}), 400
+    try:
+        d = zoho_api(f"/accounts/{zoho_akun()}/folders/{f}/messages/{m}/content") or {}
+    except Exception as e:
+        return jsonify({"error": str(e)[:300]}), 502
+    return jsonify({"html": str(d.get("content") or "")[:400_000]})
 
 
 def run_flask():
