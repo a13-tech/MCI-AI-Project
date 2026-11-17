@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>MCI · Mahardika Cakrawala Indonesia</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Instrument+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Instrument+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="icon" href="/aset/favicon.ico"><link rel="apple-touch-icon" href="/aset/app-apple-180.png"><link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#0B1730"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="MCI"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <script>try{if(localStorage.getItem("tema")==="gelap")document.documentElement.dataset.tema="gelap"}catch(e){}</script>
@@ -244,9 +244,12 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 .apx .tp{align-self:flex-start;color:var(--mute);font-size:13px}
 .apxs{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 0}.apxs button{all:unset;cursor:pointer;padding:7px 13px;border-radius:99px;border:1px solid #BFD0F2;background:var(--paper);font-size:13px;font-weight:600;color:#0A2A6B}
 .apxs button:hover{background:#EEF3FC}.apxs button:focus-visible{outline:3px solid #D4AF5A;outline-offset:2px}
+/* MCI Serif: font milik MCI (turunan Source Serif 4, lisensi SIL OFL 1.1, lihat /aset/mci-serif-ofl.txt). U+E000 = simbol cakrawala MCI */
+@font-face{font-family:"MCI Serif";src:url(/aset/mci-serif-roman.woff) format("woff");font-weight:400 600;font-style:normal;font-display:swap}
+@font-face{font-family:"MCI Serif";src:url(/aset/mci-serif-italic.woff) format("woff");font-weight:400 600;font-style:italic;font-display:swap}
 /* ===== Tanya Apex gaya obrolan: daftar obrolan di kiri, sapaan di tengah, kotak tanya besar ===== */
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.ax{--axSerif:'Source Serif 4',Georgia,'Times New Roman',serif;--axSans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+.ax{--axSerif:'MCI Serif',Georgia,'Times New Roman',serif;--axSans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
  display:grid;grid-template-columns:268px 1fr;height:640px;min-height:440px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--paper);font-family:var(--axSans);color:var(--ink)}
 .ax svg{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .axSide{display:flex;flex-direction:column;gap:6px;padding:14px 10px;background:var(--bg);border-right:1px solid var(--line);min-height:0}

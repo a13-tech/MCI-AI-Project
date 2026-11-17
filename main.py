@@ -3151,11 +3151,12 @@ ASET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "aset
 
 @app.route("/aset/<path:f>")
 def aset(f):
-    """Logo & ikon (publik, dipakai juga di halaman login). Cache 7 hari."""
-    if not re.fullmatch(r"[a-z0-9-]+\.(webp|png|ico|mp4)", f):
+    """Logo, ikon, dan font MCI Serif (publik, dipakai juga di halaman login). Cache 7 hari; font 1 tahun."""
+    if not re.fullmatch(r"[a-z0-9-]+\.(webp|png|ico|mp4|woff|txt)", f):
         abort(404)
-    r = send_from_directory(ASET_DIR, f)
-    r.headers["Cache-Control"] = "public, max-age=604800"
+    tipe = {"woff": "font/woff", "txt": "text/plain"}.get(f.rsplit(".", 1)[1])
+    r = send_from_directory(ASET_DIR, f, mimetype=tipe) if tipe else send_from_directory(ASET_DIR, f)
+    r.headers["Cache-Control"] = "public, max-age=31536000, immutable" if f.endswith(".woff") else "public, max-age=604800"
     return r
 
 
