@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>MCI · Mahardika Cakrawala Indonesia</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Instrument+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
 <link rel="icon" href="/aset/favicon.ico"><link rel="apple-touch-icon" href="/aset/app-apple-180.png"><link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#0B1730"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="MCI"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <script>try{if(localStorage.getItem("tema")==="gelap")document.documentElement.dataset.tema="gelap"}catch(e){}</script>
@@ -244,6 +244,99 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 .apx .tp{align-self:flex-start;color:var(--mute);font-size:13px}
 .apxs{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 0}.apxs button{all:unset;cursor:pointer;padding:7px 13px;border-radius:99px;border:1px solid #BFD0F2;background:var(--paper);font-size:13px;font-weight:600;color:#0A2A6B}
 .apxs button:hover{background:#EEF3FC}.apxs button:focus-visible{outline:3px solid #D4AF5A;outline-offset:2px}
+/* ===== Tanya Apex gaya obrolan: daftar obrolan di kiri, sapaan di tengah, kotak tanya besar ===== */
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.ax{--axSerif:'Source Serif 4',Georgia,'Times New Roman',serif;--axSans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+ display:grid;grid-template-columns:268px 1fr;height:640px;min-height:440px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--paper);font-family:var(--axSans);color:var(--ink)}
+.ax svg{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.axSide{display:flex;flex-direction:column;gap:6px;padding:14px 10px;background:var(--bg);border-right:1px solid var(--line);min-height:0}
+.axBaru{all:unset;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer;color:var(--ink)}
+.axBaru svg{width:18px;height:18px;padding:3px;border-radius:99px;background:var(--navy2);color:#fff;stroke-width:2.2}
+.axBaru:hover{background:var(--hov)}
+.axCariW{display:flex;align-items:center;gap:8px;margin:2px 4px 8px;padding:0 10px;border-radius:9px;border:1px solid var(--line);background:var(--paper);color:var(--mute)}
+.axCariW svg{width:15px;height:15px;flex:none}
+.axCariW input{all:unset;flex:1;min-width:0;padding:8px 0;font-size:13.5px;color:var(--ink)}
+.axDaftar{flex:1;overflow:auto;min-height:0;padding:0 2px}
+.axGrup{font-size:12px;font-weight:500;color:var(--mute);padding:14px 10px 6px}
+.axIt{display:flex;align-items:center;border-radius:9px;position:relative}
+.axIt>button:first-child{all:unset;flex:1;min-width:0;padding:8px 10px;font-size:13.5px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;color:var(--ink)}
+.axIt:hover,.axIt.on{background:var(--hov)}.axIt.on>button:first-child{font-weight:500}
+.axIt .axAksi{display:none;gap:2px;padding-right:4px}.axIt:hover .axAksi,.axIt.on .axAksi,.axIt:focus-within .axAksi{display:flex}
+.axAksi button{all:unset;display:grid;place-items:center;width:26px;height:26px;border-radius:7px;color:var(--mute);cursor:pointer}
+.axAksi button:hover{background:var(--line);color:var(--ink)}.axAksi svg{width:14px;height:14px}
+.axKosongDaftar{font-size:13px;color:var(--mute);padding:10px 12px;line-height:1.5}
+.axKuota{font-size:12px;color:var(--mute);padding:10px 12px 2px;border-top:1px solid var(--line)}
+.axKuota i{display:block;height:4px;border-radius:9px;background:var(--line);margin-top:6px;overflow:hidden}.axKuota i b{display:block;height:100%;background:var(--gold)}
+.axMain{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
+.axTop{display:flex;align-items:center;gap:8px;padding:10px 14px;min-height:52px}
+.axJudul{flex:1;min-width:0;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.axIk{all:unset;display:none;place-items:center;width:36px;height:36px;border-radius:9px;cursor:pointer;color:var(--ink)}.axIk:hover{background:var(--hov)}.axIk svg{width:20px;height:20px}
+.axLog{flex:1;overflow:auto;min-height:0;padding:4px 20px 12px}
+.axKolom,.axDasar{width:100%;max-width:740px;margin:0 auto}
+.axM{margin:0 0 26px}
+.axU{display:flex;justify-content:flex-end}
+.axU div{max-width:min(82%,560px);padding:10px 16px;border-radius:18px;background:var(--hov);font-size:15px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+.axA .axIsi{font-family:var(--axSerif);font-size:17px;line-height:1.68;word-break:break-word;font-optical-sizing:auto}
+.axIsi p{margin:0 0 .8em}.axIsi p:last-child{margin-bottom:0}
+.axIsi h3,.axIsi h4{font-family:var(--axSerif);font-weight:600;margin:1.1em 0 .4em;line-height:1.3}.axIsi h3{font-size:20px}.axIsi h4{font-size:17.5px}
+.axIsi ul,.axIsi ol{margin:0 0 .8em;padding-left:1.4em}.axIsi li{margin:.25em 0}
+.axIsi code{font:13.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--hov);padding:1px 5px;border-radius:5px}
+.axIsi pre{margin:.6em 0 1em;padding:14px 16px;border-radius:12px;background:var(--bg);border:1px solid var(--line);overflow:auto}.axIsi pre code{background:none;padding:0;font-size:13px}
+.axIsi a{color:var(--judul);text-decoration:underline;text-underline-offset:2px;word-break:break-all}
+.axIsi table{border-collapse:collapse;margin:.4em 0 1em;font-family:var(--axSans);font-size:14px;display:block;overflow:auto;max-width:100%}
+.axIsi th,.axIsi td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}.axIsi th{background:var(--bg);font-weight:600}
+.axA.galat .axIsi{color:#B42318;font-family:var(--axSans);font-size:15px}
+.axKursor{display:inline-block;width:.5em;height:1em;margin-left:2px;vertical-align:-.12em;background:var(--gold);border-radius:2px;animation:axKedip 1s steps(2) infinite}
+@keyframes axKedip{50%{opacity:0}}
+.axCek{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--mute)}
+.axCek svg{width:30px;height:20px;color:var(--gold);stroke-width:2.2}.axCek svg path:first-child{stroke-dasharray:52;animation:axTerbit 1.6s ease-in-out infinite}
+@keyframes axTerbit{0%{stroke-dashoffset:52}60%,100%{stroke-dashoffset:0}}
+.axBawah{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-top:10px;font-size:12px;color:var(--mute)}
+.axBawah button{all:unset;display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:7px;cursor:pointer}
+.axBawah button:hover{background:var(--hov);color:var(--ink)}.axBawah svg{width:14px;height:14px}
+.axAlat{padding:3px 9px;border-radius:99px;border:1px solid var(--line);font-size:11.5px}
+.axSapa{display:none;text-align:center;padding:0 20px 26px}
+.axSapa h2{font-family:var(--axSerif);font-weight:400;font-size:clamp(28px,4.2vw,40px);letter-spacing:-.01em;line-height:1.15;margin:10px 0 0;color:var(--judul)}
+.axTanda{width:52px;height:36px;color:var(--gold);stroke-width:2.4}
+.axDasar{padding:0 20px 14px}
+.axKotak{display:block;border:1px solid var(--line2);border-radius:20px;background:var(--paper);padding:14px 14px 10px 18px;box-shadow:0 1px 2px rgba(15,25,45,.04),0 6px 22px rgba(15,25,45,.06);transition:border-color .15s}
+.axKotak:focus-within{border-color:var(--gold)}
+.axKotak textarea{all:unset;display:block;width:100%;min-height:26px;max-height:220px;overflow:auto;font:15.5px/1.55 var(--axSans);color:var(--ink);white-space:pre-wrap;word-break:break-word}
+.axKotak textarea::placeholder{color:var(--mute)}
+.axBaris{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:8px}
+.axModelW{position:relative}
+.axModel{all:unset;display:inline-flex;align-items:center;gap:4px;padding:6px 8px 6px 10px;border-radius:9px;font-size:13px;color:var(--mute);cursor:pointer}
+.axModel:hover,.axModel[aria-expanded=true]{background:var(--hov);color:var(--ink)}.axModel svg{width:15px;height:15px}
+.axMenuModel{position:absolute;right:0;bottom:calc(100% + 6px);z-index:20;min-width:240px;padding:6px;border-radius:14px;border:1px solid var(--line);background:var(--paper);box-shadow:0 10px 30px rgba(15,25,45,.16)}
+.axMenuModel button{all:unset;display:flex;flex-direction:column;gap:1px;width:calc(100% - 20px);padding:8px 10px;border-radius:9px;cursor:pointer;font-size:13.5px;font-weight:500;position:relative}
+.axMenuModel button small{font-size:12px;font-weight:400;color:var(--mute)}
+.axMenuModel button:hover:not(:disabled){background:var(--hov)}.axMenuModel button:disabled{opacity:.45;cursor:not-allowed}
+.axMenuModel button[aria-selected=true]::after{content:"";position:absolute;right:10px;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:9px;background:var(--gold)}
+.axKirim{all:unset;display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--navy2);color:#fff;cursor:pointer}
+.axKirim svg{width:18px;height:18px;stroke-width:2.2}.axKirim:disabled{opacity:.35;cursor:not-allowed}
+.axSaran{display:none;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:16px}
+.axSaran button{all:unset;cursor:pointer;padding:8px 14px;border-radius:12px;border:1px solid var(--line);font-size:13.5px;color:var(--ink);background:var(--paper)}
+.axSaran button:hover{background:var(--hov)}
+.axCatat{margin:8px 0 0;text-align:center;font-size:11.5px;color:var(--mute)}
+.ax.kosong .axLog{display:none}.ax.kosong .axMain{justify-content:center}.ax.kosong .axSapa{display:block}.ax.kosong .axSaran{display:flex}.ax.kosong .axTop{position:absolute;top:0;left:0;right:0}
+.ax.kosong .axCatat{visibility:hidden}
+.ax .apu .cd{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 14px;font-size:14px}.ax .apu .cd span{flex:1 1 260px}
+.ax button:focus-visible,.ax input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+:root[data-tema=gelap] .axBaru svg,:root[data-tema=gelap] .axKirim{background:#E6E9EF;color:#0B1730}
+:root[data-tema=gelap] .axKotak{box-shadow:none}
+@media (max-width:860px){
+ .ax{grid-template-columns:1fr;border-radius:14px}
+ .axSide{position:absolute;z-index:30;top:0;bottom:0;left:0;width:min(300px,86%);transform:translateX(-102%);transition:transform .2s ease;box-shadow:0 0 40px rgba(0,0,0,.18)}
+ .ax{position:relative}.ax.buka .axSide{transform:none}
+ .axTirai{position:absolute;inset:0;z-index:25;background:rgba(10,16,28,.35)}
+ .axIk{display:grid}.axLog{padding:4px 14px 10px}.axDasar{padding:0 12px 12px}
+ .axA .axIsi{font-size:16.5px}.axIt .axAksi{display:flex}
+}
+.ax .axKotak textarea,.ax .axCariW input{border:0!important;outline:0!important;background:transparent!important;box-shadow:none!important;border-radius:0!important;resize:none}
+.ax .axKotak textarea{padding:0!important}.ax .axCariW input{padding:8px 0!important}
+#p-apex>.exw{display:none}
+@media (max-width:900px){body:has(#p-apex:not([hidden])) #fabCatat{display:none}}
+@media (prefers-reduced-motion:reduce){.axKursor,.axCek svg path:first-child{animation:none}.axSide{transition:none}}
 
 /* =================== TEMA MCI: elegan, mengikuti logo (navy · perak · kuningan) =================== */
 :root{--navy:#14284B;--navy2:#0F1E3A;--ink:#1B2335;--mute:#5E6678;--line:#E4DFD3;--line2:#D6D0C2;--bg:#F6F4EF;--paper:#FFFFFF;--gold:#A88A55;--gold2:#D9C49A;--silver:#C9CED6;--serif:'Cormorant Garamond',Georgia,'Times New Roman',serif}
@@ -943,7 +1036,7 @@ details.cara p{line-height:1.65}
  <button class="nv" data-p="perpus">Perpustakaan</button>
  <button class="ng" type="button">AI &amp; Lab</button>
  <button class="nv" data-p="cmd">Command Center</button>
- <button class="nv" data-p="apex" id="nvApex">Tanya Apex</button>
+ <button class="nv" data-p="apex" id="nvApex">MCI Copilot</button>
  <button class="nv" data-p="office">Virtual Office</button>
  <button class="nv" data-p="iot">Lab IoT</button>
  <button class="nv" data-p="panduan">Buku Panduan Rakit</button>
@@ -1612,16 +1705,39 @@ details.cara p{line-height:1.65}
  </section>
 
  <section id="p-apex" class="pg" hidden>
-  <h1>Tanya Apex</h1>
-  <p class="mu">Khusus kamu (token admin). Apex bisa <b>membaca</b> data MCI lewat alat: stok gudang, produk, kas, invoice, hutang, iuran, anggota, blacklist, catatan, perpustakaan, sensor IoT, dan status bot. Dia cek datanya dulu baru menjawab, dan label di bawah jawaban menunjukkan apa saja yang dia cek. Apex tidak pernah membuka token atau foto bukti. Apex bisa <b>mengusulkan</b> catatan kas, tugas, atau catatan pribadi; usulannya muncul sebagai kartu dan baru dijalankan setelah kamu menekan Setujui.</p>
-  <div class="cd">
-   <div class="seg" id="apxModel" role="radiogroup" aria-label="Model AI" style="margin:0 0 12px;background:#EFECE4;flex-wrap:wrap"></div>
-   <div class="apu" id="apxUsul" aria-live="polite"></div>
-   <div class="apx" id="apxLog" aria-live="polite"></div>
-   <div class="apxs" id="apxSaran"></div>
-   <div class="bar" style="margin:12px 0 0;align-items:flex-end"><textarea id="apxIn" rows="2" maxlength="1500" placeholder="Tanya apa saja, misal: LED sisa berapa?" style="flex:1 1 60%;min-width:220px" aria-label="Pertanyaan untuk Apex"></textarea>
-    <button class="bt g" type="button" id="apxKirim">Kirim</button><button class="bt o" type="button" id="apxHapus">Obrolan baru</button></div>
-   <div class="mu" id="apxMsg" style="font-size:12.5px;margin-top:6px">Enter = kirim · Shift+Enter = baris baru. Obrolan tersimpan di server, jadi tetap ada walau halaman dimuat ulang atau modelnya diganti. "Obrolan baru" mengosongkan.</div>
+  <h1 class="sr">MCI Copilot</h1>
+  <div class="ax kosong" id="ax">
+   <aside class="axSide" id="axSide" aria-label="Daftar obrolan">
+    <button type="button" class="axBaru" id="axBaru"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>Obrolan baru</button>
+    <label class="axCariW"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5"/><path d="m13 13 3.5 3.5"/></svg><input id="axCari" type="search" placeholder="Cari obrolan" aria-label="Cari obrolan"></label>
+    <nav class="axDaftar" id="axDaftar"></nav>
+    <div class="axKuota" id="axKuota"></div>
+   </aside>
+   <div class="axTirai" id="axTirai" hidden></div>
+   <div class="axMain">
+    <header class="axTop">
+     <button type="button" class="axIk" id="axMenu" aria-label="Buka daftar obrolan" aria-controls="axSide"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13"/></svg></button>
+     <span class="axJudul" id="axJudul"></span>
+     <button type="button" class="axIk axBaruKecil" id="axBaru2" aria-label="Obrolan baru"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></button>
+    </header>
+    <div class="axLog" id="apxLog" aria-live="polite"><div class="axKolom"><div class="apu" id="apxUsul"></div><div id="axPesan"></div></div></div>
+    <div class="axSapa" id="axSapa">
+     <svg class="axTanda" viewBox="0 0 48 32" aria-hidden="true"><path d="M8 24a16 16 0 0 1 32 0"/><path d="M2 28h44"/><path d="M24 2v4M10.5 7.5l2.8 2.8M37.5 7.5l-2.8 2.8"/></svg>
+     <h2 id="axSapaTeks">Selamat datang</h2>
+    </div>
+    <div class="axDasar">
+     <form class="axKotak" id="axForm">
+      <textarea id="apxIn" rows="1" maxlength="1500" placeholder="Tanya apa saja ke MCI Copilot" aria-label="Pertanyaan untuk MCI Copilot"></textarea>
+      <div class="axBaris">
+       <div class="axModelW"><button type="button" class="axModel" id="axModelBtn" aria-haspopup="listbox" aria-expanded="false"><span id="axModelNama">Gemini Flash</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg></button>
+        <div class="axMenuModel" id="apxModel" role="listbox" aria-label="Model AI" hidden></div></div>
+       <button type="submit" class="axKirim" id="apxKirim" aria-label="Kirim"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4M5 9l5-5 5 5"/></svg></button>
+      </div>
+     </form>
+     <div class="axSaran" id="apxSaran"></div>
+     <p class="axCatat" id="apxMsg">MCI Copilot bisa keliru. Cek ulang angka penting di halaman aslinya.</p>
+    </div>
+   </div>
   </div>
  </section>
 
@@ -2119,7 +2235,7 @@ function show(p) {
   if (p === "invoice") loadInvoice();
   if (p === "info") piBuka();
   if (p === "absen") abMuat();
-  if (p === "apex") { apxRender(); apxMuat(); apxUsul(); setTimeout(() => $("#apxIn").focus(), 50); }
+  if (p === "apex") { apxRender(); apxMuat(); if (ADM()) apxUsul(); setTimeout(() => { axTinggi(); $("#apxIn").focus(); }, 50); }
   if (p === "graf") grafMuat();
   if (p === "hutang") loadHutang();
   if (p === "anggota") loadAnggota();
@@ -3504,7 +3620,7 @@ const EKSPOR = {
     if (d.daftar) t.push({nama: "Absen anggota " + d.hari_ini, kolom: ["Anggota", "Hari ini", "Total hadir", "Bolos"], baris: d.daftar.map(x => [x.nama, x.jam ? "Hadir " + x.jam : x.izin ? "Izin (" + x.izin + ")" : "Belum", x.hadir_total, x.bolos])});
     return t; },
   info: () => [{nama: "Percakapan Pusat Info", kolom: ["Dari", "Pesan"], baris: PI.filter(m => !m.galat).map(m => [m.role === "user" ? "Kamu" : "Pusat Info", m.text || ""])}],
-  apex: () => [{nama: "Percakapan Tanya Apex", kolom: ["Dari", "Pesan"], baris: (APX || []).map(m => [m.role === "user" ? "Kamu" : "Apex", m.text || ""])}],
+  apex: () => [{nama: "Percakapan MCI Copilot", kolom: ["Dari", "Pesan"], baris: (APX || []).map(m => [m.role === "user" ? "Kamu" : "Copilot", m.text || ""])}],
   invoice: () => [exTabel("Invoice", IVD && IVD.items), exKV("Ringkasan", IVD && IVD.ringkas)],
   hutang: () => [exTabel("Hutang", HB && HB.items, ["nama", "jumlah", "status", "tanggal", "catatan"]), exTabel("Sudah dikeluarkan", HB && HB.dikeluarkan)],
   stok: () => [exTabel("Stok barang", STK && STK.items, ["nama", "jumlah", "satuan", "minimum", "kategori", "lokasi"])],
@@ -4074,37 +4190,108 @@ $("#prSave").onclick = async () => {
   $("#prSave").disabled = false;
 };
 
-/* ===== Tanya Apex: chat khusus CEO; Apex memanggil alat baca-saja di server dan menjawab dari data asli ===== */
-const APX_LABEL = {buat_gambar: "🎨 Bikin gambar", buat_model_3d: "🧊 Bikin model 3D", buat_panduan_rakit: "🔧 Bikin panduan rakit", cek_stok: "📦 Stok gudang", cek_produk: "🛒 Katalog produk", cek_kas: "💰 Buku kas", cek_invoice: "🧾 Invoice", cek_hutang: "📒 Hutang", cek_iuran: "💸 Iuran kas", cek_anggota: "👥 Anggota",
-  cek_blacklist: "⛔ Blacklist", cek_catatan: "📝 Catatan", cek_perpustakaan: "📚 Perpustakaan", cek_dokumentasi_dan_voting: "🗳️ Dokumentasi & voting", cek_iot: "📡 Sensor IoT", cek_status_bot: "🤖 Status bot"};
-const APX_SARAN = ["LED sisa berapa?", "Barang apa yang perlu restock?", "Saldo kas sekarang berapa?", "Siapa yang belum bayar kas minggu ini?", "Invoice mana yang belum lunas?", "Siapa yang hutangnya telat?", "Bot mana yang lagi kerja?"];
-let APX = [], APX_BUSY = false, APX_MODEL = [], APX_PILIH = "gemini", APX_MUAT = false;
+/* ===== Tanya Apex gaya obrolan: banyak obrolan per orang, terbuka untuk anggota (alat sesuai izin, kuota harian di server) ===== */
+const APX_LABEL = {buat_gambar: "Bikin gambar", buat_model_3d: "Bikin model 3D", buat_panduan_rakit: "Bikin panduan rakit", cek_stok: "Stok gudang", cek_produk: "Katalog produk", cek_kas: "Buku kas", cek_invoice: "Invoice", cek_hutang: "Hutang", cek_iuran: "Iuran kas", cek_anggota: "Anggota",
+  cek_blacklist: "Blacklist", cek_catatan: "Catatan", cek_perpustakaan: "Perpustakaan", cek_dokumentasi_dan_voting: "Dokumentasi & voting", cek_iot: "Sensor IoT", cek_status_bot: "Status bot", cek_peta: "Peta jaringan",
+  usulkan_kas: "Usulan kas", usulkan_tugas: "Usulan tugas", usulkan_catatan: "Usulan catatan"};
+const APX_SARAN_CEO = ["Barang apa yang perlu restock?", "Saldo kas sekarang berapa?", "Siapa yang belum bayar kas minggu ini?", "Invoice mana yang belum lunas?"];
+const APX_SARAN_ANGGOTA = ["Ide proyek IoT sederhana pakai ESP32", "Jelaskan cara kerja relay", "Buku apa saja di perpustakaan soal Arduino?", "Bikinin panduan rakit sensor suhu"];
+const AX_IK = {salin: '<svg viewBox="0 0 20 20"><rect x="7" y="7" width="9.5" height="9.5" rx="2"/><path d="M13 7V5a1.5 1.5 0 0 0-1.5-1.5h-6A1.5 1.5 0 0 0 4 5v6.5A1.5 1.5 0 0 0 5.5 13H7"/></svg>',
+  ulang: '<svg viewBox="0 0 20 20"><path d="M16 10a6 6 0 1 1-1.8-4.3M16 3.5v3.2h-3.2"/></svg>', ubah: '<svg viewBox="0 0 20 20"><path d="m12.5 4.5 3 3L7 16H4v-3z"/></svg>',
+  hapus: '<svg viewBox="0 0 20 20"><path d="M4.5 6h11M8 6V4.5h4V6M6 6l.7 9.5h6.6L14 6"/></svg>', terbit: '<svg viewBox="0 0 30 20"><path d="M5 16a10 10 0 0 1 20 0"/><path d="M1 18.5h28"/></svg>'};
+let APX = [], APX_BUSY = false, APX_MODEL = [], APX_PILIH = "gemini", APX_MUAT = false, AX_C = "", AX_DAFTAR = [], AX_INFO = {}, AX_CARI = "";
 try { APX_PILIH = localStorage.getItem("apxModel") || "gemini"; } catch (e) {}
-const apxMd = t => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/^\s*[*\-] /gm, "• ")
-  .replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]])/g, u => `<a href="${u}" ${u.startsWith(location.origin) ? "" : 'target="_blank" rel="noopener"'} style="color:var(--judul);text-decoration:underline;word-break:break-all">${u}</a>`);   // link hasil Studio bisa diklik
-const apxNamaModel = id => (APX_MODEL.find(m => m.id === id) || {}).nama || "";
-function apxRender() {
-  const lg = $("#apxLog");
-  $("#apxModel").innerHTML = APX_MODEL.map(m => `<button type="button" data-apm="${m.id}" class="${m.id === APX_PILIH ? "on" : ""}" ${m.siap ? "" : "disabled"} title="${esc(m.ket)}${m.siap ? "" : " · belum aktif"}">${esc(m.nama)}</button>`).join("");
-  lg.innerHTML = (APX.length ? "" : '<div class="m a">Halo Alvaro. Mau cek apa? Stok, kas, invoice, iuran… tinggal tanya, nanti gw cek datanya dulu.</div>')
-    + APX.map(x => x.role === "user" ? `<div class="m u">${esc(x.text)}</div>` : `<div class="m a${x.galat ? " g" : ""}">${apxMd(x.text)}${x.alir ? '<span class="tp" style="display:inline">▍</span>' : ""}${(x.alat || []).length ? `<div class="al">${x.alat.map(a => `<span class="ch n" title="${esc(JSON.stringify(a.arg || {}))}">${esc(APX_LABEL[a.alat] || a.alat)}</span>`).join("")}</div>` : ""}${x.model && apxNamaModel(x.model) ? `<div class="mu" style="font-size:11.5px;margin-top:4px">${esc(apxNamaModel(x.model))}</div>` : ""}</div>`).join("")
-    + (APX_BUSY && !(APX.length && APX[APX.length - 1].alir && APX[APX.length - 1].text) ? '<div class="tp">Apex lagi mengecek data…</div>' : "");
-  lg.scrollTop = lg.scrollHeight; $("#apxKirim").disabled = APX_BUSY; $("#apxSaran").hidden = APX.length > 0;
+
+function axInline(s) {   // s sudah di-escape
+  return s.replace(/`([^`\n]+)`/g, "<code>$1</code>").replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,!?:;]|$)/g, "$1<i>$2</i>")
+    .replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]])/g, u => `<a href="${u}"${u.startsWith(location.origin) ? "" : ' target="_blank" rel="noopener"'}>${u}</a>`);
 }
-async function apxMuat() {
-  if (APX_MUAT) return; APX_MUAT = true;
-  try { const d = await api("/api/apex"); APX_MODEL = d.model; APX = d.riwayat.map(x => ({role: x.role, text: x.text, model: x.model}));
-    if (!APX_MODEL.some(m => m.id === APX_PILIH && m.siap)) APX_PILIH = "gemini"; apxRender(); }
+function axMd(t) {   // markdown ringan & aman: semua teks di-escape dulu
+  const kode = [];
+  t = String(t || "").replace(/```[\w-]*\n?([\s\S]*?)(?:```|$)/g, (m, c) => { kode.push(`<pre><code>${esc(c.replace(/\n$/, ""))}</code></pre>`); return `\n\u0000${kode.length - 1}\u0000\n`; });
+  const baris = t.split("\n"), out = []; let para = [], daftar = null, tabel = [];
+  const tutupPara = () => { if (para.length) { out.push(`<p>${axInline(esc(para.join("\n"))).replace(/\n/g, "<br>")}</p>`); para = []; } };
+  const tutupDaftar = () => { if (daftar) { out.push(`<${daftar.t}>${daftar.i.map(x => `<li>${axInline(esc(x))}</li>`).join("")}</${daftar.t}>`); daftar = null; } };
+  const tutupTabel = () => { if (tabel.length) { const sel = l => l.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map(x => axInline(esc(x.trim())));
+      const isi = tabel.filter(l => !/^\s*\|?[\s:|-]+\|?\s*$/.test(l)), [kep, ...bd] = isi;
+      out.push(`<table><thead><tr>${sel(kep).map(x => `<th>${x}</th>`).join("")}</tr></thead><tbody>${bd.map(l => `<tr>${sel(l).map(x => `<td>${x}</td>`).join("")}</tr>`).join("")}</tbody></table>`); tabel = []; } };
+  const tutup = () => { tutupPara(); tutupDaftar(); tutupTabel(); };
+  for (const l of baris) {
+    let m;
+    if ((m = l.match(/^\u0000(\d+)\u0000$/))) { tutup(); out.push(kode[+m[1]]); }
+    else if (/^\s*\|.*\|\s*$/.test(l)) { tutupPara(); tutupDaftar(); tabel.push(l); }
+    else if ((m = l.match(/^\s{0,3}(#{1,4})\s+(.*)$/))) { tutup(); out.push(`<${m[1].length <= 2 ? "h3" : "h4"}>${axInline(esc(m[2]))}</${m[1].length <= 2 ? "h3" : "h4"}>`); }
+    else if ((m = l.match(/^\s*([-*•]|\d+[.)])\s+(.*)$/))) { tutupPara(); tutupTabel(); const t2 = /\d/.test(m[1]) ? "ol" : "ul"; if (!daftar || daftar.t !== t2) { tutupDaftar(); daftar = {t: t2, i: []}; } daftar.i.push(m[2]); }
+    else if (!l.trim()) tutup();
+    else { tutupDaftar(); tutupTabel(); para.push(l); }
+  }
+  tutup(); return out.join("");
+}
+const apxMd = t => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/^\s*[*\-] /gm, "• ")   // dipakai Pusat Info (gelembung lama)
+  .replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]])/g, u => `<a href="${u}" ${u.startsWith(location.origin) ? "" : 'target="_blank" rel="noopener"'} style="color:var(--judul);text-decoration:underline;word-break:break-all">${u}</a>`);
+const apxNamaModel = id => (APX_MODEL.find(m => m.id === id) || {}).nama || "";
+function axSapaan() {
+  const j = new Date().getHours(), w = j < 11 ? "pagi" : j < 15 ? "siang" : j < 18 ? "sore" : "malam";
+  return `Selamat ${w}, ${AX_INFO.nama || "kamu"}`;
+}
+function axGrupWaktu(w) {
+  if (!w) return "Lebih lama"; const d = new Date(w), h = new Date(); h.setHours(0, 0, 0, 0); const sel = (h - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 864e5;
+  return sel <= 0 ? "Hari ini" : sel < 2 ? "Kemarin" : sel < 7 ? "7 hari terakhir" : sel < 30 ? "30 hari terakhir" : "Lebih lama";
+}
+function axDaftarRender() {
+  const q = AX_CARI.toLowerCase(), L = AX_DAFTAR.filter(o => !q || o.judul.toLowerCase().includes(q)); let g = "", h = "";
+  for (const o of L) { const gw = axGrupWaktu(o.waktu); if (gw !== g) { g = gw; h += `<div class="axGrup">${gw}</div>`; }
+    h += `<div class="axIt${o.id === AX_C ? " on" : ""}"><button type="button" data-axc="${esc(o.id)}" title="${esc(o.judul)}">${esc(o.judul)}</button><span class="axAksi"><button type="button" data-axu="${esc(o.id)}" aria-label="Ganti nama">${AX_IK.ubah}</button><button type="button" data-axh="${esc(o.id)}" aria-label="Hapus obrolan">${AX_IK.hapus}</button></span></div>`; }
+  $("#axDaftar").innerHTML = h || `<p class="axKosongDaftar">${q ? "Tidak ada obrolan yang cocok." : "Belum ada obrolan. Mulai dengan menulis pertanyaan."}</p>`;
+  const k = AX_INFO.kuota;
+  $("#axKuota").innerHTML = !k ? "" : k.tanpa_batas ? "Tanpa batas pesan · Cipher 7.5" : `${Math.max(0, k.batas - k.pakai)} dari ${k.batas} pesan tersisa hari ini<i><b style="width:${k.batas ? Math.min(100, k.pakai / k.batas * 100) : 100}%"></b></i>`;
+}
+function apxRender() {
+  const ax = $("#ax"); if (!ax) return;
+  const kosong = !APX.length; ax.classList.toggle("kosong", kosong);
+  $("#axSapaTeks").textContent = axSapaan();
+  const cur = AX_DAFTAR.find(o => o.id === AX_C); $("#axJudul").textContent = kosong ? "" : (cur ? cur.judul : (APX[0] && APX[0].text || "").slice(0, 60));
+  const pm = APX_MODEL.find(m => m.id === APX_PILIH); $("#axModelNama").textContent = pm ? pm.nama : "Gemini Flash";
+  $("#apxModel").innerHTML = APX_MODEL.map(m => `<button type="button" role="option" data-apm="${m.id}" aria-selected="${m.id === APX_PILIH}" ${m.siap ? "" : "disabled"}>${esc(m.nama)}<small>${esc(m.ket)}${m.siap ? "" : " · belum aktif"}</small></button>`).join("");
+  const akhir = APX.length - 1;
+  $("#axPesan").innerHTML = APX.map((x, i) => x.role === "user" ? `<div class="axM axU"><div>${esc(x.text)}</div></div>`
+    : `<div class="axM axA${x.galat ? " galat" : ""}">${x.alir && !x.text ? `<div class="axCek">${AX_IK.terbit}Copilot lagi mengecek data…</div>` : `<div class="axIsi">${axMd(x.text)}${x.alir ? '<span class="axKursor"></span>' : ""}</div>`}
+      ${x.alir ? "" : `<div class="axBawah">${x.galat ? "" : `<button type="button" data-axsalin="${i}">${AX_IK.salin}Salin</button>`}${i === akhir && AX_C ? `<button type="button" data-axulang>${AX_IK.ulang}Ulangi</button>` : ""}${(x.alat || []).map(a => `<span class="axAlat" title="${esc(JSON.stringify(a.arg || {}))}">${esc(APX_LABEL[a.alat] || a.alat)}</span>`).join("")}${x.model && apxNamaModel(x.model) ? `<span>${esc(apxNamaModel(x.model))}</span>` : ""}</div>`}</div>`).join("");
+  const lg = $("#apxLog"); if (APX_BUSY || lg.dataset.bawah !== "0") lg.scrollTop = lg.scrollHeight;
+  $("#apxKirim").disabled = APX_BUSY || !$("#apxIn").value.trim();
+  $("#apxSaran").innerHTML = (AX_INFO.ceo ? APX_SARAN_CEO : APX_SARAN_ANGGOTA).map(q => `<button type="button">${esc(q)}</button>`).join("");
+  axDaftarRender();
+}
+function axTinggi() {   // panel obrolan setinggi layar yang tersisa
+  const ax = $("#ax"); if (!ax || ax.closest(".pg").hidden) return;
+  const hp = $("#hpNav"), bawah = hp && getComputedStyle(hp).display !== "none" && hp.getBoundingClientRect().top < innerHeight ? innerHeight - hp.getBoundingClientRect().top : 0;
+  ax.style.height = Math.max(440, innerHeight - ax.getBoundingClientRect().top - bawah - 16) + "px";
+}
+addEventListener("resize", () => axTinggi());
+async function apxMuat(c) {
+  if (c === undefined && APX_MUAT) { axTinggi(); return; } APX_MUAT = true;
+  try { const d = await api("/api/apex" + (c ? "?c=" + encodeURIComponent(c) : ""));
+    APX_MODEL = d.model; AX_DAFTAR = d.obrolan; AX_INFO = {kuota: d.kuota, ceo: d.ceo, nama: d.nama};
+    if (c) { AX_C = d.c; APX = d.riwayat.filter(x => x.role === "user" || x.role === "model").map(x => ({role: x.role, text: x.text, model: x.model})); }
+    if (!APX_MODEL.some(m => m.id === APX_PILIH && m.siap)) APX_PILIH = "gemini";
+    apxRender(); axTinggi(); }
   catch (e) { APX_MUAT = false; $("#apxMsg").textContent = e.message; }
 }
-async function apxTanya(teks) {
-  teks = String(teks == null ? $("#apxIn").value : teks).trim(); if (!teks || APX_BUSY) return;
-  APX.push({role: "user", text: teks}); $("#apxIn").value = ""; $("#apxMsg").textContent = ""; APX_BUSY = true;
-  const jwb = {role: "model", text: "", alir: true, model: APX_PILIH}; APX.push(jwb); apxRender();
+function axBaru() { if (APX_BUSY) return; AX_C = ""; APX = []; $("#ax").classList.remove("buka"); $("#axTirai").hidden = true; apxRender(); $("#apxIn").focus(); }
+function axAutoTinggi() { const t = $("#apxIn"); t.style.height = "auto"; t.style.height = Math.min(220, t.scrollHeight) + "px"; $("#apxKirim").disabled = APX_BUSY || !t.value.trim(); }
+async function apxTanya(teks, ulang) {
+  if (APX_BUSY) return;
+  if (ulang) { const u = APX[APX.length - 2]; if (!u || u.role !== "user") return; teks = u.text; APX.splice(APX.length - 1, 1); }
+  else { teks = String(teks == null ? $("#apxIn").value : teks).trim(); if (!teks) return; APX.push({role: "user", text: teks}); $("#apxIn").value = ""; axAutoTinggi(); }
+  $("#apxMsg").textContent = "MCI Copilot bisa keliru. Cek ulang angka penting di halaman aslinya."; APX_BUSY = true;
+  const jwb = {role: "model", text: "", alir: true, model: APX_PILIH}; APX.push(jwb); $("#apxLog").dataset.bawah = "1"; apxRender();
+  const body = ulang ? {ulang: true, c: AX_C, model: APX_PILIH} : {pesan: teks, c: AX_C, model: APX_PILIH};
   let selesai = false;
-  try {   // butir 2: jawaban mengalir (Server-Sent Events lewat fetch)
-    const res = await fetch("/api/apex/alir", {method: "POST", headers: {"X-MCI": "1", "Content-Type": "application/json"}, body: JSON.stringify({pesan: teks, model: APX_PILIH})});
-    if (!res.ok || !res.body || !(res.headers.get("content-type") || "").includes("event-stream")) throw new Error("alir");
+  const beres = isi => { Object.assign(jwb, {text: isi.jawaban, alat: isi.alat, model: isi.model, alir: false}); if (isi.c) AX_C = isi.c; if (isi.kuota) AX_INFO.kuota = isi.kuota; };
+  try {
+    const res = await fetch("/api/apex/alir", {method: "POST", headers: {"X-MCI": "1", "Content-Type": "application/json"}, body: JSON.stringify(body)});
+    if (!res.ok) { let m = "Apex gagal menjawab"; try { m = (await res.json()).error || m; } catch (e) {} throw Object.assign(new Error(m), {keras: true}); }
+    if (!res.body || !(res.headers.get("content-type") || "").includes("event-stream")) throw new Error("alir");
     const rd = res.body.getReader(), dec = new TextDecoder(); let buf = "";
     while (!selesai) {
       const {value, done} = await rd.read(); if (done) break;
@@ -4113,35 +4300,59 @@ async function apxTanya(teks) {
         const blok = buf.slice(0, k); buf = buf.slice(k + 2);
         const ev = (blok.match(/^event: (.+)$/m) || [])[1], dt = (blok.match(/^data: (.*)$/m) || [])[1]; if (!ev || dt == null) continue;
         const isi = JSON.parse(dt);
-        if (ev === "t") { jwb.text += isi; apxRender(); }
-        else if (ev === "selesai") { Object.assign(jwb, {text: isi.jawaban, alat: isi.alat, model: isi.model, alir: false}); selesai = true; }
-        else if (ev === "error") { Object.assign(jwb, {text: "⚠️ " + isi, galat: true, alir: false}); selesai = true; }
+        if (ev === "c") AX_C = isi;
+        else if (ev === "t") { jwb.text += isi; apxRender(); }
+        else if (ev === "selesai") { beres(isi); selesai = true; }
+        else if (ev === "error") { Object.assign(jwb, {text: isi, galat: true, alir: false}); selesai = true; }
       }
     }
     if (!selesai && !jwb.text) throw new Error("alir");
     if (!selesai) jwb.alir = false;
   } catch (e) {
-    if (!jwb.text || e.message === "alir") {   // cadangan: cara lama, jawaban utuh
-      try { const d = await api("/api/apex", {json: {pesan: teks, model: APX_PILIH}}); Object.assign(jwb, {text: d.jawaban, alat: d.alat, model: d.model, alir: false}); }
-      catch (e2) { Object.assign(jwb, {text: "⚠️ " + e2.message, galat: true, alir: false}); }
+    if (e.keras) Object.assign(jwb, {text: e.message, galat: true, alir: false});
+    else if (!jwb.text || e.message === "alir") {   // cadangan: jawaban utuh tanpa streaming
+      try { beres(await api("/api/apex", {json: body})); }
+      catch (e2) { Object.assign(jwb, {text: e2.message, galat: true, alir: false}); }
     } else jwb.alir = false;
   }
-  APX_BUSY = false; apxRender(); $("#apxIn").focus(); apxUsul();
+  APX_BUSY = false; apxRender(); $("#apxIn").focus();
+  try { const d = await api("/api/apex" + (AX_C ? "?c=" + AX_C : "")); AX_DAFTAR = d.obrolan; AX_INFO.kuota = d.kuota; axDaftarRender(); const cur = AX_DAFTAR.find(o => o.id === AX_C); if (cur) $("#axJudul").textContent = cur.judul; } catch (e) {}
+  if (AX_INFO.ceo) apxUsul();
 }
 async function apxUsul() {
+  if (!AX_INFO.ceo && APX_MUAT) { $("#apxUsul").innerHTML = ""; return; }
   try { const d = await api("/api/apex/usul"); const ik = {kas: "💰", tugas: "📋", catatan: "📝"};
-    $("#apxUsul").innerHTML = d.menunggu.map(u => `<div class="cd"><span>${ik[u.jenis] || "•"} <b>Usulan Apex:</b> ${esc(u.ringkas)}</span><button class="bt g" type="button" data-usul="${u.id}" data-a="setujui">Setujui</button><button class="bt o" type="button" data-usul="${u.id}" data-a="tolak">Tolak</button></div>`).join(""); }
-  catch (e) {}
+    $("#apxUsul").innerHTML = d.menunggu.map(u => `<div class="cd"><span>${ik[u.jenis] || "•"} <b>Usulan Copilot:</b> ${esc(u.ringkas)}</span><button class="bt g" type="button" data-usul="${u.id}" data-a="setujui">Setujui</button><button class="bt o" type="button" data-usul="${u.id}" data-a="tolak">Tolak</button></div>`).join(""); }
+  catch (e) { $("#apxUsul").innerHTML = ""; }
 }
 $("#apxUsul").onclick = async e => { const b = e.target.closest("[data-usul]"); if (!b) return; b.disabled = true;
   try { await api("/api/apex/usul", {json: {id: +b.dataset.usul, aksi: b.dataset.a}}); pesan(b.dataset.a === "setujui" ? "Disetujui dan dijalankan" : "Usulan ditolak"); }
   catch (er) { alert(er.message); } apxUsul(); };
-$("#apxModel").onclick = e => { const b = e.target.closest("[data-apm]"); if (!b || b.disabled) return; APX_PILIH = b.dataset.apm; try { localStorage.setItem("apxModel", APX_PILIH); } catch (er) {} apxRender(); };
-$("#apxSaran").innerHTML = APX_SARAN.map(q => `<button type="button">${esc(q)}</button>`).join("");
-$$("#apxSaran button").forEach(b => b.onclick = () => apxTanya(b.textContent));
-$("#apxKirim").onclick = () => apxTanya();
-$("#apxIn").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); apxTanya(); } };
-$("#apxHapus").onclick = async () => { if (APX_BUSY || !confirm("Mulai obrolan baru? Riwayat obrolan ini dihapus.")) return; try { await api("/api/apex", {method: "DELETE"}); } catch (e) {} APX = []; apxRender(); };
+$("#axModelBtn").onclick = e => { e.stopPropagation(); const m = $("#apxModel"), buka = m.hidden; m.hidden = !buka; $("#axModelBtn").setAttribute("aria-expanded", buka); };
+$("#apxModel").onclick = e => { const b = e.target.closest("[data-apm]"); if (!b || b.disabled) return; APX_PILIH = b.dataset.apm; try { localStorage.setItem("apxModel", APX_PILIH); } catch (er) {} $("#apxModel").hidden = true; $("#axModelBtn").setAttribute("aria-expanded", "false"); apxRender(); };
+document.addEventListener("click", e => { const m = $("#apxModel"); if (m && !m.hidden && !e.target.closest(".axModelW")) { m.hidden = true; $("#axModelBtn").setAttribute("aria-expanded", "false"); } });
+$("#apxSaran").onclick = e => { const b = e.target.closest("button"); if (b) apxTanya(b.textContent); };
+$("#axForm").onsubmit = e => { e.preventDefault(); apxTanya(); };
+$("#apxIn").oninput = axAutoTinggi;
+$("#apxIn").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); apxTanya(); } };
+$("#apxLog").onscroll = () => { const lg = $("#apxLog"); lg.dataset.bawah = lg.scrollHeight - lg.scrollTop - lg.clientHeight < 60 ? "1" : "0"; };
+$("#axPesan").onclick = async e => {
+  const s = e.target.closest("[data-axsalin]"), u = e.target.closest("[data-axulang]");
+  if (s) { try { await navigator.clipboard.writeText(APX[+s.dataset.axsalin].text); pesan("Jawaban disalin"); } catch (er) { pesan("Gagal menyalin"); } }
+  if (u) apxTanya(null, true);
+};
+$("#axBaru").onclick = axBaru; $("#axBaru2").onclick = axBaru;
+$("#axMenu").onclick = () => { $("#ax").classList.add("buka"); $("#axTirai").hidden = false; };
+$("#axTirai").onclick = () => { $("#ax").classList.remove("buka"); $("#axTirai").hidden = true; };
+$("#axCari").oninput = e => { AX_CARI = e.target.value.trim(); axDaftarRender(); };
+$("#axDaftar").onclick = async e => {
+  const b = e.target.closest("[data-axc]"), ub = e.target.closest("[data-axu]"), hb = e.target.closest("[data-axh]");
+  if (b && !APX_BUSY) { $("#ax").classList.remove("buka"); $("#axTirai").hidden = true; $("#apxLog").dataset.bawah = "1"; await apxMuat(b.dataset.axc); }
+  if (ub) { const o = AX_DAFTAR.find(x => x.id === ub.dataset.axu); const j = prompt("Nama baru obrolan ini:", o ? o.judul : ""); if (j === null) return;
+    try { const d = await api("/api/apex/judul", {json: {c: ub.dataset.axu, judul: j}}); AX_DAFTAR = d.obrolan; apxRender(); } catch (er) { alert(er.message); } }
+  if (hb && !APX_BUSY) { if (!confirm("Hapus obrolan ini? Tidak bisa dikembalikan.")) return;
+    try { const d = await api("/api/apex?c=" + encodeURIComponent(hb.dataset.axh), {method: "DELETE"}); AX_DAFTAR = d.obrolan; if (hb.dataset.axh === AX_C) { AX_C = ""; APX = []; } apxRender(); pesan("Obrolan dihapus"); } catch (er) { alert(er.message); } }
+};
 apxRender();
 
 
@@ -6806,7 +7017,7 @@ const CH_KATA = {   // sinonim supaya "uang" ketemu Keuangan, "3d" ketemu Studio
   invoice: "tagihan faktur nota", produk: "katalog jualan toko harga", jasa: "layanan pesan jasa website", backup: "cadangan unduh data ekspor",
   uu: "pasal undang aturan peraturan ad art", sidang: "pelanggaran hukuman sidang", putusan: "keputusan sidang vonis", sp: "surat peringatan teguran sanksi", blacklist: "daftar hitam banned",
   studio: "3d stl model cetak print svg kode desain casing", gambar: "foto ilustrasi poster logo canvas ai gambar", konten: "jadwal posting instagram tiktok sosmed", dokumentasi: "foto kegiatan dokumentasi",
-  perpus: "buku pdf perpustakaan bacaan ebook", cmd: "command center perintah bot", apex: "ai chat boss tanya argon hydrogen", office: "kantor virtual 3d bot ai",
+  perpus: "buku pdf perpustakaan bacaan ebook", cmd: "command center perintah bot", apex: "mci copilot ai chat boss tanya apex argon hydrogen", office: "kantor virtual 3d bot ai",
   iot: "sensor esp32 perangkat iot monitor", panduan: "rakit tutorial elektronika arduino esp32 manual", laporan: "laporan mingguan report", memori: "ingatan memory ai",
   skills: "skill kemampuan bot", tim: "token pemakaian bot ai kuota", berita: "news kabar berita hari ini", tentang: "about kontak profil mci"
 };
@@ -7655,6 +7866,8 @@ function pnRender() {
   $("#pnKunci").hidden = true; $("#pnIsi").hidden = false; $("#pnSidik").hidden = d.sidik_cocok !== false;
   ME.fitur_mati = d.fitur.filter(f => !f.aktif).map(f => f.id); ME.hal_mati = d.hal_mati; halMatiAtur();
   $("#pnFitur").innerHTML = d.fitur.map(f => `<div class="pnR"><div class="tx"><b>${esc(f.nama)}</b><small>${esc(f.ket)}</small></div>${pnSk(f.aktif, `data-pnf="${f.id}" aria-label="${esc(f.nama)}"`)}</div>`).join("");
+  $("#pnFitur").insertAdjacentHTML("beforeend", `<div class="pnR"><div class="tx"><b>Kuota MCI Copilot anggota</b><small>Pesan per anggota per hari. 0 = Copilot ditutup untuk anggota. CEO tanpa batas.</small></div><span style="display:flex;gap:6px;align-items:center"><input type="number" id="pnAxK" min="0" max="500" value="${d.apex_kuota ?? 40}" style="width:84px;padding:7px 9px" aria-label="Kuota pesan per hari"><button class="bt o" type="button" id="pnAxKS">Simpan</button></span></div>`);
+  $("#pnAxKS").onclick = () => { const n = parseInt($("#pnAxK").value, 10); if (!(n >= 0 && n <= 500)) return alert("Isi angka 0 sampai 500."); pnKirim({aksi: "apex_kuota", batas: n}, "Kuota Copilot disimpan"); };
   $("#pnModel").innerHTML = d.model.map(m => `<div class="pnR" style="display:block"><b>${esc(m.judul)}</b><small class="mu" style="display:block;font-size:12.5px">${esc(m.ket)}</small><div class="pnM">${m.pilihan.map(x =>
       `<button type="button" class="${x.id === m.dipakai ? "on" : ""}" data-pnm="${m.id}" data-id="${esc(x.id)}" ${x.siap ? "" : "disabled title=\"Kunci belum diisi\""}>${esc(x.nama)}<small>${esc(x.harga)}</small></button>`).join("")}</div></div>`).join("");
   const sumber = s => s === "panel" ? '<span class="ch g">dari panel</span>' : s === "render" ? '<span class="ch">dari Render</span>' : "";
@@ -8012,7 +8225,7 @@ const rpUsd = (t, kurs) => esc(t).replace(/\$(\d+(?:[.,]\d+)?)/g, (m, n) => { co
   if (!PUNYA_INBOX()) ["inbox", "bayarkas"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // viewer tidak punya inbox & iuran
   if (!ADM()) { $("#nvPanel").style.display = "none"; $("#nvGraf").style.display = "none"; }   // Panel CEO & Peta khusus CEO
   if (ME.role !== "viewer" && !(ME.fitur_mati || []).includes("absen")) api("/api/absen").then(d => { AB = d; const nb = $("#nbAbsen"); if (nb) nb.hidden = !(d.status === "belum"); }).catch(() => {});   // tanda "!" kalau belum absen
-  if (!ADM()) $("#nvApex").style.display = "none";   // Tanya Apex khusus token admin
+  if (!ADM() && !ME.anggota) $("#nvApex").style.display = "none";   // Tanya Apex: CEO + anggota (viewer tidak)
   inboxBadge(); setInterval(() => { if (!document.hidden && !layarDiam()) inboxBadge(); }, 20000);
   pasangAI();
   const NP = ME.anggota ? ME.anggota.nama + " · " + ME.anggota.jabatan.join(", ") + (ME.anggota.sp ? " · SP" + ME.anggota.sp : "") : (ME.nama_peran || "Viewer");

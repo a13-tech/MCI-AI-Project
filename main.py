@@ -3292,7 +3292,7 @@ def api_sehat():
 
 
 SET_PRIVAT = {"kuota", "tg_users", "tg_izin", "iuran", "berita_ringkas", "hp_ringan", "argon_anggaran", "argon_harga", "argon_kabar", "vapid",
-              "backup_kunci", "kapal_alarm", "kabar", "harga", "harga_ingat", "neon", "sehat_ingat", "panel_log", "groq_ingat", "model_tugas", "tutup_ingat", "cadangan_absen_2026-11-15"}   # tidak dikirim ke browser lewat /api/me
+              "backup_kunci", "kapal_alarm", "kabar", "harga", "harga_ingat", "neon", "sehat_ingat", "panel_log", "groq_ingat", "model_tugas", "tutup_ingat", "cadangan_absen_2026-11-15", "apex_judul"}   # tidak dikirim ke browser lewat /api/me
 
 
 @app.route("/api/me")
@@ -11238,7 +11238,7 @@ def cek_blacklist(cari: str = "") -> dict:
 def cek_catatan(cari: str = "") -> dict:
     """Cari catatan bersama dan catatan CEO: judul dan isi. cari = kata kunci judul/isi."""
     _alat("cek_catatan", cari=cari)
-    hasil = [x for x in catatan_list("admin") if _cocok(x["judul"] + " " + x["isi"], cari)]
+    hasil = [x for x in catatan_list(_PENANYA.get() or "admin") if _cocok(x["judul"] + " " + x["isi"], cari)]
     return {"jumlah": len(hasil), "hasil": [{"judul": x["judul"], "isi": x["isi"][:600], "pemilik": x["pemilik"], "diubah": x["diubah"]} for x in hasil[:15]]}
 
 
@@ -11253,7 +11253,7 @@ def cek_dokumentasi_dan_voting() -> dict:
     """Cek dokumentasi kegiatan terbaru dan voting/polling yang sedang berjalan atau sudah selesai."""
     _alat("cek_dokumentasi_dan_voting")
     return {"dokumentasi_terbaru": [{k: x[k] for k in ("judul", "tanggal", "keterangan")} for x in dok_list()[:10]],
-            "voting": [{"judul": p["judul"], "status": "selesai" if p["tutup"] else "berjalan", "opsi": p["opsi"], "hasil": p["hasil"], "jumlah_pemilih": p["pemilih"]} for p in polling_list("admin")[:10]]}
+            "voting": [{"judul": p["judul"], "status": "selesai" if p["tutup"] else "berjalan", "opsi": p["opsi"], "hasil": p["hasil"], "jumlah_pemilih": p["pemilih"]} for p in polling_list(_PENANYA.get() or "admin")[:10]]}
 
 
 def cek_iot() -> dict:
@@ -11905,14 +11905,14 @@ def buat_gambar(deskripsi: str) -> dict:
     """Buat GAMBAR (foto/ilustrasi/poster/logo) dengan AI pelukis MCI.Canvas. deskripsi = gambar yang diminta, sedetail mungkin (objek, gaya, warna, latar).
     Gambar dibuat di latar belakang; hasil: link halaman Studio Gambar. Berikan link itu ke CEO apa adanya."""
     _alat("buat_gambar", deskripsi=deskripsi)
-    return studio_mulai("gambar", deskripsi, "admin", "apex")
+    return studio_mulai("gambar", deskripsi, _PENANYA.get() or "admin", "apex")
 
 
 def buat_model_3d(deskripsi: str) -> dict:
     """Buat MODEL 3D siap cetak (STL) di Studio 3D, misalnya casing, braket, dudukan sensor. deskripsi = bentuk, ukuran dalam mm, lubang, ketebalan dinding.
     Dibuat di latar belakang lalu diperiksa mesin; hasil: link halaman Studio 3D. Berikan link itu ke CEO apa adanya."""
     _alat("buat_model_3d", deskripsi=deskripsi)
-    return studio_mulai("3d", deskripsi, "admin", "apex")
+    return studio_mulai("3d", deskripsi, _PENANYA.get() or "admin", "apex")
 
 
 def buat_panduan_rakit(permintaan: str, papan: str = "") -> dict:
@@ -11923,98 +11923,241 @@ def buat_panduan_rakit(permintaan: str, papan: str = "") -> dict:
     p = str(papan or "").lower().strip()
     if p in rakit.PAPAN:
         permintaan = f"{permintaan}\n(Papan yang dipilih: {rakit.PAPAN[p]['nama']})"
-    return studio_mulai("panduan", permintaan, "admin", "apex")
+    return studio_mulai("panduan", permintaan, _PENANYA.get() or "admin", "apex")
 
 
 APEX_ALAT = [cek_stok, cek_produk, cek_kas, cek_invoice, cek_hutang, cek_iuran, cek_anggota, cek_blacklist, cek_catatan, cek_perpustakaan, cek_dokumentasi_dan_voting, cek_iot, cek_status_bot, buat_gambar, buat_model_3d, buat_panduan_rakit]
 
 
-def apex_model_daftar():
-    """Model yang bisa dipilih di Tanya Apex. Semuanya keluarga Gemini karena Apex memakai alat data (function calling)."""
-    return [{"id": "gemini", "nama": "Gemini Flash", "model": MODEL, "siap": bool(client("apex")), "ket": "seimbang"},
+def apex_model_daftar(r="admin"):
+    """Model yang bisa dipilih di Tanya Apex. Semuanya keluarga Gemini karena Apex memakai alat data (function calling). Argon (berbayar) khusus CEO."""
+    L = [{"id": "gemini", "nama": "Gemini Flash", "model": MODEL, "siap": bool(client("apex")), "ket": "seimbang"},
             {"id": "hydrogen", "nama": "Gemini 4 Hydrogen", "model": HYDROGEN_MODEL, "siap": bool(kunci_hydrogen()), "ket": "cepat, ringan"},
             {"id": "argon", "nama": "Gemini 4 Argon", "model": ARGON_MODEL, "siap": bool(kunci_argon()) and ARGON_AKTIF, "ket": "penalaran berat, berbayar"}]
+    return L if is_admin(r) else [m for m in L if m["id"] != "argon"]
 
 
-def _apex_mesin(mid):
-    pil = next((m for m in apex_model_daftar() if m["id"] == mid and m["siap"]), None) or apex_model_daftar()[0]
+def _apex_mesin(mid, r="admin"):
+    pil = next((m for m in apex_model_daftar(r) if m["id"] == mid and m["siap"]), None) or apex_model_daftar(r)[0]
     kunci = kunci_hydrogen() if pil["id"] == "hydrogen" else kunci_argon() if pil["id"] == "argon" else None
     return pil, kunci
 
 
-async def apex_tanya(pesan, riwayat, model_id="gemini", alir=None):
-    """Jalankan satu giliran obrolan. riwayat: format netral [{role, text}] sehingga nyambung walau modelnya ganti. Balik (jawaban, alat, model)."""
+async def apex_tanya(pesan, riwayat, model_id="gemini", alir=None, r="admin"):
+    """Jalankan satu giliran obrolan. riwayat: format netral [{role, text}] sehingga nyambung walau modelnya ganti. Balik (jawaban, alat, model).
+    r = peran penanya: CEO dapat semua alat; anggota hanya alat yang sesuai izin jabatan/divisinya."""
     jejak = []
     _APEX_LOG.set(jejak)
-    _PENANYA.set("admin")   # Tanya Apex khusus CEO
+    _PENANYA.set(r)
     hist = ke_content([h for h in riwayat if isinstance(h, dict)][-APEX_RIWAYAT:])
-    pil, kunci = _apex_mesin(model_id)
-    jawab = await ask("apex", pesan, history=hist, model=pil["model"], act="Menjawab pertanyaan CEO", use_mcp=False, cache=False, fungsi=APEX_ALAT,
-                      sistem=APEX_SISTEM, kunci=kunci, alir=alir)
+    pil, kunci = _apex_mesin(model_id, r)
+    bos = is_admin(r)
+    jawab = await ask("apex", pesan, history=hist, model=pil["model"], act="Menjawab pertanyaan CEO" if bos else "Menjawab pertanyaan anggota", use_mcp=False,
+                      cache=False, fungsi=apex_alat_untuk(r), sistem=apex_sistem_untuk(r), kunci=kunci, alir=alir)
     return jawab, jejak, pil["id"]
 
 
-def _apex_ruang(r):
+# ---------- Tanya Apex: banyak obrolan per orang, terbuka untuk anggota (alat sesuai izin, kuota harian) ----------
+APEX_KUOTA_BAWAAN = 40
+# alat -> izin yang dibutuhkan anggota. None = semua anggota. Tidak terdaftar = khusus CEO (anggota, blacklist, IoT, peta jaringan, usulan aksi).
+APEX_IZIN_ALAT = {"cek_produk": None, "cek_perpustakaan": None, "cek_stok": "stok", "cek_kas": "kas", "cek_catatan": "catatan",
+                  "cek_dokumentasi_dan_voting": "dok_lihat", "cek_status_bot": "tim", "cek_invoice": "produk_kelola", "cek_hutang": "hutang",
+                  "cek_iuran": "kas_edit", "buat_gambar": "gambar_buat", "buat_model_3d": None, "buat_panduan_rakit": None}
+
+
+def apex_alat_untuk(r):
+    if is_admin(r):
+        return APEX_ALAT
+    return [f for f in APEX_ALAT if f.__name__ in APEX_IZIN_ALAT and (APEX_IZIN_ALAT[f.__name__] is None or can(APEX_IZIN_ALAT[f.__name__], r))]
+
+
+APEX_COPILOT = (" Di web, halaman obrolan ini bernama MCI Copilot: kalau ditanya namamu di sini, kamu MCI Copilot (ditenagai Apex, sistem Cipher 7.5).")
+
+
+def apex_sistem_untuk(r):
+    if is_admin(r):
+        return APEX_SISTEM + APEX_COPILOT
+    m = member_of(r) or {}
+    jab = ", ".join(JABATAN.get(j, j) for j in m.get("jabatan") or []) or "anggota"
+    alat = ", ".join(f.__name__ for f in apex_alat_untuk(r)) or "(tidak ada)"
+    return (APEX_SISTEM.replace("sedang ngobrol langsung dengan Alvaro (Owner, CEO, dan General Founder MCI; pemilik sistem).",
+                                f"sedang ngobrol dengan {m.get('nama', 'anggota')}, anggota MCI (jabatan: {jab}). Dia BUKAN CEO; jangan panggil dia Bos.")
+            + f" PENTING: alat yang tersedia untuk anggota ini HANYA: {alat}. Kalau dia menanyakan data yang alatnya tidak tersedia (misalnya data anggota, blacklist, "
+              "kas, IoT, atau usulan aksi), jelaskan dengan sopan bahwa akses itu khusus pengurus terkait atau CEO, lalu sarankan menghubungi mereka. "
+              "Jangan menebak isi data yang tidak bisa kamu cek." + APEX_COPILOT)
+
+
+def apex_kuota_batas():
+    try:
+        return max(0, int(SET.get("apex_kuota", APEX_KUOTA_BAWAAN)))
+    except (TypeError, ValueError):
+        return APEX_KUOTA_BAWAAN
+
+
+def _apex_akar(r):
     return f"apex:{mid_of(r) if mid_of(r) is not None else 'admin'}"
 
 
-def _apex_siap():
+def _apex_ruang(r, cid="0"):
+    """cid '0' = obrolan lama (sebelum ada banyak obrolan), tetap terbaca tanpa migrasi."""
+    return _apex_akar(r) if cid == "0" else f"{_apex_akar(r)}:{cid}"
+
+
+def _apex_cid(v):
+    v = str(v or "").strip()
+    return v if v == "0" or re.fullmatch(r"[0-9a-f]{8}", v) else ""
+
+
+def apex_kuota_pakai(r):
+    if is_admin(r):
+        return 0
+    akar = _apex_akar(r)
+    with db() as c:
+        return int(sql(c, "SELECT COUNT(*) FROM chat_riwayat WHERE (ruang=? OR ruang LIKE ?) AND role='user' AND waktu LIKE ?",
+                       (akar, akar + ":%", today() + "%")).fetchone()[0] or 0)
+
+
+def apex_kuota_info(r):
+    if is_admin(r):
+        return {"pakai": 0, "batas": 0, "tanpa_batas": True}
+    return {"pakai": apex_kuota_pakai(r), "batas": apex_kuota_batas(), "tanpa_batas": False}
+
+
+def apex_obrolan(r):
+    """Daftar obrolan milik orang ini: id, judul (ganti nama atau pertanyaan pertama), waktu terakhir, jumlah pesan."""
+    akar, judul = _apex_akar(r), SET.get("apex_judul") or {}
+    with db() as c:
+        rows = sql(c, "SELECT ruang, MAX(waktu), COUNT(*), MAX(id) FROM chat_riwayat WHERE ruang=? OR ruang LIKE ? GROUP BY ruang ORDER BY MAX(id) DESC LIMIT 80",
+                   (akar, akar + ":%")).fetchall()
+        out = []
+        for ru, w, n, _ in rows:
+            pertama = sql(c, "SELECT teks FROM chat_riwayat WHERE ruang=? AND role='user' ORDER BY id LIMIT 1", (ru,)).fetchone()
+            cid = "0" if ru == akar else ru[len(akar) + 1:]
+            t = judul.get(ru) or re.sub(r"\s+", " ", (pertama[0] if pertama else "") or "Obrolan").strip()
+            out.append({"id": cid, "judul": t[:70] + ("…" if len(t) > 70 and not judul.get(ru) else ""), "waktu": w or "", "jumlah": int(n)})
+    return out
+
+
+def _apex_siap(khusus_ceo=False):
+    """CEO selalu boleh. Anggota aktif boleh (kecuali khusus_ceo). Viewer dan orang luar ditolak."""
     r = role()
     if not r:
         abort(401)
-    if not is_admin(r):   # sama dengan aturan menu di web: token admin master atau anggota berjabatan admin (CEO)
+    if is_admin(r):
+        return r
+    if khusus_ceo or not member_of(r):
         abort(403)
     return r
 
 
+def _apex_cek_kuota(r):
+    k = apex_kuota_info(r)
+    if k["tanpa_batas"]:
+        return None
+    if k["batas"] == 0:
+        return "MCI Copilot sedang ditutup untuk anggota oleh CEO."
+    if k["pakai"] >= k["batas"]:
+        return f"Jatah MCI Copilot hari ini sudah habis ({k['batas']} pesan). Reset jam 00.00 WIB."
+    return None
+
+
+def _apex_siapkan(r, d):
+    """Baca body: cid (baru kalau kosong), pesan, atau ulang=true (hapus jawaban terakhir lalu tanya lagi). Balik (cid, ruang, pesan, error)."""
+    cid = _apex_cid(d.get("c")) or secrets.token_hex(4)
+    ruang = _apex_ruang(r, cid)
+    if d.get("ulang"):
+        with db() as c:
+            rows = sql(c, "SELECT id,role,teks FROM chat_riwayat WHERE ruang=? ORDER BY id DESC LIMIT 2", (ruang,)).fetchall()
+            if len(rows) < 2 or rows[0][1] != "model" or rows[1][1] != "user":
+                return cid, ruang, "", "Tidak ada jawaban yang bisa diulang."
+            sql(c, "DELETE FROM chat_riwayat WHERE ruang=? AND id>=?", (ruang, rows[1][0]))
+        return cid, ruang, rows[1][2][:APEX_TEKS], None
+    pesan = str(d.get("pesan") or "").strip()[:APEX_TEKS]
+    return cid, ruang, pesan, (None if pesan else "Tulis pertanyaannya dulu")
+
+
 @app.route("/api/apex", methods=["GET", "POST", "DELETE"])
 def api_apex():
-    """GET: riwayat tersimpan + pilihan model. POST {pesan, model}: satu giliran (tanpa streaming). DELETE: obrolan baru. Khusus CEO."""
+    """GET ?c=id: daftar obrolan + isi obrolan c + pilihan model + kuota. POST {pesan, model, c}: satu giliran tanpa streaming.
+    DELETE ?c=id: hapus satu obrolan. CEO dan anggota (alat sesuai izin)."""
     r = _apex_siap()
-    ruang = _apex_ruang(r)
     if request.method == "GET":
-        return jsonify({"riwayat": riwayat_ambil(ruang, 60), "model": apex_model_daftar()})
+        cid = _apex_cid(request.args.get("c"))
+        return jsonify({"riwayat": riwayat_ambil(_apex_ruang(r, cid), 80) if cid else [], "c": cid, "obrolan": apex_obrolan(r),
+                        "model": apex_model_daftar(r), "kuota": apex_kuota_info(r), "ceo": is_admin(r),
+                        "nama": "Bos" if is_admin(r) else ((member_of(r) or {}).get("nama") or "").split(" ")[0]})
     if request.method == "DELETE":
-        riwayat_hapus(ruang)
-        return jsonify({"ok": True})
+        cid = _apex_cid(request.args.get("c"))
+        if not cid:
+            return jsonify({"error": "Obrolan tidak dikenal"}), 400
+        ru = _apex_ruang(r, cid)
+        riwayat_hapus(ru)
+        if (SET.get("apex_judul") or {}).pop(ru, None):
+            set_save()
+        return jsonify({"ok": True, "obrolan": apex_obrolan(r)})
     d = request.get_json(silent=True) or {}
-    pesan = str(d.get("pesan") or "").strip()[:APEX_TEKS]
-    if not pesan:
-        return jsonify({"error": "Tulis pertanyaannya dulu"}), 400
+    habis = _apex_cek_kuota(r)
+    if habis:
+        return jsonify({"error": habis}), 429
+    cid, ruang, pesan, err = _apex_siapkan(r, d)
+    if err:
+        return jsonify({"error": err}), 400
     if not LOOP:
         return jsonify({"error": "Mesin AI belum siap, coba lagi sebentar."}), 503
     riwayat = riwayat_ambil(ruang, APEX_RIWAYAT)
     try:
-        jawab, jejak, mid = asyncio.run_coroutine_threadsafe(apex_tanya(pesan, riwayat, str(d.get("model") or "gemini")), LOOP).result(120)
+        jawab, jejak, mid = asyncio.run_coroutine_threadsafe(apex_tanya(pesan, riwayat, str(d.get("model") or "gemini"), r=r), LOOP).result(120)
     except Exception as e:
         log.exception("Tanya Apex gagal")
         return jsonify({"error": f"Apex gagal menjawab: {e}"}), 502
     jawab = jawab or "(Apex tidak memberi jawaban. Coba tulis ulang pertanyaannya.)"
     riwayat_tambah(ruang, "user", pesan, mid)
     riwayat_tambah(ruang, "model", jawab, mid)
-    return jsonify({"jawaban": jawab, "alat": jejak, "model": mid})
+    return jsonify({"jawaban": jawab, "alat": jejak, "model": mid, "c": cid, "kuota": apex_kuota_info(r)})
+
+
+@app.route("/api/apex/judul", methods=["POST"])
+def api_apex_judul():
+    r = _apex_siap()
+    d = request.get_json(silent=True) or {}
+    cid, judul = _apex_cid(d.get("c")), re.sub(r"\s+", " ", str(d.get("judul") or "")).strip()[:80]
+    if not cid:
+        return jsonify({"error": "Obrolan tidak dikenal"}), 400
+    J = SET.setdefault("apex_judul", {})
+    if judul:
+        J[_apex_ruang(r, cid)] = judul
+    else:
+        J.pop(_apex_ruang(r, cid), None)
+    if len(J) > 2000:   # jaga ukuran pengaturan
+        for k in list(J)[:len(J) - 2000]:
+            J.pop(k, None)
+    set_save()
+    return jsonify({"ok": True, "obrolan": apex_obrolan(r)})
 
 
 @app.route("/api/apex/alir", methods=["POST"])
 def api_apex_alir():
-    """Butir 2: jawaban Apex mengalir kata per kata (Server-Sent Events). event t = potongan teks, selesai = {jawaban, alat, model}, error = pesan."""
+    """Jawaban mengalir kata per kata (Server-Sent Events). event c = id obrolan, t = potongan teks, selesai = {jawaban, alat, model, c, kuota}, error = pesan."""
     r = _apex_siap()
-    ruang = _apex_ruang(r)
     d = request.get_json(silent=True) or {}
-    pesan = str(d.get("pesan") or "").strip()[:APEX_TEKS]
-    if not pesan:
-        return jsonify({"error": "Tulis pertanyaannya dulu"}), 400
+    habis = _apex_cek_kuota(r)
+    if habis:
+        return jsonify({"error": habis}), 429
+    cid, ruang, pesan, err = _apex_siapkan(r, d)
+    if err:
+        return jsonify({"error": err}), 400
     if not LOOP:
         return jsonify({"error": "Mesin AI belum siap, coba lagi sebentar."}), 503
     riwayat, q = riwayat_ambil(ruang, APEX_RIWAYAT), queue.Queue()
+    q.put(("c", cid))
 
     async def kerja():
         try:
-            jawab, jejak, mid = await apex_tanya(pesan, riwayat, str(d.get("model") or "gemini"), alir=lambda t: q.put(("t", t)))
+            jawab, jejak, mid = await apex_tanya(pesan, riwayat, str(d.get("model") or "gemini"), alir=lambda t: q.put(("t", t)), r=r)
             jawab = jawab or "(Apex tidak memberi jawaban. Coba tulis ulang pertanyaannya.)"
             await asyncio.to_thread(riwayat_tambah, ruang, "user", pesan, mid)
             await asyncio.to_thread(riwayat_tambah, ruang, "model", jawab, mid)
-            q.put(("selesai", {"jawaban": jawab, "alat": jejak, "model": mid}))
+            q.put(("selesai", {"jawaban": jawab, "alat": jejak, "model": mid, "c": cid, "kuota": await asyncio.to_thread(apex_kuota_info, r)}))
         except Exception as e:
             log.exception("Tanya Apex (alir) gagal")
             q.put(("error", f"Apex gagal menjawab: {e}"))
@@ -12681,7 +12824,7 @@ def panel_data():
             "hemat": {"router": STATS.get("router_hemat", 0), "cache": STATS.get("cache_hit", 0), "pi_cache": PI_CACHE_STAT["kena"], "pi_lokal": PI_CACHE_STAT["lokal"],
                       "graf": dict(GRAF_HEMAT)},
             "harga": harga_list(), "harga_per": HARGA_PER, "kurs": int(SET.get("kurs_usd") or 16500), "zoho": {"siap": zoho_siap(), "scope": ZOHO_SCOPE}, "kabar": SET.get("kabar"), "kabar_kat": {k: v[0] for k, v in KABAR_KAT.items()},
-            **kuota_data()}
+            "apex_kuota": apex_kuota_batas(), **kuota_data()}
 
 
 @app.route("/api/panel", methods=["GET", "POST"])
@@ -12746,6 +12889,12 @@ def api_panel():
             u = [k for k in dict.fromkeys(d.get("urut") or []) if k in dict(CADANGAN_SEMUA)]
             SET["cadangan_urut"] = u
             panel_catat("Urutan cadangan: " + (" → ".join(dict(CADANGAN_SEMUA)[k] for k in u) or "semua dimatikan"))
+        elif aksi == "apex_kuota":
+            b = int(d.get("batas") or 0)
+            if not 0 <= b <= 500:
+                return jsonify({"error": "Kuota 0-500 pesan per hari (0 = Apex ditutup untuk anggota)"}), 400
+            SET["apex_kuota"] = b
+            panel_catat(f"Kuota MCI Copilot anggota: {b} pesan/hari")
         elif aksi == "kuota_batas":
             e, b = str(d.get("id") or ""), int(d.get("batas") or 0)
             if e not in dict((a, n) for a, n, _ in KUOTA_JENIS) or not 0 < b <= 1_000_000:
@@ -13183,7 +13332,7 @@ def usul_jalankan(u, r):
 
 @app.route("/api/apex/usul", methods=["GET", "POST"])
 def api_apex_usul():
-    r = _apex_siap()
+    r = _apex_siap(True)
     lst = SET.setdefault("apex_usul", [])
     if request.method == "POST":
         d = request.get_json(silent=True) or {}
