@@ -249,7 +249,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 @font-face{font-family:"MCI Serif";src:url(/aset/mci-serif-italic.woff) format("woff");font-weight:400 600;font-style:italic;font-display:swap}
 /* ===== Tanya Apex gaya obrolan: daftar obrolan di kiri, sapaan di tengah, kotak tanya besar ===== */
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.ax{--axSerif:'MCI Serif',Georgia,'Times New Roman',serif;--axSans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+.ax{--axSerif:'MCI Serif',Georgia,'Times New Roman',serif;--axJudul:'Cormorant Garamond','MCI Serif',Georgia,serif;--axSans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
  display:grid;grid-template-columns:268px 1fr;height:640px;min-height:440px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--paper);font-family:var(--axSans);color:var(--ink)}
 .ax svg{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .axSide{display:flex;flex-direction:column;gap:6px;padding:14px 10px;background:var(--bg);border-right:1px solid var(--line);min-height:0}
@@ -281,7 +281,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 .axU div{max-width:min(82%,560px);padding:10px 16px;border-radius:18px;background:var(--hov);font-size:15px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
 .axA .axIsi{font-family:var(--axSerif);font-size:17px;line-height:1.68;word-break:break-word;font-optical-sizing:auto}
 .axIsi p{margin:0 0 .8em}.axIsi p:last-child{margin-bottom:0}
-.axIsi h3,.axIsi h4{font-family:var(--axSerif);font-weight:600;margin:1.1em 0 .4em;line-height:1.3}.axIsi h3{font-size:20px}.axIsi h4{font-size:17.5px}
+.axIsi h3,.axIsi h4{font-family:var(--axJudul);font-weight:700;margin:1.1em 0 .35em;line-height:1.25}.axIsi h3{font-size:24px}.axIsi h4{font-size:20.5px}
 .axIsi ul,.axIsi ol{margin:0 0 .8em;padding-left:1.4em}.axIsi li{margin:.25em 0}
 .axIsi code{font:13.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--hov);padding:1px 5px;border-radius:5px}
 .axIsi pre{margin:.6em 0 1em;padding:14px 16px;border-radius:12px;background:var(--bg);border:1px solid var(--line);overflow:auto}.axIsi pre code{background:none;padding:0;font-size:13px}
@@ -299,7 +299,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 .axBawah button:hover{background:var(--hov);color:var(--ink)}.axBawah svg{width:14px;height:14px}
 .axAlat{padding:3px 9px;border-radius:99px;border:1px solid var(--line);font-size:11.5px}
 .axSapa{display:none;text-align:center;padding:0 20px 26px}
-.axSapa h2{font-family:var(--axSerif);font-weight:400;font-size:clamp(28px,4.2vw,40px);letter-spacing:-.01em;line-height:1.15;margin:10px 0 0;color:var(--judul)}
+.axSapa h2{font-family:var(--axJudul);font-weight:600;font-size:clamp(32px,4.8vw,46px);letter-spacing:0;line-height:1.12;margin:10px 0 0;color:var(--judul)}
 .axTanda{width:52px;height:36px;color:var(--gold);stroke-width:2.4}
 .axDasar{padding:0 20px 14px}
 .axKotak{display:block;border:1px solid var(--line2);border-radius:20px;background:var(--paper);padding:14px 14px 10px 18px;box-shadow:0 1px 2px rgba(15,25,45,.04),0 6px 22px rgba(15,25,45,.06);transition:border-color .15s}
