@@ -12,7 +12,7 @@ Studio Gambar: Cloudflare Workers AI (FLUX schnell + img2img), gratis 10.000 neu
 """
 import studio3d
 import panduan as rakit
-import os, io, csv, json, re, time, math, gzip, random, base64, asyncio, secrets, logging, sqlite3, threading, contextlib, hashlib, zipfile, queue
+import os, io, csv, json, re, time, math, gzip, random, base64, asyncio, secrets, logging, sqlite3, threading, contextlib, hashlib, hmac, zipfile, queue
 from types import SimpleNamespace
 from collections import deque, OrderedDict
 from datetime import datetime, date, timedelta, timezone
@@ -507,6 +507,12 @@ def db_init():
         try:
             with db() as c:
                 sql(c, f"ALTER TABLE jasa_pesan ADD COLUMN {kol}")
+        except Exception:
+            pass   # sudah ada
+    for kol in ("jenis TEXT", "url TEXT", "ukuran BIGINT"):   # dokumentasi: foto | video (Cloudflare R2) | link (YouTube/Drive/IG/TikTok)
+        try:
+            with db() as c:
+                sql(c, f"ALTER TABLE dokumentasi ADD COLUMN {kol}")
         except Exception:
             pass   # sudah ada
     with db() as c:   # pesanan jasa dari orang luar (form publik /pesan)
@@ -8240,11 +8246,96 @@ def api_polling_aksi(i):
     return jsonify({"items": polling_list(r), "bisa_buat": can("polling_buat", r)})
 
 
-# Dokumentasi: album foto kegiatan. Upload/hapus = divisi Dokumentasi + CEO; lihat = semua anggota.
+# Dokumentasi: album foto + video kegiatan. Upload/hapus = divisi Dokumentasi + CEO; lihat = semua anggota.
+# Foto disimpan di database (kecil). Video TIDAK masuk database: diunggah langsung dari browser ke Cloudflare R2 lewat tautan
+# bertanda tangan (server tidak ikut memikul file besar), lalu diputar dari R2. Video juga bisa berupa link YouTube/Drive/IG/TikTok.
+R2_BUCKET_BAWAAN = "mci-dokumentasi"
+R2_VIDEO_MAKS = int(os.getenv("R2_VIDEO_MAKS_MB", "200")) * 1024 * 1024
+R2_TOTAL_MAKS = int(float(os.getenv("R2_TOTAL_MAKS_GB", "9.5")) * 1024 ** 3)   # jatah gratis R2 = 10 GB
+DOK_MAKS = 300
+
+
+def _r2_cfg():
+    return (os.getenv("CF_ACCOUNT_ID", "") or CF_ACCOUNT or "").strip(), os.getenv("R2_ACCESS_KEY_ID", "").strip(), \
+        os.getenv("R2_SECRET_ACCESS_KEY", "").strip(), (os.getenv("R2_BUCKET", "") or R2_BUCKET_BAWAAN).strip()
+
+
+def r2_siap():
+    return all(_r2_cfg())
+
+
+def _sigv4_url(method, host, path, region, ak, sk, detik, extra=None, t=None):
+    """Tautan bertanda tangan AWS SigV4 (query string, UNSIGNED-PAYLOAD)."""
+    t = t or datetime.utcnow()
+    amz, d = t.strftime("%Y%m%dT%H%M%SZ"), t.strftime("%Y%m%d")
+    scope = f"{d}/{region}/s3/aws4_request"
+    q = {"X-Amz-Algorithm": "AWS4-HMAC-SHA256", "X-Amz-Credential": f"{ak}/{scope}", "X-Amz-Date": amz, "X-Amz-Expires": str(detik), "X-Amz-SignedHeaders": "host", **(extra or {})}
+    cq = "&".join(f"{quote(k, safe='-_.~')}={quote(str(v), safe='-_.~')}" for k, v in sorted(q.items()))
+    creq = "\n".join([method, path, cq, f"host:{host}\n", "host", "UNSIGNED-PAYLOAD"])
+    sts = "\n".join(["AWS4-HMAC-SHA256", amz, scope, hashlib.sha256(creq.encode()).hexdigest()])
+    kk = ("AWS4" + sk).encode()
+    for bagian in (d, region, "s3", "aws4_request"):
+        kk = hmac.new(kk, bagian.encode(), hashlib.sha256).digest()
+    return f"https://{host}{path}?{cq}&X-Amz-Signature={hmac.new(kk, sts.encode(), hashlib.sha256).hexdigest()}"
+
+
+def r2_url(method, key=None, detik=900, extra=None):
+    """Tautan bertanda tangan untuk Cloudflare R2. key=None -> tingkat bucket."""
+    acct, ak, sk, bk = _r2_cfg()
+    path = f"/{bk}" + (("/" + quote(key, safe="/-_.~")) if key else "")
+    return _sigv4_url(method, f"{acct}.r2.cloudflarestorage.com", path, "auto", ak, sk, detik, extra)
+
+
+def r2_panggil(method, key=None, extra=None):
+    import urllib.request
+    req = urllib.request.Request(r2_url(method, key, 300, extra), method=method)
+    with urllib.request.urlopen(req, timeout=20) as f:
+        return f.status, dict(f.headers), f.read() if method == "GET" else b""
+
+
+def dok_link(u):
+    """Link video -> (sumber, embed, thumbnail). None kalau bukan link yang didukung."""
+    u = str(u or "").strip()
+    if not re.match(r"^https://", u) or len(u) > 500:
+        return None
+    m = re.search(r"(?:youtube\.com/(?:watch\?(?:.*&)?v=|shorts/|live/|embed/)|youtu\.be/)([\w-]{11})", u)
+    if m:
+        return "YouTube", f"https://www.youtube-nocookie.com/embed/{m[1]}", f"https://i.ytimg.com/vi/{m[1]}/hqdefault.jpg"
+    m = re.search(r"drive\.google\.com/(?:file/d/|open\?id=)([\w-]{20,})", u)
+    if m:
+        return "Google Drive", f"https://drive.google.com/file/d/{m[1]}/preview", ""
+    m = re.search(r"instagram\.com/(?:[\w.]+/)?(p|reel|reels|tv)/([\w-]+)", u)
+    if m:
+        return "Instagram", f"https://www.instagram.com/{'reel' if m[1].startswith('reel') else m[1]}/{m[2]}/embed", ""
+    m = re.search(r"tiktok\.com/@[\w.-]+/video/(\d+)", u)
+    if m:
+        return "TikTok", f"https://www.tiktok.com/embed/v2/{m[1]}", ""
+    if re.search(r"\.(mp4|webm|mov)(\?|$)", u, re.I):
+        return "Video", u, ""
+    return None
+
+
 def dok_list():
     with db() as c:
-        rows = sql(c, "SELECT id,judul,tanggal,keterangan,oleh,dibuat FROM dokumentasi ORDER BY tanggal DESC, id DESC LIMIT 300").fetchall()
-    return [{"id": int(i), "judul": j, "tanggal": t or "", "keterangan": k or "", "oleh": o or "", "dibuat": d} for i, j, t, k, o, d in rows]
+        rows = sql(c, "SELECT id,judul,tanggal,keterangan,oleh,dibuat,jenis,url,ukuran FROM dokumentasi ORDER BY tanggal DESC, id DESC LIMIT 300").fetchall()
+    out = []
+    for i, j, t, k, o, d, jn, url, uk in rows:
+        x = {"id": int(i), "judul": j, "tanggal": t or "", "keterangan": k or "", "oleh": o or "", "dibuat": d, "jenis": jn or "foto", "ukuran": int(uk or 0)}
+        if x["jenis"] == "link":
+            info = dok_link(url) or ("Link", url, "")
+            x.update(sumber=info[0], embed=info[1], thumb=info[2], url=url)
+        out.append(x)
+    return out
+
+
+def _dok_balas(r):
+    return jsonify({"items": dok_list(), "kelola": can("dok_kelola", r), "video_upload": r2_siap(), "video_maks_mb": R2_VIDEO_MAKS // (1024 * 1024)})
+
+
+def _dok_cek_ruang(c):
+    if int(sql(c, "SELECT COUNT(*) FROM dokumentasi").fetchone()[0]) >= DOK_MAKS:
+        return f"Album penuh ({DOK_MAKS} item). Hapus yang lama dulu."
+    return None
 
 
 @app.route("/api/dokumentasi", methods=["GET", "POST"])
@@ -8253,39 +8344,134 @@ def api_dok():
     if request.method == "POST":
         if not can("dok_kelola", r):
             return jsonify({"error": "Upload dokumentasi khusus tim Dokumentasi dan CEO"}), 403
+        judul = request.form.get("judul", "").strip()[:120] or "Kegiatan MCI"
+        tgl, ket = _tgl(request.form.get("tanggal"), today()), request.form.get("keterangan", "").strip()[:500]
+        link = request.form.get("link", "").strip()
+        if link:
+            if not dok_link(link):
+                return jsonify({"error": "Link belum didukung. Pakai link YouTube, Google Drive (akses: siapa saja yang punya link), Instagram, TikTok, atau file .mp4"}), 400
+            with db() as c:
+                err = _dok_cek_ruang(c)
+                if err:
+                    return jsonify({"error": err}), 400
+                sql(c, "INSERT INTO dokumentasi (judul,tanggal,keterangan,mime,data,oleh,dibuat,jenis,url,ukuran) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (judul, tgl, ket, "", "", nama_peran(r), _now(), "link", link, 0))
+            return _dok_balas(r)
         f = request.files.get("foto")
         if not f:
             return jsonify({"error": "Pilih foto dulu"}), 400
         foto = f.read(2_000_001)
         if len(foto) > 2_000_000 or not (f.mimetype or "").startswith("image/"):
             return jsonify({"error": "Foto harus gambar, maksimal 2 MB"}), 400
-        judul = request.form.get("judul", "").strip()[:120] or "Kegiatan MCI"
         with db() as c:
-            n = sql(c, "SELECT COUNT(*) FROM dokumentasi").fetchone()[0]
-            if int(n) >= 300:
-                return jsonify({"error": "Album penuh (300 foto). Hapus foto lama dulu."}), 400
-            sql(c, "INSERT INTO dokumentasi (judul,tanggal,keterangan,mime,data,oleh,dibuat) VALUES (?,?,?,?,?,?,?)",
-                (judul, _tgl(request.form.get("tanggal"), today()), request.form.get("keterangan", "").strip()[:500], f.mimetype,
-                 base64.b64encode(foto).decode(), nama_peran(r), _now()))
-    return jsonify({"items": dok_list(), "kelola": can("dok_kelola", r)})
+            err = _dok_cek_ruang(c)
+            if err:
+                return jsonify({"error": err}), 400
+            sql(c, "INSERT INTO dokumentasi (judul,tanggal,keterangan,mime,data,oleh,dibuat,jenis) VALUES (?,?,?,?,?,?,?,?)",
+                (judul, tgl, ket, f.mimetype, base64.b64encode(foto).decode(), nama_peran(r), _now(), "foto"))
+    return _dok_balas(r)
+
+
+_VIDEO_EXT = {"video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "video/x-m4v": "m4v", "video/3gpp": "3gp"}
+
+
+@app.route("/api/dokumentasi/video-izin", methods=["POST"])
+def api_dok_video_izin():
+    """Langkah 1 upload video: server memberi tautan PUT sementara (15 menit) ke R2. File tidak lewat server."""
+    r = need_perm("dok_lihat")
+    if not can("dok_kelola", r):
+        return jsonify({"error": "Upload dokumentasi khusus tim Dokumentasi dan CEO"}), 403
+    if not r2_siap():
+        return jsonify({"error": "Upload video belum aktif: kunci Cloudflare R2 belum diisi di Panel CEO. Sementara pakai Tempel link."}), 503
+    d = request.get_json(silent=True) or {}
+    mime, uk = str(d.get("mime") or ""), int(d.get("ukuran") or 0)
+    if mime not in _VIDEO_EXT:
+        return jsonify({"error": "Format video belum didukung (pakai MP4, MOV, WEBM, M4V, atau 3GP)"}), 400
+    if not 0 < uk <= R2_VIDEO_MAKS:
+        return jsonify({"error": f"Video maksimal {R2_VIDEO_MAKS // (1024 * 1024)} MB. Potong atau kecilkan resolusinya dulu, atau unggah ke YouTube lalu tempel link."}), 400
+    with db() as c:
+        err = _dok_cek_ruang(c)
+        terpakai = int(sql(c, "SELECT COALESCE(SUM(ukuran),0) FROM dokumentasi WHERE jenis='video'").fetchone()[0] or 0)
+    if err:
+        return jsonify({"error": err}), 400
+    if terpakai + uk > R2_TOTAL_MAKS:
+        return jsonify({"error": f"Ruang video hampir penuh ({terpakai / 1024 ** 3:.1f} GB dari jatah gratis). Hapus video lama dulu."}), 400
+    key = f"video/{datetime.now(WIB):%Y%m}/{secrets.token_urlsafe(12)}.{_VIDEO_EXT[mime]}"
+    IZIN_VIDEO[key] = {"r": r, "ukuran": uk, "mime": mime, "t": time.time()}
+    for k in [k for k, v in IZIN_VIDEO.items() if time.time() - v["t"] > 3600]:
+        IZIN_VIDEO.pop(k, None)
+    return jsonify({"key": key, "put": r2_url("PUT", key, 900)})
+
+
+IZIN_VIDEO = {}   # key R2 -> siapa yang minta izin (supaya video-selesai tidak bisa dipakai untuk key sembarangan)
+
+
+@app.route("/api/dokumentasi/video-selesai", methods=["POST"])
+def api_dok_video_selesai():
+    """Langkah 2: browser selesai upload ke R2. Server memastikan file benar-benar ada lalu mencatatnya di album."""
+    r = need_perm("dok_lihat")
+    d = request.get_json(silent=True) or {}
+    key = str(d.get("key") or "")
+    izin = IZIN_VIDEO.get(key)
+    if not izin or izin["r"] != r or not can("dok_kelola", r):
+        return jsonify({"error": "Izin upload tidak ditemukan atau kedaluwarsa. Ulangi upload."}), 400
+    try:
+        _st, h, _ = r2_panggil("HEAD", key)
+        uk = int(h.get("Content-Length") or h.get("content-length") or 0)
+    except Exception as e:
+        log.warning("Video R2 tidak ditemukan setelah upload: %s", str(e)[:120])
+        return jsonify({"error": "Video belum sampai di penyimpanan. Coba unggah ulang."}), 400
+    if uk <= 0 or uk > R2_VIDEO_MAKS:
+        try:
+            r2_panggil("DELETE", key)
+        except Exception:
+            pass
+        return jsonify({"error": "Ukuran video tidak sesuai."}), 400
+    poster = ""
+    pm = re.match(r"^data:image/jpeg;base64,([A-Za-z0-9+/=]+)$", str(d.get("poster") or ""))
+    if pm and len(pm[1]) <= 400_000:   # gambar sampul kecil dari browser (frame pertama video)
+        poster = pm[1]
+    with db() as c:
+        sql(c, "INSERT INTO dokumentasi (judul,tanggal,keterangan,mime,data,oleh,dibuat,jenis,url,ukuran) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (str(d.get("judul") or "").strip()[:120] or "Kegiatan MCI", _tgl(d.get("tanggal"), today()), str(d.get("keterangan") or "").strip()[:500],
+             izin["mime"], poster, nama_peran(r), _now(), "video", key, uk))
+    IZIN_VIDEO.pop(key, None)
+    return _dok_balas(r)
 
 
 @app.route("/api/dokumentasi/<int:i>", methods=["GET", "DELETE"])
 def api_dok_one(i):
     r = need_perm("dok_lihat")
     with db() as c:
+        row = sql(c, "SELECT mime, data, jenis, url FROM dokumentasi WHERE id=?", (i,)).fetchone()
         if request.method == "DELETE":
             if not can("dok_kelola", r):
                 return jsonify({"error": "Khusus tim Dokumentasi dan CEO"}), 403
+            if row and row[2] == "video" and row[3] and r2_siap():
+                try:
+                    r2_panggil("DELETE", row[3])
+                except Exception:
+                    log.exception("Gagal menghapus video di R2 (%s)", row[3])
             sql(c, "DELETE FROM dokumentasi WHERE id=?", (i,))
-            return jsonify({"items": dok_list(), "kelola": True})
-        row = sql(c, "SELECT mime, data FROM dokumentasi WHERE id=?", (i,)).fetchone()
+            return _dok_balas(r)
     if not row:
         abort(404)
+    mime, data, jenis, url = row
+    if jenis == "link":
+        return redirect(url)
+    if jenis == "video":
+        if request.args.get("poster"):
+            if not data:
+                abort(404)
+            return foto_kirim(base64.b64decode(data), "image/jpeg", {"Cache-Control": "private, max-age=86400"}, ("dokp", i))
+        if not r2_siap():
+            return jsonify({"error": "Penyimpanan video belum tersambung"}), 503
+        ex = {"response-content-disposition": f'attachment; filename="mci-dokumentasi-{i}.{url.rsplit(".", 1)[-1]}"'} if request.args.get("unduh") else None
+        return redirect(r2_url("GET", url, 3600, ex))   # diputar langsung dari R2 (bisa lompat-lompat), server tidak memikul videonya
     h = {"Cache-Control": "private, max-age=86400"}
     if request.args.get("unduh"):
         h["Content-Disposition"] = f"attachment; filename=mci-dokumentasi-{i}.jpg"
-    return foto_kirim(base64.b64decode(row[1]), row[0], h, ("dok", i))
+    return foto_kirim(base64.b64decode(data), mime, h, ("dok", i))
 
 
 @app.route("/api/hutang", methods=["GET", "POST"])
@@ -12216,8 +12402,10 @@ KUNCI_DAFTAR = [   # (nama env, label, kelompok, cara uji). Token login, SECRET_
     ("MISTRAL_API_KEY", "Mistral", "Lainnya", "mistral"),
     ("CF_ACCOUNT_ID", "Cloudflare: Account ID (gambar + cadangan)", "Studio Gambar", ""),
     ("CF_API_TOKEN", "Cloudflare: API Token", "Studio Gambar", "cloudflare"),
+    ("R2_ACCESS_KEY_ID", "R2 Access Key ID", "Dokumentasi Video", ""),
+    ("R2_SECRET_ACCESS_KEY", "R2 Secret Access Key", "Dokumentasi Video", "r2"),
 ]
-TEKS_DAFTAR = [("GROQ_MODEL", "ID model Groq"), ("NVIDIA_MODEL", "ID model NVIDIA"), ("MISTRAL_MODEL", "ID model Mistral")]   # bukan rahasia
+TEKS_DAFTAR = [("R2_BUCKET", "Nama bucket R2 (kosong = mci-dokumentasi)"), ("GROQ_MODEL", "ID model Groq"), ("NVIDIA_MODEL", "ID model NVIDIA"), ("MISTRAL_MODEL", "ID model Mistral")]   # bukan rahasia
 KUNCI_NAMA = {k for k, *_ in KUNCI_DAFTAR} | {k for k, _ in TEKS_DAFTAR}
 
 FITUR_DAFTAR = [
@@ -12442,6 +12630,10 @@ def _uji_kunci(cara, nilai):
         req = urllib.request.Request(MESIN_LAIN[cara]["url"].replace("/chat/completions", "/models"), headers={"Authorization": f"Bearer {nilai}", "User-Agent": "MCI-HQ/1.0"})
     elif cara == "cloudflare":
         req = urllib.request.Request("https://api.cloudflare.com/client/v4/user/tokens/verify", headers={"Authorization": f"Bearer {nilai}"})
+    elif cara == "r2":   # coba daftar 1 isi bucket memakai Account ID + Access Key ID + Secret yang sekarang terpasang
+        if not r2_siap():
+            return False, "Account ID, Access Key ID, dan Secret harus terisi semua"
+        req = urllib.request.Request(r2_url("GET", None, 120, {"list-type": "2", "max-keys": "1"}))
     else:
         return True, "tidak perlu diuji"
     try:

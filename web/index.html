@@ -838,6 +838,23 @@ details.cara p{line-height:1.65}
 @media (max-width:900px){.obs{height:600px}.obsSide{left:12px;right:12px;width:auto;top:auto;bottom:12px;max-height:58%}.obsSide[hidden]{transform:translateY(calc(100% + 30px))}.obsTop input{width:170px}.obsHint{display:none}}
 .grafG{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
 
+/* Dokumentasi: video & link */
+.gal .vd{position:relative;cursor:pointer;aspect-ratio:1;background:linear-gradient(135deg,#1A2546,#0B1730);display:grid;place-items:center;overflow:hidden}
+.gal .vd img{position:absolute;inset:0;height:100%;cursor:pointer}
+.gal .vd .ply{position:relative;z-index:1;width:46px;height:46px;border-radius:50%;background:rgba(11,23,48,.62);backdrop-filter:blur(4px);border:1.5px solid rgba(255,255,255,.8);display:grid;place-items:center;transition:transform .2s}
+.gal .vd .ply::after{content:"";border-style:solid;border-width:9px 0 9px 15px;border-color:transparent transparent transparent #fff;margin-left:4px}
+.gal .vd:hover .ply{transform:scale(1.08)}
+.gal .vd .src{position:absolute;left:8px;top:8px;z-index:1;font-size:11px;font-weight:600;color:#fff;background:rgba(0,0,0,.45);padding:2px 8px;border-radius:99px}
+.gal .vd .nm{position:absolute;bottom:8px;left:8px;right:8px;z-index:1;color:#E6E9EF;font-size:11.5px;text-align:center}
+#vdBox{position:fixed;inset:0;z-index:300;background:rgba(5,8,18,.88);display:grid;place-items:center;padding:20px}
+#vdBox[hidden]{display:none}
+#vdBox .in{width:min(960px,100%);max-height:100%;display:flex;flex-direction:column;gap:10px}
+#vdBox video,#vdBox iframe{width:100%;aspect-ratio:16/9;max-height:78vh;border:0;border-radius:12px;background:#000}
+#vdBox iframe.tall{display:block;aspect-ratio:9/16;max-width:min(420px,100%);max-height:78vh;width:auto;height:78vh;margin:0 auto}
+#vdBox .tp{display:flex;justify-content:space-between;align-items:center;color:#E6E9EF;gap:12px}
+#vdBox .tp button{all:unset;cursor:pointer;font-size:26px;line-height:1;padding:4px 8px;color:#fff}
+.dkPg{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:10px}
+.dkPg>i{display:block;height:100%;width:0;background:#2E8B57;transition:width .3s}
 </style>
 </head>
 <body>
@@ -1237,17 +1254,22 @@ details.cara p{line-height:1.65}
 
  <section id="p-dokumentasi" class="pg" hidden>
   <h1>Dokumentasi</h1>
-  <p class="mu">Album foto kegiatan MCI. Tim Dokumentasi mengunggah dan merapikan; semua anggota bisa melihat dan mengunduh. Tim Dokumentasi juga dapat jatah Studio Gambar 5x/hari untuk poster dan konten.</p>
-  <div class="cd" id="dkForm" hidden><b>Unggah foto kegiatan</b>
+  <p class="mu">Album foto dan video kegiatan MCI. Tim Dokumentasi mengunggah dan merapikan; semua anggota bisa melihat dan mengunduh. Tim Dokumentasi juga dapat jatah Studio Gambar 5x/hari untuk poster dan konten.</p>
+  <div class="cd" id="dkForm" hidden><b>Unggah dokumentasi kegiatan</b>
+   <div class="seg" id="dkSeg" style="margin:12px 0 0;background:#EFECE4"><button type="button" class="on" data-dkm="foto">Foto</button><button type="button" data-dkm="video">Video</button><button type="button" data-dkm="link">Tempel link</button></div>
    <div class="fl" style="margin-top:12px">
     <label>Judul kegiatan<input type="text" id="dkJudul" maxlength="120" placeholder="contoh: Uji kapal di danau"></label>
     <label>Tanggal<input type="date" id="dkTgl"></label>
     <label class="full">Keterangan<input type="text" id="dkKet" maxlength="500"></label>
-    <label class="full">Foto (bisa pilih banyak)<input type="file" id="dkFoto" accept="image/*" multiple></label>
+    <label class="full" data-dkf="foto">Foto (bisa pilih banyak)<input type="file" id="dkFoto" accept="image/*" multiple></label>
+    <label class="full" data-dkf="video" hidden>Video (bisa pilih beberapa)<input type="file" id="dkVideo" accept="video/mp4,video/quicktime,video/webm,video/x-m4v,video/3gpp" multiple><small class="mu" id="dkVidInfo" style="display:block;margin-top:4px"></small></label>
+    <label class="full" data-dkf="link" hidden>Link video<input type="url" id="dkLink" maxlength="500" placeholder="https://youtu.be/… · drive.google.com/… · instagram.com/reel/… · tiktok.com/…"><small class="mu" style="display:block;margin-top:4px">Google Drive: atur akses "Siapa saja yang memiliki link". YouTube boleh unlisted.</small></label>
    </div>
+   <div class="dkPg" id="dkPg" hidden><i></i></div>
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="dkSave">Unggah</button><span id="dkMsg" class="mu"></span></div>
   </div>
-  <div class="cd"><div class="gal" id="dkList"></div></div>
+  <div class="cd"><div class="seg" id="dkFilt" style="margin:0 0 4px;background:#EFECE4"><button type="button" class="on" data-dkt="">Semua</button><button type="button" data-dkt="foto">Foto</button><button type="button" data-dkt="video">Video</button></div><div class="gal" id="dkList"></div></div>
+  <div id="vdBox" hidden role="dialog" aria-modal="true" aria-label="Putar video"><div class="in"><div class="tp"><b id="vdJudul"></b><button type="button" id="vdTutup" aria-label="Tutup">×</button></div><div id="vdIsi"></div></div></div>
  </section>
 
  <section id="p-blacklist" class="pg" hidden>
@@ -2745,23 +2767,92 @@ let DKD = null;
 const dkImg = id => "/api/dokumentasi/" + id;
 const fotoKecil = (u, w) => u + (u.includes("?") ? "&" : "?") + "w=" + (RINGAN ? Math.min(w, 320) : w);   // galeri: versi kecil dari server
 const fotoBesar = u => RINGAN ? u + (u.includes("?") ? "&" : "?") + "w=1080" : u;   // layar penuh: HP Ringan cukup 1080 px
+let DK_MODE = "foto", DK_FILT = "";
+const mbStr = n => n >= 1073741824 ? (n / 1073741824).toFixed(1) + " GB" : Math.max(1, Math.round(n / 1048576)) + " MB";
 function renderDok() {
   $("#dkForm").hidden = !DKD.kelola;
-  $("#dkList").innerHTML = DKD.items.map(x => `<figure><img src="${fotoKecil(dkImg(x.id), 480)}" alt="${esc(x.judul)}" loading="lazy" decoding="async" data-dkz="${x.id}"><figcaption title="${esc(x.keterangan)}"><b>${esc(x.judul)}</b> · ${esc(x.tanggal)}${x.keterangan ? "<br>" + esc(x.keterangan) : ""}</figcaption>
-    <div class="bar"><a class="bt o" href="${dkImg(x.id)}?unduh=1" download>Unduh</a>${DKD.kelola ? `<button class="bt o" data-dkd="${x.id}">Hapus</button>` : ""}</div></figure>`).join("") || '<div class="mu">Belum ada foto kegiatan.</div>';
+  $('[data-dkm="video"]').hidden = !DKD.video_upload;   // tab upload video baru muncul kalau penyimpanan R2 sudah disambungkan
+  if (!DKD.video_upload && DK_MODE === "video") $('[data-dkm="foto"]').click();
+  $("#dkVidInfo").textContent = DKD.video_upload ? `Maksimal ${DKD.video_maks_mb} MB per video. Diputar langsung dari penyimpanan Cloudflare R2.` : "Upload video belum aktif (kunci Cloudflare R2 belum diisi di Panel CEO). Sementara pakai Tempel link.";
+  const L = DKD.items.filter(x => !DK_FILT || (DK_FILT === "video" ? x.jenis !== "foto" : x.jenis === "foto"));
+  $("#dkList").innerHTML = L.map(x => {
+    const cap = `<figcaption title="${esc(x.keterangan)}"><b>${esc(x.judul)}</b> · ${esc(x.tanggal)}${x.keterangan ? "<br>" + esc(x.keterangan) : ""}</figcaption>`;
+    const hapus = DKD.kelola ? `<button class="bt o" data-dkd="${x.id}">Hapus</button>` : "";
+    if (x.jenis === "foto") return `<figure><img src="${fotoKecil(dkImg(x.id), 480)}" alt="${esc(x.judul)}" loading="lazy" decoding="async" data-dkz="${x.id}">${cap}<div class="bar"><a class="bt o" href="${dkImg(x.id)}?unduh=1" download>Unduh</a>${hapus}</div></figure>`;
+    const thumb = x.jenis === "video" ? `<img src="${fotoKecil(dkImg(x.id) + "?poster=1", 480)}" alt="" loading="lazy" onerror="this.remove()">` : x.thumb ? `<img src="${esc(x.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : "";
+    return `<figure><div class="vd" data-dkv="${x.id}" role="button" tabindex="0" aria-label="Putar ${esc(x.judul)}">${thumb}<span class="src">${x.jenis === "video" ? "Video · " + mbStr(x.ukuran) : esc(x.sumber)}</span><span class="ply"></span></div>${cap}
+      <div class="bar">${x.jenis === "video" ? `<a class="bt o" href="${dkImg(x.id)}?unduh=1">Unduh</a>` : `<a class="bt o" href="${esc(x.url)}" target="_blank" rel="noopener">Buka</a>`}${hapus}</div></figure>`;
+  }).join("") || `<div class="mu">${DK_FILT === "video" ? "Belum ada video kegiatan." : DK_FILT === "foto" ? "Belum ada foto kegiatan." : "Belum ada dokumentasi kegiatan."}</div>`;
   $$("[data-dkz]").forEach(i => i.onclick = () => vwBuka(fotoBesar(dkImg(i.dataset.dkz)), i.alt || "Foto"));
-  $$("[data-dkd]").forEach(b => b.onclick = async () => { if (!confirm("Hapus foto ini?")) return; DKD = await api("/api/dokumentasi/" + b.dataset.dkd, {method: "DELETE"}); renderDok(); });
+  $$("[data-dkv]").forEach(v => { v.onclick = () => dkPutar(+v.dataset.dkv); v.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); dkPutar(+v.dataset.dkv); } }; });
+  $$("[data-dkd]").forEach(b => b.onclick = async () => { if (!confirm("Hapus dokumentasi ini?")) return; DKD = await api("/api/dokumentasi/" + b.dataset.dkd, {method: "DELETE"}); renderDok(); });
 }
+function dkPutar(id) {
+  const x = DKD.items.find(y => y.id === id); if (!x) return;
+  $("#vdJudul").textContent = x.judul + (x.tanggal ? " · " + x.tanggal : "");
+  if (x.jenis === "video" || x.sumber === "Video") $("#vdIsi").innerHTML = `<video controls autoplay playsinline preload="metadata" src="${x.jenis === "video" ? dkImg(id) : esc(x.embed)}"></video>`;
+  else $("#vdIsi").innerHTML = `<iframe class="${/Instagram|TikTok/.test(x.sumber) ? "tall" : ""}" src="${esc(x.embed)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" title="${esc(x.judul)}"></iframe>`;
+  if ($("#vdBox").parentNode !== document.body) document.body.appendChild($("#vdBox"));   // keluar dari halaman yang beranimasi supaya benar-benar layar penuh
+  $("#vdBox").hidden = false; $("#vdTutup").focus();
+}
+function dkTutup() { $("#vdBox").hidden = true; $("#vdIsi").innerHTML = ""; }
+$("#vdTutup").onclick = dkTutup;
+$("#vdBox").onclick = e => { if (e.target.id === "vdBox") dkTutup(); };
+addEventListener("keydown", e => { if (e.key === "Escape" && !$("#vdBox").hidden) dkTutup(); });
+$("#dkSeg").onclick = e => { const b = e.target.closest("[data-dkm]"); if (!b) return; DK_MODE = b.dataset.dkm;
+  $$("#dkSeg button").forEach(x => x.classList.toggle("on", x === b)); $$("[data-dkf]").forEach(l => l.hidden = l.dataset.dkf !== DK_MODE); $("#dkMsg").textContent = ""; };
+$("#dkFilt").onclick = e => { const b = e.target.closest("[data-dkt]"); if (!b) return; DK_FILT = b.dataset.dkt; $$("#dkFilt button").forEach(x => x.classList.toggle("on", x === b)); renderDok(); };
 async function loadDok() { if (!$("#dkTgl").value) $("#dkTgl").value = new Date().toISOString().slice(0, 10); try { DKD = await api("/api/dokumentasi"); renderDok(); } catch (e) { $("#dkList").innerHTML = '<div class="er">' + esc(e.message) + "</div>"; } }
+function dkPoster(file) {   // ambil 1 frame dari video sebagai sampul (dikerjakan di HP/laptop, bukan server)
+  return new Promise(res => {
+    const v = document.createElement("video"), u = URL.createObjectURL(file); let selesai = false;
+    const akhir = d => { if (selesai) return; selesai = true; URL.revokeObjectURL(u); res(d); };
+    v.muted = true; v.playsInline = true; v.preload = "metadata"; v.src = u;
+    v.onloadeddata = () => { try { v.currentTime = Math.min(1, (v.duration || 2) / 3); } catch (e) { akhir(""); } };
+    v.onseeked = () => { try { const w = Math.min(640, v.videoWidth || 640), h = Math.round(w * (v.videoHeight || 360) / (v.videoWidth || 640)), c = document.createElement("canvas");
+      c.width = w; c.height = h; c.getContext("2d").drawImage(v, 0, 0, w, h); akhir(c.toDataURL("image/jpeg", .72)); } catch (e) { akhir(""); } };
+    v.onerror = () => akhir(""); setTimeout(() => akhir(""), 8000);
+  });
+}
+function dkPut(url, file, onp) {
+  return new Promise((ok, gagal) => { const x = new XMLHttpRequest(); x.open("PUT", url); x.setRequestHeader("Content-Type", file.type);
+    x.upload.onprogress = e => { if (e.lengthComputable) onp(e.loaded / e.total); };
+    x.onload = () => x.status >= 200 && x.status < 300 ? ok() : gagal(new Error(`Upload ditolak penyimpanan (${x.status}). Cek pengaturan CORS bucket R2.`));
+    x.onerror = () => gagal(new Error("Koneksi putus atau CORS bucket R2 belum diatur. Coba lagi."));
+    x.send(file); });
+}
 $("#dkSave").onclick = async () => {
-  const fs = [...$("#dkFoto").files]; if (!fs.length) { $("#dkMsg").textContent = "Pilih foto dulu."; return; }
+  const meta = {judul: $("#dkJudul").value, tanggal: $("#dkTgl").value, keterangan: $("#dkKet").value}, msg = $("#dkMsg"), pg = $("#dkPg");
+  if (DK_MODE === "link") {
+    const l = $("#dkLink").value.trim(); if (!l) { msg.textContent = "Tempel link video dulu."; return; }
+    $("#dkSave").disabled = true;
+    try { const fd = new FormData(); Object.entries(meta).forEach(([k, v]) => fd.append(k, v)); fd.append("link", l); DKD = await api("/api/dokumentasi", {method: "POST", body: fd}); $("#dkLink").value = ""; msg.textContent = "Link ditambahkan."; renderDok(); }
+    catch (e) { msg.textContent = e.message; }
+    $("#dkSave").disabled = false; return;
+  }
+  if (DK_MODE === "video") {
+    const fs = [...$("#dkVideo").files]; if (!fs.length) { msg.textContent = "Pilih video dulu."; return; }
+    if (!DKD.video_upload) { msg.textContent = "Upload video belum aktif. Pakai Tempel link dulu."; return; }
+    $("#dkSave").disabled = true; pg.hidden = false;
+    for (let i = 0; i < fs.length; i++) {
+      const f = fs[i], set = p => { pg.firstChild.style.width = Math.round(p * 100) + "%"; msg.textContent = `Video ${i + 1} dari ${fs.length} · ${Math.round(p * 100)}% dari ${mbStr(f.size)}`; };
+      try { set(0); const poster = await dkPoster(f);
+        const iz = await api("/api/dokumentasi/video-izin", {json: {mime: f.type, ukuran: f.size}});
+        await dkPut(iz.put, f, set);
+        msg.textContent = `Video ${i + 1} dari ${fs.length} · menyimpan…`;
+        DKD = await api("/api/dokumentasi/video-selesai", {json: {key: iz.key, poster, ...meta}}); renderDok(); }
+      catch (e) { msg.textContent = e.message; pg.hidden = true; $("#dkSave").disabled = false; return; }
+    }
+    $("#dkVideo").value = ""; pg.hidden = true; $("#dkSave").disabled = false; msg.textContent = "Selesai."; return;
+  }
+  const fs = [...$("#dkFoto").files]; if (!fs.length) { msg.textContent = "Pilih foto dulu."; return; }
   $("#dkSave").disabled = true;
   for (let i = 0; i < fs.length; i++) {
-    $("#dkMsg").textContent = `Mengunggah ${i + 1} dari ${fs.length}…`;
-    try { const r = await resizeFoto(fs[i], 1600); const fd = new FormData(); fd.append("foto", r.blob, "foto.jpg"); fd.append("judul", $("#dkJudul").value); fd.append("tanggal", $("#dkTgl").value); fd.append("keterangan", $("#dkKet").value);
-      DKD = await api("/api/dokumentasi", {method: "POST", body: fd}); } catch (e) { $("#dkMsg").textContent = e.message; break; }
+    msg.textContent = `Mengunggah ${i + 1} dari ${fs.length}…`;
+    try { const r = await resizeFoto(fs[i], 1600); const fd = new FormData(); fd.append("foto", r.blob, "foto.jpg"); Object.entries(meta).forEach(([k, v]) => fd.append(k, v));
+      DKD = await api("/api/dokumentasi", {method: "POST", body: fd}); } catch (e) { msg.textContent = e.message; break; }
   }
-  renderDok(); $("#dkFoto").value = ""; $("#dkSave").disabled = false; if ($("#dkMsg").textContent.startsWith("Mengunggah")) $("#dkMsg").textContent = "Selesai.";
+  renderDok(); $("#dkFoto").value = ""; $("#dkSave").disabled = false; if (msg.textContent.startsWith("Mengunggah")) msg.textContent = "Selesai.";
 };
 
 /* Surat Peringatan */
