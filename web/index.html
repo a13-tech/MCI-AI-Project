@@ -1408,7 +1408,7 @@ details.cara p{line-height:1.65}
     <div class="mu" style="font-size:12.5px;margin:2px 0 0">Tanggal berakhir diingatkan otomatis ke Inbox 30, 7, dan 1 hari sebelumnya. Harga produk luar bisa berubah; cek link resminya.</div>
     <div id="hgIsi"></div>
     <div class="hgF" id="hgForm" hidden>
-     <label>Kelompok<select id="hgGrup"><option value="mci">Langganan MCI</option><option value="ai">Paket AI (perbandingan)</option></select></label>
+     <label>Kelompok<select id="hgGrup"><option value="mci">Langganan MCI</option><option value="token">Harga token AI (Harga = input, Periode = output)</option></select></label>
      <label>Nama<input id="hgNama" maxlength="200"></label><label>Paket<input id="hgPaket" maxlength="200"></label><label>Harga<input id="hgHarga" maxlength="200"></label>
      <label>Periode<input id="hgPeriode" maxlength="200" placeholder="per bulan / per tahun"></label><label>Berakhir<input id="hgBerakhir" type="date"></label>
      <label>Catatan<input id="hgCatatan" maxlength="200"></label><label>Link resmi<input id="hgLink" maxlength="200" placeholder="https://"></label>
@@ -7926,11 +7926,11 @@ $("#kbSegar").onclick = async () => { const b = $("#kbSegar"); b.disabled = true
 function pnHarga(d) {
   const L = d.harga || [], hari = t => { if (!t) return ""; const n = Math.round((new Date(t + "T00:00:00") - new Date(new Date().toDateString())) / 864e5);
     return `${esc(t)}<br><span class="ch ${n <= 7 ? "r" : n <= 30 ? "y" : "n"}">${n < 0 ? "lewat " + -n + " hari" : n === 0 ? "hari ini" : n + " hari lagi"}</span>`; };
-  const tabel = (g, judul) => { const R = L.filter(x => x.grup === g); if (!R.length) return "";
-    return `<b style="display:block;margin-top:14px;font-size:13.5px">${judul}</b><table class="hgT"><thead><tr><th>Nama</th><th class="sm">Paket</th><th>Harga</th><th class="sm">Periode</th><th>Berakhir</th><th></th></tr></thead><tbody>${R.map(x =>
-      `<tr><td>${x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.nama)}</a>` : esc(x.nama)}${x.catatan ? `<br><small class="mu">${esc(x.catatan)}</small>` : ""}</td><td class="sm">${esc(x.paket)}</td><td>${esc(x.harga)}</td><td class="sm">${esc(x.periode)}</td><td>${hari(x.berakhir)}</td>
+  const tabel = (g, judul) => { const R = L.filter(x => x.grup === g); if (!R.length) return ""; const tk = g === "token";
+    return `<b style="display:block;margin-top:14px;font-size:13.5px">${judul}</b><table class="hgT"><thead><tr><th>${tk ? "Model" : "Nama"}</th><th class="sm">${tk ? "Penyedia / dipakai di" : "Paket"}</th><th>${tk ? "Input" : "Harga"}</th><th${tk ? "" : ' class="sm"'}>${tk ? "Output" : "Periode"}</th><th>${tk ? "Promo s.d." : "Berakhir"}</th><th></th></tr></thead><tbody>${R.map(x =>
+      `<tr><td>${x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.nama)}</a>` : esc(x.nama)}${x.catatan ? `<br><small class="mu">${esc(x.catatan)}</small>` : ""}</td><td class="sm">${esc(x.paket)}</td><td>${esc(x.harga)}</td><td${tk ? "" : ' class="sm"'}>${esc(x.periode)}</td><td>${hari(x.berakhir)}</td>
       <td class="ak"><button type="button" data-hge="${x.id}">Edit</button><button type="button" data-hgh="${x.id}">Hapus</button></td></tr>`).join("")}</tbody></table>`; };
-  $("#hgIsi").innerHTML = tabel("mci", "Langganan MCI") + tabel("ai", `Paket AI (perbandingan, per ${esc(d.harga_per || "")})`) || '<p class="mu">Belum ada data.</p>';
+  $("#hgIsi").innerHTML = tabel("mci", "Langganan MCI") + tabel("token", `Harga token AI per model (USD per 1 juta token, per ${esc(d.harga_per || "")})`) || '<p class="mu">Belum ada data.</p>';
 }
 const HGF = ["grup", "nama", "paket", "harga", "periode", "berakhir", "catatan", "link"];
 function hgBuka(x) { HG_EDIT = x ? x.id : null; HGF.forEach(k => $("#hg" + k[0].toUpperCase() + k.slice(1)).value = x ? (x[k] || "") : (k === "grup" ? "mci" : "")); $("#hgForm").hidden = false; $("#hgNama").focus(); }

@@ -13701,20 +13701,29 @@ def harga_bawaan():
         R("mci", "Email @mci-ai.my.id (Zoho)", "Forever Free, maks 5 akun", "Rp0", "", "", "Tanpa IMAP/POP/SMTP", "https://mailadmin.zoho.com"),
         R("mci", "Groq (AI cadangan)", "Kunci gratis", "Rp0", "", g, "Ganti kunci di Panel CEO sebelum berakhir", "https://console.groq.com/keys"),
         R("mci", "Gemini API tier 1", "Bayar sesuai pemakaian", "Lihat anggaran Argon di Kesehatan Sistem", "per bulan", "", "", "https://aistudio.google.com"),
-        R("ai", "Claude Free", "Anthropic", "$0", "", "", "", "https://claude.ai/upgrade"),
-        R("ai", "Claude Pro", "Anthropic", "$20 (harga Indonesia ikut mata uang lokal)", "per bulan", "", "Tahunan lebih murah", "https://support.claude.com/en/articles/8325606-choosing-a-claude-plan"),
-        R("ai", "Claude Max 5x", "Anthropic", "$100", "per bulan", "", "", "https://support.claude.com/en/articles/11049744-how-much-does-the-max-plan-cost"),
-        R("ai", "Claude Max 20x", "Anthropic", "$200", "per bulan", "", "", "https://support.claude.com/en/articles/11049744-how-much-does-the-max-plan-cost"),
-        R("ai", "Google AI Pro", "Google (Gemini)", "±Rp320.000 ($19,99)", "per bulan", "", "Termasuk 2 TB penyimpanan", "https://gemini.google/subscriptions/?hl=id"),
-        R("ai", "Google AI Ultra", "Google (Gemini)", "$99,99–$199,99", "per bulan", "", "", "https://gemini.google/subscriptions/?hl=id"),
-        R("ai", "ChatGPT Plus", "OpenAI", "$20", "per bulan", "", "", "https://openai.com/chatgpt/pricing/"),
-        R("ai", "ChatGPT Pro", "OpenAI", "mulai $100–$200", "per bulan", "", "", "https://openai.com/chatgpt/pricing/"),
+        # Harga token API per model (USD per 1 juta token, input / output), per 17 Nov 2026
+        R("token", "gemini-3.8-flash", "Google · bot & Studio utama", "$0.75", "$3.75", "", "Ada jatah gratis; naik 2x mulai 1 Jan 2027", "https://ai.google.dev/gemini-api/docs/pricing"),
+        R("token", "gemini-3.5-flash-lite", "Google · Pusat Info & catatan", "$0.30", "$2.50", "", "Ada jatah gratis", "https://ai.google.dev/gemini-api/docs/pricing"),
+        R("token", "gemini-4-hydrogen", "Google", "cek", "cek", "", "Dipakai lewat kunci gratis; harga resmi belum tercatat", "https://ai.google.dev/gemini-api/docs/pricing"),
+        R("token", "gemini-4-argon", "Google · berbayar", "$2.00", "$10.00", "2026-11-30", "Harga promo; mulai 1 Des 2026 jadi $4 / $20", "https://ai.google.dev/gemini-api/docs/pricing"),
+        R("token", "claude-haiku-5-5", "Anthropic", "$0.10", "$0.50", "", "Prompt di atas 100 ribu token: $0.50 / $2.50", "https://platform.claude.com/docs/en/about-claude/pricing"),
+        R("token", "claude-sonnet-5-5", "Anthropic · Studio", "$2.00", "$10.00", "", "", "https://platform.claude.com/docs/en/about-claude/pricing"),
+        R("token", "claude-opus-5-5", "Anthropic · Studio", "$4.00", "$20.00", "", "", "https://platform.claude.com/docs/en/about-claude/pricing"),
+        R("token", "claude-fable-5-2", "Anthropic", "$8.00", "$40.00", "", "", "https://platform.claude.com/docs/en/about-claude/pricing"),
+        R("token", "openai/gpt-oss-120b", "Groq · cadangan", "$0.15", "$0.60", "", "Dipakai lewat kunci gratis (kuota harian)", "https://groq.com/pricing"),
+        R("token", "whisper-large-v3-turbo", "Groq · transkrip suara", "$0.04 per jam audio", "", "", "", "https://groq.com/pricing"),
+        R("token", "Mistral · NVIDIA · Cloudflare", "Cadangan", "gratis (kuota)", "", "", "Dipakai lewat jatah gratis masing-masing penyedia", ""),
     ]
 
 
 def harga_list():
     if not isinstance(SET.get("harga"), list):
         SET["harga"] = harga_bawaan()
+        SET["harga_ver"] = 2
+        set_save()
+    elif SET.get("harga_ver", 1) < 2:   # versi 1 berisi paket langganan AI; diganti harga token per model
+        SET["harga"] = [x for x in SET["harga"] if x.get("grup") != "ai"] + [x for x in harga_bawaan() if x["grup"] == "token"]
+        SET["harga_ver"] = 2
         set_save()
     return SET["harga"]
 
@@ -13723,6 +13732,10 @@ def harga_ingat_cek():
     """Kabari CEO 30, 7, dan 1 hari sebelum tanggal berakhir (sekali per tahap)."""
     tanda = SET.setdefault("harga_ingat", {})
     ubah = False
+    if today() >= "2026-12-01" and list(SET.get("argon_harga") or []) == [2.0, 10.0]:   # promo Argon habis: hitungan anggaran ikut harga baru
+        SET["argon_harga"] = [4.0, 20.0]
+        ubah = True
+        inbox_kirim(_dev_ids(), "info", "Harga Gemini 4 Argon naik", "Mulai 1 Des 2026 harga Argon $4 / $20 per 1 juta token. Hitungan anggaran Argon sudah ikut harga baru.")
     for x in harga_list():
         try:
             sisa = (datetime.strptime(x.get("berakhir") or "", "%Y-%m-%d").date() - datetime.now(WIB).date()).days
@@ -13741,7 +13754,7 @@ def harga_ingat_cek():
 
 def harga_simpan(d):
     row = {k: str(d.get(k) or "").strip()[:200] for k in ("nama", "paket", "harga", "periode", "berakhir", "catatan", "link")}
-    row["grup"] = d.get("grup") if d.get("grup") in ("mci", "ai") else "mci"
+    row["grup"] = d.get("grup") if d.get("grup") in ("mci", "token") else "mci"
     if not row["nama"]:
         raise ValueError("Nama wajib diisi")
     if row["berakhir"] and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", row["berakhir"]):
