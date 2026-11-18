@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Instrument+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="icon" href="/aset/favicon.ico"><link rel="apple-touch-icon" href="/aset/app-apple-180.png"><link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#0B1730"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="MCI"><meta name="apple-mobile-web-app-status-bar-style" content="default">
-<script>try{if(localStorage.getItem("tema")==="gelap")document.documentElement.dataset.tema="gelap"}catch(e){}</script>
+<script>try{if(localStorage.getItem("tema")!=="terang")document.documentElement.dataset.tema="gelap"}catch(e){document.documentElement.dataset.tema="gelap"}</script>
 <style>
 :root{--navy:#0A2A6B;--ink:#0B1F4D;--mute:#4A5A7A;--line:#D9E4FA;--bg:#F3F7FF;--gold:#D4AF5A;--gold2:#F1D58A}
 *{box-sizing:border-box}
@@ -1009,6 +1009,66 @@ details.cara p{line-height:1.65}
 #zmBox .tp{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line)}
 #zmBox .tp button{all:unset;cursor:pointer;font-size:24px;line-height:1;padding:2px 8px}
 #zmBox iframe{flex:1;border:0;background:#fff;width:100%}
+/* =================== TAMPILAN v5 "Cakrawala Biru": navy + cream + electric blue (CEO, 18 Nov 2026) ===================
+   Terang = cream + navy + biru; gelap = navy + cream + electric blue menyala. Semua halaman ikut lewat token. */
+:root{--bg:#F3EBDB;--paper:#FBF6EC;--ink:#0B1A33;--mute:#5E6678;--line:#E3D9C5;--line2:#D2C6AE;--judul:#0B1A33;--navy:#0B1A33;--navy2:#081428;
+ --gold:#1677FF;--gold2:#8EC5FF;--bar:rgba(243,235,219,.97);--hov:rgba(11,26,51,.06);--aksen:#1677FF;--aksenTeks:#0B63E5;--aksenG:rgba(22,119,255,.20);--btnTeks:#FFFFFF;
+ --serif:'MCI Serif',Georgia,'Times New Roman',serif;--r:18px;--r2:12px}
+:root[data-tema=gelap]{--bg:#081428;--paper:#0F1F3B;--ink:#F1E8D6;--mute:#9AA6BA;--line:#1C2E4E;--line2:#294167;--judul:#F1E8D6;--navy:#0B1A33;--navy2:#081428;
+ --gold:#38D6FF;--gold2:#38D6FF;--bar:rgba(8,20,40,.96);--hov:rgba(241,232,214,.07);--aksen:#38D6FF;--aksenTeks:#38D6FF;--aksenG:rgba(40,190,255,.34);--btnTeks:#061229}
+body{background:var(--bg);color:var(--ink)}
+body::before{content:"";position:fixed;inset:0 0 auto 0;height:520px;pointer-events:none;z-index:-1;
+ background:radial-gradient(ellipse 55% 75% at 50% -18%,var(--aksenG),transparent 70%)}
+:root[data-tema=gelap] body::after{content:"";position:fixed;inset:0 0 auto 0;height:340px;pointer-events:none;z-index:-1;
+ background:repeating-linear-gradient(90deg,transparent 0 7px,rgba(56,214,255,.045) 7px 8px);-webkit-mask:radial-gradient(ellipse 50% 90% at 50% 0,#000,transparent 75%);mask:radial-gradient(ellipse 50% 90% at 50% 0,#000,transparent 75%)}
+::selection{background:var(--aksen);color:var(--btnTeks)}
+:focus-visible{outline:2px solid var(--aksen);outline-offset:2px}
+h1{font:400 44px/1.08 var(--serif);letter-spacing:-.012em;color:var(--judul)}
+h1 em,.v5em{font-style:italic;color:var(--aksenTeks)}
+.ey{color:var(--aksenTeks)}
+.v{font-family:var(--serif);font-weight:400;font-size:32px;letter-spacing:-.01em}
+/* kartu */
+.cd,.it2{background:var(--paper);border:1px solid var(--line);border-radius:var(--r)}
+:root[data-tema=gelap] .cd,:root[data-tema=gelap] .it2{background:rgba(15,31,59,.82);backdrop-filter:blur(10px)}
+.hl button{background:var(--paper);border-radius:14px}.hl b{color:var(--judul)}.hl button:hover,.hl button:focus-visible{border-color:var(--aksen)}.hl i{color:var(--aksenTeks)}
+:root[data-tema=gelap] .prg{background:rgba(241,232,214,.12)}.prg{background:var(--line)}.prg i{background:var(--aksen);box-shadow:0 0 8px var(--aksenG)}
+.pagiK{border:1px solid var(--line2)}.pagiK .bt.o{color:#F1E8D6;border-color:rgba(241,232,214,.3)}.pagiK .bt.o:hover{background:rgba(241,232,214,.08)}.pagiK h2{color:#8EDBFF}
+/* tombol: kapsul, satu aksi utama menyala */
+.bt{border-radius:99px;padding:9px 18px}
+.bt.g,:root[data-tema=gelap] .bt.g{background:var(--aksen);color:var(--btnTeks);border:0;box-shadow:0 0 22px var(--aksenG)}.bt.g:hover,:root[data-tema=gelap] .bt.g:hover{background:var(--aksen);filter:brightness(1.08)}
+.bt.o{background:transparent;color:var(--ink);border:1px solid var(--line2)}.bt.o:hover{border-color:var(--aksen);background:var(--hov)}
+textarea:focus,input:focus,select:focus{border-color:var(--aksen);box-shadow:0 0 0 3px var(--aksenG)}
+:root[data-tema=gelap] textarea,:root[data-tema=gelap] input[type=text],:root[data-tema=gelap] input[type=number],:root[data-tema=gelap] input[type=search],:root[data-tema=gelap] input[type=url],:root[data-tema=gelap] input[type=date],:root[data-tema=gelap] input[type=datetime-local],:root[data-tema=gelap] input[type=time],:root[data-tema=gelap] input[type=password],:root[data-tema=gelap] select{background:rgba(8,20,40,.6);color:var(--ink)}
+:root[data-tema=gelap] main a:not(.bt):not(.lo){color:var(--aksen)}
+@media (min-width:901px){tbody tr:hover td{background:var(--hov)}}
+/* menu atas: kaca, penanda titik menyala */
+@media (min-width:901px){
+ #sd{background:var(--bar);border-bottom:1px solid var(--line)}
+ #sd .brand b{font:500 21px/1 var(--serif);letter-spacing:.06em}
+ #sd .nv.ut.on{background:transparent;color:var(--judul)}
+ #sd .nv.ut.on::before{content:"";width:6px;height:6px;border-radius:9px;background:var(--aksen);box-shadow:0 0 8px var(--aksen)}
+}
+/* Copilot ikut aksen baru */
+.axBaru svg,.axKirim,:root[data-tema=gelap] .axBaru svg,:root[data-tema=gelap] .axKirim{background:var(--aksen);color:var(--btnTeks)}
+.axBawah .axYa,:root[data-tema=gelap] .axBawah .axYa{background:var(--aksen);color:var(--btnTeks)}
+:root[data-tema=gelap] .ax{background:rgba(15,31,59,.82)}:root[data-tema=gelap] .axSide{background:rgba(8,20,40,.55)}
+:root[data-tema=gelap] .axKotak{background:rgba(8,20,40,.6);border-color:rgba(56,214,255,.35);box-shadow:0 0 26px rgba(40,190,255,.10)}
+/* Beranda: sampul diganti hero ala mockup */
+#p-beranda>.sampulW,#p-beranda>#brHari,#p-beranda>#brHalo{display:none}
+.brHero{position:relative;display:grid;grid-template-columns:1fr minmax(0,620px) 1fr;align-items:start;gap:18px;padding:34px 0 46px;margin:0 0 10px}
+.brHero::before{content:"";position:absolute;left:50%;bottom:-40px;width:min(900px,100%);height:420px;transform:translateX(-50%);z-index:-1;pointer-events:none;
+ background:radial-gradient(ellipse at 50% 80%,var(--aksenG),transparent 65%)}
+.brTengah{text-align:center}
+.brTengah h1{font-size:clamp(40px,5.6vw,68px);line-height:1.03;margin:0}
+.brTengah p{color:var(--mute);font-size:15px;line-height:1.6;max-width:460px;margin:18px auto 22px}
+.brTombol{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}.brTombol .bt{padding:12px 22px;font-size:14px}
+.brAngka{display:flex;flex-direction:column;gap:30px;padding-top:12px}.brAngka.kanan{text-align:right}
+.brAngka b{display:block;font:400 40px/1 var(--serif);color:var(--judul)}.brAngka small{font-size:12px;color:var(--mute)}
+@media (max-width:900px){
+ h1{font-size:32px}
+ .brHero{grid-template-columns:1fr 1fr;padding:18px 0 28px}.brTengah{grid-column:1/-1;order:-1}
+ .brAngka{gap:14px;padding:0}.brAngka.kanan{text-align:left}.brAngka b{font-size:30px}
+}
 </style>
 </head>
 <body>
@@ -7541,7 +7601,14 @@ async function brMuat() {
   const baris = (x, i) => `<button data-brh="${esc(x.hal)}" class="${x.penting ? "pt" : ""}"><span><b>${esc(x.judul)}</b>${x.ket ? `<small>${esc(x.ket)}</small>` : ""}</span><i aria-hidden="true">›</i></button>`;
   const pg = d.pagi ? `<div class="pagiK tutup" id="pagiK"><h2>☀️ Laporan Pagi Apex</h2><div style="font-size:12.5px;opacity:.8">${d.pagi.waktu ? "Dibuat " + esc(tglID(d.pagi.waktu.slice(0, 10))) + " pukul " + esc(d.pagi.waktu.slice(11, 16)) : "Belum ada laporan"} · otomatis tiap hari pukul ${String(d.pagi.jam).padStart(2, "0")}.00 ke Telegram &amp; Inbox</div>
     ${d.pagi.isi ? `<pre>${esc(d.pagi.isi)}</pre>` : ""}<div class="bar" style="margin:10px 0 0;flex-wrap:wrap">${d.pagi.isi ? '<button class="bt o" id="pagiLebar" type="button">Lihat semua</button>' : ""}<button class="bt o" id="pagiBuat" type="button">Buat ulang sekarang</button><span id="pagiMsg" style="font-size:12.5px;opacity:.85"></span></div></div>` : "";
-  $("#brBox").innerHTML = pg + `<h2 style="margin-top:18px">Perlu dikerjakan</h2>${d.perlu.length ? `<div class="hl">${d.perlu.map(baris).join("")}</div>` : '<p class="mu">Tidak ada yang mendesak. Semua beres.</p>'}
+  const jam = new Date().getHours(), waktu = jam < 11 ? "pagi" : jam < 15 ? "siang" : jam < 18 ? "sore" : "malam";
+  const rata = d.proyek.length ? Math.round(d.proyek.reduce((a, x) => a + (+x.progres || 0), 0) / d.proyek.length) : 0;
+  const copilot = $("#nvApex") && $("#nvApex").style.display !== "none";
+  const hero = `<div class="brHero"><div class="brAngka"><div><b>${d.perlu.length}</b><small>Perlu dikerjakan</small></div><div><b>${d.proyek.length}</b><small>Proyek berjalan</small></div></div>
+    <div class="brTengah"><h1>Berjaya di <em>tiga bidang</em> sekaligus.</h1><p>Selamat ${waktu}, ${esc(d.nama.split(" ")[0])}. ${esc(d.hari)}. Semua proyek, tugas, dan agenda MCI ada di sini${copilot ? ", dan Copilot siap membantu" : ""}.</p>
+    <div class="brTombol"><button class="bt g" type="button" data-brh="${copilot ? "apex" : "info"}">${copilot ? "Tanya Copilot" : "Tanya Pusat Info"}</button><button class="bt o" type="button" data-brh="proyek">Lihat proyek</button></div></div>
+    <div class="brAngka kanan"><div><b>${rata}%</b><small>Progres rata-rata</small></div><div><b>${d.info.length}</b><small>Akan datang</small></div></div></div>`;
+  $("#brBox").innerHTML = hero + pg + `<h2 style="margin-top:18px">Perlu dikerjakan</h2>${d.perlu.length ? `<div class="hl">${d.perlu.map(baris).join("")}</div>` : '<p class="mu">Tidak ada yang mendesak. Semua beres.</p>'}
     ${d.info.length ? `<h2>Akan datang</h2><div class="hl">${d.info.map(baris).join("")}</div>` : ""}
     ${(d.sorot || []).length ? `<h2>Proyek unggulan</h2>${sorotHtml(d.sorot)}` : ""}
     ${d.proyek.length ? `<h2>Proyek berjalan</h2><div class="hl">${d.proyek.map(x => `<button data-brh="proyek"><span style="flex:1"><b>${esc(x.nama)}</b><span class="prg" style="display:block;margin-top:8px"><i style="width:${x.progres}%"></i></span></span><small>${x.progres}%</small></button>`).join("")}</div>` : ""}
