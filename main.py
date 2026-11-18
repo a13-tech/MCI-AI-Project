@@ -125,10 +125,10 @@ AI_SERI = [{"seri": "1 Genesis", "ket": "Seri pertama sistem AI MCI. Desain web 
             "gambar": "/aset/genesis-virtual-office.webp", "video": "/aset/genesis-virtual-office.mp4"},
            {"seri": "4.9 Vertex", "ket": "Seri kedua."},
            {"seri": "7 Cipher", "ket": "Seri ketiga."},
-           {"seri": "Cipher 7.5", "ket": "Seri yang dipakai sekarang (sejak November 2026). Dilengkapi Graphify: peta pengetahuan yang membuat AI mencari jalur ke data "
+           {"seri": "7.5 Cipher", "ket": "Seri yang dipakai sekarang (sejak November 2026). Dilengkapi Graphify: peta pengetahuan yang membuat AI mencari jalur ke data "
                                        "yang dibutuhkan, bukan membaca semua data, sehingga jawaban lebih tepat dan jauh lebih hemat token. Juga membawa antrean AI "
                                        "cadangan berlapis, router pintar, cache yang paham makna, dan Panel CEO."}]
-AI_NAMA = AI_SERI[-1]["seri"] + " AI"   # nama sistem yang dipakai sekarang, misalnya "Cipher 7.5 AI"
+AI_NAMA = AI_SERI[-1]["seri"] + " AI"   # nama sistem yang dipakai sekarang, misalnya "7.5 Cipher AI"
 # Nama sistem AI MCI. Jujur: sistem AI MCI adalah sistem buatan MCI yang memakai model bahasa (LLM) dari luar; jangan mengaku LLM-nya dilatih MCI.
 IDENTITAS_AI = (f"\n\nIDENTITAS: kamu bagian dari {AI_NAMA}, sistem AI yang dikembangkan MCI (Mahardika Cakrawala Indonesia) untuk web MCI HQ, katalog, dan bot MCI. "
                 f"Kalau ditanya kamu AI apa, pakai AI apa, atau siapa pembuatmu, jawab: {AI_NAMA}, sistem AI yang dikembangkan MCI. "
@@ -11984,7 +11984,7 @@ def apex_alat_untuk(r):
     return [f for f in APEX_ALAT if f.__name__ in APEX_IZIN_ALAT and (APEX_IZIN_ALAT[f.__name__] is None or can(APEX_IZIN_ALAT[f.__name__], r))]
 
 
-APEX_COPILOT = (" Di web, halaman obrolan ini bernama MCI Copilot: kalau ditanya namamu di sini, kamu MCI Copilot (ditenagai Apex, sistem Cipher 7.5).")
+APEX_COPILOT = (" Di web, halaman obrolan ini bernama MCI Copilot: kalau ditanya namamu di sini, kamu MCI Copilot (ditenagai Apex, sistem 7.5 Cipher).")
 
 
 def apex_sistem_untuk(r):
@@ -15164,18 +15164,30 @@ if __name__ == "__main__":
         members_load()
         _panel_reset_cek()
         kunci_terapkan()   # kunci AI dari Panel CEO mengalahkan nilai Render
-        if not SET.get("mig_cipher75"):   # catat peluncuran Cipher 7.5 di Sejarah Tentang Kami (database), sekali saja
+        if not SET.get("mig_cipher75"):   # catat peluncuran 7.5 Cipher di Sejarah Tentang Kami (database), sekali saja
             try:
                 t = tentang_get()
-                if not any("Cipher 7.5" in (x.get("judul") or "") for x in t.get("sejarah") or []):
-                    t["sejarah"] = list(t.get("sejarah") or []) + [{"tahun": "2026", "judul": "Peluncuran Cipher 7.5",
-                        "isi": "Sistem AI MCI naik ke seri Cipher 7.5 dengan Graphify: peta pengetahuan yang membuat AI mencari jalur ke data yang dibutuhkan, "
+                if not any("7.5 Cipher" in (x.get("judul") or "") for x in t.get("sejarah") or []):
+                    t["sejarah"] = list(t.get("sejarah") or []) + [{"tahun": "2026", "judul": "Peluncuran 7.5 Cipher",
+                        "isi": "Sistem AI MCI naik ke seri 7.5 Cipher dengan Graphify: peta pengetahuan yang membuat AI mencari jalur ke data yang dibutuhkan, "
                                "bukan membaca semua data, sehingga lebih tepat dan hemat token."}]
                     tentang_save(t)
                 SET["mig_cipher75"] = True
                 set_save()
             except Exception:
-                log.exception("Catat Cipher 7.5 di Tentang Kami gagal")
+                log.exception("Catat 7.5 Cipher di Tentang Kami gagal")
+        if not SET.get("mig_75cipher_nama"):   # CEO 18 Nov 2026: penulisan resmi "7.5 Cipher" (bukan "Cipher 7.5")
+            try:
+                t = tentang_get()
+                for x in t.get("sejarah") or []:
+                    for f in ("judul", "isi"):
+                        if isinstance(x.get(f), str):
+                            x[f] = x[f].replace("Cipher 7.5", "7.5 Cipher")
+                tentang_save(t)
+                SET["mig_75cipher_nama"] = True
+                set_save()
+            except Exception:
+                log.exception("Ganti nama 7.5 Cipher di Tentang Kami gagal")
         if not SET.get("mig_kas_tunda_1118"):   # permintaan CEO 18 Nov 2026: tunda pengeluaran otomatis penunggak kas (batas 18 Nov 23.59)
             iuran_set()["keluar_tunda"] = True
             SET["mig_kas_tunda_1118"] = True
