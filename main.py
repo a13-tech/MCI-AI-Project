@@ -8949,7 +8949,7 @@ def iuran_data(r, minggu=None):
            "next": minggu_geser(minggu, 1) if minggu < min(minggu_geser(cur, 4), akhir or "9999-W99") else None, "tarif": {"biasa": d["biasa"], "ringan": d["ringan"]}, "tingkat_nama": TINGKAT,
            "anggota": anggota, "lunas": sum(1 for a in wajib if a["status"] == "lunas"), "wajib": len(wajib), "masuk": masuk,
            "bisa_konfirmasi": konf, "saya": None, "menunggu": [], "riwayat": [],
-           "selesai": akhir, "selesai_label": minggu_label(akhir) if akhir else "", "selesai_tgl": _senin(akhir).isoformat() if akhir else "", "lunas_batas": kas_batas_lunas().strftime("%Y-%m-%d %H:%M") if kas_batas_lunas() else ""}
+           "selesai": akhir, "selesai_label": minggu_label(akhir) if akhir else "", "selesai_tgl": _senin(akhir).isoformat() if akhir else "", "lunas_batas": kas_batas_lunas().strftime("%Y-%m-%d %H:%M") if kas_batas_lunas() else "", "keluar_tunda": bool(d.get("keluar_tunda"))}
     if mine is not None and mine in MEMBERS:
         out["saya"] = {"id": mine, "tingkat": tingkat_of(mine), "tingkat_label": TINGKAT[tingkat_of(mine)], "nominal": nominal_of(mine),
                        "pilihan": _pilihan_minggu(rows, mine), "bendahara": "bendahara" in MEMBERS[mine]["jabatan"]}
@@ -8967,7 +8967,7 @@ def kas_tutup_cek():
     lalu setelah batas lunas lewat, yang MASIH menunggak otomatis dikeluarkan. Pembayaran yang sedang menunggu konfirmasi tidak dihitung nunggak.
     CEO/pemegang akses penuh tidak dikeluarkan otomatis. Kembalikan daftar nama yang dikeluarkan."""
     d, batas = iuran_set(), kas_batas_lunas()
-    if not kas_akhir() or not batas or d.get("tutup_diproses"):
+    if not kas_akhir() or not batas or d.get("tutup_diproses") or d.get("keluar_tunda"):   # keluar_tunda: CEO menunda pengeluaran otomatis
         return []
     now = datetime.now(WIB)
     ik = iuran_data("admin")
@@ -9204,6 +9204,11 @@ def api_iuran_atur():
                 return jsonify({"error": "Tanggal berhenti / batas lunas tidak valid"}), 400
             d.pop("tutup_diproses", None)
             d.pop("tutup_ingat", None)
+    if "keluar_tunda" in b:   # tunda/aktifkan lagi pengeluaran otomatis anggota yang menunggak setelah batas lunas
+        if b["keluar_tunda"]:
+            d["keluar_tunda"] = True
+        else:
+            d.pop("keluar_tunda", None)
     for k, v in (b.get("kas_mulai") or {}).items():   # {id: "YYYY-MM-DD" | ""} minggu pertama wajib kas per anggota
         if str(k).isdigit() and int(k) in MEMBERS:
             if not v:
@@ -15171,6 +15176,10 @@ if __name__ == "__main__":
                 set_save()
             except Exception:
                 log.exception("Catat Cipher 7.5 di Tentang Kami gagal")
+        if not SET.get("mig_kas_tunda_1118"):   # permintaan CEO 18 Nov 2026: tunda pengeluaran otomatis penunggak kas (batas 18 Nov 23.59)
+            iuran_set()["keluar_tunda"] = True
+            SET["mig_kas_tunda_1118"] = True
+            set_save()
         if "fitur_mati" not in SET:   # pertama kali Panel CEO aktif: absen langsung dimatikan (permintaan CEO, 16 Nov 2026)
             SET["fitur_mati"] = ["absen"]
             panel_catat("Absen dimatikan (awal Panel CEO)")
