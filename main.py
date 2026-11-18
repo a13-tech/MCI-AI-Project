@@ -11938,11 +11938,16 @@ APEX_ALAT = [cek_stok, cek_produk, cek_kas, cek_invoice, cek_hutang, cek_iuran, 
 
 
 def apex_model_daftar(r="admin"):
-    """Model yang bisa dipilih di Tanya Apex. Semuanya keluarga Gemini karena Apex memakai alat data (function calling). Argon (berbayar) khusus CEO."""
+    """Model yang bisa dipilih di MCI Copilot. Semuanya keluarga Gemini karena Copilot memakai alat data (function calling).
+    CEO melihat nama mesin aslinya; anggota melihat nama seri AI MCI (nomor dulu, baru nama). Argon (berbayar) khusus CEO."""
     L = [{"id": "gemini", "nama": "Gemini Flash", "model": MODEL, "siap": bool(client("apex")), "ket": "seimbang"},
-            {"id": "hydrogen", "nama": "Gemini 4 Hydrogen", "model": HYDROGEN_MODEL, "siap": bool(kunci_hydrogen()), "ket": "cepat, ringan"},
-            {"id": "argon", "nama": "Gemini 4 Argon", "model": ARGON_MODEL, "siap": bool(kunci_argon()) and ARGON_AKTIF, "ket": "penalaran berat, berbayar"}]
-    return L if is_admin(r) else [m for m in L if m["id"] != "argon"]
+         {"id": "hydrogen", "nama": "Gemini 4 Hydrogen", "model": HYDROGEN_MODEL, "siap": bool(kunci_hydrogen()), "ket": "cepat, ringan"},
+         {"id": "lite", "nama": "Gemini Flash Lite", "model": MODEL_LITE, "siap": bool(client("apex")), "ket": "paling ringan"},
+         {"id": "argon", "nama": "Gemini 4 Argon", "model": ARGON_MODEL, "siap": bool(kunci_argon()) and ARGON_AKTIF, "ket": "penalaran berat, berbayar"}]
+    if is_admin(r):
+        return L
+    seri = {"gemini": ("7.5 Cipher", "terbaru, paling pintar"), "hydrogen": ("7 Cipher", "cepat"), "lite": ("4.9 Vertex", "paling ringan")}
+    return [{**m, "nama": seri[m["id"]][0], "ket": seri[m["id"]][1]} for m in L if m["id"] in seri]
 
 
 def _apex_mesin(mid, r="admin"):

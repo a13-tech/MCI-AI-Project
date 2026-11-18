@@ -1771,7 +1771,7 @@ details.cara p{line-height:1.65}
       <textarea id="apxIn" rows="1" maxlength="1500" placeholder="Tanya apa saja ke MCI Copilot" aria-label="Pertanyaan untuk MCI Copilot"></textarea>
       <div class="axBaris">
        <div class="axKon" id="axKon"></div>
-       <div class="axModelW"><button type="button" class="axModel" id="axModelBtn" aria-haspopup="listbox" aria-expanded="false"><span id="axModelNama">Gemini Flash</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg></button>
+       <div class="axModelW"><button type="button" class="axModel" id="axModelBtn" aria-haspopup="listbox" aria-expanded="false"><span id="axModelNama"></span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg></button>
         <div class="axMenuModel" id="apxModel" role="listbox" aria-label="Model AI" hidden></div></div>
        <button type="submit" class="axKirim" id="apxKirim" aria-label="Kirim"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4M5 9l5-5 5 5"/></svg></button>
       </div>
@@ -4310,7 +4310,7 @@ function apxRender() {
   $("#axJejak").hidden = !(fd && !kosong); if (fd) $("#axJejak").textContent = fd.nama + " ›";
   $("#axKon").innerHTML = AX_INFO.ceo ? AX_KONEKTOR.map(k => `<button type="button" data-axk="${k.id}" aria-pressed="${AX_KON.has(k.id) && k.siap}" ${k.siap ? "" : 'disabled title="Isi kuncinya dulu di Panel CEO → Kunci AI"'}>${esc(k.nama)}</button>`).join("") : "";
   const cur = AX_DAFTAR.find(o => o.id === AX_C); $("#axJudul").textContent = kosong ? "" : (cur ? cur.judul : (APX[0] && APX[0].text || "").slice(0, 60));
-  const pm = APX_MODEL.find(m => m.id === APX_PILIH); $("#axModelNama").textContent = pm ? pm.nama : "Gemini Flash";
+  const pm = APX_MODEL.find(m => m.id === APX_PILIH); $("#axModelNama").textContent = pm ? pm.nama : (APX_MODEL[0] || {}).nama || "";
   $("#apxModel").innerHTML = APX_MODEL.map(m => `<button type="button" role="option" data-apm="${m.id}" aria-selected="${m.id === APX_PILIH}" ${m.siap ? "" : "disabled"}>${esc(m.nama)}<small>${esc(m.ket)}${m.siap ? "" : " · belum aktif"}</small></button>`).join("");
   const akhir = APX.length - 1;
   $("#axPesan").innerHTML = APX.map((x, i) => x.role === "user" ? `<div class="axM axU"><div>${esc(x.text)}</div></div>`
