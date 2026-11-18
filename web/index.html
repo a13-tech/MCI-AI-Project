@@ -297,6 +297,8 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 .axBawah{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-top:10px;font-size:12px;color:var(--mute)}
 .axBawah button{all:unset;display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:7px;cursor:pointer}
 .axBawah button:hover{background:var(--hov);color:var(--ink)}.axBawah svg{width:14px;height:14px}
+.axBawah .axYa{background:var(--navy2);color:#fff;font-weight:500}.axBawah .axYa:hover{background:var(--navy2);color:#fff;opacity:.9}
+:root[data-tema=gelap] .axBawah .axYa{background:#E6E9EF;color:#0B1730}
 .axAlat{padding:3px 9px;border-radius:99px;border:1px solid var(--line);font-size:11.5px}
 .axSapa{display:none;text-align:center;padding:0 20px 26px}
 .axSapa h2{font-family:var(--axJudul);font-weight:600;font-size:clamp(32px,4.8vw,46px);letter-spacing:0;line-height:1.12;margin:10px 0 0;color:var(--judul)}
@@ -4236,7 +4238,8 @@ $("#prSave").onclick = async () => {
 /* ===== Tanya Apex gaya obrolan: banyak obrolan per orang, terbuka untuk anggota (alat sesuai izin, kuota harian di server) ===== */
 const APX_LABEL = {buat_gambar: "Bikin gambar", buat_model_3d: "Bikin model 3D", buat_panduan_rakit: "Bikin panduan rakit", cek_stok: "Stok gudang", cek_produk: "Katalog produk", cek_kas: "Buku kas", cek_invoice: "Invoice", cek_hutang: "Hutang", cek_iuran: "Iuran kas", cek_anggota: "Anggota",
   cek_blacklist: "Blacklist", cek_catatan: "Catatan", cek_perpustakaan: "Perpustakaan", cek_dokumentasi_dan_voting: "Dokumentasi & voting", cek_iot: "Sensor IoT", cek_status_bot: "Status bot", cek_peta: "Peta jaringan",
-  usulkan_kas: "Usulan kas", usulkan_tugas: "Usulan tugas", usulkan_catatan: "Usulan catatan", usulkan_deploy: "Usulan deploy"};
+  usulkan_kas: "Usulan kas", usulkan_tugas: "Usulan tugas", usulkan_catatan: "Usulan catatan", usulkan_deploy: "Usulan deploy",
+  cek_tugas: "Tugas", cek_proyek: "Proyek", cek_agenda: "Agenda", cek_uu: "UU MCI", cek_jasa: "Jasa internal"};
 const APX_SARAN_CEO = ["Barang apa yang perlu restock?", "Saldo kas sekarang berapa?", "Siapa yang belum bayar kas minggu ini?", "Invoice mana yang belum lunas?"];
 const APX_SARAN_ANGGOTA = ["Ide proyek IoT sederhana pakai ESP32", "Jelaskan cara kerja relay", "Buku apa saja di perpustakaan soal Arduino?", "Bikinin panduan rakit sensor suhu"];
 const AX_IK = {salin: '<svg viewBox="0 0 20 20"><rect x="7" y="7" width="9.5" height="9.5" rx="2"/><path d="M13 7V5a1.5 1.5 0 0 0-1.5-1.5h-6A1.5 1.5 0 0 0 4 5v6.5A1.5 1.5 0 0 0 5.5 13H7"/></svg>',
@@ -4315,7 +4318,7 @@ function apxRender() {
   const akhir = APX.length - 1;
   $("#axPesan").innerHTML = APX.map((x, i) => x.role === "user" ? `<div class="axM axU"><div>${esc(x.text)}</div></div>`
     : `<div class="axM axA${x.galat ? " galat" : ""}">${x.alir && !x.text ? `<div class="axCek">${AX_IK.terbit}Copilot lagi mengecek data…</div>` : `<div class="axIsi">${axMd(x.text)}${x.alir ? '<span class="axKursor"></span>' : ""}</div>`}
-      ${x.alir ? "" : `<div class="axBawah">${x.galat ? "" : `<button type="button" data-axsalin="${i}">${AX_IK.salin}Salin</button>`}${i === akhir && AX_C ? `<button type="button" data-axulang>${AX_IK.ulang}Ulangi</button>` : ""}${(x.alat || []).map(a => `<span class="axAlat" title="${esc(JSON.stringify(a.arg || {}))}">${esc(axLabelAlat(a))}</span>`).join("")}${x.model && apxNamaModel(x.model) ? `<span>${esc(apxNamaModel(x.model))}</span>` : ""}</div>`}</div>`).join("");
+      ${x.alir ? "" : `<div class="axBawah">${x.galat ? "" : `<button type="button" data-axsalin="${i}">${AX_IK.salin}Salin</button>`}${i === akhir && AX_C ? `<button type="button" data-axulang>${AX_IK.ulang}Ulangi</button>` : ""}${i === akhir && !x.galat && /lanjut\s*\?\s*\**\s*$/i.test(x.text || "") ? `<button type="button" class="axYa" data-axjawab="Lanjut">Lanjut</button><button type="button" data-axjawab="Batal, jangan dijalankan">Batal</button>` : ""}${(x.alat || []).map(a => `<span class="axAlat" title="${esc(JSON.stringify(a.arg || {}))}">${esc(axLabelAlat(a))}</span>`).join("")}${x.model && apxNamaModel(x.model) ? `<span>${esc(apxNamaModel(x.model))}</span>` : ""}</div>`}</div>`).join("");
   const lg = $("#apxLog"); if (APX_BUSY || lg.dataset.bawah !== "0") lg.scrollTop = lg.scrollHeight;
   $("#apxKirim").disabled = APX_BUSY || !$("#apxIn").value.trim();
   $("#apxSaran").innerHTML = (AX_INFO.ceo ? APX_SARAN_CEO : APX_SARAN_ANGGOTA).map(q => `<button type="button">${esc(q)}</button>`).join("");
@@ -4400,6 +4403,7 @@ $("#axPesan").onclick = async e => {
   const s = e.target.closest("[data-axsalin]"), u = e.target.closest("[data-axulang]");
   if (s) { try { await navigator.clipboard.writeText(APX[+s.dataset.axsalin].text); pesan("Jawaban disalin"); } catch (er) { pesan("Gagal menyalin"); } }
   if (u) apxTanya(null, true);
+  const j = e.target.closest("[data-axjawab]"); if (j) apxTanya(j.dataset.axjawab);
 };
 $("#axBaru").onclick = axBaru; $("#axBaru2").onclick = axBaru;
 $("#axMenu").onclick = () => { $("#ax").classList.add("buka"); $("#axTirai").hidden = false; };

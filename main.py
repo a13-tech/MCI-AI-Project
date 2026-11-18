@@ -138,6 +138,7 @@ IDENTITAS_AI = (f"\n\nIDENTITAS: kamu bagian dari {AI_NAMA}, sistem AI yang dike
 PANGGILAN_BOS = ("\n\nLAWAN BICARAMU: Alvaro, Owner, CEO, dan General Founder MCI, atasanmu langsung. Panggil dia \"Bos\" "
                  "(contoh: \"Siap, Bos!\", \"Bos, ini hasilnya\"). Tetap jujur dan berani menyampaikan risiko atau ketidaksetujuan; panggilan Bos bukan alasan untuk asal setuju.")
 import contextvars as _cv
+import functools
 _PENANYA = _cv.ContextVar("penanya", default=None)   # peran yang sedang mengobrol dengan bot (web / Telegram)
 
 
@@ -11962,6 +11963,7 @@ async def apex_tanya(pesan, riwayat, model_id="gemini", alir=None, r="admin", ta
     jejak = []
     _APEX_LOG.set(jejak)
     _PENANYA.set(r)
+    _KONFIRM.set(apex_konfirmasi_cek(pesan, riwayat))   # SOP: alat aksi hanya jalan kalau pesan ini konfirmasi atas pertanyaan AI sebelumnya
     hist = ke_content([h for h in riwayat if isinstance(h, dict)][-APEX_RIWAYAT:])
     pil, kunci = _apex_mesin(model_id, r)
     bos = is_admin(r)
@@ -11984,9 +11986,10 @@ APEX_IZIN_ALAT = {"cek_produk": None, "cek_perpustakaan": None, "cek_stok": "sto
 
 
 def apex_alat_untuk(r):
+    """Alat sesuai izin; alat aksi dibungkus penjaga SOP konfirmasi."""
     if is_admin(r):
-        return APEX_ALAT
-    return [f for f in APEX_ALAT if f.__name__ in APEX_IZIN_ALAT and (APEX_IZIN_ALAT[f.__name__] is None or can(APEX_IZIN_ALAT[f.__name__], r))]
+        return [_jaga_alat(f) for f in APEX_ALAT]
+    return [_jaga_alat(f) for f in APEX_ALAT if f.__name__ in APEX_IZIN_ALAT and (APEX_IZIN_ALAT[f.__name__] is None or can(APEX_IZIN_ALAT[f.__name__], r))]
 
 
 APEX_COPILOT = (" Di web, halaman obrolan ini bernama MCI Copilot: kalau ditanya namamu di sini, kamu MCI Copilot (ditenagai Apex, sistem 7.5 Cipher).")
@@ -12552,6 +12555,143 @@ def api_cp_pindah():
         return jsonify({"error": "Folder tidak ditemukan"}), 404
     cp_ruang_set(_apex_ruang(r, cid), fid)
     return jsonify({"ok": True, "obrolan": apex_obrolan(r)})
+
+
+# ---------- MCI Copilot: akses baca halaman Tugas, Proyek, Agenda, UU MCI, Jasa ----------
+def _nm_ang(i):
+    return (MEMBERS.get(int(i)) or {}).get("nama", f"#{i}") if str(i).isdigit() else str(i or "")
+
+
+def _cocok_kata(teks, cari):
+    kata = [k for k in re.findall(r"\w+", str(cari or "").lower()) if len(k) > 1]
+    t = str(teks or "").lower()
+    return all(k in t for k in kata) if kata else True
+
+
+def cek_tugas(cari: str = "", status: str = "", punya_saya: bool = False) -> dict:
+    """Lihat daftar tugas tim MCI (halaman Tugas). cari = kata kunci judul/rincian/nama; status = 'belum', 'proses', 'selesai', atau kosong (semua yang belum selesai);
+    punya_saya = true untuk tugas milik penanya saja."""
+    _alat("cek_tugas", cari=cari, status=status)
+    r = _PENANYA.get() or "admin"
+    if not rk_bisa_lihat("tugas", r):
+        return {"error": "tidak punya akses ke halaman Tugas"}
+    me, out = mid_of(r), []
+    for x in rk_rows("tugas"):
+        st = x.get("status") or "belum"
+        if (status and st != status) or (not status and st == "selesai"):
+            continue
+        if punya_saya and str(x.get("pj")) != str(me):
+            continue
+        if not _cocok_kata(f"{x.get('judul')} {x.get('deskripsi')} {_nm_ang(x.get('pj'))}", cari):
+            continue
+        out.append({"judul": x.get("judul"), "pj": _nm_ang(x.get("pj")), "status": st, "prioritas": x.get("prioritas") or "normal",
+                    "tenggat": x.get("tenggat") or "", "rincian": str(x.get("deskripsi") or "")[:300]})
+    out.sort(key=lambda t: (t["tenggat"] or "9999", t["judul"] or ""))
+    return {"jumlah": len(out), "tugas": out[:40], "hari_ini": today()}
+
+
+def cek_proyek(cari: str = "") -> dict:
+    """Lihat proyek MCI (halaman Proyek): status, progres, pemilik, tim, tanggal, deskripsi. cari = nama proyek atau kata kunci; kalau cocok 1 proyek, rinciannya lebih lengkap."""
+    _alat("cek_proyek", cari=cari)
+    r = _PENANYA.get() or "admin"
+    if not rk_bisa_lihat("proyek", r):
+        return {"error": "tidak punya akses ke halaman Proyek"}
+    L = [x for x in rk_rows("proyek") if _cocok_kata(f"{x.get('nama')} {x.get('deskripsi')}", cari)]
+    rinci = len(L) == 1
+    out = []
+    for x in L[:30]:
+        p = {"nama": x.get("nama"), "status": x.get("status"), "progres_persen": x.get("progres"), "pemilik": _nm_ang(x.get("pj")) if x.get("pj") else "",
+             "tim": [_nm_ang(t) for t in x.get("tim") or []], "mulai": x.get("tgl_mulai") or "", "selesai": x.get("tgl_selesai") or "",
+             "deskripsi": str(x.get("deskripsi") or "")[:1500 if rinci else 250]}
+        if rinci:
+            p.update(komponen=str(x.get("komponen") or "")[:1500], laporan_akhir=str(x.get("laporan_akhir") or "")[:1500], tautan=x.get("link") or "",
+                     alasan_freeze=x.get("alasan_freeze") or "")
+            if is_admin(r) or boleh(r, "proyek_kelola"):
+                p.update(dana_diminta=x.get("dana") or 0, dana_tambahan=x.get("dana_tambahan") or 0)
+        out.append({k: v for k, v in p.items() if v not in ("", None, [])})
+    return {"jumlah": len(L), "proyek": out}
+
+
+def cek_agenda(cari: str = "", mendatang: bool = True) -> dict:
+    """Lihat agenda & rapat MCI (halaman Agenda). mendatang = true untuk rapat hari ini dan sesudahnya, false untuk rapat yang sudah lewat (beserta notulen). cari = kata kunci."""
+    _alat("cek_agenda", cari=cari, mendatang=mendatang)
+    r = _PENANYA.get() or "admin"
+    if not rk_bisa_lihat("agenda", r):
+        return {"error": "tidak punya akses ke halaman Agenda"}
+    h, out = today(), []
+    for x in rk_rows("agenda"):
+        tg = x.get("tanggal") or ""
+        if (mendatang and tg < h) or (not mendatang and tg >= h) or not _cocok_kata(f"{x.get('judul')} {x.get('agenda')} {x.get('notulen')}", cari):
+            continue
+        a = {"judul": x.get("judul"), "tanggal": tg, "jam": x.get("jam") or "", "tempat": x.get("tempat") or "", "agenda": str(x.get("agenda") or "")[:600]}
+        if not mendatang:
+            a.update(notulen=str(x.get("notulen") or "")[:1200], hadir=[_nm_ang(t) for t in x.get("hadir") or []])
+        out.append({k: v for k, v in a.items() if v not in ("", None, [])})
+    out.sort(key=lambda a: (a["tanggal"], a.get("jam", "")), reverse=not mendatang)
+    return {"jumlah": len(out), "agenda": out[:20], "hari_ini": h}
+
+
+def cek_uu(pertanyaan: str) -> dict:
+    """Cari pasal UU MCI dan Peraturan Kas yang relevan dengan pertanyaan (aturan absen, kas, denda, izin, keanggotaan, proyek, dll). Kutip nomor pasalnya saat menjawab."""
+    _alat("cek_uu", pertanyaan=pertanyaan)
+    r = _PENANYA.get() or "admin"
+    if mid_of(r) is None and not is_admin(r):
+        return {"error": "UU MCI hanya untuk anggota"}
+    hasil = [{"dokumen": "Peraturan Kas" if x["tipe"] == "kas_pasal" else "UU MCI", "pasal": x["nomor"], "judul": x["judul"], "isi": str(x["isi"])[:1500],
+              "artinya": str(x.get("artinya") or "")[:600]} for x in uu_cari(pertanyaan, 4)]
+    return {"pasal": hasil} if hasil else {"pasal": [], "catatan": "tidak ada pasal yang cocok; coba kata kunci lain"}
+
+
+def cek_jasa(cari: str = "") -> dict:
+    """Lihat daftar jasa internal MCI yang aktif (halaman Jasa): nama jasa, harga, pengerja, deskripsi. cari = kata kunci."""
+    _alat("cek_jasa", cari=cari)
+    r = _PENANYA.get() or "admin"
+    if mid_of(r) is None and not is_admin(r):
+        return {"error": "Jasa internal hanya untuk anggota"}
+    with db() as c:
+        rows = sql(c, "SELECT nama,deskripsi,harga,pengerja,publik FROM jasa WHERE status='aktif' ORDER BY LOWER(nama)").fetchall()
+    out = [{"nama": n, "harga": h or "", "pengerja": _nm_ang(p) if p else "", "tampil_di_katalog_publik": bool(pb), "deskripsi": str(d or "")[:400]}
+           for n, d, h, p, pb in rows if _cocok_kata(f"{n} {d}", cari)]
+    return {"jumlah": len(out), "jasa": out[:40]}
+
+
+APEX_ALAT += [cek_tugas, cek_proyek, cek_agenda, cek_uu, cek_jasa]
+APEX_IZIN_ALAT.update({"cek_tugas": None, "cek_proyek": None, "cek_agenda": None, "cek_uu": None, "cek_jasa": None})
+
+
+# ---------- SOP MCI: semua AI WAJIB konfirmasi ulang sebelum eksekusi (permintaan CEO, 18 Nov 2026) ----------
+# Lapis 1: aturan di IDENTITAS_AI (dibaca semua AI). Lapis 2 (Copilot): alat aksi dikunci sampai pesan pengguna berupa konfirmasi atas pertanyaan AI sebelumnya.
+_KONFIRM = contextvars.ContextVar("apex_konfirm", default=None)   # None = jalur lain (tidak dikunci), True/False = giliran Copilot
+ALAT_AKSI = {"buat_gambar", "buat_model_3d", "buat_panduan_rakit", "usulkan_kas", "usulkan_tugas", "usulkan_catatan", "usulkan_deploy"}
+KONFIRM_POLA = re.compile(r"^\W*(ya+|iya+|y|yoi|ok(e+|ey|ay)?|gas+|lanjut(kan)?|setuju|boleh|jalan(kan)?|eksekusi|yes|yup|sip+|siap|betul|bener|benar|go|acc|buat(kan|in)?|bikin(in|kan)?|"
+                         r"kerjakan|kerjain|lakukan|mantap)\b", re.I)
+_JAGA = {}
+
+
+def apex_konfirmasi_cek(pesan, riwayat):
+    """True kalau pesan ini menjawab 'ya' atas pertanyaan konfirmasi AI di giliran sebelumnya."""
+    model = [h for h in riwayat if isinstance(h, dict) and h.get("role") == "model"]
+    return bool(model) and len(str(pesan)) <= 120 and bool(KONFIRM_POLA.match(str(pesan) or "")) and not re.search(r"\b(jangan|batal|tidak|enggak|gak|nggak|ga)\b", str(pesan).lower())
+
+
+def _jaga_alat(f):
+    if f.__name__ not in ALAT_AKSI:
+        return f
+    if f.__name__ not in _JAGA:
+        @functools.wraps(f)
+        def g(*a, **k):
+            if _KONFIRM.get() is False:
+                return {"status": "PERLU_KONFIRMASI", "pesan": "SOP MCI: belum boleh dieksekusi. Jawab dulu bahwa kamu siap, ringkas apa yang akan dibuat/diubah "
+                        "(rincian penting), lalu tanya 'Lanjut?'. Jalankan alat ini hanya setelah pengguna menjawab ya."}
+            return f(*a, **k)
+        _JAGA[f.__name__] = g
+    return _JAGA[f.__name__]
+
+
+IDENTITAS_AI += ("\n\nSOP MCI (WAJIB untuk semua AI MCI): sebelum MENGEKSEKUSI permintaan yang membuat, mengubah, mengirim, atau menghapus sesuatu "
+                 "(gambar, model 3D, buku panduan, usulan kas/tugas/catatan, deploy, data apa pun), jawab dulu dengan positif bahwa kamu siap (misalnya \"Oke, siap!\"), "
+                 "ringkas apa yang akan kamu buat beserta rincian pentingnya, lalu minta konfirmasi dengan pertanyaan \"Lanjut?\". Eksekusi HANYA setelah pengguna "
+                 "menjawab ya/lanjut/gas. Kalau pengguna mengubah rincian, ringkas ulang dan minta konfirmasi lagi. Bertanya atau membaca data tidak perlu konfirmasi.")
 
 
 # ---------- PERPUSTAKAAN: semua yang bisa membuka web (termasuk viewer) boleh MEMBACA; mengunggah khusus anggota; ubah/hapus milik orang lain khusus CEO ----------
