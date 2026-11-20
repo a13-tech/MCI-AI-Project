@@ -278,7 +278,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 .axKolom,.axDasar{width:100%;max-width:740px;margin:0 auto}
 .axM{margin:0 0 26px}
 .axU{display:flex;justify-content:flex-end}
-.axU div{max-width:min(82%,560px);padding:10px 16px;border-radius:18px;background:var(--hov);font-size:15px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+.axU>div:not(.axUL){max-width:min(82%,560px);padding:10px 16px;border-radius:18px;background:var(--hov);font-size:15px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
 .axA .axIsi{font-family:var(--axSerif);font-size:17px;line-height:1.68;word-break:break-word;font-optical-sizing:auto}
 .axIsi p{margin:0 0 .8em}.axIsi p:last-child{margin-bottom:0}
 .axIsi h3,.axIsi h4{font-family:var(--axJudul);font-weight:700;margin:1.1em 0 .35em;line-height:1.25}.axIsi h3{font-size:24px}.axIsi h4{font-size:20.5px}
@@ -309,6 +309,23 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 .axKotak textarea{all:unset;display:block;width:100%;min-height:26px;max-height:220px;overflow:auto;font:15.5px/1.55 var(--axSans);color:var(--ink);white-space:pre-wrap;word-break:break-word}
 .axKotak textarea::placeholder{color:var(--mute)}
 .axBaris{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:8px}
+.axPlusW{position:relative;flex:none}
+.axPlus{all:unset;display:grid;place-items:center;width:32px;height:32px;border-radius:10px;border:1px solid var(--line2);color:var(--mute);cursor:pointer}
+.axPlus:hover,.axPlus[aria-expanded=true]{background:var(--hov);color:var(--ink)}.axPlus svg{width:17px;height:17px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round}
+.axPlus:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.axMenuPlus{left:0;right:auto;min-width:250px}
+.axLamp{display:flex;gap:8px;overflow-x:auto;padding:2px 0 10px;margin-bottom:4px}
+.axLampI{position:relative;flex:none;display:flex;align-items:center;gap:8px;max-width:220px;padding:6px 26px 6px 6px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.axLampI .tb{flex:none;width:42px;height:42px;border-radius:8px;background:var(--hov) center/cover no-repeat;display:grid;place-items:center;font-size:11px;font-weight:700;color:var(--mute);text-transform:uppercase}
+.axLampI .nm{display:flex;flex-direction:column;min-width:0;font-size:12.5px;line-height:1.3}.axLampI .nm b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.axLampI .nm small{color:var(--mute);font-size:11.5px}.axLampI.gagal{border-color:#e05252}.axLampI.gagal small{color:#e05252}
+.axLampI .br{position:absolute;left:6px;right:6px;bottom:3px;height:3px;border-radius:3px;background:var(--line)}.axLampI .br i{display:block;height:100%;border-radius:3px;background:var(--gold);transition:width .2s}
+.axLampI .x{all:unset;position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;cursor:pointer;color:var(--mute);font-size:14px;line-height:1}.axLampI .x:hover{background:var(--hov);color:var(--ink)}
+.axU .axUL{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:flex-end;gap:6px;margin-bottom:6px;max-width:min(82%,560px);margin-left:auto}
+.axU .axUL span{padding:5px 10px;border-radius:10px;border:1px solid var(--line);font-size:12.5px;color:var(--mute);background:none;max-width:none}
+.axU .axUL img{width:120px;height:90px;object-fit:cover;border-radius:10px;border:1px solid var(--line);padding:0;max-width:none}
+.axU{flex-direction:column;align-items:flex-end}
+#ax.seret .axKotak{border-color:var(--gold);border-style:dashed}
 .axModelW{position:relative}
 .axModel{all:unset;display:inline-flex;align-items:center;gap:4px;padding:6px 8px 6px 10px;border-radius:9px;font-size:13px;color:var(--mute);cursor:pointer}
 .axModel:hover,.axModel[aria-expanded=true]{background:var(--hov);color:var(--ink)}.axModel svg{width:15px;height:15px}
@@ -1831,8 +1848,15 @@ textarea:focus,input:focus,select:focus{border-color:var(--aksen);box-shadow:0 0
     </div>
     <div class="axDasar">
      <form class="axKotak" id="axForm">
+      <div class="axLamp" id="axLamp" hidden></div>
       <textarea id="apxIn" rows="1" maxlength="1500" placeholder="Tanya apa saja ke MCI Copilot" aria-label="Pertanyaan untuk MCI Copilot"></textarea>
       <div class="axBaris">
+       <div class="axPlusW"><button type="button" class="axPlus" id="axPlus" aria-label="Tambah foto, video, atau file" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></button>
+        <div class="axMenuModel axMenuPlus" id="axMenuPlus" role="menu" hidden>
+         <button type="button" role="menuitem" data-axpilih="media">Foto atau video<small>Dari galeri / folder</small></button>
+         <button type="button" role="menuitem" data-axpilih="kamera">Ambil foto<small>Pakai kamera HP</small></button>
+         <button type="button" role="menuitem" data-axpilih="file">File<small>PDF, Word, Excel, PowerPoint, audio, teks, kode</small></button>
+        </div><input type="file" id="axBerkas" multiple hidden></div>
        <div class="axKon" id="axKon"></div>
        <div class="axModelW"><button type="button" class="axModel" id="axModelBtn" aria-haspopup="listbox" aria-expanded="false"><span id="axModelNama"></span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg></button>
         <div class="axMenuModel" id="apxModel" role="listbox" aria-label="Model AI" hidden></div></div>
@@ -4301,7 +4325,7 @@ const APX_LABEL = {buat_gambar: "Bikin gambar", buat_model_3d: "Bikin model 3D",
   cek_blacklist: "Blacklist", cek_catatan: "Catatan", cek_perpustakaan: "Perpustakaan", cek_dokumentasi_dan_voting: "Dokumentasi & voting", cek_iot: "Sensor IoT", cek_status_bot: "Status bot", cek_peta: "Peta jaringan",
   usulkan_kas: "Usulan kas", usulkan_tugas: "Usulan tugas", usulkan_catatan: "Usulan catatan", usulkan_deploy: "Usulan deploy",
   cek_tugas: "Tugas", cek_proyek: "Proyek", cek_agenda: "Agenda", cek_uu: "UU MCI", cek_jasa: "Jasa internal",
-  cek_halaman: "Baca halaman", cek_inbox: "Inbox", isi_halaman: "Tambah data", ubah_halaman: "Ubah data", ubah_stok: "Ubah stok", pakai_stok_proyek: "Pakai stok", pinjam_alat: "Pinjam alat", kembalikan_alat: "Kembalikan alat"};
+  lampiran: "Lampiran", cek_halaman: "Baca halaman", cek_inbox: "Inbox", isi_halaman: "Tambah data", ubah_halaman: "Ubah data", ubah_stok: "Ubah stok", pakai_stok_proyek: "Pakai stok", pinjam_alat: "Pinjam alat", kembalikan_alat: "Kembalikan alat"};
 const axChipAlat = L => { const n = new Map(); (L || []).forEach(a => { const k = axLabelAlat(a); n.set(k, {a, c: (n.get(k)?.c || 0) + 1}); }); return [...n].map(([k, v]) => `<span class="axAlat" title="${esc(JSON.stringify(v.a.arg || {}))}">${esc(k)}${v.c > 1 ? " ×" + v.c : ""}</span>`).join(""); };
 const APX_SARAN_CEO = ["Barang apa yang perlu restock?", "Saldo kas sekarang berapa?", "Siapa yang belum bayar kas minggu ini?", "Invoice mana yang belum lunas?"];
 const APX_SARAN_ANGGOTA = ["Ide proyek IoT sederhana pakai ESP32", "Jelaskan cara kerja relay", "Buku apa saja di perpustakaan soal Arduino?", "Bikinin panduan rakit sensor suhu"];
@@ -4375,15 +4399,15 @@ function apxRender() {
     $("#axFdObr").innerHTML = ob.length ? ob.map(o => `<button type="button" data-axc="${esc(o.id)}"><span>${esc(o.judul)}</span><small>${esc(axGrupWaktu(o.waktu))}</small></button>`).join("") : "<p>Belum ada obrolan di proyek ini. Tulis pertanyaan di atas untuk memulai.</p>"; }
   $("#axJejak").hidden = !(fd && !kosong); if (fd) $("#axJejak").textContent = fd.nama + " ›";
   $("#axKon").innerHTML = AX_INFO.ceo ? AX_KONEKTOR.map(k => `<button type="button" data-axk="${k.id}" aria-pressed="${AX_KON.has(k.id) && k.siap}" ${k.siap ? "" : 'disabled title="Isi kuncinya dulu di Panel CEO → Kunci AI"'}>${esc(k.nama)}</button>`).join("") : "";
-  const cur = AX_DAFTAR.find(o => o.id === AX_C); $("#axJudul").textContent = kosong ? "" : (cur ? cur.judul : (APX[0] && APX[0].text || "").slice(0, 60));
+  const cur = AX_DAFTAR.find(o => o.id === AX_C); $("#axJudul").textContent = kosong ? "" : (cur ? cur.judul : (APX[0] && APX[0].text || (APX[0] && APX[0].lamp && APX[0].lamp.length ? "📎 " + APX[0].lamp[0].nama : "")).replace(/\n?\[📎 .+\]$/, "").slice(0, 60));
   const pm = APX_MODEL.find(m => m.id === APX_PILIH); $("#axModelNama").textContent = pm ? pm.nama : (APX_MODEL[0] || {}).nama || "";
   $("#apxModel").innerHTML = APX_MODEL.map(m => `<button type="button" role="option" data-apm="${m.id}" aria-selected="${m.id === APX_PILIH}" ${m.siap ? "" : "disabled"}>${esc(m.nama)}<small>${esc(m.ket)}${m.siap ? "" : " · belum aktif"}</small></button>`).join("");
   const akhir = APX.length - 1;
-  $("#axPesan").innerHTML = APX.map((x, i) => x.role === "user" ? `<div class="axM axU"><div>${esc(x.text)}</div></div>`
+  $("#axPesan").innerHTML = APX.map((x, i) => x.role === "user" ? axBubbleU(x)
     : `<div class="axM axA${x.galat ? " galat" : ""}">${x.alir && !x.text ? `<div class="axCek">${AX_IK.terbit}Copilot lagi mengecek data…</div>` : `<div class="axIsi">${axMd(x.text)}${x.alir ? '<span class="axKursor"></span>' : ""}</div>`}
       ${x.alir ? "" : `<div class="axBawah">${x.galat ? "" : `<button type="button" data-axsalin="${i}">${AX_IK.salin}Salin</button>`}${i === akhir && AX_C ? `<button type="button" data-axulang>${AX_IK.ulang}Ulangi</button>` : ""}${i === akhir && !x.galat && /lanjut\s*\?\s*\**\s*$/i.test(x.text || "") ? `<button type="button" class="axYa" data-axjawab="Lanjut">Lanjut</button><button type="button" data-axjawab="Batal, jangan dijalankan">Batal</button>` : ""}${axChipAlat(x.alat)}${x.model && apxNamaModel(x.model) ? `<span>${esc(apxNamaModel(x.model))}</span>` : ""}</div>`}</div>`).join("");
   const lg = $("#apxLog"); if (APX_BUSY || lg.dataset.bawah !== "0") lg.scrollTop = lg.scrollHeight;
-  $("#apxKirim").disabled = APX_BUSY || !$("#apxIn").value.trim();
+  $("#apxKirim").disabled = !axBisaKirim();
   $("#apxSaran").innerHTML = (AX_INFO.ceo ? APX_SARAN_CEO : APX_SARAN_ANGGOTA).map(q => `<button type="button">${esc(q)}</button>`).join("");
   axDaftarRender();
 }
@@ -4403,14 +4427,70 @@ async function apxMuat(c) {
   catch (e) { APX_MUAT = false; $("#apxMsg").textContent = e.message; }
 }
 function axBaru() { if (APX_BUSY) return; AX_C = ""; APX = []; AX_F = 0; $("#ax").classList.remove("buka"); $("#axTirai").hidden = true; apxRender(); $("#apxIn").focus(); }
-function axAutoTinggi() { const t = $("#apxIn"); t.style.height = "auto"; t.style.height = Math.min(220, t.scrollHeight) + "px"; $("#apxKirim").disabled = APX_BUSY || !t.value.trim(); }
+function axAutoTinggi() { const t = $("#apxIn"); t.style.height = "auto"; t.style.height = Math.min(220, t.scrollHeight) + "px"; $("#apxKirim").disabled = !axBisaKirim(); }
+// ---- Lampiran (tombol +): diunggah langsung saat dipilih, dikirim bersama pesan berikutnya ----
+let AX_LAMP = [];
+const AX_TERIMA = "image/*,video/*,audio/*,.pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.tsv,.json,.xml,.yaml,.yml,.log,.ini,.py,.js,.ts,.ino,.c,.cpp,.h,.hpp,.java,.kt,.go,.rs,.php,.rb,.sh,.html,.css,.sql";
+const axUk = b => b >= 1048576 ? (b / 1048576).toFixed(1).replace(".", ",") + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+const axBisaKirim = () => !APX_BUSY && !AX_LAMP.some(x => x.status === "naik") && (!!$("#apxIn").value.trim() || AX_LAMP.some(x => x.status === "siap"));
+function axBubbleU(x) {
+  let t = x.text || "", L = x.lamp;
+  const m = t.match(/\n?\[📎 (.+)\]$/);
+  if (m) { t = t.slice(0, m.index); L = L || m[1].split(", ").map(n => ({nama: n})); }
+  if (t === "Tolong lihat lampiran ini." && L && L.length) t = "";
+  const lp = L && L.length ? `<div class="axUL">${L.map(a => a.url ? `<img src="${a.url}" alt="${esc(a.nama)}">` : `<span>📎 ${esc(a.nama)}</span>`).join("")}</div>` : "";
+  return `<div class="axM axU">${lp}${t ? `<div>${esc(t)}</div>` : ""}</div>`;
+}
+function axLampRender() {
+  const w = $("#axLamp"); w.hidden = !AX_LAMP.length;
+  w.innerHTML = AX_LAMP.map(x => `<div class="axLampI${x.status === "gagal" ? " gagal" : ""}"><span class="tb"${x.url ? ` style="background-image:url('${x.url}')"` : ""}>${x.url ? "" : esc((x.nama.split(".").pop() || "file").slice(0, 4))}</span>
+    <span class="nm"><b title="${esc(x.nama)}">${esc(x.nama)}</b><small>${x.status === "gagal" ? esc(x.err) : x.status === "naik" ? "Mengunggah " + x.persen + "%" : axUk(x.ukuran)}</small></span>
+    ${x.status === "naik" ? `<span class="br"><i style="width:${x.persen}%"></i></span>` : ""}<button type="button" class="x" data-axlx="${x.k}" aria-label="Hapus ${esc(x.nama)}">×</button></div>`).join("");
+  $("#apxKirim").disabled = !axBisaKirim();
+}
+function axLampTambah(files) {
+  for (const f of [...files]) {
+    if (AX_LAMP.length >= 5) { $("#apxMsg").textContent = "Maksimal 5 lampiran per pesan."; break; }
+    const x = {k: Math.random().toString(36).slice(2), nama: f.name || "tempelan.png", ukuran: f.size, status: "naik", persen: 0,
+               url: /^image\//.test(f.type) ? URL.createObjectURL(f) : ""};
+    AX_LAMP.push(x);
+    const fd = new FormData(); fd.append("f", f, x.nama);
+    const xhr = new XMLHttpRequest(); x.xhr = xhr;
+    xhr.open("POST", "/api/copilot/lampiran"); xhr.setRequestHeader("X-MCI", "1");
+    xhr.upload.onprogress = e => { if (e.lengthComputable) { x.persen = Math.round(e.loaded / e.total * 100); axLampRender(); } };
+    xhr.onload = () => { let d = {}; try { d = JSON.parse(xhr.responseText); } catch (e) {}
+      if (xhr.status === 200 && d.id) Object.assign(x, {id: d.id, status: "siap", ukuran: d.ukuran});
+      else Object.assign(x, {status: "gagal", err: d.error || "Gagal mengunggah (" + xhr.status + ")"});
+      axLampRender(); };
+    xhr.onerror = () => { Object.assign(x, {status: "gagal", err: "Koneksi putus"}); axLampRender(); };
+    xhr.send(fd);
+  }
+  axLampRender();
+}
+$("#axPlus").onclick = e => { e.stopPropagation(); const m = $("#axMenuPlus"), buka = m.hidden; m.hidden = !buka; $("#axPlus").setAttribute("aria-expanded", buka); };
+$("#axMenuPlus").onclick = e => { const b = e.target.closest("[data-axpilih]"); if (!b) return; const inp = $("#axBerkas"), p = b.dataset.axpilih;
+  inp.accept = p === "media" || p === "kamera" ? "image/*,video/*" : AX_TERIMA; inp.multiple = p !== "kamera";
+  if (p === "kamera") inp.setAttribute("capture", "environment"); else inp.removeAttribute("capture");
+  $("#axMenuPlus").hidden = true; $("#axPlus").setAttribute("aria-expanded", "false"); inp.click(); };
+document.addEventListener("click", e => { const m = $("#axMenuPlus"); if (m && !m.hidden && !e.target.closest(".axPlusW")) { m.hidden = true; $("#axPlus").setAttribute("aria-expanded", "false"); } });
+$("#axBerkas").onchange = e => { axLampTambah(e.target.files); e.target.value = ""; };
+$("#axLamp").onclick = e => { const b = e.target.closest("[data-axlx]"); if (!b) return; const i = AX_LAMP.findIndex(x => x.k === b.dataset.axlx);
+  if (i >= 0) { const x = AX_LAMP[i]; if (x.status === "naik" && x.xhr) x.xhr.abort(); if (x.url) URL.revokeObjectURL(x.url); AX_LAMP.splice(i, 1); axLampRender(); } };
+$("#apxIn").addEventListener("paste", e => { const fs = [...(e.clipboardData || {}).files || []]; if (fs.length) { e.preventDefault(); axLampTambah(fs); } });
+["dragenter", "dragover"].forEach(t => $("#ax").addEventListener(t, e => { if ([...(e.dataTransfer || {}).types || []].includes("Files")) { e.preventDefault(); $("#ax").classList.add("seret"); } }));
+["dragleave", "drop"].forEach(t => $("#ax").addEventListener(t, e => { if (t === "dragleave" && $("#ax").contains(e.relatedTarget)) return; $("#ax").classList.remove("seret"); }));
+$("#ax").addEventListener("drop", e => { if ((e.dataTransfer || {}).files && e.dataTransfer.files.length) { e.preventDefault(); axLampTambah(e.dataTransfer.files); } });
 async function apxTanya(teks, ulang) {
   if (APX_BUSY) return;
   if (ulang) { const u = APX[APX.length - 2]; if (!u || u.role !== "user") return; teks = u.text; APX.splice(APX.length - 1, 1); }
-  else { teks = String(teks == null ? $("#apxIn").value : teks).trim(); if (!teks) return; APX.push({role: "user", text: teks}); $("#apxIn").value = ""; axAutoTinggi(); }
+
+  const lampSiap = ulang ? [] : AX_LAMP.filter(x => x.status === "siap");
+  if (!ulang && AX_LAMP.some(x => x.status === "naik")) { $("#apxMsg").textContent = "Tunggu lampiran selesai diunggah dulu."; return; }
+  if (!ulang) { teks = String(teks == null ? $("#apxIn").value : teks).trim(); if (!teks && !lampSiap.length) return;
+    APX.push({role: "user", text: teks, lamp: lampSiap.map(x => ({nama: x.nama, url: x.url}))}); $("#apxIn").value = ""; AX_LAMP = []; axLampRender(); axAutoTinggi(); }
   $("#apxMsg").textContent = "MCI Copilot bisa keliru. Cek ulang angka penting di halaman aslinya."; APX_BUSY = true;
   const jwb = {role: "model", text: "", alir: true, model: APX_PILIH}; APX.push(jwb); $("#apxLog").dataset.bawah = "1"; apxRender();
-  const body = ulang ? {ulang: true, c: AX_C, model: APX_PILIH} : {pesan: teks, c: AX_C, model: APX_PILIH, folder: AX_C ? 0 : AX_F};
+  const body = ulang ? {ulang: true, c: AX_C, model: APX_PILIH} : {pesan: teks, c: AX_C, model: APX_PILIH, folder: AX_C ? 0 : AX_F, lampiran: lampSiap.map(x => x.id)};
   if (AX_INFO.ceo) body.konektor = [...AX_KON].filter(k => (AX_KONEKTOR.find(x => x.id === k) || {}).siap);
   let selesai = false;
   const beres = isi => { Object.assign(jwb, {text: isi.jawaban, alat: isi.alat, model: isi.model, alir: false}); if (isi.c) AX_C = isi.c; if (isi.kuota) AX_INFO.kuota = isi.kuota; };

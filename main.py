@@ -11969,7 +11969,7 @@ def _apex_mesin(mid, r="admin"):
     return pil, kunci
 
 
-async def apex_tanya(pesan, riwayat, model_id="gemini", alir=None, r="admin", tambahan="", konektor=()):
+async def apex_tanya(pesan, riwayat, model_id="gemini", alir=None, r="admin", tambahan="", konektor=(), lampiran=()):
     """Jalankan satu giliran obrolan. riwayat: format netral [{role, text}] sehingga nyambung walau modelnya ganti. Balik (jawaban, alat, model).
     r = peran penanya: CEO dapat semua alat; anggota hanya alat yang sesuai izin jabatan/divisinya."""
     jejak = []
@@ -11984,7 +11984,13 @@ async def apex_tanya(pesan, riwayat, model_id="gemini", alir=None, r="admin", ta
         fns, gagal = await konektor_fungsi(konektor)
         fungsi += fns
         jejak += [{"alat": "konektor_gagal", "arg": {"konektor": g}} for g in gagal]
-    jawab = await ask("apex", pesan, history=hist, model=pil["model"], act="Menjawab pertanyaan CEO" if bos else "Menjawab pertanyaan anggota", use_mcp=False,
+    parts = None
+    if lampiran:   # tombol +: foto/file/video ikut dikirim di giliran ini
+        parts, gagal_l = await lamp_parts(lampiran, kunci)
+        if gagal_l:
+            pesan += "\n\n(Catatan sistem: lampiran ini gagal dibaca, sampaikan ke pengguna: " + "; ".join(gagal_l) + ")"
+        jejak.append({"alat": "lampiran", "arg": {"file": [m["nama"] for m in lampiran]}})
+    jawab = await ask("apex", pesan, history=hist, parts=parts or None, model=pil["model"], act="Menjawab pertanyaan CEO" if bos else "Menjawab pertanyaan anggota", use_mcp=False,
                       cache=False, fungsi=fungsi, sistem=apex_sistem_untuk(r) + tambahan, kunci=kunci, alir=alir)
     return jawab, jejak, pil["id"]
 
@@ -12073,7 +12079,10 @@ def apex_obrolan(r):
         for ru, w, n, _ in rows:
             pertama = sql(c, "SELECT teks FROM chat_riwayat WHERE ruang=? AND role='user' ORDER BY id LIMIT 1", (ru,)).fetchone()
             cid = "0" if ru == akar else ru[len(akar) + 1:]
-            t = judul.get(ru) or re.sub(r"\s+", " ", (pertama[0] if pertama else "") or "Obrolan").strip()
+            awal = re.sub(r"\n?\[📎 (.+)\]$", "", (pertama[0] if pertama else "") or "").strip()
+            if pertama and (not awal or awal == "Tolong lihat lampiran ini.") and "[📎 " in pertama[0]:
+                awal = "📎 " + pertama[0].rsplit("[📎 ", 1)[1].rstrip("]")
+            t = judul.get(ru) or re.sub(r"\s+", " ", awal or "Obrolan").strip()
             out.append({"id": cid, "judul": t[:70] + ("…" if len(t) > 70 and not judul.get(ru) else ""), "waktu": w or "", "jumlah": int(n), "_ru": ru})
         peta = dict(sql(c, "SELECT ruang,folder FROM copilot_ruang WHERE ruang=? OR ruang LIKE ?", (akar, akar + ":%")).fetchall())
     for o in out:
@@ -12116,6 +12125,8 @@ def _apex_siapkan(r, d):
             sql(c, "DELETE FROM chat_riwayat WHERE ruang=? AND id>=?", (ruang, rows[1][0]))
         return cid, ruang, rows[1][2][:APEX_TEKS], None
     pesan = str(d.get("pesan") or "").strip()[:APEX_TEKS]
+    if not pesan and d.get("lampiran"):
+        pesan = "Tolong lihat lampiran ini."
     if pesan and not _apex_cid(d.get("c")) and int(d.get("folder") or 0) and cp_folder_get(r, d.get("folder")):
         cp_ruang_set(ruang, int(d["folder"]))   # obrolan baru dimulai dari halaman folder
     return cid, ruang, pesan, (None if pesan else "Tulis pertanyaannya dulu")
@@ -12161,14 +12172,16 @@ def api_apex():
         return jsonify({"error": "Mesin AI belum siap, coba lagi sebentar."}), 503
     riwayat = riwayat_ambil(ruang, APEX_RIWAYAT)
     tambahan, kon = _cp_siapkan(r, ruang, d)
+    lamp = _lamp_ambil(r, d)
     try:
-        jawab, jejak, mid = asyncio.run_coroutine_threadsafe(apex_tanya(pesan, riwayat, str(d.get("model") or "gemini"), r=r, tambahan=tambahan, konektor=kon), LOOP).result(150)
+        jawab, jejak, mid = asyncio.run_coroutine_threadsafe(apex_tanya(pesan, riwayat, str(d.get("model") or "gemini"), r=r, tambahan=tambahan, konektor=kon, lampiran=lamp), LOOP).result(290)
     except Exception as e:
         log.exception("Tanya Apex gagal")
         return jsonify({"error": f"Apex gagal menjawab: {e}"}), 502
     jawab = jawab or "(Apex tidak memberi jawaban. Coba tulis ulang pertanyaannya.)"
-    riwayat_tambah(ruang, "user", pesan, mid)
+    riwayat_tambah(ruang, "user", pesan + lamp_catat(lamp), mid)
     riwayat_tambah(ruang, "model", jawab, mid)
+    _lamp_hapus(lamp)
     return jsonify({"jawaban": jawab, "alat": jejak, "model": mid, "c": cid, "kuota": apex_kuota_info(r)})
 
 
@@ -12206,13 +12219,15 @@ def api_apex_alir():
         return jsonify({"error": "Mesin AI belum siap, coba lagi sebentar."}), 503
     riwayat, q = riwayat_ambil(ruang, APEX_RIWAYAT), queue.Queue()
     tambahan, kon = _cp_siapkan(r, ruang, d)
+    lamp = _lamp_ambil(r, d)
     q.put(("c", cid))
 
     async def kerja():
         try:
-            jawab, jejak, mid = await apex_tanya(pesan, riwayat, str(d.get("model") or "gemini"), alir=lambda t: q.put(("t", t)), r=r, tambahan=tambahan, konektor=kon)
+            jawab, jejak, mid = await apex_tanya(pesan, riwayat, str(d.get("model") or "gemini"), alir=lambda t: q.put(("t", t)), r=r, tambahan=tambahan, konektor=kon, lampiran=lamp)
             jawab = jawab or "(Apex tidak memberi jawaban. Coba tulis ulang pertanyaannya.)"
-            await asyncio.to_thread(riwayat_tambah, ruang, "user", pesan, mid)
+            await asyncio.to_thread(riwayat_tambah, ruang, "user", pesan + lamp_catat(lamp), mid)
+            await asyncio.to_thread(_lamp_hapus, lamp)
             await asyncio.to_thread(riwayat_tambah, ruang, "model", jawab, mid)
             q.put(("selesai", {"jawaban": jawab, "alat": jejak, "model": mid, "c": cid, "kuota": await asyncio.to_thread(apex_kuota_info, r)}))
         except Exception as e:
@@ -12223,7 +12238,7 @@ def api_apex_alir():
 
     def aliran():
         mulai = time.time()
-        while time.time() - mulai < 150:
+        while time.time() - mulai < (290 if lamp else 150):
             try:
                 jenis, isi = q.get(timeout=10)
             except queue.Empty:
@@ -12235,6 +12250,194 @@ def api_apex_alir():
         yield f"event: error\ndata: {json.dumps('Waktu habis, coba lagi.')}\n\n"
 
     return Response(aliran(), mimetype="text/event-stream", headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"})
+
+
+# ---------- MCI Copilot: lampiran (tombol +). File singgah sebentar di disk server (maks 2 jam), lalu dikirim ke Gemini:
+# kecil = ikut di pesan (inline), video/besar = File API Gemini (otomatis terhapus di Google setelah 48 jam). Tidak masuk database.
+import tempfile as _tmpf, zipfile as _zipf, html as _html
+LAMP_DIR = os.path.join(_tmpf.gettempdir(), "mci_lampiran")
+LAMP_UMUR, LAMP_PER_PESAN, LAMP_HARIAN, LAMP_INLINE = 7200, 5, 15, 14 * 1024 * 1024
+LAMP_TEKS_EXT = {"txt", "md", "csv", "tsv", "json", "xml", "yaml", "yml", "ini", "log", "py", "js", "ts", "ino", "c", "cpp", "h", "hpp", "java", "kt", "go", "rs",
+                 "php", "rb", "sh", "html", "css", "sql"}
+LAMP_OFFICE = {"docx", "xlsx", "pptx"}
+LAMP_MB = {"gambar": 10, "dok": 20, "audio": 25, "video": 100}
+
+
+def _lamp_jenis(nama, mime):
+    ext = nama.rsplit(".", 1)[-1].lower() if "." in nama else ""
+    mime = (mime or "").lower()
+    if mime.startswith("image/") and ext not in ("svg",):
+        return "gambar", mime if mime in ("image/png", "image/jpeg", "image/webp", "image/heic", "image/heif") else "image/jpeg"
+    if mime.startswith("video/") or ext in ("mp4", "mov", "webm", "mkv", "avi", "3gp"):
+        return "video", mime if mime.startswith("video/") else "video/mp4"
+    if mime.startswith("audio/") or ext in ("mp3", "wav", "m4a", "ogg", "aac", "flac"):
+        return "audio", mime if mime.startswith("audio/") else "audio/mpeg"
+    if ext == "pdf" or mime == "application/pdf":
+        return "dok", "application/pdf"
+    if ext in LAMP_OFFICE:
+        return "dok", "office/" + ext
+    if ext in LAMP_TEKS_EXT or mime.startswith("text/"):
+        return "dok", "text/plain"
+    return None, None
+
+
+def _lamp_bersih():
+    try:
+        os.makedirs(LAMP_DIR, exist_ok=True)
+        batas = time.time() - LAMP_UMUR
+        for n in os.listdir(LAMP_DIR):
+            p = os.path.join(LAMP_DIR, n)
+            if os.path.getmtime(p) < batas:
+                os.remove(p)
+    except OSError:
+        pass
+
+
+def _lamp_meta(i):
+    if not re.fullmatch(r"[0-9a-f]{24}", str(i or "")):
+        return None
+    try:
+        with open(os.path.join(LAMP_DIR, i + ".json"), encoding="utf-8") as f:
+            m = json.load(f)
+        return m if os.path.exists(os.path.join(LAMP_DIR, i)) else None
+    except (OSError, ValueError):
+        return None
+
+
+@app.route("/api/copilot/lampiran", methods=["POST"])
+def api_cp_lampiran():
+    """Unggah satu lampiran (multipart f). Balik {id, nama, jenis, ukuran}. Anggota: jatah harian; video maks 50 MB."""
+    r = _apex_siap()
+    f = request.files.get("f")
+    if not f or not f.filename:
+        return jsonify({"error": "Pilih filenya dulu"}), 400
+    nama = re.sub(r"[\r\n\t/\\]+", " ", f.filename).strip()[:120] or "lampiran"
+    jenis, mime = _lamp_jenis(nama, f.mimetype)
+    if not jenis:
+        return jsonify({"error": f"Jenis file {nama} belum didukung. Bisa: foto, video, audio, PDF, Word, Excel, PowerPoint, teks, dan kode."}), 400
+    bos = is_admin(r)
+    if not bos:
+        h = SET.setdefault("lamp_hari", {})
+        if h.get("tgl") != today():
+            h.clear(); h["tgl"] = today()
+        akar = _apex_akar(r)
+        if h.get(akar, 0) >= LAMP_HARIAN:
+            return jsonify({"error": f"Jatah lampiran hari ini sudah habis ({LAMP_HARIAN} file). Reset jam 00.00 WIB."}), 429
+    maks = (LAMP_MB[jenis] if bos or jenis != "video" else 50) * 1024 * 1024
+    _lamp_bersih()
+    i = secrets.token_hex(12)
+    p = os.path.join(LAMP_DIR, i)
+    f.save(p)
+    uk = os.path.getsize(p)
+    if not 0 < uk <= maks:
+        os.remove(p)
+        return jsonify({"error": f"{nama} terlalu besar. Maksimal {maks // (1024 * 1024)} MB untuk {jenis}."}), 400
+    with open(p + ".json", "w", encoding="utf-8") as fm:
+        json.dump({"pemilik": _apex_akar(r), "nama": nama, "jenis": jenis, "mime": mime, "ukuran": uk, "waktu": _now()}, fm)
+    if not bos:
+        SET["lamp_hari"][_apex_akar(r)] = SET["lamp_hari"].get(_apex_akar(r), 0) + 1
+        set_save()
+    return jsonify({"id": i, "nama": nama, "jenis": jenis, "ukuran": uk})
+
+
+def _lamp_ambil(r, d):
+    """Daftar lampiran milik penanya yang dikirim bersama pesan (maks 5). Lampiran orang lain / kedaluwarsa diabaikan."""
+    out = []
+    for i in (d.get("lampiran") or [])[:LAMP_PER_PESAN] if isinstance(d.get("lampiran"), list) else []:
+        m = _lamp_meta(i)
+        if m and m["pemilik"] == _apex_akar(r):
+            out.append({**m, "id": i, "path": os.path.join(LAMP_DIR, i)})
+    return out
+
+
+def _lamp_hapus(L):
+    for m in L:
+        for p in (m["path"], m["path"] + ".json"):
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+
+
+def _xml_teks(x, pisah_par):
+    x = re.sub(pisah_par, "\n", x)
+    x = re.sub(r"<[^>]+>", "", x)
+    return _html.unescape(x)
+
+
+def lamp_teks_office(path, ext):
+    """Ambil teks dari docx/xlsx/pptx tanpa pustaka tambahan (zip + XML)."""
+    with _zipf.ZipFile(path) as z:
+        nama = z.namelist()
+        if ext == "docx":
+            return _xml_teks(z.read("word/document.xml").decode("utf8", "ignore"), r"</w:p>|<w:br/>|<w:tab/>")
+        if ext == "pptx":
+            sl = sorted([n for n in nama if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)], key=lambda n: int(re.findall(r"\d+", n)[-1]))
+            return "\n\n".join(f"--- Slide {k + 1} ---\n" + _xml_teks(z.read(n).decode("utf8", "ignore"), r"</a:p>") for k, n in enumerate(sl))
+        ss = []
+        if "xl/sharedStrings.xml" in nama:
+            ss = [_xml_teks(s, r"$^") for s in re.findall(r"<si>(.*?)</si>", z.read("xl/sharedStrings.xml").decode("utf8", "ignore"), re.S)]
+        judul = re.findall(r'<sheet [^>]*name="([^"]+)"', z.read("xl/workbook.xml").decode("utf8", "ignore")) if "xl/workbook.xml" in nama else []
+        out = []
+        sh = sorted([n for n in nama if re.fullmatch(r"xl/worksheets/sheet\d+\.xml", n)], key=lambda n: int(re.findall(r"\d+", n)[-1]))
+        for k, n in enumerate(sh):
+            out.append(f"--- Sheet {judul[k] if k < len(judul) else k + 1} ---")
+            for row in re.findall(r"<row[^>]*>(.*?)</row>", z.read(n).decode("utf8", "ignore"), re.S)[:2000]:
+                sel = []
+                for atr, isi in re.findall(r"<c([^>]*?)(?:/>|>(.*?)</c>)", row, re.S):
+                    v = re.search(r"<v>(.*?)</v>", isi or "", re.S)
+                    t = re.search(r'\bt="(\w+)"', atr)
+                    if t and t.group(1) == "s" and v:
+                        sel.append(ss[int(v.group(1))] if v.group(1).isdigit() and int(v.group(1)) < len(ss) else "")
+                    elif t and t.group(1) == "inlineStr":
+                        sel.append(_xml_teks(isi, r"$^"))
+                    else:
+                        sel.append(_html.unescape(v.group(1)) if v else "")
+                out.append("\t".join(sel))
+        return "\n".join(out)
+
+
+async def lamp_parts(L, kunci=None):
+    """Lampiran → potongan pesan Gemini. Balik (parts, catatan_gagal)."""
+    parts, gagal, inline = [], [], 0
+    cl = None
+    for m in L:
+        try:
+            if m["mime"] == "text/plain" or m["mime"].startswith("office/"):
+                if m["mime"] == "text/plain":
+                    with open(m["path"], "rb") as f:
+                        t = f.read(400_000).decode("utf8", "replace")
+                else:
+                    t = await asyncio.to_thread(lamp_teks_office, m["path"], m["mime"].split("/")[1])
+                t = t.strip()
+                parts.append(types.Part(text=f"[Lampiran: {m['nama']}]\n" + (t[:60000] + ("\n...(dipotong)" if len(t) > 60000 else "") if t else "(file kosong / tidak ada teks)")))
+                continue
+            if m["jenis"] != "video" and inline + m["ukuran"] <= LAMP_INLINE:
+                with open(m["path"], "rb") as f:
+                    data = f.read()
+                inline += len(data)
+                parts += [types.Part(text=f"[Lampiran: {m['nama']}]"), types.Part.from_bytes(data=data, mime_type=m["mime"])]
+                continue
+            cl = cl or (client_kunci(kunci) if kunci else client("apex"))
+            fl = await cl.aio.files.upload(file=m["path"], config=types.UploadFileConfig(mime_type=m["mime"], display_name=m["nama"][:100]))
+            for _ in range(60):   # video perlu diproses Google dulu sampai ACTIVE
+                st = str(getattr(fl, "state", "") or "")
+                if "ACTIVE" in st or not st:
+                    break
+                if "FAILED" in st:
+                    raise RuntimeError("Google gagal memproses file ini")
+                await asyncio.sleep(2)
+                fl = await cl.aio.files.get(name=fl.name)
+            parts += [types.Part(text=f"[Lampiran: {m['nama']}]"), types.Part.from_uri(file_uri=fl.uri, mime_type=m["mime"])]
+        except Exception as e:
+            log.warning("lampiran %s gagal: %s", m.get("nama"), e)
+            gagal.append(f"{m['nama']} ({e})")
+    return parts, gagal
+
+
+def lamp_catat(L):
+    """Penanda lampiran di riwayat (file aslinya tidak disimpan)."""
+    return ("\n[📎 " + ", ".join(m["nama"] for m in L) + "]") if L else ""
 
 
 # ---------- MCI Copilot tahap 1: folder proyek (pribadi) + konektor MCP (Render, Neon, GitHub; khusus CEO, baca saja) ----------
