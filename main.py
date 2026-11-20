@@ -1766,6 +1766,8 @@ def _nama_key(n):
 
 def hutang_cek_telat():
     """Tandai anggota yang menunggak lewat jatuh tempo (tanpa konfirmasi) sebagai dikeluarkan. Return nama baru."""
+    if not hal_on("hutang"):
+        return []
     hari = today()
     baru = []
     with db() as c:
@@ -2540,7 +2542,7 @@ def laporan_list():
 def _lap_jatuh_tempo(now):
     """True kalau minggu ini sudah lewat jadwal (mis. Jumat 17:00) dan laporan otomatis belum dibuat.
     Kalau server sempat mati saat jadwal, laporan tetap dibuat begitu server hidup lagi (Sabtu/Minggu)."""
-    if not SET.get("laporan_on", True):
+    if not SET.get("laporan_on", True) or not hal_on("laporan"):
         return False
     if now.weekday() < LAP_HARI or (now.weekday() == LAP_HARI and now.hour < LAP_JAM):
         return False
@@ -4866,6 +4868,8 @@ def api_proyek_tutup(pid):
 
 def pk_cek_pinjaman():
     """Pengingat pinjaman mitra: H-3 sampai lewat jatuh tempo, sekali sehari ke pemilik proyek & Bendahara."""
+    if not hal_on("proyek"):
+        return
     hari = today()
     batas = (datetime.now(WIB) + timedelta(days=3)).date().isoformat()
     ingat = SET.setdefault("pk_ingat", {})
@@ -5017,7 +5021,7 @@ def _absen_kebal(mid):
 
 
 def absen_cek():
-    if not fitur_on("absen"):   # absen dimatikan di Panel CEO: tidak ada pengingat, hitungan bolos, atau dikeluarkan karena bolos
+    if not fitur_on("absen") or not hal_on("absen"):   # absen dimatikan di Panel CEO: tidak ada pengingat, hitungan bolos, atau dikeluarkan karena bolos
         return []
     return _absen_cek()
 
@@ -5359,6 +5363,8 @@ def api_alat_aksi(i, aksi):
 
 def alat_cek_telat():
     """Sekali sehari: ingatkan peminjam alat yang lewat tenggat (dan pengelola alat)."""
+    if not hal_on("alat"):
+        return 0
     hari = today()
     if SET.get("alat_ingat") == hari or datetime.now(WIB).hour < 8:
         return 0
@@ -5911,8 +5917,12 @@ def api_beranda():
     proyek = [{"id": x["id"], "nama": x.get("nama", ""), "progres": int(x.get("progres") or 0), "status": x.get("status")} for x in rk_rows("proyek")
               if x.get("status") in ("berjalan", "ide") and (me is None or me in (x.get("tim") or []) or x.get("pj") == me)][:6]
     umum = [{"judul": x.get("judul", ""), "tanggal": (x.get("dibuat") or "")[:10]} for x in sorted(rk_rows("pengumuman"), key=lambda x: (-bool(x.get("sematkan")), -x["id"]))[:3]]
+    perlu = [x for x in perlu if hal_on(x["hal"])]   # halaman/fitur yang dimatikan CEO tidak ditagih di Beranda
+    info = [x for x in info if hal_on(x["hal"])]
+    proyek = proyek if hal_on("proyek") else []
+    umum = umum if hal_on("pengumuman") else []
     perlu.sort(key=lambda x: not x["penting"])
-    pagi = {"isi": SET.get("pagi_isi", ""), "waktu": SET.get("pagi_waktu", ""), "jam": PAGI_JAM} if is_admin(r) else None   # Laporan Pagi Apex khusus CEO
+    pagi = {"isi": SET.get("pagi_isi", ""), "waktu": SET.get("pagi_waktu", ""), "jam": PAGI_JAM} if is_admin(r) and fitur_on("laporan_pagi") else None   # Laporan Pagi Apex khusus CEO
     return jsonify({"nama": m["nama"] if m else nama_peran(r), "hari": tglid(hi), "perlu": perlu, "info": info, "proyek": proyek, "pengumuman": umum, "sorot": PROYEK_SOROT, "pagi": pagi})
 
 
@@ -8967,6 +8977,8 @@ def kas_tutup_cek():
     """Kas mingguan diberhentikan: ingatkan yang masih menunggak (saat diumumkan & pagi hari terakhir),
     lalu setelah batas lunas lewat, yang MASIH menunggak otomatis dikeluarkan. Pembayaran yang sedang menunggu konfirmasi tidak dihitung nunggak.
     CEO/pemegang akses penuh tidak dikeluarkan otomatis. Kembalikan daftar nama yang dikeluarkan."""
+    if not hal_on("bayarkas"):
+        return []
     d, batas = iuran_set(), kas_batas_lunas()
     if not kas_akhir() or not batas or d.get("tutup_diproses") or d.get("keluar_tunda"):   # keluar_tunda: CEO menunda pengeluaran otomatis
         return []
@@ -11634,58 +11646,58 @@ def pagi_data():
     sejak = SET.get("pagi_terakhir_waktu") or (now - timedelta(days=1)).isoformat(timespec="seconds")
     nm = lambda i: (MEMBERS.get(i) or {}).get("nama", "?")
     d = {"tanggal": hi, "hari": tglid(hi)}
-    tugas = [x for x in rk_rows("tugas") if x.get("status") != "selesai" and x.get("tenggat") and x["tenggat"] <= besok]
+    tugas = [x for x in rk_rows("tugas") if x.get("status") != "selesai" and x.get("tenggat") and x["tenggat"] <= besok] if hal_on("tugas") else []
     d["deadline"] = [f"{'⚠️ LEWAT ' + tglid(x['tenggat']) if x['tenggat'] < hi else ('HARI INI' if x['tenggat'] == hi else 'besok')}: {x.get('judul', '')} ({nm(x.get('pj'))})"
                      for x in sorted(tugas, key=lambda x: x["tenggat"])][:10]
-    for x in rk_rows("proyek"):
+    for x in (rk_rows("proyek") if hal_on("proyek") else []):
         if x.get("status") == "berjalan" and x.get("tgl_selesai") and x["tgl_selesai"] <= lusa3:
             d["deadline"].append(f"Proyek {x.get('nama', '')} target selesai {tglid(x['tgl_selesai'])}, progres {int(x.get('progres') or 0)}%")
     with db() as c:
-        for kebutuhan, tenggat, st in sql(c, "SELECT kebutuhan, tenggat, status FROM jasa_pesan WHERE status NOT IN ('selesai','ditolak','batal') AND tenggat IS NOT NULL AND tenggat<>'' AND tenggat<=?", (besok,)).fetchall():
+        for kebutuhan, tenggat, st in (sql(c, "SELECT kebutuhan, tenggat, status FROM jasa_pesan WHERE status NOT IN ('selesai','ditolak','batal') AND tenggat IS NOT NULL AND tenggat<>'' AND tenggat<=?", (besok,)).fetchall() if hal_on("jasa") else []):
             d["deadline"].append(f"Pesanan jasa ({st}) tenggat {tglid(tenggat)}: {str(kebutuhan)[:80]}")
-        d["agenda"] = [f"{(x.get('jam') or '').replace(':', '.')} {x.get('judul', '')}" + (f" · {x['tempat']}" if x.get("tempat") else "") for x in rk_rows("agenda") if x.get("tanggal") == hi]
+        d["agenda"] = [f"{(x.get('jam') or '').replace(':', '.')} {x.get('judul', '')}" + (f" · {x['tempat']}" if x.get("tempat") else "") for x in rk_rows("agenda") if x.get("tanggal") == hi] if hal_on("agenda") else []
         baru = []
         for jenis, label in (("pengumuman", "Pengumuman"), ("tugas", "Tugas baru"), ("proyek", "Proyek baru")):
-            for x in rk_rows(jenis):
+            for x in (rk_rows(jenis) if hal_on(jenis) else []):
                 if (x.get("dibuat") or "") >= sejak:
                     baru.append(f"{label}: {x.get('judul') or x.get('nama') or ''} (oleh {x.get('oleh') or '?'})")
-        for kebutuhan, oleh in sql(c, "SELECT kebutuhan, oleh FROM jasa_pesan WHERE dibuat>=?", (sejak,)).fetchall():
+        for kebutuhan, oleh in (sql(c, "SELECT kebutuhan, oleh FROM jasa_pesan WHERE dibuat>=?", (sejak,)).fetchall() if hal_on("jasa") else []):
             baru.append(f"Pesanan jasa baru dari {oleh}: {str(kebutuhan)[:80]}")
-        n = int(sql(c, "SELECT COUNT(*) FROM absen_izin WHERE status='menunggu' AND tanggal>=?", (hi,)).fetchone()[0]) if fitur_on("absen") else 0
+        n = int(sql(c, "SELECT COUNT(*) FROM absen_izin WHERE status='menunggu' AND tanggal>=?", (hi,)).fetchone()[0]) if fitur_on("absen") and hal_on("absen") else 0
         if n:
             baru.append(f"{n} izin absen menunggu persetujuan")
-        for judul, st in sql(c, "SELECT judul, status FROM panduan WHERE diubah>=? AND status IN ('jadi','gagal')", (sejak,)).fetchall():
+        for judul, st in (sql(c, "SELECT judul, status FROM panduan WHERE diubah>=? AND status IN ('jadi','gagal')", (sejak,)).fetchall() if hal_on("panduan") else []):
             baru.append(f"Buku panduan {'jadi' if st == 'jadi' else 'GAGAL'}: {judul}")
         n = int(sql(c, "SELECT COUNT(*) FROM model3d WHERE dibuat>=?", (sejak,)).fetchone()[0]) + int(sql(c, "SELECT COUNT(*) FROM gambar WHERE dibuat>=?", (sejak,)).fetchone()[0])
-        if n:
+        if n and (hal_on("studio") or hal_on("gambar")):
             baru.append(f"{n} karya Studio baru (gambar/3D)")
         d["baru"] = baru[:12]
         m_, k_ = sql(c, "SELECT COALESCE(SUM(masuk),0), COALESCE(SUM(keluar),0) FROM kas WHERE tanggal=?", (kemarin,)).fetchone()
         uang = []
-        if int(m_) or int(k_):
+        if (int(m_) or int(k_)) and hal_on("kas"):
             uang.append(f"Kas kemarin: masuk {rp(int(m_))}, keluar {rp(int(k_))}")
-        ivs = sql(c, "SELECT nomor, pembeli, total, jatuh_tempo FROM invoice WHERE status='terkirim'").fetchall()
+        ivs = sql(c, "SELECT nomor, pembeli, total, jatuh_tempo FROM invoice WHERE status='terkirim'").fetchall() if hal_on("invoice") else []
         if ivs:
             telat = [v for v in ivs if v[3] and v[3] <= hi]
             uang.append(f"{len(ivs)} invoice menunggu bayar ({rp(sum(int(v[2] or 0) for v in ivs))})" + (f", {len(telat)} sudah jatuh tempo" if telat else ""))
-        for nama, jml, jt in sql(c, "SELECT nama, jumlah, jatuh_tempo FROM hutang WHERE status<>'lunas' AND jatuh_tempo<=?", (lusa3,)).fetchall():
+        for nama, jml, jt in (sql(c, "SELECT nama, jumlah, jatuh_tempo FROM hutang WHERE status<>'lunas' AND jatuh_tempo<=?", (lusa3,)).fetchall() if hal_on("hutang") else []):
             uang.append(f"Hutang {nama} {rp(int(jml))} jatuh tempo {tglid(jt)}")
-        tg = rk_tunggak()
+        tg = rk_tunggak() if hal_on("bayarkas") else {}
         if tg:
             uang.append(f"{len(tg)} anggota menunggak iuran kas (" + ", ".join(f"{nm(a)} {w} mgg" for a, w in list(tg.items())[:5]) + ")")
         d["uang"] = uang
-        d["stok"] = [f"{s['nama']}: sisa {s['jumlah']} {s['satuan']} (min {s['minimum']})" for s in stok_menipis()][:8]
-        bl = [x for x in belanja_rows() if x["status"] == "perlu"]
+        d["stok"] = [f"{s['nama']}: sisa {s['jumlah']} {s['satuan']} (min {s['minimum']})" for s in stok_menipis()][:8] if hal_on("stok") else []
+        bl = [x for x in belanja_rows() if x["status"] == "perlu"] if hal_on("stok") else []
         d["belanja"] = ([f"{len(bl)} barang perlu dibeli, perkiraan {rp(sum(int(x['harga'] or 0) * max(1, int(x['jumlah'] or 1)) for x in bl))}"
                          + (" · penting: " + ", ".join(x["nama"] for x in bl if x["prioritas"] == "penting")[:150] if any(x["prioritas"] == "penting" for x in bl) else "")] if bl else [])
         dev = [0] + [m["id"] for m in MEMBERS.values() if is_admin(f"m:{m['id']}")]
         d["catatan"] = [f"{judul or str(isi or '')[:60]}" for judul, isi in sql(c, "SELECT judul, isi FROM catatan WHERE tanggal=? AND (bersama=1 OR pemilik IN ("
-                                                                                + ",".join("?" * len(dev or [0])) + "))", (hi, *(dev or [0]))).fetchall()][:8]
+                                                                                + ",".join("?" * len(dev or [0])) + "))", (hi, *(dev or [0]))).fetchall()][:8] if hal_on("catatan") else []
         wajib = [m for m in MEMBERS.values() if m["aktif"]]
         hadir = int(sql(c, "SELECT COUNT(DISTINCT anggota) FROM absen WHERE tanggal=? AND status='hadir'", (kemarin,)).fetchone()[0])
         tok = sql(c, "SELECT COALESCE(SUM(masuk+keluar+pikir),0), COALESCE(SUM(panggilan),0) FROM pemakaian WHERE tanggal=?", (kemarin,)).fetchone()
         gagal = int(sql(c, "SELECT COUNT(*) FROM panduan WHERE status='gagal' AND diubah>=?", (sejak,)).fetchone()[0])
-    d["sehat"] = ([f"Absen kemarin: {hadir} dari {len(wajib)} anggota hadir"] if fitur_on("absen") else []) + [f"AI kemarin: {int(tok[1])} panggilan, {int(tok[0]):,} token".replace(",", ".")] + ([f"{gagal} pembuatan panduan gagal"] if gagal else [])
+    d["sehat"] = ([f"Absen kemarin: {hadir} dari {len(wajib)} anggota hadir"] if fitur_on("absen") and hal_on("absen") else []) + [f"AI kemarin: {int(tok[1])} panggilan, {int(tok[0]):,} token".replace(",", ".")] + ([f"{gagal} pembuatan panduan gagal"] if gagal else [])
     return d
 
 
@@ -11985,11 +11997,18 @@ APEX_IZIN_ALAT = {"cek_produk": None, "cek_perpustakaan": None, "cek_stok": "sto
                   "cek_iuran": "kas_edit", "buat_gambar": "gambar_buat", "buat_model_3d": None, "buat_panduan_rakit": None}
 
 
+APEX_HAL_ALAT = {"cek_stok": "stok", "cek_produk": "produk", "cek_kas": "kas", "cek_invoice": "invoice", "cek_hutang": "hutang", "cek_iuran": "bayarkas",
+                 "cek_anggota": "tim", "cek_blacklist": "blacklist", "cek_catatan": "catatan", "cek_perpustakaan": "perpus", "cek_dokumentasi_dan_voting": "dokumentasi",
+                 "cek_iot": "iot", "cek_peta": "graf", "buat_gambar": "gambar", "buat_model_3d": "studio", "buat_panduan_rakit": "panduan", "usulkan_kas": "kas",
+                 "usulkan_tugas": "tugas", "usulkan_catatan": "catatan", "cek_tugas": "tugas", "cek_proyek": "proyek", "cek_agenda": "agenda", "cek_uu": "uu", "cek_jasa": "jasa"}
+
+
 def apex_alat_untuk(r):
-    """Alat sesuai izin; alat aksi dibungkus penjaga SOP konfirmasi."""
+    """Alat sesuai izin; alat aksi dibungkus penjaga SOP konfirmasi. Anggota tidak mendapat alat dari halaman yang dimatikan CEO."""
     if is_admin(r):
         return [_jaga_alat(f) for f in APEX_ALAT]
-    return [_jaga_alat(f) for f in APEX_ALAT if f.__name__ in APEX_IZIN_ALAT and (APEX_IZIN_ALAT[f.__name__] is None or can(APEX_IZIN_ALAT[f.__name__], r))]
+    return [_jaga_alat(f) for f in APEX_ALAT if f.__name__ in APEX_IZIN_ALAT and (APEX_IZIN_ALAT[f.__name__] is None or can(APEX_IZIN_ALAT[f.__name__], r))
+            and hal_on(APEX_HAL_ALAT.get(f.__name__, ""))]
 
 
 APEX_COPILOT = (" Di web, halaman obrolan ini bernama MCI Copilot: kalau ditanya namamu di sini, kamu MCI Copilot (ditenagai Apex, sistem 7.5 Cipher).")
@@ -12069,7 +12088,7 @@ def _apex_siap(khusus_ceo=False):
         abort(401)
     if is_admin(r):
         return r
-    if khusus_ceo or not member_of(r):
+    if khusus_ceo or not member_of(r) or not hal_on("apex"):   # halaman Copilot dimatikan CEO: anggota tidak bisa memakai
         abort(403)
     return r
 
@@ -13110,6 +13129,17 @@ MODEL_TUGAS = {   # pilihan model per tugas (tombol di panel)
 
 def fitur_on(k):
     return k not in (SET.get("fitur_mati") or [])
+
+
+FITUR_HAL = {"absen": ["absen"], "pusat_info": ["info"], "studio_gambar": ["gambar"]}   # sama dengan FITUR_HAL di web/index.html
+
+
+def hal_on(p):
+    """Halaman p aktif? Mati kalau dimatikan di Panel CEO (kartu Halaman) atau fitur pemiliknya dimatikan.
+    SOP: halaman/fitur yang mati tidak boleh menagih, mengirim pengingat, muncul di laporan/Beranda, atau dibaca Copilot anggota."""
+    if p in (SET.get("hal_mati") or []):
+        return False
+    return not any(p in FITUR_HAL.get(f, []) for f in (SET.get("fitur_mati") or []))
 
 
 def model_tugas(t):

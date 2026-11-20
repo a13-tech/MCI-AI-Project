@@ -7606,7 +7606,7 @@ async function brMuat() {
   const copilot = $("#nvApex") && $("#nvApex").style.display !== "none";
   const hero = `<div class="brHero"><div class="brAngka"><div><b>${d.perlu.length}</b><small>Perlu dikerjakan</small></div><div><b>${d.proyek.length}</b><small>Proyek berjalan</small></div></div>
     <div class="brTengah"><h1>Berjaya di <em>tiga bidang</em> sekaligus.</h1><p>Selamat ${waktu}, ${esc(d.nama.split(" ")[0])}. ${esc(d.hari)}. Semua proyek, tugas, dan agenda MCI ada di sini${copilot ? ", dan Copilot siap membantu" : ""}.</p>
-    <div class="brTombol"><button class="bt g" type="button" data-brh="${copilot ? "apex" : "info"}">${copilot ? "Tanya Copilot" : "Tanya Pusat Info"}</button><button class="bt o" type="button" data-brh="proyek">Lihat proyek</button></div></div>
+    <div class="brTombol"><button class="bt g" type="button" data-brh="${copilot ? "apex" : "info"}">${copilot ? "Tanya Copilot" : "Tanya Pusat Info"}</button>${halMati().has("proyek") ? "" : '<button class="bt o" type="button" data-brh="proyek">Lihat proyek</button>'}</div></div>
     <div class="brAngka kanan"><div><b>${rata}%</b><small>Progres rata-rata</small></div><div><b>${d.info.length}</b><small>Akan datang</small></div></div></div>`;
   $("#brBox").innerHTML = hero + pg + `<h2 style="margin-top:18px">Perlu dikerjakan</h2>${d.perlu.length ? `<div class="hl">${d.perlu.map(baris).join("")}</div>` : '<p class="mu">Tidak ada yang mendesak. Semua beres.</p>'}
     ${d.info.length ? `<h2>Akan datang</h2><div class="hl">${d.info.map(baris).join("")}</div>` : ""}
