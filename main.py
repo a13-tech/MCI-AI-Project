@@ -13236,6 +13236,278 @@ APEX_SISTEM = APEX_SISTEM.replace(
     "Kalau alat menjawab ok=false, sampaikan alasannya apa adanya. ")
 
 
+# ---------- MCI Copilot: Google Drive lewat akun robot (service account). Robot hanya melihat file/folder yang DI-SHARE ke email robot.
+# Baca + edit Docs/Sheets yang sudah ada. Khusus CEO; semua edit lewat SOP konfirmasi dan tercatat di audit. Tidak ada alat hapus.
+GD_SCOPE = "https://www.googleapis.com/auth/drive"
+_GD = {"token": "", "habis": 0, "email": ""}
+GD_MIME = {"application/vnd.google-apps.document": "Google Docs", "application/vnd.google-apps.spreadsheet": "Google Sheets",
+           "application/vnd.google-apps.presentation": "Google Slides", "application/vnd.google-apps.folder": "Folder", "application/pdf": "PDF"}
+
+
+def gd_sa():
+    """Isi kunci JSON service account dari env GOOGLE_SA_JSON (boleh JSON mentah atau base64)."""
+    v = os.getenv("GOOGLE_SA_JSON", "").strip()
+    if not v:
+        return None
+    try:
+        d = json.loads(v) if v.startswith("{") else json.loads(base64.b64decode(v).decode())
+        return d if d.get("client_email") and d.get("private_key") else None
+    except Exception:
+        return None
+
+
+def gd_siap():
+    return bool(gd_sa())
+
+
+def gd_token():
+    if _GD["token"] and _GD["habis"] > time.time() + 60:
+        return _GD["token"]
+    sa = gd_sa()
+    if not sa:
+        raise RuntimeError("Kunci Google (GOOGLE_SA_JSON) belum diisi di Panel CEO")
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding
+    b64 = lambda b: base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+    t = int(time.time())
+    aud = sa.get("token_uri") or "https://oauth2.googleapis.com/token"
+    isi = b64(json.dumps({"alg": "RS256", "typ": "JWT"}).encode()) + "." + b64(json.dumps({"iss": sa["client_email"], "scope": GD_SCOPE, "aud": aud, "iat": t, "exp": t + 3600}).encode())
+    kunci = serialization.load_pem_private_key(sa["private_key"].encode(), password=None)
+    jwt = isi + "." + b64(kunci.sign(isi.encode(), padding.PKCS1v15(), hashes.SHA256()))
+    r_ = httpx.post(aud, data={"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer", "assertion": jwt}, timeout=20)
+    if r_.status_code >= 400:
+        raise RuntimeError(f"Google menolak kunci robot ({r_.status_code}): {r_.text[:160]}")
+    j = r_.json()
+    _GD.update(token=j["access_token"], habis=time.time() + int(j.get("expires_in", 3600)), email=sa["client_email"])
+    return _GD["token"]
+
+
+def _gd(metode, url, **kw):
+    r_ = httpx.request(metode, url, headers={"Authorization": f"Bearer {gd_token()}"}, timeout=kw.pop("timeout", 30), **kw)
+    if r_.status_code >= 400:
+        teks = r_.text[:400]
+        if "storageQuotaExceeded" in teks or "do not have storage quota" in teks:
+            raise RuntimeError("KUOTA_ROBOT")
+        if r_.status_code == 404:
+            raise RuntimeError("file tidak ditemukan atau belum di-share ke robot")
+        if r_.status_code == 403:
+            raise RuntimeError("robot tidak punya izin (share file/folder ke robot sebagai Editor)")
+        raise RuntimeError(f"Google menjawab {r_.status_code}: {teks[:160]}")
+    return r_
+
+
+GD_API = "https://www.googleapis.com/drive/v3/files"
+_GD_FIELDS = "id,name,mimeType,modifiedTime,webViewLink,size,owners(displayName)"
+
+
+def _gd_info(f):
+    return {"id": f["id"], "nama": f["name"], "jenis": GD_MIME.get(f["mimeType"], f["mimeType"].split("/")[-1]), "diubah": (f.get("modifiedTime") or "")[:16].replace("T", " "),
+            "link": f.get("webViewLink", ""), "pemilik": ", ".join(o.get("displayName", "") for o in f.get("owners") or [])}
+
+
+def _gd_resolve(file):
+    """id, link Google, atau nama file → metadata satu file. Balik (file, error)."""
+    s = str(file or "").strip()
+    m = re.search(r"/d/([\w-]{20,})", s) or re.search(r"[?&]id=([\w-]{20,})", s) or re.fullmatch(r"([\w-]{25,})", s)
+    if m:
+        try:
+            return _gd("GET", f"{GD_API}/{m.group(1)}", params={"fields": _GD_FIELDS, "supportsAllDrives": "true"}).json(), None
+        except RuntimeError as e:
+            return None, str(e)
+    q = "trashed=false and name contains '" + s.replace("\\", "\\\\").replace("'", "\\'") + "'"
+    L = _gd("GET", GD_API, params={"q": q, "fields": f"files({_GD_FIELDS})", "pageSize": 10, "supportsAllDrives": "true", "includeItemsFromAllDrives": "true"}).json().get("files", [])
+    persis = [f for f in L if f["name"].lower() == s.lower()]
+    L = persis or L
+    if len(L) != 1:
+        return None, (f"'{s}' cocok dengan {len(L)} file: " + "; ".join(f"{f['name']} ({GD_MIME.get(f['mimeType'], f['mimeType'])})" for f in L[:8])) if L else f"tidak ada file bernama '{s}' yang di-share ke robot"
+    return L[0], None
+
+
+def _gd_bungkus(fn):
+    @functools.wraps(fn)
+    def g(*a, **k):
+        if not gd_siap():
+            return {"ok": False, "pesan": "Google Drive belum terhubung. CEO perlu mengisi kunci robot (GOOGLE_SA_JSON) di Panel CEO → Kunci AI."}
+        try:
+            return fn(*a, **k)
+        except RuntimeError as e:
+            if str(e) == "KUOTA_ROBOT":
+                return {"ok": False, "pesan": "Google menolak: akun robot tidak punya kuota penyimpanan, jadi tidak bisa MEMBUAT file baru di Drive pribadi. "
+                        "Solusi: buat dulu file kosong (Docs/Sheets) di folder MCI lalu minta saya mengisinya, atau pakai Shared Drive (Google Workspace)."}
+            return {"ok": False, "pesan": str(e)}
+        except Exception as e:
+            log.exception("Drive gagal")
+            return {"ok": False, "pesan": f"Drive gagal: {str(e)[:160]}"}
+    return g
+
+
+@_gd_bungkus
+def drive_cari(cari: str = "") -> dict:
+    """Cari file/folder di Google Drive MCI (yang di-share ke robot MCI). cari = kata di nama atau isi file; kosong = 25 file terbaru."""
+    _alat("drive_cari", cari=cari)
+    q = "trashed=false"
+    if str(cari or "").strip():
+        k = str(cari).strip().replace("\\", "\\\\").replace("'", "\\'")
+        q += f" and (name contains '{k}' or fullText contains '{k}')"
+    L = _gd("GET", GD_API, params={"q": q, "fields": f"files({_GD_FIELDS})", "pageSize": 25, "orderBy": "modifiedTime desc" if not cari else None,
+                                     "supportsAllDrives": "true", "includeItemsFromAllDrives": "true"}).json().get("files", [])
+    out = {"jumlah": len(L), "file": [_gd_info(f) for f in L], "email_robot": _GD["email"] or (gd_sa() or {}).get("client_email")}
+    if not L:
+        out["info"] = "Tidak ada yang cocok. Ingat: robot hanya melihat file/folder yang di-share ke email robot."
+    return out
+
+
+def _gd_sheet_teks(sid, maks=60000):
+    meta = _gd("GET", f"https://sheets.googleapis.com/v4/spreadsheets/{sid}", params={"fields": "sheets.properties(title,gridProperties)"}).json()
+    judul = [s["properties"]["title"] for s in meta.get("sheets", [])][:10]
+    if not judul:
+        return ""
+    v = _gd("GET", f"https://sheets.googleapis.com/v4/spreadsheets/{sid}/values:batchGet", params=[("ranges", f"'{t}'") for t in judul]).json()
+    out = []
+    for t, vr in zip(judul, v.get("valueRanges", [])):
+        out.append(f"--- Sheet {t} --- (baris 1 = baris 1 di sheet)")
+        out += ["\t".join(str(c) for c in row) for row in (vr.get("values") or [])[:1500]]
+    return "\n".join(out)[:maks]
+
+
+@_gd_bungkus
+def drive_baca(file: str) -> dict:
+    """Baca isi file Google Drive: Google Docs/Slides (teks), Google Sheets (semua sheet, dipisah tab), Word/Excel/PowerPoint, dan file teks.
+    file = nama file, link Google, atau id."""
+    _alat("drive_baca", file=file)
+    f, err = _gd_resolve(file)
+    if err:
+        return {"ok": False, "pesan": err}
+    mt, info = f["mimeType"], _gd_info(f)
+    if mt == "application/vnd.google-apps.folder":
+        L = _gd("GET", GD_API, params={"q": f"'{f['id']}' in parents and trashed=false", "fields": f"files({_GD_FIELDS})", "pageSize": 50,
+                                         "supportsAllDrives": "true", "includeItemsFromAllDrives": "true"}).json().get("files", [])
+        return {"ok": True, **info, "isi_folder": [_gd_info(x) for x in L]}
+    if mt == "application/vnd.google-apps.spreadsheet":
+        teks = _gd_sheet_teks(f["id"])
+    elif mt in ("application/vnd.google-apps.document", "application/vnd.google-apps.presentation"):
+        teks = _gd("GET", f"{GD_API}/{f['id']}/export", params={"mimeType": "text/plain"}).text
+    else:
+        if int(f.get("size") or 0) > 15_000_000:
+            return {"ok": False, "pesan": "file lebih dari 15 MB, terlalu besar untuk dibaca"}
+        data = _gd("GET", f"{GD_API}/{f['id']}", params={"alt": "media", "supportsAllDrives": "true"}, timeout=60).content
+        ext = f["name"].rsplit(".", 1)[-1].lower() if "." in f["name"] else ""
+        if ext in LAMP_OFFICE:
+            with _tmpf.NamedTemporaryFile(suffix="." + ext) as tf:
+                tf.write(data); tf.flush()
+                teks = lamp_teks_office(tf.name, ext)
+        elif ext in LAMP_TEKS_EXT or mt.startswith("text/"):
+            teks = data.decode("utf8", "replace")
+        else:
+            return {"ok": False, **info, "pesan": f"jenis {info['jenis']} belum bisa dibaca langsung. Untuk PDF/foto, unduh lalu lampirkan lewat tombol + di Copilot."}
+    teks = (teks or "").strip()
+    return {"ok": True, **info, "isi": teks[:60000] + ("\n...(dipotong)" if len(teks) > 60000 else "")}
+
+
+def _gd_harus(f, mt, nama):
+    if f["mimeType"] != mt:
+        raise RuntimeError(f"'{f['name']}' bukan {nama} (jenisnya {GD_MIME.get(f['mimeType'], f['mimeType'])})")
+
+
+@_gd_bungkus
+def drive_tulis_dokumen(file: str, teks: str, mode: str = "tambah") -> dict:
+    """AKSI: tulis ke Google Docs yang sudah ada. mode = 'tambah' (tambahkan teks di akhir dokumen) atau 'ganti_semua' (hapus isi lama, ganti dengan teks ini).
+    file = nama/link/id dokumen."""
+    _alat("drive_tulis_dokumen", file=file, mode=mode)
+    f, err = _gd_resolve(file)
+    if err:
+        return {"ok": False, "pesan": err}
+    _gd_harus(f, "application/vnd.google-apps.document", "Google Docs")
+    doc = _gd("GET", f"https://docs.googleapis.com/v1/documents/{f['id']}", params={"fields": "body(content(endIndex))"}).json()
+    akhir = max([c.get("endIndex", 1) for c in doc.get("body", {}).get("content", [])] or [1])
+    teks = str(teks or "").replace("\r", "")[:50000]
+    req = []
+    if mode == "ganti_semua" and akhir > 2:
+        req.append({"deleteContentRange": {"range": {"startIndex": 1, "endIndex": akhir - 1}}})
+        req.append({"insertText": {"location": {"index": 1}, "text": teks}})
+    else:
+        req.append({"insertText": {"endOfSegmentLocation": {}, "text": ("\n" if akhir > 2 else "") + teks}})
+    _gd("POST", f"https://docs.googleapis.com/v1/documents/{f['id']}:batchUpdate", json={"requests": req})
+    audit("Google Drive", f"tulis dokumen ({mode})", f"{f['name']}: {len(teks)} karakter", 0, nama_peran(_PENANYA.get() or "admin"))
+    return {"ok": True, "pesan": f"Dokumen '{f['name']}' sudah ditulis ({'diganti semua' if mode == 'ganti_semua' else 'ditambah di akhir'}).", "link": f.get("webViewLink", "")}
+
+
+@_gd_bungkus
+def drive_ganti_teks(file: str, cari: str, ganti: str) -> dict:
+    """AKSI: cari-dan-ganti semua kemunculan teks di Google Docs yang sudah ada (huruf besar/kecil diperhatikan)."""
+    _alat("drive_ganti_teks", file=file, cari=cari)
+    f, err = _gd_resolve(file)
+    if err:
+        return {"ok": False, "pesan": err}
+    _gd_harus(f, "application/vnd.google-apps.document", "Google Docs")
+    if not str(cari or ""):
+        return {"ok": False, "pesan": "teks yang dicari wajib diisi"}
+    j = _gd("POST", f"https://docs.googleapis.com/v1/documents/{f['id']}:batchUpdate",
+            json={"requests": [{"replaceAllText": {"containsText": {"text": str(cari), "matchCase": True}, "replaceText": str(ganti or "")}}]}).json()
+    n = ((j.get("replies") or [{}])[0].get("replaceAllText") or {}).get("occurrencesChanged", 0)
+    audit("Google Drive", "ganti teks dokumen", f"{f['name']}: {n} tempat", 0, nama_peran(_PENANYA.get() or "admin"))
+    return {"ok": True, "pesan": f"{n} tempat diganti di '{f['name']}'." if n else f"Teks '{cari}' tidak ditemukan di '{f['name']}'.", "link": f.get("webViewLink", "")}
+
+
+@_gd_bungkus
+def drive_tulis_sheet(file: str, rentang: str, nilai: str, mode: str = "ubah") -> dict:
+    """AKSI: tulis ke Google Sheets yang sudah ada. rentang = notasi A1, misalnya 'Stok!A2' atau 'Sheet1!B3:D5' (untuk mode tambah cukup nama sheet atau 'Sheet1!A:D').
+    nilai = JSON array baris, misalnya [["LCD 1602", 0, "dipakai lomba"]]. mode = 'ubah' (timpa sel mulai rentang) atau 'tambah' (tambah baris di bawah data)."""
+    _alat("drive_tulis_sheet", file=file, rentang=rentang, mode=mode)
+    f, err = _gd_resolve(file)
+    if err:
+        return {"ok": False, "pesan": err}
+    _gd_harus(f, "application/vnd.google-apps.spreadsheet", "Google Sheets")
+    try:
+        v = json.loads(nilai) if isinstance(nilai, str) else nilai
+        if v and not isinstance(v[0], list):
+            v = [v]
+        assert isinstance(v, list) and v and len(v) <= 2000
+    except Exception:
+        return {"ok": False, "pesan": "nilai harus JSON array baris, contoh [[\"a\", 1], [\"b\", 2]]"}
+    rg = quote(str(rentang or "A1").strip(), safe="!:'")
+    base = f"https://sheets.googleapis.com/v4/spreadsheets/{f['id']}/values/{rg}"
+    if mode == "tambah":
+        j = _gd("POST", base + ":append", params={"valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS"}, json={"values": v}).json()
+        tempat = (j.get("updates") or {}).get("updatedRange", "")
+    else:
+        j = _gd("PUT", base, params={"valueInputOption": "USER_ENTERED"}, json={"values": v}).json()
+        tempat = j.get("updatedRange", "")
+    audit("Google Drive", f"tulis sheet ({mode})", f"{f['name']} {tempat}: {len(v)} baris", 0, nama_peran(_PENANYA.get() or "admin"))
+    return {"ok": True, "pesan": f"{len(v)} baris ditulis di '{f['name']}' ({tempat}).", "link": f.get("webViewLink", "")}
+
+
+@_gd_bungkus
+def drive_buat(nama: str, jenis: str = "dokumen", folder: str = "", isi: str = "") -> dict:
+    """AKSI: buat file baru di Drive. jenis = dokumen | spreadsheet | folder. folder = nama/link folder tujuan (wajib folder yang di-share ke robot).
+    isi = teks awal (untuk dokumen). Catatan: di Drive pribadi (Gmail) Google bisa menolak karena robot tidak punya kuota; sampaikan solusinya kalau gagal."""
+    _alat("drive_buat", judul=nama, jenis=jenis, folder=folder)
+    mt = {"dokumen": "application/vnd.google-apps.document", "spreadsheet": "application/vnd.google-apps.spreadsheet", "folder": "application/vnd.google-apps.folder"}.get(str(jenis).lower())
+    if not mt or not str(nama or "").strip():
+        return {"ok": False, "pesan": "nama wajib, jenis = dokumen | spreadsheet | folder"}
+    body = {"name": str(nama).strip()[:200], "mimeType": mt}
+    if str(folder or "").strip():
+        fo, err = _gd_resolve(folder)
+        if err:
+            return {"ok": False, "pesan": "folder: " + err}
+        _gd_harus(fo, "application/vnd.google-apps.folder", "folder")
+        body["parents"] = [fo["id"]]
+    else:
+        return {"ok": False, "pesan": "sebut folder tujuan (folder MCI yang sudah di-share ke robot)"}
+    f = _gd("POST", GD_API, params={"fields": _GD_FIELDS, "supportsAllDrives": "true"}, json=body).json()
+    if isi and mt.endswith("document"):
+        _gd("POST", f"https://docs.googleapis.com/v1/documents/{f['id']}:batchUpdate", json={"requests": [{"insertText": {"location": {"index": 1}, "text": str(isi)[:50000]}}]})
+    audit("Google Drive", "buat " + jenis, f["name"], 0, nama_peran(_PENANYA.get() or "admin"))
+    return {"ok": True, "pesan": f"{jenis.capitalize()} '{f['name']}' dibuat.", **_gd_info(f)}
+
+
+APEX_ALAT += [drive_cari, drive_baca, drive_tulis_dokumen, drive_ganti_teks, drive_tulis_sheet, drive_buat]   # tidak masuk APEX_IZIN_ALAT = khusus CEO
+ALAT_AKSI |= {"drive_tulis_dokumen", "drive_ganti_teks", "drive_tulis_sheet", "drive_buat"}
+APEX_SISTEM += (" GOOGLE DRIVE: kamu bisa membaca dan mengedit Google Drive MCI lewat drive_cari, drive_baca, drive_tulis_dokumen, drive_ganti_teks, drive_tulis_sheet, drive_buat. "
+                "Robot hanya melihat file/folder yang di-share ke email robot. Sebelum mengedit, baca dulu isinya, ringkas perubahan (file, bagian, isi baru), tanya 'Lanjut?'. "
+                "Sertakan link file dari hasil alat setelah selesai.")
+
+
 # ---------- PERPUSTAKAAN: semua yang bisa membuka web (termasuk viewer) boleh MEMBACA; mengunggah khusus anggota; ubah/hapus milik orang lain khusus CEO ----------
 PERPUS_MAKS, PERPUS_FILE_MAKS = 300, 8_000_000
 PERPUS_JATAH = {"viewer_ip": 3, "viewer_semua": 30, "anggota": 10}   # unggahan per hari (WIB); CEO tanpa batas
@@ -13615,6 +13887,7 @@ KUNCI_DAFTAR = [   # (nama env, label, kelompok, cara uji). Token login, SECRET_
     ("RENDER_API_KEY", "Render: API key (konektor Copilot + usulan deploy)", "Konektor Copilot", "render"),
     ("NEON_API_KEY", "Neon: API key (konektor Copilot)", "Konektor Copilot", "neon"),
     ("GITHUB_TOKEN", "GitHub: token fine-grained, baca saja (konektor Copilot)", "Konektor Copilot", "github"),
+    ("GOOGLE_SA_JSON", "Google Drive: isi file kunci JSON akun robot (service account)", "Google Drive", "gdrive"),
 ]
 TEKS_DAFTAR = [("ZOHO_DC", "Pusat data Zoho (com / in / eu, kosong = com)"), ("R2_BUCKET", "Nama bucket R2 (kosong = mci-dokumentasi)"), ("GROQ_MODEL", "ID model Groq"), ("NVIDIA_MODEL", "ID model NVIDIA"), ("MISTRAL_MODEL", "ID model Mistral")]   # bukan rahasia
 KUNCI_NAMA = {k for k, *_ in KUNCI_DAFTAR} | {k for k, _ in TEKS_DAFTAR}
@@ -13866,6 +14139,13 @@ def _uji_kunci(cara, nilai):
         req = urllib.request.Request("https://console.neon.tech/api/v2/projects?limit=1", headers={"Authorization": f"Bearer {nilai}", "Accept": "application/json"})
     elif cara == "github":
         req = urllib.request.Request("https://api.github.com/user", headers={"Authorization": f"Bearer {nilai}", "Accept": "application/vnd.github+json", "User-Agent": "MCI-HQ/1.0"})
+    elif cara == "gdrive":
+        try:
+            _GD.update(token="", habis=0)
+            n = len(_gd("GET", GD_API, params={"q": "trashed=false", "pageSize": 100, "fields": "files(id)"}).json().get("files", []))
+            return True, f"tersambung sebagai {_GD['email']}; robot melihat {n}{'+' if n >= 100 else ''} file. Share folder MCI ke email itu sebagai Editor."
+        except Exception as e:
+            return False, str(e)[:160]
     elif cara == "r2":   # coba daftar 1 isi bucket memakai Account ID + Access Key ID + Secret yang sekarang terpasang
         if not r2_siap():
             return False, "Account ID, Access Key ID, dan Secret harus terisi semua"
@@ -13988,7 +14268,15 @@ def api_panel():
                 panel_catat(f"{k} dikembalikan ke nilai Render")
             else:
                 v = str(d.get("nilai") or "").strip()
-                if not v or len(v) > 400 or re.search(r"\s", v):
+                if k == "GOOGLE_SA_JSON":   # isi file JSON (panjang, ada spasi): dipadatkan dan dicek dulu
+                    try:
+                        j = json.loads(v)
+                        assert j.get("type") == "service_account" and j.get("client_email") and "PRIVATE KEY" in j.get("private_key", "")
+                        v = json.dumps(j, separators=(",", ":"))
+                    except Exception:
+                        return jsonify({"error": "Tempel SELURUH isi file JSON kunci service account (diawali { dan diakhiri })"}), 400
+                    _GD.update(token="", habis=0)
+                elif not v or len(v) > 400 or re.search(r"\s", v):
                     return jsonify({"error": "Isi kunci tidak valid"}), 400
                 simpan[k] = _sandi().encrypt(v.encode()).decode()
                 panel_catat(f"{k} diganti")
