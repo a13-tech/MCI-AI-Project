@@ -12713,6 +12713,326 @@ IDENTITAS_AI += ("\n\nSOP MCI (WAJIB untuk semua AI MCI): sebelum MENGEKSEKUSI p
                  "menjawab ya/lanjut/gas. Kalau pengguna mengubah rincian, ringkas ulang dan minta konfirmasi lagi. Bertanya atau membaca data tidak perlu konfirmasi.")
 
 
+# ---------- MCI Copilot: akses SEMUA halaman (baca + aksi). Izin = izin halaman orangnya; aksi lewat SOP konfirmasi "Lanjut?" (permintaan CEO, 21 Nov 2026) ----------
+COP_HAL = {"agenda": "agenda", "rapat": "agenda", "tugas": "tugas", "pengumuman": "pengumuman", "proyek": "proyek", "mitra": "mitra",
+           "alat": "alat", "peminjaman": "alat", "inventaris": "alat", "konten": "konten", "sidang": "sidang", "pelanggaran": "sidang", "putusan": "putusan"}
+
+
+def _cop_jenis(halaman):
+    h = re.sub(r"[^a-z]", "", str(halaman or "").lower())
+    return COP_HAL.get(h) or next((v for k, v in COP_HAL.items() if k in h), None)
+
+
+def _cop_tampil(jenis, x):
+    """Satu entri rekord jadi teks rapi untuk AI: id anggota → nama, pilihan → label, field sistem panjang dipangkas."""
+    out = {"id": x["id"]}
+    for f in JENIS[jenis]["fields"]:
+        v = x.get(f["nama"])
+        if v in (None, "", [], False):
+            continue
+        if f["tipe"] == "anggota":
+            v = _nm(v)
+        elif f["tipe"] == "anggota_banyak":
+            v = [_nm(i) for i in v]
+        elif f["tipe"] == "pilih":
+            v = dict(f["opsi"]).get(v, v)
+        elif isinstance(v, str):
+            v = v[-600:] if f["nama"] == "riwayat" else v[:800]
+        out[f["label"]] = v
+    out["dicatat_oleh"] = x.get("oleh") or ""
+    return out
+
+
+def cek_halaman(halaman: str, cari: str = "") -> dict:
+    """Baca isi halaman web MCI yang berbentuk daftar: agenda/rapat, tugas, pengumuman, proyek, mitra, alat (peminjaman alat), konten, sidang/pelanggaran, putusan.
+    cari = kata kunci (kosong = semua, terbaru dulu). Hasil sudah disaring sesuai hak akses penanya."""
+    _alat("cek_halaman", halaman=halaman, cari=cari)
+    r = _PENANYA.get() or "admin"
+    j = _cop_jenis(halaman)
+    if not j:
+        return {"error": f"halaman '{halaman}' tidak dikenal", "halaman_tersedia": sorted(set(COP_HAL.values()))}
+    if not hal_on(j):
+        return {"error": f"halaman {JENIS[j]['judul']} sedang dinonaktifkan CEO"}
+    if not rk_bisa_lihat(j, r):
+        return {"error": f"tidak punya akses ke halaman {JENIS[j]['judul']}"}
+    p = rk_payload(j, r)
+    L = [_cop_tampil(j, x) for x in p["items"]]
+    L = [x for x in L if _cocok_kata(json.dumps(x, ensure_ascii=False), cari)]
+    return {"halaman": JENIS[j]["judul"], "jumlah": len(L), "boleh_tambah": p["buat"], "isi": L[:25], "hari_ini": today()}
+
+
+def _cop_isian(jenis, isian):
+    """isian JSON (nama field atau label → nilai). Nama anggota diubah jadi id. Balik (dict, error)."""
+    try:
+        d = json.loads(isian) if isinstance(isian, str) else dict(isian or {})
+    except (ValueError, TypeError):
+        return None, "isian harus objek JSON, contoh {\"judul\": \"...\"}"
+    if not isinstance(d, dict):
+        return None, "isian harus objek JSON"
+    kunci = {f["nama"]: f for f in JENIS[jenis]["fields"] if not f.get("sistem")}
+    kunci.update({f["label"].lower(): f for f in kunci.values()})
+    out = {}
+    for k, v in d.items():
+        f = kunci.get(str(k)) or kunci.get(str(k).lower())
+        if not f:
+            return None, f"field '{k}' tidak ada. Field yang tersedia: " + ", ".join(f"{x['nama']} ({x['label']})" for x in JENIS[jenis]["fields"] if not x.get("sistem"))
+        def ang(n):
+            if str(n).isdigit():
+                return int(n)
+            c = [m for m in MEMBERS.values() if m.get("aktif") and str(n).strip().lower() in m["nama"].lower()]
+            if len(c) != 1:
+                raise ValueError(f"nama anggota '{n}' cocok dengan {len(c)} orang" + (": " + ", ".join(m["nama"] for m in c[:6]) if c else ""))
+            return c[0]["id"]
+        try:
+            if f["tipe"] == "anggota":
+                v = ang(v) if str(v or "").strip() else None
+            elif f["tipe"] == "anggota_banyak":
+                v = [ang(n) for n in (v if isinstance(v, list) else str(v).split(",")) if str(n).strip()]
+        except ValueError as e:
+            return None, str(e)
+        if f["tipe"] == "pilih" and v not in [o[0] for o in f["opsi"]]:
+            v = next((o[0] for o in f["opsi"] if str(v).strip().lower() in (o[0].lower(), o[1].lower())), v)
+        out[f["nama"]] = v
+    return out, None
+
+
+def _cop_cari_item(jenis, item):
+    s = str(item or "").strip()
+    L = rk_rows(jenis)
+    if s.lstrip("#").isdigit():
+        return [x for x in L if x["id"] == int(s.lstrip("#"))]
+    kunci = next((f["nama"] for f in JENIS[jenis]["fields"] if f["wajib"] and f["tipe"] in ("teks", "anggota")), "judul")
+    persis = [x for x in L if str(x.get(kunci) or "").strip().lower() == s.lower()]
+    return persis or [x for x in L if _cocok_kata(str(x.get(kunci) or x.get("judul") or x.get("nama") or ""), s)]
+
+
+def isi_halaman(halaman: str, isian: str) -> dict:
+    """AKSI: tambah entri baru di halaman agenda/tugas/pengumuman/proyek/mitra/alat/konten/sidang/putusan, persis seperti mengisi formulir di web.
+    isian = objek JSON, kunci = nama field (lihat dulu dengan cek_halaman kalau ragu), nilai anggota boleh nama orang. Contoh tugas: {"judul": "Solder PCB", "pj": "Budi", "tenggat": "2026-11-25"}."""
+    _alat("isi_halaman", halaman=halaman)
+    r = _PENANYA.get() or "admin"
+    j = _cop_jenis(halaman)
+    if not j or not hal_on(j):
+        return {"ok": False, "pesan": "halaman tidak dikenal atau sedang dinonaktifkan"}
+    if not rk_bisa_lihat(j, r) or not (boleh(r, JENIS[j]["tulis"]) or (JENIS[j].get("buat") == "anggota" and mid_of(r) is not None)):
+        return {"ok": False, "pesan": f"tidak punya izin menambah data di {JENIS[j]['judul']}"}
+    d, err = _cop_isian(j, isian)
+    if not err:
+        data, err = rk_bersih(j, d)
+    if not err:
+        err = rk_cek(j, data, None, r)
+    if err:
+        return {"ok": False, "pesan": err}
+    sid = rk_simpan_raw(j, data, r)
+    rk_setelah(j, rk_get(j, sid), None, r)
+    audit("Copilot", f"tambah {j}", json.dumps(_cop_tampil(j, rk_get(j, sid)), ensure_ascii=False)[:300], 0, nama_peran(r))
+    return {"ok": True, "pesan": f"Tersimpan di {JENIS[j]['judul']} (#{sid}).", "data": _cop_tampil(j, rk_get(j, sid))}
+
+
+def ubah_halaman(halaman: str, item: str, isian: str) -> dict:
+    """AKSI: ubah entri yang sudah ada di halaman agenda/tugas/pengumuman/proyek/mitra/alat/konten/sidang/putusan. item = id (#12) atau judul/nama entrinya.
+    isian = objek JSON berisi HANYA field yang diubah, misalnya {"status": "selesai"} atau {"notulen": "..."}."""
+    _alat("ubah_halaman", halaman=halaman, item=item)
+    r = _PENANYA.get() or "admin"
+    j = _cop_jenis(halaman)
+    if not j or not hal_on(j):
+        return {"ok": False, "pesan": "halaman tidak dikenal atau sedang dinonaktifkan"}
+    c = _cop_cari_item(j, item)
+    if len(c) != 1:
+        return {"ok": False, "pesan": f"'{item}' cocok dengan {len(c)} entri; sebut id-nya", "kandidat": [_cop_tampil(j, x) for x in c[:6]]}
+    lama = c[0]
+    if j == "putusan" and lama.get("rahasia") and not boleh(r, "sidang"):
+        return {"ok": False, "pesan": "tidak ditemukan"}
+    e = rk_edit_fields(j, lama, r)
+    if not e:
+        return {"ok": False, "pesan": f"tidak punya izin mengubah entri ini di {JENIS[j]['judul']}"}
+    d, err = _cop_isian(j, isian)
+    if not err and e != "semua" and set(d) - set(e):
+        err = "kamu hanya boleh mengubah: " + ", ".join(e)
+    simpan = _rk_data(lama)
+    if not err:
+        data, err = rk_bersih(j, d, lama=simpan, hanya=set(d))
+    if not err and j == "proyek" and pk_ditutup(lama["id"]) and int(data.get("dana") or 0) != int(simpan.get("dana") or 0):
+        err = "Kas proyek sudah ditutup, dana tidak bisa diubah lagi."
+    if not err:
+        err = rk_cek(j, data, simpan, r)
+    if err:
+        return {"ok": False, "pesan": err}
+    _rk_tulis(j, lama["id"], data)
+    rk_setelah(j, rk_get(j, lama["id"]), lama, r)
+    audit("Copilot", f"ubah {j}", f"#{lama['id']}: " + ", ".join(d)[:200], 0, nama_peran(r))
+    return {"ok": True, "pesan": f"Entri #{lama['id']} di {JENIS[j]['judul']} sudah diubah.", "data": _cop_tampil(j, rk_get(j, lama["id"]))}
+
+
+def _cop_stok(barang):
+    s = str(barang or "").strip().lower()
+    L = stok_load()
+    return [x for x in L if x["nama"].lower() == s] or [x for x in L if _cocok(x["nama"] + " " + x["kategori"], s)]
+
+
+def ubah_stok(barang: str, ubah_jumlah: int = 0, catatan: str = "") -> dict:
+    """AKSI (khusus CEO): ubah stok gudang. ubah_jumlah = selisih (negatif = berkurang/dipakai, positif = barang masuk, 0 = hanya catatan).
+    catatan = keterangan singkat, misalnya 'dipakai Alvaro untuk lomba'; ditambahkan ke catatan barang beserta tanggal."""
+    _alat("ubah_stok", barang=barang, ubah=ubah_jumlah)
+    r = _PENANYA.get() or "admin"
+    if not hal_on("stok"):
+        return {"ok": False, "pesan": "halaman Stok sedang dinonaktifkan"}
+    if not is_admin(r):
+        return {"ok": False, "pesan": "mengubah stok gudang khusus CEO; anggota bisa memakai stok untuk proyek (pakai_stok_proyek)"}
+    c = _cop_stok(barang)
+    if len(c) != 1:
+        return {"ok": False, "pesan": f"'{barang}' cocok dengan {len(c)} barang; sebut nama persisnya", "kandidat": [x["nama"] for x in c[:10]]}
+    s = c[0]
+    try:
+        n = int(float(ubah_jumlah or 0))
+    except (TypeError, ValueError):
+        return {"ok": False, "pesan": "ubah_jumlah harus angka"}
+    baru = s["jumlah"] + n
+    if baru < 0:
+        return {"ok": False, "pesan": f"stok {s['nama']} cuma {s['jumlah']} {s['satuan']}"}
+    cat = s["catatan"]
+    if str(catatan or "").strip():
+        cat = (f"{today()}: {str(catatan).strip()}" + (f" ({n:+d})" if n else "") + (f" | {cat}" if cat else ""))[:300]
+    with db() as k:
+        sql(k, "UPDATE stok SET jumlah=?, catatan=?, diubah=? WHERE id=?", (baru, cat, _now(), s["id"]))
+    stok_load()
+    audit("Stok", "ubah via Copilot", f"{s['nama']}: {s['jumlah']} → {baru}" + (f" · {catatan}" if catatan else ""), 0, nama_peran(r))
+    out = {"ok": True, "pesan": f"{s['nama']}: {s['jumlah']} → {baru} {s['satuan']}.", "catatan_barang": cat}
+    if s["minimum"] and baru <= s["minimum"]:
+        out["peringatan"] = f"di bawah/sama dengan minimum ({s['minimum']}), perlu restock"
+    return out
+
+
+def pakai_stok_proyek(barang: str, jumlah: int, proyek: str) -> dict:
+    """AKSI: pakai komponen stok gudang untuk sebuah proyek (stok berkurang dan tercatat di jurnal proyek), sama seperti tombol Pakai di halaman Stok."""
+    _alat("pakai_stok_proyek", barang=barang, jumlah=jumlah, proyek=proyek)
+    r = _PENANYA.get() or "admin"
+    if not hal_on("stok") or not can("stok", r):
+        return {"ok": False, "pesan": "tidak punya akses ke halaman Stok"}
+    c = _cop_stok(barang)
+    if len(c) != 1:
+        return {"ok": False, "pesan": f"'{barang}' cocok dengan {len(c)} barang", "kandidat": [x["nama"] for x in c[:10]]}
+    s = c[0]
+    pr = _cop_cari_item("proyek", proyek)
+    if len(pr) != 1:
+        return {"ok": False, "pesan": f"proyek '{proyek}' cocok dengan {len(pr)} proyek", "kandidat": [x.get("nama") for x in pr[:8]]}
+    x = pr[0]
+    if not pl_boleh(x, r):
+        return {"ok": False, "pesan": "kamu bukan anggota tim proyek itu"}
+    if x.get("status") == "selesai":
+        return {"ok": False, "pesan": "proyek itu sudah selesai"}
+    try:
+        n = int(float(jumlah or 0))
+    except (TypeError, ValueError):
+        n = 0
+    if n <= 0 or n > s["jumlah"]:
+        return {"ok": False, "pesan": f"jumlah harus 1 sampai {s['jumlah']} {s['satuan']}"}
+    with db() as k:
+        if not sql(k, "UPDATE stok SET jumlah=jumlah-?, diubah=? WHERE id=? AND jumlah>=?", (n, _now(), s["id"], n)).rowcount:
+            return {"ok": False, "pesan": "stok baru saja berubah, coba lagi"}
+        pl_ins(k, x["id"], "sistem", f"Memakai {n} {s['satuan']} {s['nama']} dari stok MCI (lewat Copilot)", r)
+    stok_load()
+    sisa = s["jumlah"] - n
+    if s["minimum"] and sisa <= s["minimum"]:
+        inbox_kirim(_bendahara_ids(), "stok", f"Stok menipis: {s['nama']}", f"Sisa {sisa} {s['satuan']} (batas minimum {s['minimum']}). Terakhir dipakai proyek {x.get('nama', '')}.", s["id"])
+    return {"ok": True, "pesan": f"{n} {s['satuan']} {s['nama']} dipakai proyek {x.get('nama')}. Sisa {sisa}."}
+
+
+def pinjam_alat(alat: str, tenggat: str, peminjam: str = "") -> dict:
+    """AKSI: catat peminjaman alat (halaman Peminjaman Alat). tenggat = tanggal kembali YYYY-MM-DD (maks 14 hari). peminjam = nama anggota; kosong = penanya sendiri.
+    Mencatatkan atas nama orang lain hanya untuk pengelola alat / CEO."""
+    _alat("pinjam_alat", alat=alat, tenggat=tenggat, peminjam=peminjam)
+    r = _PENANYA.get() or "admin"
+    if not hal_on("alat"):
+        return {"ok": False, "pesan": "halaman Peminjaman Alat sedang dinonaktifkan"}
+    c = _cop_cari_item("alat", alat)
+    if len(c) != 1:
+        return {"ok": False, "pesan": f"'{alat}' cocok dengan {len(c)} alat", "kandidat": [x.get("nama") for x in c[:10]] or [x.get("nama") for x in rk_rows("alat")[:30]]}
+    x = c[0]
+    data = _rk_data(x)
+    me = mid_of(r) if member_of(r) else None
+    if str(peminjam or "").strip():
+        d, err = _cop_isian("alat", {"peminjam": peminjam})
+        if err:
+            return {"ok": False, "pesan": err}
+        siapa = d["peminjam"]
+    else:
+        siapa = me
+    if siapa is None:
+        return {"ok": False, "pesan": "sebut nama anggota peminjamnya"}
+    if siapa != me and not boleh(r, "alat_kelola"):
+        return {"ok": False, "pesan": "mencatat peminjaman atas nama orang lain khusus pengelola alat"}
+    if data.get("peminjam"):
+        return {"ok": False, "pesan": f"sedang dipinjam {_nm(data['peminjam'])} sampai {data.get('tenggat', '-')}"}
+    if data.get("kondisi") == "rusak":
+        return {"ok": False, "pesan": "alat ini sedang rusak / perlu servis"}
+    try:
+        t = date.fromisoformat(str(tenggat or "")[:10])
+    except ValueError:
+        return {"ok": False, "pesan": "tenggat harus tanggal YYYY-MM-DD"}
+    hari = datetime.now(WIB).date()
+    if not hari <= t <= hari + timedelta(days=ALAT_MAKS_HARI):
+        return {"ok": False, "pesan": f"tenggat paling lama {ALAT_MAKS_HARI} hari dari hari ini ({hari.isoformat()})"}
+    data.update(peminjam=siapa, tgl_pinjam=today(), tenggat=t.isoformat())
+    data["riwayat"] = ((data.get("riwayat") or "") + f"\n{today()}: dipinjam {_nm(siapa)} sampai {t.isoformat()}" + (f", dicatat {nama_peran(r)}" if siapa != me else "")).strip()[-8000:]
+    _rk_tulis("alat", x["id"], data)
+    return {"ok": True, "pesan": f"{x.get('nama')} tercatat dipinjam {_nm(siapa)} sampai {t.isoformat()}."}
+
+
+def kembalikan_alat(alat: str, kondisi: str = "baik") -> dict:
+    """AKSI: catat alat sudah dikembalikan. kondisi = baik | rusak_ringan | rusak."""
+    _alat("kembalikan_alat", alat=alat, kondisi=kondisi)
+    r = _PENANYA.get() or "admin"
+    if not hal_on("alat"):
+        return {"ok": False, "pesan": "halaman Peminjaman Alat sedang dinonaktifkan"}
+    c = [x for x in _cop_cari_item("alat", alat)]
+    if len(c) != 1:
+        return {"ok": False, "pesan": f"'{alat}' cocok dengan {len(c)} alat", "kandidat": [x.get("nama") for x in c[:10]]}
+    x = c[0]
+    data = _rk_data(x)
+    me = mid_of(r) if member_of(r) else None
+    if not data.get("peminjam"):
+        return {"ok": False, "pesan": "alat ini tidak sedang dipinjam"}
+    if not (boleh(r, "alat_kelola") or data["peminjam"] == me):
+        return {"ok": False, "pesan": "yang boleh mencatat pengembalian: peminjamnya atau pengelola alat"}
+    kond = kondisi if kondisi in ("baik", "rusak_ringan", "rusak") else "baik"
+    telat = data.get("tenggat") and data["tenggat"] < today()
+    data["riwayat"] = ((data.get("riwayat") or "") + f"\n{today()}: dikembalikan {_nm(data['peminjam'])}" + (" (TERLAMBAT)" if telat else "")
+                       + (f", kondisi {kond.replace('_', ' ')}" if kond != "baik" else "") + (f", dicatat {nama_peran(r)}" if data["peminjam"] != me else "")).strip()[-8000:]
+    data.update(peminjam=None, tgl_pinjam="", tenggat="", kondisi=kond)
+    _rk_tulis("alat", x["id"], data)
+    return {"ok": True, "pesan": f"{x.get('nama')} sudah kembali" + (" (terlambat)" if telat else "") + "."}
+
+
+def cek_inbox(belum_dibaca: bool = True) -> dict:
+    """Lihat inbox/notifikasi milik penanya (20 terbaru). belum_dibaca = true hanya yang belum dibaca."""
+    _alat("cek_inbox", belum_dibaca=belum_dibaca)
+    r = _PENANYA.get() or "admin"
+    me = mid_of(r)
+    if me is None:
+        return {"error": "inbox hanya untuk akun anggota"}
+    try:
+        with db() as c:
+            q = "SELECT judul,isi,jenis,dibuat,dibaca FROM inbox WHERE untuk=?" + (" AND dibaca=0" if belum_dibaca else "") + " ORDER BY id DESC LIMIT 20"
+            rows = sql(c, q, (me,)).fetchall()
+    except Exception as e:
+        return {"error": f"inbox tidak bisa dibaca: {e}"}
+    return {"jumlah": len(rows), "pesan": [{"judul": a[0], "isi": str(a[1] or "")[:400], "jenis": a[2], "waktu": a[3], "dibaca": bool(a[4])} for a in rows]}
+
+
+APEX_ALAT += [cek_halaman, cek_inbox, isi_halaman, ubah_halaman, ubah_stok, pakai_stok_proyek, pinjam_alat, kembalikan_alat]
+APEX_IZIN_ALAT.update({"cek_halaman": None, "cek_inbox": None, "isi_halaman": None, "ubah_halaman": None, "pakai_stok_proyek": "stok", "pinjam_alat": None, "kembalikan_alat": None})
+APEX_HAL_ALAT.update({"cek_inbox": "inbox", "ubah_stok": "stok", "pakai_stok_proyek": "stok", "pinjam_alat": "alat", "kembalikan_alat": "alat"})
+ALAT_AKSI |= {"isi_halaman", "ubah_halaman", "ubah_stok", "pakai_stok_proyek", "pinjam_alat", "kembalikan_alat"}
+APEX_SISTEM = APEX_SISTEM.replace(
+    "Data organisasi hanya bisa kamu BACA. Kalau diminta mengubah data (tambah stok, catat kas, hapus), jelaskan itu belum bisa dari halaman ini dan sebut halaman web yang cocok. ",
+    "Kamu terhubung ke SEMUA halaman web MCI. BACA: alat cek_* dan cek_halaman (agenda, tugas, pengumuman, proyek, mitra, peminjaman alat, konten, sidang, putusan). "
+    "UBAH: ubah_stok (stok gudang, termasuk mencatat siapa memakai barang), pakai_stok_proyek, pinjam_alat, kembalikan_alat, isi_halaman (tambah entri), "
+    "ubah_halaman (ubah entri, misal status tugas/notulen). Kas dan hal keuangan tetap lewat usulan (kartu Setujui). Kalau diminta mencatat sesuatu, JANGAN bilang tidak bisa: "
+    "cari alat yang cocok, ringkas apa yang akan diubah (barang/halaman, jumlah sebelum → sesudah, catatan), tanya 'Lanjut?', lalu jalankan setelah dijawab ya. "
+    "Kalau alat menjawab ok=false, sampaikan alasannya apa adanya. ")
+
+
 # ---------- PERPUSTAKAAN: semua yang bisa membuka web (termasuk viewer) boleh MEMBACA; mengunggah khusus anggota; ubah/hapus milik orang lain khusus CEO ----------
 PERPUS_MAKS, PERPUS_FILE_MAKS = 300, 8_000_000
 PERPUS_JATAH = {"viewer_ip": 3, "viewer_semua": 30, "anggota": 10}   # unggahan per hari (WIB); CEO tanpa batas
