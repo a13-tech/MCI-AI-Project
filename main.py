@@ -5873,7 +5873,7 @@ def api_beranda():
         perlu.append({"hal": hal, "judul": judul, "ket": ket, "penting": penting})
     with db() as c:
         if me is not None:
-            libur = datetime.now(WIB).weekday() == 6 or hi < absen_mulai()
+            libur = datetime.now(WIB).weekday() == 6 or hi < absen_mulai() or not fitur_on("absen")   # absen dimatikan di Panel CEO: jangan ditagih
             sudah = sql(c, "SELECT 1 FROM absen WHERE anggota=? AND tanggal=? AND status='hadir'", (me, hi)).fetchone()
             izin = sql(c, "SELECT status FROM absen_izin WHERE anggota=? AND tanggal=?", (me, hi)).fetchone()
             if not libur and not sudah and not (izin and izin[0] == "disetujui"):
@@ -11651,7 +11651,7 @@ def pagi_data():
                     baru.append(f"{label}: {x.get('judul') or x.get('nama') or ''} (oleh {x.get('oleh') or '?'})")
         for kebutuhan, oleh in sql(c, "SELECT kebutuhan, oleh FROM jasa_pesan WHERE dibuat>=?", (sejak,)).fetchall():
             baru.append(f"Pesanan jasa baru dari {oleh}: {str(kebutuhan)[:80]}")
-        n = int(sql(c, "SELECT COUNT(*) FROM absen_izin WHERE status='menunggu' AND tanggal>=?", (hi,)).fetchone()[0])
+        n = int(sql(c, "SELECT COUNT(*) FROM absen_izin WHERE status='menunggu' AND tanggal>=?", (hi,)).fetchone()[0]) if fitur_on("absen") else 0
         if n:
             baru.append(f"{n} izin absen menunggu persetujuan")
         for judul, st in sql(c, "SELECT judul, status FROM panduan WHERE diubah>=? AND status IN ('jadi','gagal')", (sejak,)).fetchall():
@@ -11685,7 +11685,7 @@ def pagi_data():
         hadir = int(sql(c, "SELECT COUNT(DISTINCT anggota) FROM absen WHERE tanggal=? AND status='hadir'", (kemarin,)).fetchone()[0])
         tok = sql(c, "SELECT COALESCE(SUM(masuk+keluar+pikir),0), COALESCE(SUM(panggilan),0) FROM pemakaian WHERE tanggal=?", (kemarin,)).fetchone()
         gagal = int(sql(c, "SELECT COUNT(*) FROM panduan WHERE status='gagal' AND diubah>=?", (sejak,)).fetchone()[0])
-    d["sehat"] = [f"Absen kemarin: {hadir} dari {len(wajib)} anggota hadir", f"AI kemarin: {int(tok[1])} panggilan, {int(tok[0]):,} token".replace(",", ".")] + ([f"{gagal} pembuatan panduan gagal"] if gagal else [])
+    d["sehat"] = ([f"Absen kemarin: {hadir} dari {len(wajib)} anggota hadir"] if fitur_on("absen") else []) + [f"AI kemarin: {int(tok[1])} panggilan, {int(tok[0]):,} token".replace(",", ".")] + ([f"{gagal} pembuatan panduan gagal"] if gagal else [])
     return d
 
 
