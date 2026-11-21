@@ -3,6 +3,7 @@
 MCI Node menjadikan MacBook di markas sebagai **gudang file berat** untuk web MCI HQ:
 
 - **Video dokumentasi ukuran asli** disimpan di HDD, lalu diputar langsung dari HDD.
+- Semua data berat (video, backup, model Ollama, log) ada di **HDD eksternal**. Storage internal Mac hanya dipakai untuk program kecil: Node kurang dari 100 KB, cloudflared sekitar 40 MB, aplikasi Ollama sekitar 500 MB.
 - **Backup database dikirim tiap malam** (setelah pukul 02.00 WIB) ke HDD atau SSD. Yang disimpan 30 backup terakhir.
 - **Ollama di MacBook jadi cadangan AI terakhir** kalau semua AI lain penuh.
 
@@ -60,7 +61,7 @@ Domain tetap milikmu di Hostinger. Yang dipindah hanya "buku alamat"-nya (namese
    Argumen kedua adalah folder backup database. Boleh dihapus kalau backup cukup disimpan di HDD.
 4. Di akhir, skrip akan menampilkan **TOKEN RAHASIA**. Salin token itu. Jangan dikirim ke chat atau grup.
 
-Kalau ingin melihat log Node: `tail -f ~/MCI-Node/node.log`.
+Kalau ingin melihat log Node: `tail -f "/Volumes/HDD/MCI-Node/node.log"`. Log disimpan di HDD dan dibatasi 2 MB, jadi tidak memenuhi storage internal Mac. Kalau Node gagal menyala sebelum HDD siap, pesannya ada di `~/MCI-Node/darurat.log`.
 
 ## Tahap 4: Pasang Cloudflare Tunnel di MacBook
 
@@ -126,7 +127,7 @@ Kalau ingin melihat log Node: `tail -f ~/MCI-Node/node.log`.
 | Gejala | Yang dicek |
 |---|---|
 | Panel: "Node tidak menjawab atau token salah" | Laptop menyala? Jalankan `curl http://127.0.0.1:8787/sehat` di Mac. Cek juga https://node.mci-ai.my.id/sehat dari HP. Token di Panel sama dengan `~/MCI-Node/.token`? |
-| Node tidak jalan setelah restart Mac | `launchctl load ~/Library/LaunchAgents/id.mci.node.plist`, lalu cek `~/MCI-Node/node.log` |
+| Node tidak jalan setelah restart Mac | `launchctl load ~/Library/LaunchAgents/id.mci.node.plist`, lalu cek `~/MCI-Node/darurat.log` dan `node.log` di folder gudang HDD |
 | HDD tidak terbaca setelah restart | Colok ulang HDD; Node otomatis mencoba lagi tiap 15 detik |
 | Log berisi "Operation not permitted" | macOS butuh izin akses HDD. Pilih **Allow** kalau muncul pertanyaan "python3 would like to access files on a removable volume". Kalau tidak muncul: System Settings, Privacy & Security, Full Disk Access, tambahkan `python3`, lalu jalankan lagi `pasang_node.sh` |
 | Video tidak bisa diputar | Laptop tidur atau mati, atau HDD dicabut. Web menampilkan "HDD markas sedang offline" |

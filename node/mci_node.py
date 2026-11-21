@@ -54,8 +54,21 @@ _KUNCI_TULIS = threading.Lock()
 _SALAH = []                                     # waktu percobaan token salah (rem kasar terhadap tebak-tebakan)
 
 
+LOG_MAKS = 2 * 1024 * 1024   # log disimpan di HDD (bukan storage internal Mac), dibatasi 2 MB lalu diputar
+_KUNCI_LOG = threading.Lock()
+
+
 def log(*a):
-    print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), *a, flush=True)
+    baris = datetime.now().strftime("%Y-%m-%d %H:%M:%S") + " " + " ".join(str(x) for x in a)
+    try:
+        p = os.path.join(DIR, "node.log")
+        with _KUNCI_LOG:
+            if os.path.exists(p) and os.path.getsize(p) > LOG_MAKS:
+                os.replace(p, p + ".1")   # simpan satu log lama saja
+            with open(p, "a", encoding="utf-8") as f:
+                f.write(baris + "\n")
+    except OSError:
+        print(baris, flush=True)   # HDD belum siap: tampil di log sistem saja
 
 
 def tanda(method, key, exp, total=0):

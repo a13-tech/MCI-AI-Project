@@ -57,8 +57,8 @@ cat > "$PLIST" <<PL
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>ThrottleInterval</key><integer>15</integer>
-  <key>StandardOutPath</key><string>$RUMAH/node.log</string>
-  <key>StandardErrorPath</key><string>$RUMAH/node.log</string>
+  <key>StandardOutPath</key><string>$RUMAH/darurat.log</string>
+  <key>StandardErrorPath</key><string>$RUMAH/darurat.log</string>
 </dict></plist>
 PL
 chmod 600 "$PLIST"
@@ -68,9 +68,9 @@ launchctl load "$PLIST"
 sleep 2
 
 if curl -s http://127.0.0.1:8787/sehat | grep -q '"ok"'; then
-  echo "MCI Node jalan di http://127.0.0.1:8787 (log: $RUMAH/node.log)"
+  echo "MCI Node jalan di http://127.0.0.1:8787 (log: $GUDANG/node.log, maks 2 MB)"
 else
-  echo "MCI Node belum menjawab. Cek log: tail -n 30 $RUMAH/node.log"
+  echo "MCI Node belum menjawab. Cek: tail -n 30 \"$RUMAH/darurat.log\""
 fi
 
 echo
