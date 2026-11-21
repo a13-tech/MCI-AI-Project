@@ -1114,6 +1114,7 @@ textarea:focus,input:focus,select:focus{border-color:var(--aksen);box-shadow:0 0
  <button class="nv" data-p="arsip">Arsip Proyek</button>
  <button class="nv" data-p="alat">Peminjaman Alat</button>
  <button class="nv" data-p="stok">Stok Komponen</button>
+ <button class="nv" data-p="titipan">Penitipan Barang</button>
  <button class="nv" data-p="mitra">Database Mitra</button>
  <button class="nv" data-p="struktur">Struktur &amp; Divisi</button>
  <button class="nv" data-p="surat">Surat Penerimaan</button>
@@ -1553,6 +1554,7 @@ textarea:focus,input:focus,select:focus{border-color:var(--aksen);box-shadow:0 0
  <section id="p-tugas" class="pg" hidden><div id="rk-tugas"></div></section>
  <section id="p-proyek" class="pg" hidden><div id="rk-proyek"></div></section>
  <section id="p-mitra" class="pg" hidden><div id="rk-mitra"></div></section>
+ <section id="p-titipan" class="pg" hidden><div id="rk-titipan"></div></section>
  <section id="p-alat" class="pg" hidden><div id="rk-alat"></div><div class="bar" style="margin:14px 0 0"><button class="bt o" data-stiker="alat">🏷️ Cetak stiker QR alat</button><span class="mu" style="font-size:12.5px">Tempel di alat; scan pakai kamera HP untuk pinjam / kembalikan.</span></div></section>
  <section id="p-skor" class="pg" hidden>
   <div class="ey">Organisasi</div><h1>Skor &amp; Lencana</h1>
@@ -2377,7 +2379,7 @@ function show(p) {
   if (p === "blacklist") loadBlacklist();
   if (p === "sp") loadSP();
   if (p === "uu") loadUU();
-  if (["pengumuman", "agenda", "tugas", "proyek", "mitra", "alat", "konten", "sidang", "putusan"].includes(p)) loadRK(p);
+  if (["pengumuman", "agenda", "tugas", "proyek", "mitra", "alat", "titipan", "konten", "sidang", "putusan"].includes(p)) loadRK(p);
   if (p === "skor") skMuat();
   if (p === "beranda") brMuat();
   if (p === "arsip") arMuat();
@@ -3294,6 +3296,7 @@ const RK_INFO = {
   proyek: ["Organisasi", "Proyek", "Semua anggota boleh langsung membuat proyek tanpa persetujuan. Dana kas MCI paling banyak Rp75.000 per proyek kecuali ada tambahan dari Bendahara atau Pemilik MCI (Peraturan Kas Pasal 7). Di Kas proyek, tekan Uang masuk, Uang keluar, atau Minta dana kas MCI; Bendahara yang mencairkan dana kas MCI. Saat tutup buku, keuntungan dibagi 20% ke kas MCI dan 80% rata ke tim yang bekerja (Pasal 11). Anggota yang menunggak 2 minggu tanpa izin dicabut hak proyeknya: proyek miliknya tetap boleh dibuat tetapi ditangguhkan sampai lunas, dan pemilik proyek boleh mengeluarkannya dari tim lain (Pasal 4 & 6).", "Buat proyek"],
   mitra: ["Organisasi", "Database Mitra", "Daftar toko, sponsor, pemberi pinjaman, dan kolaborator MCI. Total subsidi, pinjaman, dan sisa utang dihitung otomatis dari Kas proyek, jadi tulis nama mitra sama persis dengan di Kas proyek.", "Tambah mitra"],
   alat: ["Organisasi", "Peminjaman Alat", "Alat milik MCI: siapa yang sedang memegang, sampai kapan, dan kondisinya. Anggota bisa meminjam sendiri paling lama 14 hari. Yang terlambat diingatkan otomatis setiap hari.", "Tambah alat"],
+  titipan: ["Organisasi", "Penitipan Barang", "Barang dan komponen milik mitra, perorangan, atau titipan untuk proyek. Ini BUKAN stok MCI: jangan dipakai tanpa izin pengelola. Yang mencatat dan mengeluarkan: pemegang izin Kelola Stok. Penitip bisa diberi link cek titipan yang berlaku 7 hari.", "Catat titipan"],
   konten: ["Konten & karya", "Jadwal Konten", "Kalender posting Instagram dan TikTok: dari ide, draf, siap tayang, sampai hasil tayangnya.", "Tambah konten"],
   sidang: ["Hukum & disiplin", "Pelanggaran & Sidang", "Laporan pelanggaran UU MCI. Terlapor berhak membela diri sebelum sanksi ditetapkan (Pasal 18). Hanya Dewan, CEO, dan terlapor yang bisa melihat kasusnya.", "Laporkan pelanggaran"],
   putusan: ["Hukum & disiplin", "Arsip Putusan", "Semua putusan resmi Dewan, hasil sidang, keputusan rapat, dan perubahan UU, tersusun dan bisa dicari.", "Catat putusan"],
@@ -3314,9 +3317,10 @@ function rkInput(d, f, v) {
   else if (f.tipe === "pilih") el = `<select id="${id}" data-rkf="${f.nama}">${f.opsi.map(o => `<option value="${esc(o[0])}" ${o[0] === val ? "selected" : ""}>${esc(o[1])}</option>`).join("")}</select>`;
   else if (f.tipe === "divisi") el = `<select id="${id}" data-rkf="${f.nama}"><option value="">Semua divisi</option>${d.divisi.map(o => `<option value="${esc(o[0])}" ${o[0] === val ? "selected" : ""}>${esc(o[1])}</option>`).join("")}</select>`;
   else if (f.tipe === "anggota") el = `<select id="${id}" data-rkf="${f.nama}"><option value="">Pilih anggota</option>${d.anggota.map(a => `<option value="${a.id}" ${a.id === val ? "selected" : ""}>${esc(a.nama)}</option>`).join("")}</select>`;
+  else if (f.tipe === "proyek") el = `<select id="${id}" data-rkf="${f.nama}"><option value="">Pilih proyek</option>${(d.proyek_list || []).map(o => `<option value="${o[0]}" ${o[0] === val ? "selected" : ""}>${esc(o[1])}</option>`).join("")}</select>`;
   else if (f.tipe === "pasal") el = `<select id="${id}" data-rkf="${f.nama}"><option value="">Tidak spesifik</option>${(d.pasal || []).map(o => `<option value="${o[0]}" ${o[0] === val ? "selected" : ""}>${esc(o[1])}</option>`).join("")}</select>`;
   else if (f.tipe === "anggota_banyak") { const set = new Set(val || []); return `<div class="full"><div style="font-size:13px;color:var(--mute);font-weight:500;margin-bottom:6px">${esc(f.label)}</div><div class="mm" data-rkf="${f.nama}" data-multi="1">${d.anggota.map(a => `<label><input type="checkbox" value="${a.id}" ${set.has(a.id) ? "checked" : ""}> ${esc(a.nama)}${(d.tunggak || {})[a.id] >= 2 ? ' <span class="ch r" style="font-size:11.5px;padding:1px 7px" title="Hak proyek dicabut karena tunggakan kas. Tetap boleh dimasukkan ke tim, tetapi berstatus ditangguhkan sampai lunas.">ditangguhkan sementara</span>' : ""}</label>`).join("") || '<span class="mu">Belum ada anggota.</span>'}</div>${f.nama === "tim" && Object.values(d.tunggak || {}).some(v => v >= 2) ? '<p class="mu" style="font-size:12.5px;margin:6px 0 0">Anggota bertanda <b>ditangguhkan sementara</b> tetap boleh masuk tim. Selama tunggakannya belum lunas, ia tidak ikut bagi hasil (Peraturan Kas Pasal 4).</p>' : ""}</div>`; }
-  else el = `<input type="${f.tipe === "url" ? "url" : "text"}" id="${id}" data-rkf="${f.nama}" maxlength="${f.maks}" value="${esc(val)}">`;
+  else el = `<input type="${f.tipe === "url" ? "url" : "text"}" id="${id}" data-rkf="${f.nama}" maxlength="${f.maks}" value="${esc(val)}"${f.nama === "mitra" && d.mitra_list ? ' list="rkMitraList"' : ""}>`;
   const full = ["area", "anggota_banyak"].includes(f.tipe) || f.nama === "judul" || f.nama === "nama";
   return `<label class="${full ? "full" : ""}" for="${id}">${esc(f.label)}${f.wajib ? " *" : ""}${el}${f.info ? `<span style="font-size:12px">${esc(f.info)}</span>` : ""}</label>`;
 }
@@ -3375,13 +3379,47 @@ const rkAksi = x => (x._edit === "semua" || (Array.isArray(x._edit) && x._edit.l
 const rkMeta = x => `<span>oleh ${esc(x.oleh || "-")}</span><span>${esc(tglID(x.dibuat))}</span>`;
 const rkKosong = t => `<p class="mu">${t}</p>`;
 function rkDaftar(d, items) { return items.map(x => `<div class="it2"><h3>${esc(x.judul || x.nama || "")}</h3><div class="meta">${rkMeta(x)}</div><div class="ac">${rkAksi(x)}</div></div>`).join("") || rkKosong("Belum ada."); }
+const TT_ASAL = [["", "Semua"], ["mitra", "Mitra"], ["individu", "Individu"], ["proyek", "Proyek"]];
+const ttPemilik = (d, x) => x.asal === "mitra" ? x.mitra : x.asal === "individu" ? x.penitip : ((d.proyek_list || []).find(p => p[0] === x.proyek) || [0, "Proyek #" + x.proyek])[1];
+const ttKunci = x => (x.asal === "proyek" ? String(x.proyek || "") : String((x.asal === "mitra" ? x.mitra : x.penitip) || "").trim().toLowerCase());
 const RK_ATAS = {
+  titipan: (d, st) => `<div class="seg" style="margin:0;background:#EFECE4">${TT_ASAL.map(o => `<button class="${(st.f || "") === o[0] ? "on" : ""}" data-rkfil="${o[0]}">${o[1]}</button>`).join("")}</div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" data-ttsemua ${st.semua ? "checked" : ""} style="width:auto">Tampilkan yang sudah selesai</label>`,
   tugas: (d, st) => d.saya != null ? `<div class="seg" style="margin:0;background:#EFECE4"><button class="${st.f !== "saya" ? "on" : ""}" data-rkfil="">Semua</button><button class="${st.f === "saya" ? "on" : ""}" data-rkfil="saya">Tugasku</button></div>` : "",
   alat: (d, st) => `<div class="seg" style="margin:0;background:#EFECE4">${[["", "Semua"], ["tersedia", "Tersedia"], ["dipinjam", "Dipinjam"]].map(o => `<button class="${(st.f || "") === o[0] ? "on" : ""}" data-rkfil="${o[0]}">${o[1]}</button>`).join("")}</div>`,
   proyek: (d, st) => `<div class="seg" style="margin:0;background:#EFECE4">${[["", "Semua"], ["berjalan", "Berjalan"], ["ditunda", "Freeze"], ["selesai", "Selesai"]].map(o => `<button class="${(st.f || "") === o[0] ? "on" : ""}" data-rkfil="${o[0]}">${o[1]}</button>`).join("")}</div>`,
   konten: (d, st) => `<div class="seg" style="margin:0;background:#EFECE4"><button class="${st.f !== "daftar" ? "on" : ""}" data-rkfil="">Kalender</button><button class="${st.f === "daftar" ? "on" : ""}" data-rkfil="daftar">Daftar</button></div>`,
 };
 const RK_RENDER = {
+  titipan(d, items, st) {
+    const hi = d.hari_ini, aktif = x => ["dititip", "sebagian"].includes(x.status);
+    const semuaAktif = d.items.filter(aktif), telat = semuaAktif.filter(x => x.batas && x.batas < hi);
+    let its = items.filter(x => (!st.f || x.asal === st.f) && (st.semua || aktif(x)));
+    const grup = [...new Map(d.items.filter(x => !st.f || x.asal === st.f).map(x => [x.asal + "|" + ttKunci(x), [x.asal, ttKunci(x), ttPemilik(d, x)]])).values()];
+    if (st.g && grup.some(g => g[0] + "|" + g[1] === st.g)) its = its.filter(x => x.asal + "|" + ttKunci(x) === st.g); else st.g = "";
+    const hit = a => semuaAktif.filter(x => x.asal === a).length;
+    const ring = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:0 0 14px"><div class="cd"><div class="ey">Titipan aktif</div><b style="font:700 26px var(--serif)">${semuaAktif.length}</b></div>
+      <div class="cd"><div class="ey">Lewat batas ambil</div><b style="font:700 26px var(--serif);${telat.length ? "color:#e05252" : ""}">${telat.length}</b></div>
+      <div class="cd"><div class="ey">Mitra / individu</div><b style="font:700 26px var(--serif)">${hit("mitra")} / ${hit("individu")}</b></div><div class="cd"><div class="ey">Untuk proyek</div><b style="font:700 26px var(--serif)">${hit("proyek")}</b></div></div>`;
+    const fil = grup.length > 1 ? `<div class="bar" style="margin:0 0 12px"><select data-ttg style="max-width:320px" aria-label="Saring per pemilik"><option value="">Semua ${st.f ? esc(TT_ASAL.find(o => o[0] === st.f)[1].toLowerCase()) : "pemilik"}</option>${grup.map(g => `<option value="${esc(g[0] + "|" + g[1])}" ${st.g === g[0] + "|" + g[1] ? "selected" : ""}>${esc(g[2] || "-")}</option>`).join("")}</select></div>` : "";
+    const tok = d.tulis ? `<details class="cd" style="margin:0 0 14px"${st.tokBuka ? " open" : ""} data-ttdet><summary style="cursor:pointer;font-weight:600;color:var(--judul)">Link cek titipan untuk penitip (${(d.token || []).length} aktif)</summary>
+      <p class="mu" style="font-size:13px;margin:8px 0">Penitip bisa membuka daftar barangnya sendiri tanpa login. Link berlaku ${d.token_hari} hari dan bisa dicabut kapan saja.</p>
+      <div class="bar" style="margin:0"><select data-tttok style="max-width:320px" aria-label="Pilih pemilik titipan">${[...new Map(d.items.map(x => [x.asal + "|" + ttKunci(x), x])).values()].map(x => `<option value="${esc(x.asal + "|" + ttKunci(x))}">${esc((TT_ASAL.find(o => o[0] === x.asal) || [0, ""])[1])}: ${esc(ttPemilik(d, x) || "-")}</option>`).join("") || "<option value=''>Belum ada titipan</option>"}</select>
+      <button class="bt g" data-ttbuat>Buat link 7 hari</button></div><div id="ttHasil"></div>
+      ${(d.token || []).length ? `<div class="lst" style="margin-top:10px">${d.token.map(t => `<div class="it2" style="padding:10px 12px"><b>${esc(t.label)}</b><div class="meta"><span>Berlaku sampai ${esc(t.sampai)}</span><span>dibuat ${esc(t.oleh)}</span></div><div class="ac"><button class="bt o" data-ttcabut="${esc(t.id)}">Cabut</button></div></div>`).join("")}</div>` : ""}</details>` : "";
+    const kartu = x => { const lewat = aktif(x) && x.batas && x.batas < hi, asal = (TT_ASAL.find(o => o[0] === x.asal) || [0, ""])[1];
+      return `<article class="it2" id="tt-${x.id}"><div class="ey">TTP-${String(x.id).padStart(4, "0")} · ${esc(asal)}: ${esc(ttPemilik(d, x) || "-")}</div><h3>${esc(x.nama)}</h3>
+      <div class="meta"><span class="ch ${aktif(x) ? (lewat ? "r" : "y") : "g"}">${esc(rkOp(d, "status", x.status))}${lewat ? " · lewat batas" : ""}</span><span><b>${num(x.jumlah || 0)}</b> dari ${num(x.awal || x.jumlah || 0)} ${esc(x.satuan || "")}</span>
+        ${x.lokasi ? `<span>📍 ${esc(x.lokasi)}</span>` : ""}<span>Masuk ${esc(tglID(x.tgl_masuk))}</span>${x.batas ? `<span>Batas ambil ${esc(tglID(x.batas))}</span>` : ""}${x.kondisi === "cacat" ? '<span class="ch r">Masuk dengan cacat</span>' : ""}${x.kontak && d.tulis ? `<span>${esc(x.kontak)}</span>` : ""}</div>
+      ${x.catatan ? `<div class="bd" style="font-size:13.5px">${esc(x.catatan)}</div>` : ""}
+      ${d.tulis && aktif(x) ? `<div class="bar" style="margin:10px 0 0;align-items:flex-end"><label style="display:grid;gap:4px;font-size:12px">Jumlah<input type="number" data-ttn="${x.id}" min="1" max="${x.jumlah}" value="${x.jumlah}" style="width:90px"></label>
+        <label style="display:grid;gap:4px;font-size:12px">Aksi<select data-tta="${x.id}"><option value="kembali">Dikembalikan ke penitip</option>${x.asal === "proyek" ? '<option value="pakai">Dipakai proyek</option>' : ""}</select></label>
+        <label style="display:grid;gap:4px;font-size:12px;flex:1;min-width:160px">Diambil oleh / catatan<input type="text" data-ttc="${x.id}" maxlength="200" placeholder="mis. diambil Pak Budi"></label><button class="bt g" data-ttk="${x.id}">Keluarkan</button></div>` : ""}
+      ${x.riwayat ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600;color:var(--judul)">Riwayat</summary><div class="bd" style="font-size:13px;white-space:pre-line">${esc(x.riwayat)}</div></details>` : ""}
+      <div class="ac"><button class="bt o" data-ttbukti="${x.id}">Bukti titip</button>${rkAksi(x)}</div></article>`; };
+    return `${ring}${tok}${fil}<datalist id="rkMitraList">${(d.mitra_list || []).map(m => `<option value="${esc(m)}">`).join("")}</datalist>
+      <div class="lst">${its.map(kartu).join("") || rkKosong(st.semua ? "Belum ada titipan." : "Tidak ada titipan aktif. Centang \"Tampilkan yang sudah selesai\" untuk melihat riwayat.")}</div>`;
+  },
   pengumuman(d, items) {
     const urut = [...items].sort((a, b) => (b.sematkan - a.sematkan) || (b.id - a.id));
     return `<div class="lst">${urut.map(x => `<article class="it2${x.sematkan ? " pin" : ""}"><div class="ey">${esc(rkOp(d, "kategori", x.kategori))}${x.sematkan ? " · Disematkan" : ""}</div><h3>${esc(x.judul)}</h3>
@@ -3572,7 +3610,41 @@ function pkBind(el) {
       if (await pkMuat(pid, `/api/proyek/${pid}/tutup`, {method: "POST", json: {}})) { try { RK.proyek = await api("/api/r/proyek"); renderRK("proyek"); } catch (e) {} } }
   };
 }
+async function ttBukti(d, x) {
+  const no = "TTP-" + String(x.id).padStart(4, "0"), asal = (TT_ASAL.find(o => o[0] === x.asal) || [0, ""])[1], qr = await qrDataUrl(location.origin + "/#qr/titipan/" + x.id).catch(() => "");
+  const html = `<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Bukti titip ${no}</title><style>@page{size:A5;margin:12mm}body{font-family:Arial,sans-serif;color:#0B1A33;margin:0}
+    h1{font:700 20px Georgia,serif;margin:0}.k{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:2px solid #0B1A33;padding-bottom:10px}
+    table{width:100%;border-collapse:collapse;margin:14px 0;font-size:12.5px}td{padding:6px 4px;border-bottom:1px solid #ddd;vertical-align:top}td:first-child{color:#555;width:38%}
+    .q svg{width:30mm;height:30mm}.tt{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:28px;font-size:12px;text-align:center}.tt div{border-top:1px solid #333;padding-top:4px}
+    small{color:#555;font-size:11px}</style></head><body><div class="k"><div><h1>Bukti Penitipan Barang</h1><small>Mahardika Cakrawala Indonesia</small><p style="font-size:14px;margin:8px 0 0"><b>${no}</b></p></div><div class="q">${qr}</div></div>
+    <table><tr><td>Barang</td><td><b>${esc(x.nama)}</b></td></tr><tr><td>Jumlah dititipkan</td><td>${num(x.awal || x.jumlah || 0)} ${esc(x.satuan || "")}</td></tr><tr><td>Sisa di MCI</td><td>${num(x.jumlah || 0)} ${esc(x.satuan || "")}</td></tr>
+    <tr><td>Asal</td><td>${esc(asal)}: ${esc(ttPemilik(d, x) || "-")}</td></tr>${x.penitip ? `<tr><td>Penitip / pengantar</td><td>${esc(x.penitip)}</td></tr>` : ""}<tr><td>Kondisi saat masuk</td><td>${esc(rkOp(d, "kondisi", x.kondisi))}</td></tr>
+    <tr><td>Tanggal masuk</td><td>${esc(tglID(x.tgl_masuk))}</td></tr>${x.batas ? `<tr><td>Batas ambil</td><td>${esc(tglID(x.batas))}</td></tr>` : ""}${x.catatan ? `<tr><td>Catatan</td><td>${esc(x.catatan)}</td></tr>` : ""}</table>
+    <small>Barang titipan tetap milik penitip dan tidak dipakai MCI tanpa persetujuan. Simpan bukti ini untuk mengambil barang.</small>
+    <div class="tt"><div>Penitip</div><div>Penerima (MCI)</div></div><script>onload=()=>setTimeout(()=>print(),400)<\/script></body></html>`;
+  window.open(URL.createObjectURL(new Blob([html], {type: "text/html"})), "_blank");
+}
 const RK_BIND = {
+  titipan(el, d, st) {
+    const f = $("#rkForm-titipan"); if (f) { const sel = f.querySelector('[data-rkf="asal"]'), atur = () => { const a = sel.value;
+      [["mitra", a === "mitra"], ["penitip", a !== "proyek"], ["kontak", a !== "proyek"], ["proyek", a === "proyek"]].forEach(([n, on]) => { const l = f.querySelector(`[data-rkf="${n}"]`); if (l) l.closest("label").hidden = !on; }); };
+      if (sel) { sel.onchange = atur; atur(); } }
+    const cb = el.querySelector("[data-ttsemua]"); if (cb) cb.onchange = () => { st.semua = cb.checked; renderRK("titipan"); };
+    const g = el.querySelector("[data-ttg]"); if (g) g.onchange = () => { st.g = g.value; renderRK("titipan"); };
+    const det = el.querySelector("[data-ttdet]"); if (det) det.ontoggle = () => { st.tokBuka = det.open; };
+    el.querySelectorAll("[data-ttbukti]").forEach(b => b.onclick = () => ttBukti(d, d.items.find(x => x.id === +b.dataset.ttbukti)));
+    el.querySelectorAll("[data-ttk]").forEach(b => b.onclick = async () => { const i = b.dataset.ttk, n = +el.querySelector(`[data-ttn="${i}"]`).value, a = el.querySelector(`[data-tta="${i}"]`).value, x = d.items.find(y => y.id === +i);
+      if (!confirm(`${a === "pakai" ? "Pakai untuk proyek" : "Kembalikan ke penitip"}: ${n} ${x.satuan || ""} ${x.nama}?`)) return; b.disabled = true;
+      try { RK.titipan = await api(`/api/titipan/${i}/keluar`, {json: {jumlah: n, aksi: a, catatan: el.querySelector(`[data-ttc="${i}"]`).value}}); renderRK("titipan"); pesan("Titipan dikeluarkan"); } catch (e) { alert(e.message); b.disabled = false; } });
+    const bt = el.querySelector("[data-ttbuat]"); if (bt) bt.onclick = async () => { const v = el.querySelector("[data-tttok]").value; if (!v) return; const [asal, ...k] = v.split("|"); bt.disabled = true;
+      try { const r = await api("/api/titipan/token", {json: {asal, kunci: k.join("|")}}); d.token = r.token; st.tokBuka = true; renderRK("titipan");
+        $("#ttHasil").innerHTML = `<div class="cd" style="margin-top:10px;border-color:var(--gold)"><b>Link siap. Salin sekarang, link ini hanya ditampilkan sekali.</b><div class="bar" style="margin:8px 0 0"><input type="text" readonly value="${esc(r.url)}" id="ttUrl" style="flex:1;min-width:200px"><button class="bt g" id="ttSalin">Salin</button></div><small class="mu">Berlaku sampai ${esc(r.sampai)} WIB.</small></div>`;
+        $("#ttSalin").onclick = () => { $("#ttUrl").select(); (navigator.clipboard ? navigator.clipboard.writeText(r.url) : Promise.reject()).then(() => pesan("Link disalin"), () => document.execCommand("copy")); }; }
+      catch (e) { alert(e.message); bt.disabled = false; } };
+    el.querySelectorAll("[data-ttcabut]").forEach(b => b.onclick = async () => { if (!confirm("Cabut link ini? Penitip tidak bisa membukanya lagi.")) return;
+      try { const r = await api("/api/titipan/token?id=" + encodeURIComponent(b.dataset.ttcabut), {method: "DELETE"}); d.token = r.token; st.tokBuka = true; renderRK("titipan"); pesan("Link dicabut"); } catch (e) { alert(e.message); } });
+    if (st.lompat) { const t = $("#tt-" + st.lompat); st.lompat = 0; if (t) { t.scrollIntoView({behavior: "smooth", block: "center"}); t.style.outline = "2px solid var(--gold)"; } }
+  },
   mitra(el, d) {
     el.querySelectorAll("[data-mtdaftar]").forEach(b => b.onclick = async () => { b.disabled = true; await rkSimpan("mitra", null, {nama: b.dataset.mtdaftar, jenis: "lainnya", status: "aktif"}); });
   },
@@ -3730,7 +3802,7 @@ const EKSPOR = {
   uu: () => { const d = UUD || {items: []}, T = UUT(); const bersih = t => String(t || "").split("\n").map(l => l.replace(/^\*\*\s+/, "    - ").replace(/^\*\s+/, "- ")).join("\n");
     const its = d.items.filter(x => UUDOK === "kas" ? x.tipe.startsWith("kas_") : !x.tipe.startsWith("kas_"));
     return [{nama: T.nama, kolom: ["Bab", "Pasal", "Judul", "Isi", "Artinya"], baris: its.map(x => x.tipe === T.pasal ? [x.bab, x.nomor, x.judul, bersih(x.isi), x.artinya] : ["", "", x.tipe === T.info ? "Keterangan" : "Mukadimah", x.isi, ""])}]; },
-  mitra: () => exRK("mitra"), alat: () => exRK("alat"),
+  mitra: () => exRK("mitra"), alat: () => exRK("alat"), titipan: () => exRK("titipan"),
   skor: () => SK ? [{nama: "Skor keaktifan " + SK.periode, kolom: ["Peringkat", "Anggota", "Skor", "Absen %", "Tugas %", "Iuran %", "Rapat %", "Proyek %"], baris: SK.items.map((x, i) => [i + 1, x.nama, x.skor, ...["absen", "tugas", "iuran", "rapat", "proyek"].map(k => x.komponen[k] ?? "-")])}] : [],
   riwayat: () => RW ? [{nama: "Riwayat keuangan MCI", kolom: ["Waktu", "Oleh", "Bagian", "Aksi", "Keterangan", "Jumlah"], baris: rwSaring().map(x => [x.waktu.replace("T", " ").slice(0, 16), x.oleh, x.area, x.aksi, x.detail, x.jumlah])}] : [],
   portofolio: () => PF ? [{nama: "Portofolio MCI", kolom: ["Proyek", "Tahun", "Ringkasan", "Foto"], baris: PF.map(x => [x.nama, x.tahun, x.ringkasan, x.foto])}] : [],
@@ -6382,7 +6454,7 @@ const OFFICE_BUAT = () => {
         const lx = bx + o, wx = face > 0 ? gx + lx : gx - lx, yy = k ? y + .02 : 0, id = `${b}${k}${o > 0 ? 1 : 0}`;
         if (sisakan && sisakan.includes(id)) return;
         const pl = palet(g, lx, yy, 0, 0);
-        if (isi === "stok") slots.push({x: wx, y: yy + .14, z: zc, ry});
+        if (isi === "stok" || isi === "titipan") slots.push({x: wx, y: yy + .14, z: zc, ry});
         else if ((b * 7 + k * 3 + (o > 0 ? 1 : 0)) % 9 !== 4) muatan(pl, (b + k * 2 + (o > 0 ? 1 : 0)) % 4, b + k);
       }));
     }
@@ -6477,8 +6549,9 @@ const OFFICE_BUAT = () => {
     [-1, 1].forEach(s => add(CY(.1, .1, WH, 14), "#D4AF5A", -12.05, WH / 2, DOORZ[f] + s * 1.0, null, GOLD));
     // rak: A (utara, depan +z), B1 (depan -z) + B2 (depan +z, stok asli), C (selatan, depan -z)
     const A = rakPalet(-15.8, 4, -6.42, 1, "stok"), B2 = rakPalet(-15.8, 4, -1.7, 1, "stok");
-    rakPalet(-15.8, 4, -2.76, -1, "hias"); const C = rakPalet(-15.8, 4, 6.42, -1, "hias", ["110"]);
-    STOKG.slots = [...B2.slots, ...A.slots];
+    rakPalet(-15.8, 4, -2.76, -1, "hias"); const C = rakPalet(-15.8, 4, 6.42, -1, "titipan", ["110"]);
+    STOKG.slots = [...B2.slots, ...A.slots]; STOKG.tslots = C.slots;   // rak C = barang titipan (bukan milik MCI)
+    label("RAK C · BARANG TITIPAN", -19.4, 3.35, 5.85, .4, "#38D6FF");
     [["A", -6.42], ["B", -2.2], ["C", 6.42]].forEach(([t, z]) => { const sg = CT(128, 128, (q, w, h) => { q.fillStyle = "#0A2A6B"; q.fillRect(0, 0, w, h); q.strokeStyle = "#facc15"; q.lineWidth = 8; q.strokeRect(4, 4, w - 8, h - 8); q.fillStyle = "#facc15"; q.font = "900 84px system-ui"; q.textAlign = "center"; q.fillText(t, w / 2, 96); });
       plane(sg, .55, .55, -15.55, 3.25, z, PI / 2); plane(sg, .55, .55, -15.53, 3.25, z, -PI / 2); });
     // lampu gantung high-bay
@@ -6569,6 +6642,8 @@ const OFFICE_BUAT = () => {
       g.fillStyle = "rgba(120,80,40,.18)"; for (let i = 0; i < 9; i++) g.fillRect(0, i * 22, w, 2);
       g.fillStyle = "rgba(226,206,160,.85)"; g.fillRect(w / 2 - 22, 0, 44, 30);   // lakban
       const low = x[4] && x[2] <= x[4];
+      if (x[7]) { g.save(); g.translate(w - 50, 34); g.rotate(.3); g.strokeStyle = "#1d4ed8"; g.lineWidth = 4; g.strokeRect(-42, -14, 84, 28); g.fillStyle = "#1d4ed8"; g.font = "800 14px system-ui"; g.textAlign = "center"; g.fillText("TITIPAN", 0, 5); g.restore();
+        g.font = "600 13px system-ui,sans-serif"; g.fillStyle = "#1e3a8a"; g.textAlign = "center"; let o = String(x[7]); while (g.measureText(o).width > w - 20 && o.length > 3) o = o.slice(0, -2) + "…"; g.fillText(o, w / 2, h - 6); }
       if (img) { g.save(); g.translate(w / 2, 86); g.rotate(-.05); g.fillStyle = "#fff"; g.fillRect(-70, -48, 140, 100);
         const ir = img.width / img.height, bw = 128, bh = 88; let sx = 0, sy = 0, sw = img.width, sh = img.height;
         if (ir > bw / bh) { sw = img.height * bw / bh; sx = (img.width - sw) / 2; } else { sh = img.width * bh / bw; sy = (img.height - sh) / 2; }
@@ -6583,8 +6658,9 @@ const OFFICE_BUAT = () => {
   function stokSet(list) {
     const key = JSON.stringify(list); if (!STOKG.g || key === STOKG.last) return; STOKG.last = key;
     STOKG.g.children.slice().forEach(o => { STOKG.g.remove(o); o.traverse(m => { if (m.material && m.material.map) { m.material.map.dispose(); m.material.dispose(); m.geometry.dispose(); } }); });   // material warna dipakai bersama (cache), jangan di-dispose
-    list.slice(0, STOKG.slots.length).forEach((x, i) => {
-      const sl = STOKG.slots[i], bx = grp(sl.x, sl.y, sl.z, sl.ry + (i % 3 - 1) * .04, STOKG.g); bx.userData.dyn = true;
+    const titip = list.filter(x => x[7]), milik = list.filter(x => !x[7]), ts = STOKG.tslots || [];
+    [...milik.slice(0, STOKG.slots.length).map((x, i) => [x, STOKG.slots[i]]), ...titip.slice(0, ts.length).map((x, i) => [x, ts[i]])].forEach(([x, sl], i) => {
+      const bx = grp(sl.x, sl.y, sl.z, sl.ry + (i % 3 - 1) * .04, STOKG.g); bx.userData.dyn = true;
       const hgt = .5 + (x[0] % 3) * .07;
       add(PANEL(.9, hgt, .7, .025), ["#c49a6c", "#b5835a", "#d4a373"][x[0] % 3], 0, hgt / 2, 0, bx, {roughness: .85});
       add(PANEL(.91, .02, .14, .005), "#e2cea0", 0, hgt + .005, 0, bx, {roughness: .6});
@@ -8055,6 +8131,11 @@ async function qrPanel(jenis, id) {
 function bukaHash() {   // pintasan aplikasi (#inbox, #tugas, …) + link hasil Studio dari chat (#gambar/12, #studio/3d/5, #panduan/7)
   if (rapatDariHash()) return;
   const [p, a, b2] = decodeURIComponent((location.hash || "").slice(1)).split("/"), nv = p && document.querySelector(`.nv[data-p="${p}"]`);
+  if (p === "qr" && a === "titipan" && /^\d+$/.test(b2 || "")) {   // dari QR bukti titip
+    if (ME.role === "viewer") return;
+    RKS.titipan = RKS.titipan || {form: null, q: "", f: ""}; Object.assign(RKS.titipan, {f: "", g: "", semua: true, lompat: +b2});
+    show("titipan"); history.replaceState(null, "", "#titipan"); return;
+  }
   if (p === "qr" && (a === "alat" || a === "stok") && /^\d+$/.test(b2 || "")) {   // dari stiker QR
     if (ME.role === "viewer") return;
     show(a); history.replaceState(null, "", "#" + a); qrPanel(a, +b2); return;

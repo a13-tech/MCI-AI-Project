@@ -2608,6 +2608,7 @@ async def laporan_jadwal():
             log.exception("Cek batas lunas kas gagal")
         try:
             await asyncio.to_thread(alat_cek_telat)
+            await asyncio.to_thread(titip_cek_batas)
             await backup_jadwal_cek()
             await pagi_cek()
             await kabar_cek()
@@ -3445,7 +3446,9 @@ def api_office():
                 "status": o[0], "activity": o[1], "mode": o[2], "model": "cloudflare-flux", "gemini": bool(CF_TOKEN),
                 "telegram": bool(os.getenv("TOKEN_GAMBAR")), **({"calls": img_today(), "tokens": 0} if adm else {})})
     body = json.dumps({"agents": ags, "log": list(TASKLOG) if adm else [], "lantai": LANTAI, "iot": [] if luar else iot_public(adm), **({"galeri": GAL_IDS[:4]} if adm else {}),
-                       "stok": [] if luar else [[x["id"], x["nama"], x["jumlah"], x["satuan"], x["minimum"], x["foto"], x["v"]] for x in STOK[:18]]})   # kardus 3D: anggota saja
+                       "stok": [] if luar else [[x["id"], x["nama"], x["jumlah"], x["satuan"], x["minimum"], x["foto"], x["v"]] for x in STOK[:18]]
+                       + ([] if luar or not hal_on("titipan") else [[x["id"], x.get("nama", ""), x.get("jumlah") or 0, x.get("satuan") or "", 0, 0, 0, titip_label(*titip_kunci(x))[:24] or "Titipan"]
+                                                                   for x in rk_rows("titipan") if x.get("status") in TITIP_AKTIF][:23])})   # kardus 3D: anggota saja; titipan di rak C
     _OFFICE_CACHE[ck] = (time.time(), body)
     return Response(body, mimetype="application/json")
 
@@ -4302,6 +4305,8 @@ def rk_bersih(jenis, d, lama=None, hanya=None):
                 return None, f"{f['label']}: divisi tidak dikenal"
         elif t == "pasal":
             v = int(v) if str(v or "").isdigit() else None
+        elif t == "proyek":
+            v = int(v) if str(v or "").isdigit() and rk_get("proyek", int(v)) else None
         out[n] = v
     for f in JENIS[jenis]["fields"]:
         if f["wajib"] and (hanya is None or f["nama"] in hanya) and out.get(f["nama"]) in (None, "", []):
@@ -4388,6 +4393,11 @@ def rk_payload(jenis, r):
         out["statistik"] = mitra_statistik()
     if jenis == "alat":
         out["pinjam_maks_hari"] = ALAT_MAKS_HARI
+    if jenis == "titipan":
+        out["proyek_list"] = [[x["id"], x.get("nama") or f"Proyek #{x['id']}"] for x in rk_rows("proyek")]
+        out["mitra_list"] = sorted({x.get("nama") for x in rk_rows("mitra") if x.get("nama")})
+        out["token"] = _titip_token_list() if out["tulis"] else []
+        out["token_hari"] = TITIP_HARI
     if jenis == "agenda":
         out["kode_aktif"] = {str(k): v for k, v in (SET.get("agenda_kode") or {}).items() if v.get("sampai", "") >= today()} if boleh(r, "rapat_kelola") else {}
     if jenis in ("sidang", "putusan"):
@@ -4441,6 +4451,8 @@ DANA_PROYEK_MAKS = 75000   # Peraturan Kas Pasal 7
 
 def rk_cek(jenis, data, lama, r):
     """Aturan khusus sebelum disimpan. Kembalikan pesan error atau None (data boleh diubah di sini)."""
+    if jenis == "titipan":
+        return titip_cek(data, lama, r)
     if jenis == "alat":
         if not data.get("peminjam"):
             data["tgl_pinjam"], data["tenggat"] = "", ""
@@ -5384,6 +5396,208 @@ def alat_cek_telat():
             n += 1
     set_save()
     return n
+
+
+# ---------- PENITIPAN BARANG: barang/komponen milik mitra, individu, atau titipan untuk proyek. BUKAN aset MCI (terpisah dari Stok).
+# Lihat: semua anggota. Catat/keluarkan: izin Kelola Stok. Penitip bisa cek lewat link token (kedaluwarsa 7 hari, bisa dicabut).
+JENIS["titipan"] = {"judul": "Penitipan Barang", "tulis": "stok_kelola", "lihat": "anggota", "fields": [
+    F("nama", "Nama barang", wajib=True, maks=120), F("jumlah", "Jumlah (tersisa di MCI)", "angka", wajib=True, maks=10**6), F("satuan", "Satuan", maks=20, bawaan="pcs"),
+    F("asal", "Asal titipan", "pilih", opsi=[["mitra", "Dari mitra"], ["individu", "Dari individu"], ["proyek", "Untuk proyek MCI"]], bawaan="mitra"),
+    F("mitra", "Nama mitra", maks=120, info="Tulis sama persis dengan nama di Database Mitra."),
+    F("penitip", "Nama penitip / pengantar", maks=120), F("kontak", "Kontak penitip (HP / email)", maks=120),
+    F("proyek", "Untuk proyek", "proyek"), F("lokasi", "Disimpan di (laci / rak)", maks=120),
+    F("kondisi", "Kondisi saat masuk", "pilih", opsi=[["baik", "Baik"], ["cacat", "Ada cacat / kurang"]], bawaan="baik"),
+    F("tgl_masuk", "Tanggal masuk", "tanggal"), F("batas", "Batas ambil (opsional)", "tanggal"),
+    F("status", "Status", "pilih", opsi=[["dititip", "Dititip"], ["sebagian", "Sebagian sudah keluar"], ["kembali", "Sudah dikembalikan semua"], ["dipakai", "Sudah dipakai proyek"]], bawaan="dititip"),
+    F("catatan", "Catatan", "area", maks=2000),
+    {**F("awal", "Jumlah awal", "angka", maks=10**6), "sistem": True}, {**F("riwayat", "Riwayat", "area", maks=8000), "sistem": True}]}
+TITIP_AKTIF = ("dititip", "sebagian")
+TITIP_HARI = 7
+
+
+def titip_cek(data, lama, r):
+    """Aturan simpan titipan: asal wajib lengkap, jumlah awal & riwayat dicatat sistem."""
+    a = data.get("asal")
+    if a == "mitra" and not data.get("mitra"):
+        return "Nama mitra wajib diisi untuk titipan dari mitra"
+    if a == "individu" and not data.get("penitip"):
+        return "Nama penitip wajib diisi untuk titipan dari individu"
+    if a == "proyek" and not data.get("proyek"):
+        return "Pilih proyeknya untuk titipan untuk proyek"
+    if a != "mitra":
+        data["mitra"] = ""
+    if a != "proyek":
+        data["proyek"] = None
+    siapa = nama_peran(r)
+    if lama is None:
+        data["awal"] = data.get("jumlah") or 0
+        data["tgl_masuk"] = data.get("tgl_masuk") or today()
+        data["status"] = "dititip"
+        data["riwayat"] = f"{today()}: diterima {data['awal']} {data.get('satuan') or ''} oleh {siapa}" + (f" (kondisi: ada cacat)" if data.get("kondisi") == "cacat" else "")
+    elif int(data.get("jumlah") or 0) != int(lama.get("jumlah") or 0):
+        data["riwayat"] = ((lama.get("riwayat") or "") + f"\n{today()}: jumlah dikoreksi {lama.get('jumlah')} → {data.get('jumlah')} oleh {siapa}").strip()[-8000:]
+        if int(data.get("jumlah") or 0) > int(lama.get("awal") or 0):
+            data["awal"] = data["jumlah"]
+    return None
+
+
+def titip_kunci(x):
+    """Kelompok pemilik titipan: (asal, kunci) — kunci = nama mitra / nama penitip (huruf kecil) / id proyek."""
+    a = x.get("asal")
+    k = str(x.get("mitra") if a == "mitra" else x.get("penitip") if a == "individu" else x.get("proyek") or "").strip().lower()
+    return a, k
+
+
+def titip_pengelola():
+    return [m["id"] for m in MEMBERS.values() if m["aktif"] and boleh(f"m:{m['id']}", "stok_kelola")]
+
+
+def titip_proyek_nama(pid):
+    x = rk_get("proyek", int(pid)) if str(pid or "").isdigit() else None
+    return (x or {}).get("nama") or (f"Proyek #{pid}" if pid else "")
+
+
+def titip_label(a, k):
+    if a == "proyek":
+        return titip_proyek_nama(k)
+    for x in rk_rows("titipan"):
+        if titip_kunci(x) == (a, k):
+            return x.get("mitra") if a == "mitra" else x.get("penitip")
+    return k
+
+
+@app.route("/api/titipan/<int:i>/keluar", methods=["POST"])
+def api_titip_keluar(i):
+    """Pengelola mengeluarkan titipan: dikembalikan ke penitip, atau dipakai proyek (khusus titipan untuk proyek)."""
+    r = need_perm("stok_kelola")
+    if not hal_on("titipan"):
+        abort(404)
+    hasil, kode = titip_keluar(r, i, request.get_json(silent=True) or {})
+    return jsonify(hasil), kode
+
+
+def titip_keluar(r, i, d):
+    """Inti pengeluaran titipan (dipakai web & Copilot). Balik (payload | {"error"}, kode HTTP)."""
+    x = rk_get("titipan", i)
+    if not x:
+        return {"error": "Titipan tidak ditemukan"}, 404
+    aksi = d.get("aksi") if d.get("aksi") in ("kembali", "pakai") else "kembali"
+    try:
+        n = int(float(d.get("jumlah") or 0))
+    except (TypeError, ValueError):
+        n = 0
+    sisa = int(x.get("jumlah") or 0)
+    if not 0 < n <= sisa:
+        return {"error": f"Jumlah harus 1 sampai {sisa}"}, 400
+    if aksi == "pakai" and x.get("asal") != "proyek":
+        return {"error": "Hanya titipan untuk proyek yang bisa dipakai proyek. Titipan mitra/individu harus dikembalikan."}, 400
+    cat = re.sub(r"\s+", " ", str(d.get("catatan") or "")).strip()[:200]
+    penerima = re.sub(r"\s+", " ", str(d.get("penerima") or "")).strip()[:80]
+    data = _rk_data(x)
+    data["jumlah"] = sisa - n
+    data["status"] = ("kembali" if aksi == "kembali" else "dipakai") if sisa - n == 0 else "sebagian"
+    data["riwayat"] = ((data.get("riwayat") or "") + f"\n{today()}: {'dikembalikan' if aksi == 'kembali' else 'dipakai proyek'} {n} {data.get('satuan') or ''}"
+                       + (f" ke {penerima}" if penerima else "") + f", dikeluarkan {nama_peran(r)}" + (f" ({cat})" if cat else "")).strip()[-8000:]
+    _rk_tulis("titipan", i, data)
+    if aksi == "pakai" and x.get("proyek"):
+        with db() as c:
+            pl_ins(c, int(x["proyek"]), "sistem", f"Memakai {n} {data.get('satuan') or ''} {x.get('nama')} dari barang titipan" + (f" ({cat})" if cat else ""), r)
+    audit("Titipan", "kembalikan" if aksi == "kembali" else "pakai proyek", f"{x.get('nama')}: {sisa} → {sisa - n} {data.get('satuan') or ''}", 0, nama_peran(r))
+    return rk_payload("titipan", r), 200
+
+
+def _titip_token_bersih():
+    T = SET.setdefault("titip_token", {})
+    kini = _now()
+    for h in [h for h, v in T.items() if v.get("sampai", "") < kini]:
+        T.pop(h)
+    return T
+
+
+@app.route("/api/titipan/token", methods=["GET", "POST", "DELETE"])
+def api_titip_token():
+    """Link cek titipan untuk penitip (per mitra / individu / proyek). Berlaku 7 hari. Yang disimpan hanya hash token."""
+    r = need_perm("stok_kelola")
+    T = _titip_token_bersih()
+    if request.method == "POST":
+        d = request.get_json(silent=True) or {}
+        a, k = d.get("asal"), str(d.get("kunci") or "").strip().lower()
+        if a not in ("mitra", "individu", "proyek") or not k:
+            return jsonify({"error": "Pilih mitra / individu / proyek-nya"}), 400
+        if not any(titip_kunci(x) == (a, k) for x in rk_rows("titipan")):
+            return jsonify({"error": "Belum ada titipan atas nama itu"}), 400
+        if len(T) >= 200:
+            return jsonify({"error": "Terlalu banyak link aktif, cabut yang tidak dipakai"}), 400
+        tok = secrets.token_urlsafe(24)
+        sampai = (datetime.now(WIB) + timedelta(days=TITIP_HARI)).strftime("%Y-%m-%d %H:%M")
+        T[hashlib.sha256(tok.encode()).hexdigest()] = {"asal": a, "kunci": k, "label": titip_label(a, k), "sampai": sampai, "dibuat": _now(), "oleh": nama_peran(r)}
+        set_save()
+        audit("Titipan", "buat link cek", f"{titip_label(a, k)} (berlaku sampai {sampai})", 0, nama_peran(r))
+        dasar = request.host_url.rstrip("/")
+        if os.getenv("RENDER"):
+            dasar = dasar.replace("http://", "https://", 1)
+        return jsonify({"url": f"{dasar}/titip/{tok}", "sampai": sampai, "token": _titip_token_list()})
+    if request.method == "DELETE":
+        h = str(request.args.get("id") or "")
+        v = T.pop(h, None)
+        if v:
+            set_save()
+            audit("Titipan", "cabut link cek", v.get("label", ""), 0, nama_peran(r))
+    return jsonify({"token": _titip_token_list()})
+
+
+def _titip_token_list():
+    return sorted([{"id": h, **v} for h, v in (SET.get("titip_token") or {}).items()], key=lambda v: v["dibuat"], reverse=True)
+
+
+@app.route("/titip/<tok>")
+def halaman_titip(tok):
+    """Halaman publik untuk penitip: daftar barangnya yang dititipkan di MCI (baca saja)."""
+    e = lambda v: _esc_html(str(v or ""))
+    v = _titip_token_bersih().get(hashlib.sha256(str(tok).encode()).hexdigest()) if len(str(tok)) < 80 else None
+    if not v or not hal_on("titipan"):
+        isi = '<section><p class="lead">Link ini tidak berlaku atau sudah kedaluwarsa (link cek titipan hanya berlaku 7 hari). Minta link baru ke pengurus MCI.</p></section>'
+        L = []
+    else:
+        L = [x for x in rk_rows("titipan") if titip_kunci(x) == (v["asal"], v["kunci"])]
+        status = dict(next(f for f in JENIS["titipan"]["fields"] if f["nama"] == "status")["opsi"])
+        baris = "".join(
+            f'<li><b>{e(x.get("nama"))}</b><span class="jm">{int(x.get("jumlah") or 0)} <small>dari {int(x.get("awal") or x.get("jumlah") or 0)} {e(x.get("satuan"))}</small></span>'
+            f'<span class="st st-{e(x.get("status"))}">{e(status.get(x.get("status"), x.get("status")))}</span>'
+            f'<span class="mt">Masuk {e(tglid(x.get("tgl_masuk")) if x.get("tgl_masuk") else "-")}' + (f' · batas ambil {e(tglid(x["batas"]))}' if x.get("batas") else "") + (" · kondisi masuk ada cacat" if x.get("kondisi") == "cacat" else "") + "</span>"
+            + (f'<details><summary>Riwayat</summary><pre>{e(x.get("riwayat"))}</pre></details>' if x.get("riwayat") else "") + "</li>" for x in L)
+        aktif = sum(1 for x in L if x.get("status") in TITIP_AKTIF)
+        isi = (f'<section><p class="lead">Barang titipan atas nama <b>{e(v["label"])}</b> yang tercatat di MCI. {aktif} barang masih disimpan.</p>'
+               f'<ul class="tt">{baris or "<li>Belum ada barang.</li>"}</ul>'
+               f'<p class="ft">Diperbarui otomatis setiap kali halaman dibuka. Link berlaku sampai {e(v["sampai"])} WIB. Ada yang tidak sesuai? Hubungi pengurus MCI.</p></section>')
+    doc = ('<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cek Titipan | MCI</title>'
+           '<meta name="robots" content="noindex,nofollow"><link rel="icon" href="/aset/favicon.ico">'
+           f"<style>{CSS_PUBLIK}.tt{{list-style:none;padding:0;display:grid;gap:10px}}.tt li{{background:#fff;border:1px solid #E6E0D2;border-radius:14px;padding:14px 16px;display:grid;gap:4px}}"
+           ".tt b{color:var(--n);font-size:17px}.jm{font-size:22px;font-weight:700;color:var(--n)}.jm small{font-size:13px;font-weight:500;color:var(--m)}.mt,.ft{color:var(--m);font-size:13.5px}"
+           ".st{justify-self:start;font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:999px;background:#E8EEF8;color:#1E3A6B}.st-kembali,.st-dipakai{background:#E7F3EA;color:#1F6B3A}"
+           "details summary{cursor:pointer;font-size:13.5px;color:var(--n)}pre{white-space:pre-wrap;font:13px/1.5 system-ui,sans-serif;color:var(--m);margin:6px 0 0}</style></head><body>"
+           '<header><img src="/aset/logo-mci-192.webp" width="56" height="56" alt="Logo MCI"><div><p class="ey">Penitipan barang</p><h1>Cek titipan</h1>'
+           '<p class="sub">Mahardika Cakrawala Indonesia</p></div></header>' f"<main>{isi}</main></body></html>")
+    resp = Response(doc, mimetype="text/html")
+    resp.headers["Cache-Control"] = "no-store"
+    resp.headers["Referrer-Policy"] = "no-referrer"
+    return resp
+
+
+def titip_cek_batas():
+    """Sekali sehari: ingatkan pengelola titipan yang lewat batas ambil."""
+    if not hal_on("titipan"):
+        return 0
+    hari = today()
+    if SET.get("titip_ingat") == hari or datetime.now(WIB).hour < 8:
+        return 0
+    SET["titip_ingat"] = hari
+    L = [x for x in rk_rows("titipan") if x.get("status") in TITIP_AKTIF and x.get("batas") and x["batas"] < hari]
+    if L:
+        inbox_kirim(titip_pengelola(), "titipan", f"📦 {len(L)} titipan lewat batas ambil",
+                    "\n".join(f"- {x.get('nama')} ({x.get('jumlah')} {x.get('satuan')}), {titip_label(*titip_kunci(x))}, batas {x['batas']}" for x in L[:15]), L[0]["id"])
+    set_save()
+    return len(L)
 
 
 # ---------- KODE HADIR RAPAT (QR) ----------
@@ -13020,7 +13234,7 @@ IDENTITAS_AI += ("\n\nSOP MCI (WAJIB untuk semua AI MCI): sebelum MENGEKSEKUSI p
 
 # ---------- MCI Copilot: akses SEMUA halaman (baca + aksi). Izin = izin halaman orangnya; aksi lewat SOP konfirmasi "Lanjut?" (permintaan CEO, 21 Nov 2026) ----------
 COP_HAL = {"agenda": "agenda", "rapat": "agenda", "tugas": "tugas", "pengumuman": "pengumuman", "proyek": "proyek", "mitra": "mitra",
-           "alat": "alat", "peminjaman": "alat", "inventaris": "alat", "konten": "konten", "sidang": "sidang", "pelanggaran": "sidang", "putusan": "putusan"}
+           "alat": "alat", "peminjaman": "alat", "inventaris": "alat", "titipan": "titipan", "penitipan": "titipan", "titip": "titipan", "konten": "konten", "sidang": "sidang", "pelanggaran": "sidang", "putusan": "putusan"}
 
 
 def _cop_jenis(halaman):
@@ -13325,10 +13539,28 @@ def cek_inbox(belum_dibaca: bool = True) -> dict:
     return {"jumlah": len(rows), "pesan": [{"judul": a[0], "isi": str(a[1] or "")[:400], "jenis": a[2], "waktu": a[3], "dibaca": bool(a[4])} for a in rows]}
 
 
-APEX_ALAT += [cek_halaman, cek_inbox, isi_halaman, ubah_halaman, ubah_stok, pakai_stok_proyek, pinjam_alat, kembalikan_alat]
+def keluarkan_titipan(barang: str, jumlah: int, aksi: str = "kembali", catatan: str = "", penerima: str = "") -> dict:
+    """AKSI (izin Kelola Stok): keluarkan barang titipan. aksi = 'kembali' (dikembalikan ke penitip) atau 'pakai' (dipakai proyek, khusus titipan untuk proyek).
+    barang = id (#12) atau nama barang titipan. penerima = nama orang yang mengambil (opsional)."""
+    _alat("keluarkan_titipan", barang=barang, jumlah=jumlah, aksi=aksi)
+    r = _PENANYA.get() or "admin"
+    if not hal_on("titipan") or not can("stok_kelola", r):
+        return {"ok": False, "pesan": "mengeluarkan titipan butuh izin Kelola Stok"}
+    c = [x for x in _cop_cari_item("titipan", barang) if x.get("status") in TITIP_AKTIF] or _cop_cari_item("titipan", barang)
+    if len(c) != 1:
+        return {"ok": False, "pesan": f"'{barang}' cocok dengan {len(c)} titipan; sebut id-nya", "kandidat": [_cop_tampil("titipan", x) for x in c[:6]]}
+    body, kode = titip_keluar(r, c[0]["id"], {"jumlah": jumlah, "aksi": aksi, "catatan": catatan, "penerima": penerima})
+    if kode != 200:
+        return {"ok": False, "pesan": body.get("error", "gagal")}
+    x = next((y for y in body["items"] if y["id"] == c[0]["id"]), {})
+    return {"ok": True, "pesan": f"{c[0].get('nama')}: sisa {x.get('jumlah')} {x.get('satuan', '')}, status {x.get('status')}."}
+
+
+APEX_ALAT += [cek_halaman, cek_inbox, isi_halaman, ubah_halaman, ubah_stok, pakai_stok_proyek, pinjam_alat, kembalikan_alat, keluarkan_titipan]
 APEX_IZIN_ALAT.update({"cek_halaman": None, "cek_inbox": None, "isi_halaman": None, "ubah_halaman": None, "pakai_stok_proyek": "stok", "ubah_stok": "stok_kelola", "pinjam_alat": None, "kembalikan_alat": None})
 APEX_HAL_ALAT.update({"cek_inbox": "inbox", "ubah_stok": "stok", "pakai_stok_proyek": "stok", "pinjam_alat": "alat", "kembalikan_alat": "alat"})
-ALAT_AKSI |= {"isi_halaman", "ubah_halaman", "ubah_stok", "pakai_stok_proyek", "pinjam_alat", "kembalikan_alat"}
+ALAT_AKSI |= {"isi_halaman", "ubah_halaman", "ubah_stok", "pakai_stok_proyek", "pinjam_alat", "kembalikan_alat", "keluarkan_titipan"}
+APEX_IZIN_ALAT["keluarkan_titipan"] = "stok_kelola"
 APEX_SISTEM = APEX_SISTEM.replace(
     "Data organisasi hanya bisa kamu BACA. Kalau diminta mengubah data (tambah stok, catat kas, hapus), jelaskan itu belum bisa dari halaman ini dan sebut halaman web yang cocok. ",
     "Kamu terhubung ke SEMUA halaman web MCI. BACA: alat cek_* dan cek_halaman (agenda, tugas, pengumuman, proyek, mitra, peminjaman alat, konten, sidang, putusan). "
