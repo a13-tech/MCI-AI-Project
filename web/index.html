@@ -352,6 +352,7 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 .axFdNama{font-size:11px;color:var(--mute);margin-left:6px}
 .axJudul{display:flex;align-items:center;gap:6px}.axJudul>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .axJejak{all:unset;flex:none;cursor:pointer;color:var(--mute);font-size:13.5px}.axJejak:hover{color:var(--ink);text-decoration:underline}
+.axFBantu{display:block;margin-top:4px;font-size:12px;color:var(--mute);font-weight:400}
 .axFdInfo{max-width:620px;margin:10px auto 0;font-size:14.5px;color:var(--mute)}.axFdInfo p{margin:0 0 10px}
 .axSumber{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-bottom:10px}.axSumber span{padding:4px 10px;border-radius:99px;border:1px solid var(--line);font-size:12.5px;color:var(--ink)}
 .axFdAksi{display:flex;justify-content:center;gap:4px}.axFdAksi button{all:unset;cursor:pointer;padding:5px 10px;border-radius:8px;font-size:13px;color:var(--mute)}.axFdAksi button:hover{background:var(--hov);color:var(--ink)}
@@ -1828,6 +1829,8 @@ textarea:focus,input:focus,select:focus{border-color:var(--aksen);box-shadow:0 0
     <label>Instruksi untuk Copilot<textarea id="axFIns" rows="3" maxlength="2000" placeholder="misal: jawab teknis, fokus ESP32 dan sensor kapal"></textarea></label>
     <label>Hubungkan ke Proyek MCI<select id="axFPro"><option value="0">Tidak dihubungkan</option></select></label>
     <fieldset id="axFCaW"><legend>Tempel catatan</legend><input type="search" id="axFCaCari" placeholder="Cari catatan" aria-label="Cari catatan"><div class="axCek2" id="axFCa"></div></fieldset>
+    <label id="axFRepoW" hidden>Repo GitHub (khusus CEO)<textarea id="axFRepo" rows="2" maxlength="600" spellcheck="false" placeholder="a13-tech/MCI-AI-Project&#10;atau tempel link github.com/..., satu per baris (maks 5)"></textarea>
+     <small class="axFBantu">Copilot otomatis membaca README, struktur file, dan commit terakhir. Konektor GitHub ikut menyala. Hanya baca.</small></label>
     <fieldset id="axFKoW" hidden><legend>Konektor bawaan (khusus CEO)</legend><div class="axCek2" id="axFKo"></div></fieldset>
     <p class="axDlgMsg" id="axDlgMsg"></p>
     <div class="axDlgTombol"><button type="button" class="bt o" id="axDlgBatal">Batal</button><button type="submit" class="bt g" id="axDlgSimpan">Simpan</button></div></form></dialog>
@@ -4394,7 +4397,7 @@ function apxRender() {
   if (fd) { $("#axFdKet").textContent = fd.ket || "Obrolan di folder ini otomatis membaca instruksi, proyek, dan catatan yang terhubung.";
     const pr = (AX_PILIHAN && AX_PILIHAN.proyek || []).find(p => p.id === fd.proyek);
     $("#axFdSumber").innerHTML = [fd.proyek ? `Proyek MCI: ${esc(pr ? pr.nama : "#" + fd.proyek)}` : "", fd.catatan.length ? `${fd.catatan.length} catatan ditempel` : "", fd.instruksi ? "Ada instruksi khusus" : "",
-      ...fd.konektor.map(k => "Konektor " + esc((AX_KONEKTOR.find(x => x.id === k) || {}).nama || k))].filter(Boolean).map(t => `<span>${t}</span>`).join("") || "<span>Belum ada sumber terhubung</span>";
+      ...(fd.repo || []).map(x => "Repo " + esc(x)), ...fd.konektor.map(k => "Konektor " + esc((AX_KONEKTOR.find(x => x.id === k) || {}).nama || k))].filter(Boolean).map(t => `<span>${t}</span>`).join("") || "<span>Belum ada sumber terhubung</span>";
     const ob = AX_DAFTAR.filter(o => o.folder === fd.id);
     $("#axFdObr").innerHTML = ob.length ? ob.map(o => `<button type="button" data-axc="${esc(o.id)}"><span>${esc(o.judul)}</span><small>${esc(axGrupWaktu(o.waktu))}</small></button>`).join("") : "<p>Belum ada obrolan di proyek ini. Tulis pertanyaan di atas untuk memulai.</p>"; }
   $("#axJejak").hidden = !(fd && !kosong); if (fd) $("#axJejak").textContent = fd.nama + " ›";
@@ -4569,11 +4572,11 @@ function axCaRender() { const q = $("#axFCaCari").value.trim().toLowerCase(), pi
   AX_EDIT_CA = [...pil]; $("#axFCa").innerHTML = (AX_PILIHAN.catatan || []).filter(x => !q || x.judul.toLowerCase().includes(q) || pil.has(x.id)).map(x => `<label><input type="checkbox" value="${x.id}" ${pil.has(x.id) ? "checked" : ""}>${esc(x.judul)}<small>${esc(x.pemilik)}</small></label>`).join("") || '<p class="mu" style="font-size:12.5px;margin:4px">Tidak ada catatan.</p>'; }
 let AX_EDIT_CA = [];
 async function axFolderEdit(id) {
-  await axPilihanMuat(); AX_EDIT = id || 0; const f = id ? axFolder(id) : {nama: "", ket: "", instruksi: "", proyek: 0, catatan: [], konektor: [...AX_KON]};
+  await axPilihanMuat(); AX_EDIT = id || 0; const f = id ? axFolder(id) : {nama: "", ket: "", instruksi: "", proyek: 0, catatan: [], konektor: [...AX_KON], repo: []};
   $("#axDlgJudul").textContent = id ? "Atur proyek" : "Proyek baru"; $("#axFNama").value = f.nama; $("#axFKet").value = f.ket; $("#axFIns").value = f.instruksi; $("#axDlgMsg").textContent = "";
   $("#axFPro").innerHTML = '<option value="0">Tidak dihubungkan</option>' + AX_PILIHAN.proyek.map(p => `<option value="${p.id}" ${p.id === f.proyek ? "selected" : ""}>${esc(p.nama)}${p.status ? " (" + esc(p.status) + ")" : ""}</option>`).join("");
   $("#axFCaW").hidden = !AX_PILIHAN.catatan.length && !f.catatan.length; AX_EDIT_CA = [...f.catatan]; $("#axFCaCari").value = ""; $("#axFCa").innerHTML = ""; axCaRender();
-  $("#axFKoW").hidden = !AX_PILIHAN.konektor.length;
+  $("#axFKoW").hidden = $("#axFRepoW").hidden = !AX_PILIHAN.konektor.length; $("#axFRepo").value = (f.repo || []).join("\n");
   $("#axFKo").innerHTML = AX_PILIHAN.konektor.map(k => `<label><input type="checkbox" value="${k.id}" ${f.konektor.includes(k.id) ? "checked" : ""}>${esc(k.nama)}<small>${k.siap ? "siap" : "kunci belum diisi"}</small></label>`).join("");
   $("#axDlg").showModal(); $("#axFNama").focus();
 }
@@ -4582,7 +4585,7 @@ $("#axFCa").onchange = e => { const v = +e.target.value; if (e.target.checked) A
 $("#axDlgBatal").onclick = () => $("#axDlg").close();
 $("#axDlgForm").onsubmit = async e => { e.preventDefault(); $("#axDlgSimpan").disabled = true;
   try { const d = await api("/api/copilot/folder", {json: {id: AX_EDIT, nama: $("#axFNama").value, ket: $("#axFKet").value, instruksi: $("#axFIns").value, proyek: +$("#axFPro").value,
-      catatan: [...new Set(AX_EDIT_CA)], konektor: [...$$("#axFKo input:checked")].map(x => x.value)}});
+      catatan: [...new Set(AX_EDIT_CA)], konektor: [...$$("#axFKo input:checked")].map(x => x.value), repo: $("#axFRepo").value}});
     AX_FOLDER = d.folder; AX_PILIHAN.folder = d.folder; $("#axDlg").close(); pesan(AX_EDIT ? "Proyek disimpan" : "Proyek dibuat"); axFolderBuka(d.id); }
   catch (er) { $("#axDlgMsg").textContent = er.message; } $("#axDlgSimpan").disabled = false; };
 $("#axFdBaru").onclick = () => axFolderEdit(0);
