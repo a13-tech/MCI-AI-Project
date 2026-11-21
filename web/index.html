@@ -841,11 +841,6 @@ details.cara p{line-height:1.65}
 :root[data-tema=gelap] .skg .it{--ink:#141B2B;--mute:#5B6475;--judul:#0B1730;--line:#E3E6EC;--line2:#CCD2DB;color:#141B2B}
 .skg .it .ch{background:#E6ECF7;color:#2B3A55;border-color:#D3DCEB;justify-self:start}
 :root[data-tema=gelap] .pp .it{--ink:#141B2B;--mute:#5B6475;--judul:#0B1730;--line:#E3E6EC;--line2:#CCD2DB;color:#141B2B}
-:root[data-tema=gelap] .ib.baru{--ink:#141B2B;--mute:#5B6475;--judul:#0B1730;--line:#E3E6EC;--line2:#CCD2DB;color:#141B2B}
-:root[data-tema=gelap] .bkm.lunas{--ink:#141B2B;--mute:#5B6475;--judul:#0B1730;--line:#E3E6EC;--line2:#CCD2DB;color:#141B2B}
-:root[data-tema=gelap] .bkm.menunggu{--ink:#141B2B;--mute:#5B6475;--judul:#0B1730;--line:#E3E6EC;--line2:#CCD2DB;color:#141B2B}
-:root[data-tema=gelap] .bkm.belum{--ink:#141B2B;--mute:#5B6475;--judul:#0B1730;--line:#E3E6EC;--line2:#CCD2DB;color:#141B2B}
-:root[data-tema=gelap] .bkm.bebas{--ink:#141B2B;--mute:#5B6475;--judul:#0B1730;--line:#E3E6EC;--line2:#CCD2DB;color:#141B2B}
 :root[data-tema=gelap] .bkc:has(input:checked){--ink:#141B2B;--mute:#5B6475;--judul:#0B1730;--line:#E3E6EC;--line2:#CCD2DB;color:#141B2B}
 :root[data-tema=gelap] .gal figure{--ink:#141B2B;--mute:#5B6475;--judul:#0B1730;--line:#E3E6EC;--line2:#CCD2DB;color:#141B2B}
 :root[data-tema=gelap] .gal img{--ink:#141B2B;--mute:#5B6475;--judul:#0B1730;--line:#E3E6EC;--line2:#CCD2DB;color:#141B2B}
@@ -860,7 +855,6 @@ details.cara p{line-height:1.65}
 :root[data-tema=gelap] .pdWarn.r{--ink:#141B2B;--mute:#5B6475;--judul:#0B1730;--line:#E3E6EC;--line2:#CCD2DB;color:#141B2B}
 :root[data-tema=gelap] .pdCek{--ink:#141B2B;--mute:#5B6475;--judul:#0B1730;--line:#E3E6EC;--line2:#CCD2DB;color:#141B2B}
 :root[data-tema=gelap] .pdProses{--ink:#141B2B;--mute:#5B6475;--judul:#0B1730;--line:#E3E6EC;--line2:#CCD2DB;color:#141B2B}
-:root[data-tema=gelap] .kb>div{--ink:#141B2B;--mute:#5B6475;--judul:#0B1730;--line:#E3E6EC;--line2:#CCD2DB;color:#141B2B}
 :root[data-tema=gelap] .prg{--ink:#141B2B;--mute:#5B6475;--judul:#0B1730;--line:#E3E6EC;--line2:#CCD2DB;color:#141B2B}
 :root[data-tema=gelap] .s3g img{--ink:#141B2B;--mute:#5B6475;--judul:#0B1730;--line:#E3E6EC;--line2:#CCD2DB;color:#141B2B}
 :root[data-tema=gelap] .er{color:#EE928B}
@@ -1088,6 +1082,14 @@ textarea:focus,input:focus,select:focus{border-color:var(--aksen);box-shadow:0 0
  .brHero{grid-template-columns:1fr 1fr;padding:18px 0 28px}.brTengah{grid-column:1/-1;order:-1}
  .brAngka{gap:14px;padding:0}.brAngka.kanan{text-align:left}.brAngka b{font-size:30px}
 }
+/* tema gelap: bekas 'pulau terang' yang bentrok dengan v5 (21 Nov 2026) */
+:root[data-tema=gelap] .ib.baru{background:rgba(56,214,255,.07);border-left-color:var(--aksen)}
+:root[data-tema=gelap] .kb>div{background:rgba(255,255,255,.035);border:1px solid var(--line)}
+:root[data-tema=gelap] .bkm.lunas{background:rgba(52,199,120,.12);border-color:rgba(123,211,160,.45)}:root[data-tema=gelap] .bkm.lunas b{color:#7BE3A8}
+:root[data-tema=gelap] .bkm.menunggu{background:rgba(235,203,107,.12);border-color:rgba(235,203,107,.45)}
+:root[data-tema=gelap] .bkm.belum{background:rgba(243,120,110,.12);border-color:rgba(243,160,150,.4)}
+:root[data-tema=gelap] .bkm.bebas{background:rgba(255,255,255,.04);border-color:var(--line)}
+:root[data-tema=gelap] #ivTot{color:var(--aksen)!important}
 </style>
 </head>
 <body>
