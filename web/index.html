@@ -1651,6 +1651,7 @@ textarea:focus,input:focus,select:focus{border-color:var(--aksen);box-shadow:0 0
     <div class="mtr" id="pnMeter"></div><div id="pnBayar" class="mu" style="font-size:12.5px;margin-top:10px"></div>
     <b style="display:block;margin-top:18px;font-size:13.5px">7 hari terakhir</b><div id="pnMeter7"></div></div>
    <div class="pnG" style="margin-top:16px">
+    <div class="cd"><b>MCI Node (HDD + Ollama markas)</b><div class="mu" style="font-size:12.5px;margin:2px 0 8px">MacBook di markas: gudang video ukuran asli, backup database tiap malam, dan Ollama sebagai cadangan AI terakhir.</div><div id="pnNode" class="mu" style="font-size:13px">Memeriksa…</div></div>
     <div class="cd"><b>Antrean cadangan</b><div class="mu" style="font-size:12.5px;margin:2px 0 0">Saat Gemini penuh, AI dioper ke penyedia berikutnya sesuai urutan ini. Yang kena batas diistirahatkan 2 menit.</div><div class="cdg" id="pnCad"></div><div class="mu" id="pnHemat" style="font-size:12.5px;margin-top:10px"></div></div>
     <div class="cd"><b>Adu model</b><div class="mu" style="font-size:12.5px;margin:2px 0 8px">Satu pertanyaan ke 2–3 model sekaligus. Model berbayar (Argon, Claude) memakai saldo sungguhan.</div>
      <textarea id="aduIn" rows="3" maxlength="3000" placeholder="contoh: Jelaskan beda ESP32 dan Arduino Nano untuk proyek kapal" style="width:100%" aria-label="Pertanyaan adu model"></textarea>
@@ -3097,7 +3098,8 @@ function renderDok() {
   $("#dkForm").hidden = !DKD.kelola;
   $('[data-dkm="video"]').hidden = !DKD.video_upload;   // tab upload video baru muncul kalau penyimpanan R2 sudah disambungkan
   if (!DKD.video_upload && DK_MODE === "video") $('[data-dkm="foto"]').click();
-  $("#dkVidInfo").textContent = DKD.video_upload ? `Maksimal ${DKD.video_maks_mb} MB per video. Diputar langsung dari penyimpanan Cloudflare R2.` : "Upload video belum aktif (kunci Cloudflare R2 belum diisi di Panel CEO). Sementara pakai Tempel link.";
+  $("#dkVidInfo").textContent = !DKD.video_upload ? "Upload video belum aktif (HDD markas offline dan R2 belum diisi). Sementara pakai Tempel link."
+    : DKD.video_tempat === "node" ? `Disimpan ukuran asli di HDD markas MCI (maks ${mbStr(DKD.video_maks_mb * 1048576)} per video). Diputar saat laptop markas menyala.` : `Maksimal ${DKD.video_maks_mb} MB per video. Diputar langsung dari penyimpanan Cloudflare R2.`;
   const L = DKD.items.filter(x => !DK_FILT || (DK_FILT === "video" ? x.jenis !== "foto" : x.jenis === "foto"));
   $("#dkList").innerHTML = L.map(x => {
     const cap = `<figcaption title="${esc(x.keterangan)}"><b>${esc(x.judul)}</b> · ${esc(x.tanggal)}${x.keterangan ? "<br>" + esc(x.keterangan) : ""}</figcaption>`;
@@ -3138,6 +3140,24 @@ function dkPoster(file) {   // ambil 1 frame dari video sebagai sampul (dikerjak
     v.onerror = () => akhir(""); setTimeout(() => akhir(""), 8000);
   });
 }
+function dkPutPotong(url, file, potong, onp) {   // MCI Node: kirim per 64 MB (batas Cloudflare gratis 100 MB per kiriman)
+  return (async () => {
+    for (let off = 0; off < file.size; off += potong) {
+      const blob = file.slice(off, Math.min(file.size, off + potong));
+      for (let coba = 1; ; coba++) {
+        try { await new Promise((ok, gagal) => { const x = new XMLHttpRequest(); x.open("PUT", url + "&off=" + off); x.setRequestHeader("Content-Type", "application/octet-stream");
+            x.upload.onprogress = e => { if (e.lengthComputable) onp((off + e.loaded) / file.size); };
+            x.onload = () => { let j = {}; try { j = JSON.parse(x.responseText); } catch (e) {}
+              if (x.status >= 200 && x.status < 300) return ok();
+              if (x.status === 409 && j.terima === off + blob.size) return ok();   // potongan ternyata sudah sampai (balasan sempat hilang)
+              gagal(new Error(x.status === 409 ? "urutan" : `Upload ditolak HDD markas (${x.status}). ${j.error || ""}`)); };
+            x.onerror = () => gagal(new Error("Koneksi ke HDD markas putus.")); x.send(blob); }); break; }
+        catch (e) { if (coba >= 3 || e.message === "urutan") throw e.message === "urutan" ? new Error("Unggahan terputus di tengah. Ulangi dari awal.") : e; await new Promise(r => setTimeout(r, 2000 * coba)); }
+      }
+    }
+    onp(1);
+  })();
+}
 function dkPut(url, file, onp) {
   return new Promise((ok, gagal) => { const x = new XMLHttpRequest(); x.open("PUT", url); x.setRequestHeader("Content-Type", file.type);
     x.upload.onprogress = e => { if (e.lengthComputable) onp(e.loaded / e.total); };
@@ -3162,7 +3182,7 @@ $("#dkSave").onclick = async () => {
       const f = fs[i], set = p => { pg.firstChild.style.width = Math.round(p * 100) + "%"; msg.textContent = `Video ${i + 1} dari ${fs.length} · ${Math.round(p * 100)}% dari ${mbStr(f.size)}`; };
       try { set(0); const poster = await dkPoster(f);
         const iz = await api("/api/dokumentasi/video-izin", {json: {mime: f.type, ukuran: f.size}});
-        await dkPut(iz.put, f, set);
+        if (iz.potong) await dkPutPotong(iz.put, f, iz.potong, set); else await dkPut(iz.put, f, set);
         msg.textContent = `Video ${i + 1} dari ${fs.length} · menyimpan…`;
         DKD = await api("/api/dokumentasi/video-selesai", {json: {key: iz.key, poster, ...meta}}); renderDok(); }
       catch (e) { msg.textContent = e.message; pg.hidden = true; $("#dkSave").disabled = false; return; }
@@ -8237,8 +8257,17 @@ async function pnMuat() {
   try {
     const st = await api("/api/panel/pin");
     if (!st.terbuka) return pnKunciTampil(!st.ada_pin);
-    PND = await api("/api/panel"); pnRender();
+    PND = await api("/api/panel"); pnRender(); pnNode();
   } catch (e) { if (e.kunci) return pnKunciTampil(false); $("#pnKMsg").textContent = e.message; }
+}
+async function pnNode() {
+  const w = $("#pnNode"); if (!w) return;
+  try { const d = await api("/api/node"), i = d.info || {};
+    w.innerHTML = !d.diatur ? "Belum diatur. Isi NODE_URL dan NODE_TOKEN di Kunci AI, grup MCI Node."
+      : !d.online ? '<span class="ch r">Offline</span> Laptop markas mati/tidur, atau cloudflared/mci_node belum jalan. Web tetap normal; video di HDD sementara tidak bisa diputar.'
+      : `<span class="ch g">Online</span> versi ${esc(i.versi || "")} · HDD kosong <b>${(i.kosong / 1073741824).toFixed(0)} GB</b><br>Ollama: ${i.ollama ? `${esc((i.model || []).join(", ") || "belum ada model")} (dipakai: ${esc(d.ollama_model)})` : '<span class="ch r">mati</span>'}<br>Backup terakhir di HDD: ${esc(i.backup_terakhir || "belum ada")} (${i.backup_jumlah || 0} tersimpan)`
+      + (d.backup ? `<br><span style="font-size:12px">Kiriman terakhir: ${esc(d.backup)}</span>` : "");
+  } catch (e) { w.textContent = e.message; }
 }
 function pnKunciTampil(baru) {
   PN_BARU = baru; $("#pnIsi").hidden = true; $("#pnKunci").hidden = false;
@@ -8251,7 +8280,7 @@ async function pnBuka() {
   const pin = $("#pnPin").value.trim();
   if (!/^\d{6}$/.test(pin)) return $("#pnKMsg").textContent = "PIN harus 6 angka.";
   if (PN_BARU && pin !== $("#pnPin2").value.trim()) return $("#pnKMsg").textContent = "Dua PIN tidak sama.";
-  try { await api("/api/panel/pin", {json: {pin}}); $("#pnKunci").hidden = true; PND = await api("/api/panel"); pnRender(); }
+  try { await api("/api/panel/pin", {json: {pin}}); $("#pnKunci").hidden = true; PND = await api("/api/panel"); pnRender(); pnNode(); }
   catch (e) { $("#pnKMsg").textContent = e.message; $("#pnPin").value = ""; $("#pnPin").focus(); }
 }
 $("#pnBuka").onclick = pnBuka;

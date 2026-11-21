@@ -2610,6 +2610,7 @@ async def laporan_jadwal():
             await asyncio.to_thread(alat_cek_telat)
             await asyncio.to_thread(titip_cek_batas)
             await backup_jadwal_cek()
+            await node_backup_malam()
             await pagi_cek()
             await kabar_cek()
             await asyncio.to_thread(harga_ingat_cek)
@@ -8721,6 +8722,89 @@ def r2_panggil(method, key=None, extra=None):
         return f.status, dict(f.headers), f.read() if method == "GET" else b""
 
 
+# ---------- MCI NODE: MacBook + HDD di markas lewat Cloudflare Tunnel (node/mci_node.py). Neon tetap database utama.
+# Node menyimpan video dokumentasi ukuran asli, menerima backup tiap malam, dan meneruskan AI ke Ollama (cadangan terakhir).
+# Kalau Node mati / laptop tidur, web tetap jalan: video Node tampil "sedang offline", AI lompat ke cadangan lain.
+NODE_POTONG = 64 * 1024 * 1024          # Cloudflare gratis: maks 100 MB per kiriman -> unggah per 64 MB
+NODE_VIDEO_MAKS = int(os.getenv("NODE_VIDEO_MAKS_MB", "4096")) * 1024 * 1024
+_NODE = {"t": 0, "info": None}
+
+
+def node_cfg():
+    return os.getenv("NODE_URL", "").strip().rstrip("/"), os.getenv("NODE_TOKEN", "").strip()
+
+
+def node_siap():
+    u, t = node_cfg()
+    return bool(u.startswith("https://") and len(t) >= 24)
+
+
+def node_tanda(method, key, exp, total=0):
+    """Harus sama persis dengan tanda() di node/mci_node.py."""
+    return hmac.new(node_cfg()[1].encode(), f"{method}\n{key}\n{int(exp)}\n{int(total)}".encode(), hashlib.sha256).hexdigest()
+
+
+def node_url(method, key, detik=3600, total=0, extra=""):
+    exp = int(time.time()) + detik
+    return f"{node_cfg()[0]}/berkas/{quote(key, safe='/-_.~')}?exp={exp}&n={int(total)}&sig={node_tanda(method, key, exp, total)}" + extra
+
+
+def node_panggil(method, jalur, data=None, timeout=20):
+    import urllib.request
+    u, t = node_cfg()
+    req = urllib.request.Request(u + jalur, data=data, method=method, headers={"Authorization": f"Bearer {t}", "User-Agent": "MCI-HQ/1.0",
+                                                                                "Content-Type": "application/octet-stream"})
+    with urllib.request.urlopen(req, timeout=timeout) as f:
+        return f.status, dict(f.headers), f.read()
+
+
+def node_info(segar=False):
+    """Status Node (cache 60 detik). None = mati / belum diatur."""
+    if not node_siap():
+        return None
+    if not segar and time.time() - _NODE["t"] < 60:
+        return _NODE["info"]
+    try:
+        _st, _h, b = node_panggil("GET", "/sehat", timeout=6)
+        info = json.loads(b)
+        info = info if info.get("versi") else None   # tanpa versi = token salah (Node menjawab versi singkat)
+    except Exception:
+        info = None
+    _NODE.update(t=time.time(), info=info)
+    return info
+
+
+def node_video_bisa():
+    i = node_info()
+    return bool(i and int(i.get("kosong") or 0) - int(i.get("sisa_jaga") or 0) > 512 * 1024 * 1024)
+
+
+async def node_backup_malam():
+    """Tiap malam (>= 02.00 WIB) kirim backup database ke HDD lewat Node. Kunci AI & PIN panel tidak ikut (lihat backup_zip)."""
+    now = datetime.now(WIB)
+    if not node_siap() or now.hour < 2 or SET.get("node_backup") == now.date().isoformat():
+        return
+    SET["node_backup"] = now.date().isoformat()   # sekali sehari, berhasil atau tidak (dicoba lagi besok)
+    try:
+        data, info = await asyncio.to_thread(backup_zip)
+        _st, _h, b = await asyncio.to_thread(node_panggil, "POST", "/backup", data, 120)
+        SET["node_backup_hasil"] = f"{_now()}: tersimpan {json.loads(b).get('nama', '')} ({len(data) // 1024} KB)"
+    except Exception as e:
+        SET["node_backup_hasil"] = f"{_now()}: GAGAL ({str(e)[:120]})"
+        log.warning("Backup ke MCI Node gagal: %s", e)
+    await asyncio.to_thread(set_save)
+
+
+@app.route("/api/node")
+def api_node():
+    """Status MCI Node untuk Panel CEO."""
+    if not is_admin(role()):
+        abort(403)
+    i = node_info(segar=True) if node_siap() else None
+    return jsonify({"diatur": node_siap(), "online": bool(i), "info": i, "backup": SET.get("node_backup_hasil", ""),
+                    "ollama_model": os.getenv("NODE_MODEL", "gemma3:4b")})
+
+
 def dok_link(u):
     """Link video -> (sumber, embed, thumbnail). None kalau bukan link yang didukung."""
     u = str(u or "").strip()
@@ -8757,7 +8841,9 @@ def dok_list():
 
 
 def _dok_balas(r):
-    return jsonify({"items": dok_list(), "kelola": can("dok_kelola", r), "video_upload": r2_siap(), "video_maks_mb": R2_VIDEO_MAKS // (1024 * 1024)})
+    nd = node_siap() and node_video_bisa()
+    return jsonify({"items": dok_list(), "kelola": can("dok_kelola", r), "video_upload": nd or r2_siap(), "video_tempat": "node" if nd else "r2",
+                    "video_maks_mb": (NODE_VIDEO_MAKS if nd else R2_VIDEO_MAKS) // (1024 * 1024)})
 
 
 def _dok_cek_ruang(c):
@@ -8809,12 +8895,25 @@ def api_dok_video_izin():
     r = need_perm("dok_lihat")
     if not can("dok_kelola", r):
         return jsonify({"error": "Upload dokumentasi khusus tim Dokumentasi dan CEO"}), 403
-    if not r2_siap():
-        return jsonify({"error": "Upload video belum aktif: kunci Cloudflare R2 belum diisi di Panel CEO. Sementara pakai Tempel link."}), 503
+    pakai_node = node_siap() and node_video_bisa()
+    if not pakai_node and not r2_siap():
+        return jsonify({"error": "Upload video belum aktif: MCI Node sedang offline dan R2 belum diisi. Sementara pakai Tempel link."}), 503
     d = request.get_json(silent=True) or {}
     mime, uk = str(d.get("mime") or ""), int(d.get("ukuran") or 0)
     if mime not in _VIDEO_EXT:
         return jsonify({"error": "Format video belum didukung (pakai MP4, MOV, WEBM, M4V, atau 3GP)"}), 400
+    if pakai_node:   # ke HDD markas, ukuran asli, diunggah per 64 MB
+        info = node_info() or {}
+        bisa = int(info.get("kosong") or 0) - int(info.get("sisa_jaga") or 0)
+        if not 0 < uk <= min(NODE_VIDEO_MAKS, bisa):
+            return jsonify({"error": f"Video terlalu besar (maks {min(NODE_VIDEO_MAKS, max(bisa, 0)) // (1024 * 1024)} MB, sesuai ruang HDD)."}), 400
+        with db() as c:
+            err = _dok_cek_ruang(c)
+        if err:
+            return jsonify({"error": err}), 400
+        key = f"node:video/{datetime.now(WIB):%Y%m}/{secrets.token_urlsafe(12)}.{_VIDEO_EXT[mime]}"
+        IZIN_VIDEO[key] = {"r": r, "ukuran": uk, "mime": mime, "t": time.time()}
+        return jsonify({"key": key, "put": node_url("PUT", key[5:], 6 * 3600, uk), "potong": NODE_POTONG, "tempat": "node"})
     if not 0 < uk <= R2_VIDEO_MAKS:
         return jsonify({"error": f"Video maksimal {R2_VIDEO_MAKS // (1024 * 1024)} MB. Potong atau kecilkan resolusinya dulu, atau unggah ke YouTube lalu tempel link."}), 400
     with db() as c:
@@ -8843,15 +8942,19 @@ def api_dok_video_selesai():
     izin = IZIN_VIDEO.get(key)
     if not izin or izin["r"] != r or not can("dok_kelola", r):
         return jsonify({"error": "Izin upload tidak ditemukan atau kedaluwarsa. Ulangi upload."}), 400
+    di_node = key.startswith("node:")
     try:
-        _st, h, _ = r2_panggil("HEAD", key)
+        if di_node:
+            _st, h, _ = node_panggil("HEAD", "/berkas/" + quote(key[5:], safe="/-_.~"))
+        else:
+            _st, h, _ = r2_panggil("HEAD", key)
         uk = int(h.get("Content-Length") or h.get("content-length") or 0)
     except Exception as e:
-        log.warning("Video R2 tidak ditemukan setelah upload: %s", str(e)[:120])
+        log.warning("Video tidak ditemukan setelah upload: %s", str(e)[:120])
         return jsonify({"error": "Video belum sampai di penyimpanan. Coba unggah ulang."}), 400
-    if uk <= 0 or uk > R2_VIDEO_MAKS:
+    if uk <= 0 or uk != izin["ukuran"] if di_node else (uk <= 0 or uk > R2_VIDEO_MAKS):
         try:
-            r2_panggil("DELETE", key)
+            node_panggil("DELETE", "/berkas/" + quote(key[5:], safe="/-_.~")) if di_node else r2_panggil("DELETE", key)
         except Exception:
             pass
         return jsonify({"error": "Ukuran video tidak sesuai."}), 400
@@ -8875,7 +8978,12 @@ def api_dok_one(i):
         if request.method == "DELETE":
             if not can("dok_kelola", r):
                 return jsonify({"error": "Khusus tim Dokumentasi dan CEO"}), 403
-            if row and row[2] == "video" and row[3] and r2_siap():
+            if row and row[2] == "video" and row[3] and row[3].startswith("node:") and node_siap():
+                try:
+                    node_panggil("DELETE", "/berkas/" + quote(row[3][5:], safe="/-_.~"))
+                except Exception:
+                    log.exception("Gagal menghapus video di MCI Node (%s)", row[3])
+            elif row and row[2] == "video" and row[3] and r2_siap():
                 try:
                     r2_panggil("DELETE", row[3])
                 except Exception:
@@ -8892,6 +9000,10 @@ def api_dok_one(i):
             if not data:
                 abort(404)
             return foto_kirim(base64.b64decode(data), "image/jpeg", {"Cache-Control": "private, max-age=86400"}, ("dokp", i))
+        if url.startswith("node:"):   # diputar langsung dari HDD markas lewat Cloudflare Tunnel (tautan 6 jam)
+            if not node_siap() or not node_info():
+                return Response("Video ini disimpan di HDD markas MCI yang sedang offline (laptop mati/tidur). Coba lagi nanti.", 503, mimetype="text/plain; charset=utf-8")
+            return redirect(node_url("GET", url[5:], 6 * 3600, 0, "&unduh=1" if request.args.get("unduh") else ""))
         if not r2_siap():
             return jsonify({"error": "Penyimpanan video belum tersambung"}), 503
         ex = {"response-content-disposition": f'attachment; filename="mci-dokumentasi-{i}.{url.rsplit(".", 1)[-1]}"'} if request.args.get("unduh") else None
@@ -14410,6 +14522,9 @@ KUNCI_DAFTAR = [   # (nama env, label, kelompok, cara uji). Token login, SECRET_
     ("NEON_API_KEY", "Neon: API key (konektor Copilot)", "Konektor Copilot", "neon"),
     ("GITHUB_TOKEN", "GitHub: token fine-grained, baca saja (konektor Copilot)", "Konektor Copilot", "github"),
     ("GOOGLE_SA_JSON", "Google Drive: isi file kunci JSON akun robot (service account)", "Google Drive", "gdrive"),
+    ("NODE_URL", "MCI Node: alamat terowongan, mis. https://node.mci-ai.my.id", "MCI Node (HDD + Ollama markas)", ""),
+    ("NODE_TOKEN", "MCI Node: token rahasia (sama dengan di MacBook, minimal 24 karakter)", "MCI Node (HDD + Ollama markas)", "node"),
+    ("NODE_MODEL", "MCI Node: model Ollama untuk cadangan AI (bawaan gemma3:4b)", "MCI Node (HDD + Ollama markas)", ""),
 ] + [(f"SPARE_{i}", f"Cadangan bebas {i}: kunci API apa saja. Ganti model: kunci|model. Penyedia lain: kunci|model|url", "Cadangan AI bebas", "spare") for i in range(1, SPARE_PANEL + 1)]
 TEKS_DAFTAR = [("ZOHO_DC", "Pusat data Zoho (com / in / eu, kosong = com)"), ("R2_BUCKET", "Nama bucket R2 (kosong = mci-dokumentasi)"), ("GROQ_MODEL", "ID model Groq"), ("NVIDIA_MODEL", "ID model NVIDIA"), ("MISTRAL_MODEL", "ID model Mistral")]   # bukan rahasia
 KUNCI_NAMA = {k for k, *_ in KUNCI_DAFTAR} | {k for k, _ in TEKS_DAFTAR}
@@ -14644,6 +14759,23 @@ def _uji_kunci(cara, nilai):
         req = urllib.request.Request(f"https://generativelanguage.googleapis.com/v1beta/models?pageSize=1&key={quote(nilai)}")
     elif cara == "claude":
         req = urllib.request.Request("https://api.anthropic.com/v1/models?limit=1", headers={"x-api-key": nilai, "anthropic-version": "2023-06-01"})
+    elif cara == "node":
+        if not os.getenv("NODE_URL", "").strip().startswith("https://"):
+            return False, "isi NODE_URL dulu (https://...)"
+        lama = os.environ.get("NODE_TOKEN")
+        os.environ["NODE_TOKEN"] = nilai.strip()
+        try:
+            i = node_info(segar=True)
+            if not i:
+                return False, "Node tidak menjawab atau token salah (laptop menyala? cloudflared & mci_node jalan?)"
+            return True, (f"Node {i.get('versi')} online · HDD kosong {int(i.get('kosong', 0)) / 1024 ** 3:.0f} GB · "
+                          + (f"Ollama: {', '.join(i.get('model') or []) or 'belum ada model'}" if i.get("ollama") else "Ollama mati"))
+        finally:
+            if lama is None:
+                os.environ.pop("NODE_TOKEN", None)
+            else:
+                os.environ["NODE_TOKEN"] = lama
+            _NODE.update(t=0)
     elif cara == "spare":   # uji sungguhan: minta jawaban 1 kata dari slot itu
         lama = os.environ.get("SPARE_UJI")
         os.environ["SPARE_UJI"] = nilai.strip()
@@ -14785,7 +14917,7 @@ def api_panel():
             semua = dict(cadangan_semua())
             u = [k for k in dict.fromkeys(d.get("urut") or []) if k in semua]
             SET["cadangan_urut"] = u
-            SET["cadangan_lepas"] = [k for k in semua if k.startswith("spare") and k not in u]   # SPARE yang sengaja dimatikan
+            SET["cadangan_lepas"] = [k for k in semua if (k.startswith("spare") or k == "node") and k not in u]   # slot yang sengaja dimatikan
             panel_catat("Urutan cadangan: " + (" → ".join(semua[k] for k in u) or "semua dimatikan"))
         elif aksi == "apex_kuota":
             b = int(d.get("batas") or 0)
@@ -14848,9 +14980,21 @@ from array import array as _array
 CADANGAN_DASAR = [("groq", "Groq"), ("mistral", "Mistral"), ("nvidia", "NVIDIA NIM"), ("cloudflare", "Cloudflare Workers AI")]
 
 
+def node_ollama_sinkron():
+    """MCI Node terisi -> Ollama di MacBook jadi mesin cadangan 'node' (selalu paling belakang kecuali diatur lain)."""
+    u, t = node_cfg()
+    if node_siap():
+        mdl = os.getenv("NODE_MODEL", "").strip() or "gemma3:4b"
+        MESIN_LAIN["node"] = {"nama": f"MCI Node · Ollama · {mdl}", "penyedia": "Ollama", "url": u + "/v1/chat/completions", "kunci": "NODE_TOKEN", "model": mdl,
+                              "spare": False, "kurang": "", "no_json": False}
+        return ["node"]
+    MESIN_LAIN.pop("node", None)
+    return []
+
+
 def cadangan_semua():
-    """Penyedia bawaan + slot SPARE_<n> yang terisi."""
-    return CADANGAN_DASAR + [(k, MESIN_LAIN[k]["nama"]) for k in spare_sinkron()]
+    """Penyedia bawaan + slot SPARE_<n> yang terisi + Ollama di MCI Node."""
+    return CADANGAN_DASAR + [(k, MESIN_LAIN[k]["nama"]) for k in spare_sinkron() + node_ollama_sinkron()]
 _CAD_ISTIRAHAT = {}   # penyedia -> waktu boleh dicoba lagi (habis kena batas / error)
 CAD_PER = {}          # penyedia -> {"dipakai", "gagal", "terakhir"} sejak server menyala
 
@@ -14861,7 +15005,9 @@ def cadangan_urut():
     if not isinstance(u, list):
         u = [k for k, _ in semua]
     lepas = set(SET.get("cadangan_lepas") or [])
-    u = u + [k for k, _ in semua if k.startswith("spare") and k not in u and k not in lepas]   # slot SPARE baru otomatis ikut di belakang
+    u = u + [k for k, _ in semua if (k.startswith("spare") or k == "node") and k not in u and k not in lepas]   # slot baru otomatis ikut di belakang
+    if "node" in u and u[-1] != "node" and not isinstance(SET.get("cadangan_urut"), list):
+        u = [k for k in u if k != "node"] + ["node"]   # Ollama laptop = cadangan terakhir
     return [k for k in u if k in dict(semua)]
 
 
