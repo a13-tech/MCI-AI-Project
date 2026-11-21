@@ -74,7 +74,7 @@ JABATAN_PERM = {
     "manager": _BASE | {"laporan_lihat", "polling_buat", "polling_semua", "produk_kelola"},
     "pj": _BASE | {"polling_buat"},
     "sekretaris": _BASE | {"catatan_kelola", "laporan_lihat"},
-    "bendahara": _BASE | {"kas_edit", "hutang", "produk_kelola"},
+    "bendahara": _BASE | {"kas_edit", "hutang", "produk_kelola", "stok_kelola"},
     "designer": _BASE | {"gambar_buat"},
     "anggota": set(_BASE),
 }
@@ -4151,6 +4151,7 @@ IZIN_PILIHAN.update({
 IZIN_PILIHAN["absen_kelola"] = "Kelola absen harian & setujui izin"
 IZIN_PILIHAN["mitra_kelola"] = "Kelola Database Mitra"
 IZIN_PILIHAN["alat_kelola"] = "Kelola Peminjaman Alat"
+IZIN_PILIHAN["stok_kelola"] = "Kelola Stok (tambah, ubah jumlah, hapus barang)"
 IZIN_BARU_DEFAULT = {   # berlaku walau struktur sudah pernah disimpan CEO (izin ini baru ada)
     "manager": {"rapat_kelola", "tugas_kelola", "umum_kelola", "proyek_kelola", "konten_kelola", "absen_kelola", "mitra_kelola", "alat_kelola"},
     "pj": {"rapat_kelola", "tugas_kelola", "proyek_kelola", "alat_kelola"},
@@ -8543,17 +8544,20 @@ def api_stok():
     """GET admin + divisi (viewer TIDAK boleh). POST khusus admin: multipart nama, jumlah, satuan, kategori, minimum, catatan, foto, id (ubah), hapus_foto."""
     need_perm("stok")
     if request.method == "GET":
-        return jsonify({"items": STOK, "menipis": len(stok_menipis()), "edit": is_admin(role())})
-    need("admin")
+        return jsonify({"items": STOK, "menipis": len(stok_menipis()), "edit": can("stok_kelola", role()), "ai": is_admin(role())})
+    r = need_perm("stok_kelola")
     f, foto, mime = request.files.get("foto"), None, None
     if f:
         foto, mime = f.read(1_500_001), f.mimetype or "image/jpeg"
         if len(foto) > 1_500_000 or not mime.startswith("image/"):
             return jsonify({"error": "Foto harus gambar, maksimal 1,5 MB"}), 400
     try:
+        lama = next((x for x in STOK if str(x["id"]) == str(request.form.get("id") or "")), None)
         sid = stok_save(request.form, foto, mime, request.form.get("hapus_foto") == "1")
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
+    baru = next((x for x in STOK if x["id"] == sid), {})
+    audit("Stok", "ubah barang" if lama else "tambah barang", f"{baru.get('nama', '')}: " + (f"{lama['jumlah']} → " if lama else "") + f"{baru.get('jumlah', '')} {baru.get('satuan', '')}", 0, nama_peran(r))
     return jsonify({"id": sid, "items": STOK})
 
 
@@ -8606,14 +8610,21 @@ def api_stok_simpan():
 
 @app.route("/api/stok/<int:i>", methods=["POST", "DELETE"])
 def api_stok_one(i):
-    need("admin")
+    r = need_perm("stok_kelola")
+    lama = next((x for x in STOK if x["id"] == i), None)
+    if not lama:
+        return jsonify({"error": "Barang tidak ditemukan"}), 404
     if request.method == "DELETE":
-        return jsonify({"dihapus": stok_del(i), "items": STOK})
+        n = stok_del(i)
+        audit("Stok", "hapus barang", f"{lama['nama']} ({lama['jumlah']} {lama['satuan']})", 0, nama_peran(r))
+        return jsonify({"dihapus": n, "items": STOK})
     try:
         j = int((request.get_json(silent=True) or {}).get("jumlah"))
     except (TypeError, ValueError):
         return jsonify({"error": "jumlah harus angka"}), 400
-    return jsonify({"diubah": stok_jumlah(i, j), "items": STOK})
+    n = stok_jumlah(i, j)
+    audit("Stok", "ubah jumlah", f"{lama['nama']}: {lama['jumlah']} → {max(0, j)} {lama['satuan']}", 0, nama_peran(r))
+    return jsonify({"diubah": n, "items": STOK})
 
 
 # ---------- INBOX: notifikasi pribadi per anggota (0 = token admin master). Ikut dikirim ke Telegram kalau akunnya sudah terhubung ----------
@@ -13165,14 +13176,14 @@ def _cop_stok(barang):
 
 
 def ubah_stok(barang: str, ubah_jumlah: int = 0, catatan: str = "") -> dict:
-    """AKSI (khusus CEO): ubah stok gudang. ubah_jumlah = selisih (negatif = berkurang/dipakai, positif = barang masuk, 0 = hanya catatan).
+    """AKSI (izin Kelola Stok): ubah stok gudang. ubah_jumlah = selisih (negatif = berkurang/dipakai, positif = barang masuk, 0 = hanya catatan).
     catatan = keterangan singkat, misalnya 'dipakai Alvaro untuk lomba'; ditambahkan ke catatan barang beserta tanggal."""
     _alat("ubah_stok", barang=barang, ubah=ubah_jumlah)
     r = _PENANYA.get() or "admin"
     if not hal_on("stok"):
         return {"ok": False, "pesan": "halaman Stok sedang dinonaktifkan"}
-    if not is_admin(r):
-        return {"ok": False, "pesan": "mengubah stok gudang khusus CEO; anggota bisa memakai stok untuk proyek (pakai_stok_proyek)"}
+    if not can("stok_kelola", r):
+        return {"ok": False, "pesan": "mengubah stok gudang butuh izin Kelola Stok (CEO, Manager, Bendahara); anggota lain bisa memakai stok untuk proyek (pakai_stok_proyek)"}
     c = _cop_stok(barang)
     if len(c) != 1:
         return {"ok": False, "pesan": f"'{barang}' cocok dengan {len(c)} barang; sebut nama persisnya", "kandidat": [x["nama"] for x in c[:10]]}
@@ -13315,7 +13326,7 @@ def cek_inbox(belum_dibaca: bool = True) -> dict:
 
 
 APEX_ALAT += [cek_halaman, cek_inbox, isi_halaman, ubah_halaman, ubah_stok, pakai_stok_proyek, pinjam_alat, kembalikan_alat]
-APEX_IZIN_ALAT.update({"cek_halaman": None, "cek_inbox": None, "isi_halaman": None, "ubah_halaman": None, "pakai_stok_proyek": "stok", "pinjam_alat": None, "kembalikan_alat": None})
+APEX_IZIN_ALAT.update({"cek_halaman": None, "cek_inbox": None, "isi_halaman": None, "ubah_halaman": None, "pakai_stok_proyek": "stok", "ubah_stok": "stok_kelola", "pinjam_alat": None, "kembalikan_alat": None})
 APEX_HAL_ALAT.update({"cek_inbox": "inbox", "ubah_stok": "stok", "pakai_stok_proyek": "stok", "pinjam_alat": "alat", "kembalikan_alat": "alat"})
 ALAT_AKSI |= {"isi_halaman", "ubah_halaman", "ubah_stok", "pakai_stok_proyek", "pinjam_alat", "kembalikan_alat"}
 APEX_SISTEM = APEX_SISTEM.replace(
@@ -16265,6 +16276,21 @@ if __name__ == "__main__":
                 set_save()
             except Exception:
                 log.exception("Ganti nama 7.5 Cipher di Tentang Kami gagal")
+        if not SET.get("mig_stok_kelola_1121"):   # CEO 21 Nov 2026: Manager + Bendahara boleh kelola stok
+            try:
+                st = struktur_baca()
+                for j in ("manager", "bendahara"):
+                    if j in st["jabatan"] and isinstance(st["jabatan"][j], dict):
+                        iz = set(st["jabatan"][j].get("izin") or [])
+                        st["jabatan"][j]["izin"] = sorted(iz | {"stok_kelola"})
+                with db() as c:
+                    sql(c, "INSERT INTO pengaturan (k,v) VALUES (?,?) ON CONFLICT (k) DO UPDATE SET v=excluded.v", ("struktur", json.dumps(st)))
+                struktur_load()
+                SET["mig_stok_kelola_1121"] = True
+                set_save()
+                panel_catat("Izin Kelola Stok diberikan ke Manager dan Bendahara")
+            except Exception:
+                log.exception("Migrasi izin kelola stok gagal")
         if not SET.get("mig_kas_tunda_1118"):   # permintaan CEO 18 Nov 2026: tunda pengeluaran otomatis penunggak kas (batas 18 Nov 23.59)
             iuran_set()["keluar_tunda"] = True
             SET["mig_kas_tunda_1118"] = True

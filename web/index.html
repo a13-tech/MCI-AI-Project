@@ -3945,7 +3945,7 @@ function renderStok() {
   const it = STK.items || [], q = $("#stQ").value.trim().toLowerCase(), low = x => x.minimum && x.jumlah <= x.minimum;
   $("#st1").textContent = num(it.length); $("#st2").textContent = num(it.reduce((a, x) => a + x.jumlah, 0)); $("#st3").textContent = num(it.filter(low).length);
   $("#stKats").innerHTML = [...new Set(it.map(x => x.kategori))].map(k => `<option value="${esc(k)}">`).join("");
-  const ed = ADM() && !DEMO;
+  const ed = !!(STK && STK.edit) && !DEMO;
   $("#stList").innerHTML = it.filter(x => !q || (x.nama + " " + x.kategori + " " + x.catatan).toLowerCase().includes(q)).map(x => `<div class="it"><div class="ph">${x.foto ? `<img src="${stImg(x)}" alt="${esc(x.nama)}" loading="lazy" data-stz>` : "<span>📦</span>"}${low(x) ? '<i class="low">MENIPIS</i>' : ""}</div>
     <div class="bd"><b>${esc(x.nama)}</b><span class="q">${num(x.jumlah)} <small class="mu" style="font-size:13px">${esc(x.satuan)}</small></span><span class="ch">${esc(x.kategori)}</span>${x.minimum ? `<span class="mu" style="font-size:12px">Minimum ${num(x.minimum)}</span>` : ""}${x.catatan ? `<span class="mu" style="font-size:12px">${esc(x.catatan)}</span>` : ""}
     ${STP.length && x.jumlah > 0 ? `<div class="bar" style="gap:6px"><input type="number" min="1" max="${x.jumlah}" value="1" data-stn="${x.id}" aria-label="Jumlah dipakai" style="width:64px"><select data-stp="${x.id}" aria-label="Proyek" style="max-width:150px">${STP.map(p => `<option value="${p.id}">${esc(p.nama)}</option>`).join("")}</select><button class="bt o" data-stpakai="${x.id}">Pakai</button></div>` : ""}
@@ -3962,7 +3962,7 @@ function renderStok() {
 }
 async function loadStok() {
   $("#stPinjam").hidden = !(ME.anggota && ME.anggota.iuran === "bebas");
-  $("#stForm").hidden = !ADM(); $("#saiBox").hidden = !ADM() || DEMO;
+  $("#stForm").hidden = !can("stok_kelola") || DEMO; $("#saiBox").hidden = !ADM() || DEMO;
   if (ME.role !== "viewer") try { const d = await api("/api/r/proyek"); STP = d.items.filter(x => x.status !== "selesai" && (d.tulis || x.pj === d.saya || (x.tim || []).includes(d.saya))).map(x => ({id: x.id, nama: x.nama})); } catch (e) { STP = []; }
   try { STK = await api("/api/stok"); renderStok(); } catch (e) { $("#stList").innerHTML = '<p class="er">' + esc(e.message) + "</p>"; }
 }
