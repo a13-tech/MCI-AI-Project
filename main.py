@@ -6274,6 +6274,7 @@ def mesin_kunci(k):
 # Penyedia dikenali dari awalan kunci. Penyedia lain: tulis "kunci|model|url" (url = base URL kompatibel OpenAI),
 # atau isi SPARE_<n>_MODEL / SPARE_<n>_URL terpisah di Render. Analogi: colokan cadangan; alat apa pun yang dicolok, langsung jadi genset.
 SPARE_DETEKSI = [   # (awalan kunci, nama, base URL kompatibel OpenAI, model bawaan; "" = wajib tulis model)
+    ("AIza", "Gemini", "https://generativelanguage.googleapis.com/v1beta/openai", ""),   # model bawaan = model Gemini utama (MODEL)
     ("sk-or-", "OpenRouter", "https://openrouter.ai/api/v1", "openrouter/free"),
     ("sk-ant-", "Claude", "https://api.anthropic.com/v1", "claude-sonnet-5-5"),
     ("gsk_", "Groq", "https://api.groq.com/openai/v1", "openai/gpt-oss-120b"),
@@ -6297,17 +6298,15 @@ def spare_urai(env):
     det = next((d for d in SPARE_DETEKSI if kunci.startswith(d[0])), None)
     nama = det[1] if det else "Kustom"
     url = (url or (det[2] if det else "")).rstrip("/")
-    model = model or (det[3] if det else "")
+    model = model or (det[3] if det else "") or (MODEL if nama == "Gemini" else "")
     kurang = ""
-    if kunci.startswith("AIza"):
-        kurang = "kunci Gemini tidak dipakai di slot cadangan: pakai slot Gemini yang sudah ada"
-    elif not url:
+    if not url:
         kurang = "penyedia tidak dikenali: tulis kunci|model|url"
     elif not model:
         kurang = f"{nama}: tulis nama modelnya (kunci|model)"
     if url and not url.endswith("/chat/completions"):
         url += "/chat/completions"
-    return {"nama": f"{env} · {nama}", "penyedia": nama, "url": url, "kunci": env, "model": model, "spare": True, "kurang": kurang,
+    return {"nama": f"{env} · {nama}" + (f" · {model}" if model else ""), "penyedia": nama, "url": url, "kunci": env, "model": model, "spare": True, "kurang": kurang,
             "no_json": nama == "Claude"}
 
 
@@ -14411,7 +14410,7 @@ KUNCI_DAFTAR = [   # (nama env, label, kelompok, cara uji). Token login, SECRET_
     ("NEON_API_KEY", "Neon: API key (konektor Copilot)", "Konektor Copilot", "neon"),
     ("GITHUB_TOKEN", "GitHub: token fine-grained, baca saja (konektor Copilot)", "Konektor Copilot", "github"),
     ("GOOGLE_SA_JSON", "Google Drive: isi file kunci JSON akun robot (service account)", "Google Drive", "gdrive"),
-] + [(f"SPARE_{i}", f"Cadangan bebas {i}: kunci API apa saja (atau kunci|model|url)", "Cadangan AI bebas", "spare") for i in range(1, SPARE_PANEL + 1)]
+] + [(f"SPARE_{i}", f"Cadangan bebas {i}: kunci API apa saja. Ganti model: kunci|model. Penyedia lain: kunci|model|url", "Cadangan AI bebas", "spare") for i in range(1, SPARE_PANEL + 1)]
 TEKS_DAFTAR = [("ZOHO_DC", "Pusat data Zoho (com / in / eu, kosong = com)"), ("R2_BUCKET", "Nama bucket R2 (kosong = mci-dokumentasi)"), ("GROQ_MODEL", "ID model Groq"), ("NVIDIA_MODEL", "ID model NVIDIA"), ("MISTRAL_MODEL", "ID model Mistral")]   # bukan rahasia
 KUNCI_NAMA = {k for k, *_ in KUNCI_DAFTAR} | {k for k, _ in TEKS_DAFTAR}
 
