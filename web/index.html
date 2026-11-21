@@ -2470,10 +2470,12 @@ async function loadArgon() {   // kartu anggaran Argon (khusus CEO)
     const d = await api("/api/argon-anggaran"), pct = d.anggaran ? Math.min(100, Math.round(d.terpakai / d.anggaran * 100)) : 0;
     const warna = d.habis ? "#C0392B" : pct >= 80 ? "#D98E04" : "#2E8B57";
     el.hidden = false;
-    const mesinNama = {argon: "Gemini 4 Argon", gemini: "Gemini Flash (gratis)", claude: (d.claude_pilihan || {})[d.claude_model] || "Claude"};
+    const B = d.berat || {nama: "Gemini 4 Argon", harga: [2, 10], neon: false, swap: "2026-12-01"};
+    const beratTeks = B.neon ? `${B.nama} · $${B.harga[0]}/$${B.harga[1]} (otomatis sejak ${B.swap})` : `${B.nama} · $${B.harga[0]}/$${B.harga[1]} (promo; mulai ${B.swap} otomatis pindah ke Gemini 4 Neon $3/$15)`;
+    const mesinNama = {argon: B.nama, gemini: "Gemini Flash (gratis)", claude: (d.claude_pilihan || {})[d.claude_model] || "Claude"};
     (d.lain || []).forEach(m => mesinNama[m.id] = `${m.nama} (${m.model})`);
     el.innerHTML = `<b>🧠 Mesin AI Studio 3D & Panduan Rakit</b>
-      <div class="fl" style="margin-top:8px"><label>Mesin<select id="agMs"><option value="argon" ${d.mesin === "argon" ? "selected" : ""}>Gemini 4 Argon · $2/$10 (promo, $4/$20 mulai 1 Des)</option><option value="claude" ${d.mesin === "claude" ? "selected" : ""}>Claude${d.claude_kunci ? "" : " (kunci belum dipasang)"}</option><option value="gemini" ${d.mesin === "gemini" ? "selected" : ""}>Gemini Flash · paling hemat</option>${(d.lain || []).map(m => `<option value="${m.id}" ${d.mesin === m.id ? "selected" : ""}>${esc(m.nama)} · gratis${m.siap ? "" : " (isi " + esc(m.kunci) + " di Render)"}</option>`).join("")}</select></label>
+      <div class="fl" style="margin-top:8px"><label>Mesin<select id="agMs"><option value="argon" ${d.mesin === "argon" ? "selected" : ""}>${esc(beratTeks)}</option><option value="claude" ${d.mesin === "claude" ? "selected" : ""}>Claude${d.claude_kunci ? "" : " (kunci belum dipasang)"}</option><option value="gemini" ${d.mesin === "gemini" ? "selected" : ""}>Gemini Flash · paling hemat</option>${(d.lain || []).map(m => `<option value="${m.id}" ${d.mesin === m.id ? "selected" : ""}>${esc(m.nama)} · gratis${m.siap ? "" : " (isi " + esc(m.kunci) + " di Render)"}</option>`).join("")}</select></label>
         <label>Model Claude<select id="agCm">${Object.entries(d.claude_pilihan || {}).map(([k, v]) => `<option value="${k}" ${k === d.claude_model ? "selected" : ""}>${esc(v)} · $${d.claude_harga[k][0]}/$${d.claude_harga[k][1]}</option>`).join("")}</select></label></div>
       <p class="mu" style="font-size:12.5px;margin:6px 0 12px">Sedang dipakai: <b>${esc(mesinNama[d.aktif] || d.aktif)}</b>${d.mesin === "claude" && !d.claude_kunci ? " · isi <code>ANTHROPIC_API_KEY</code> di Render dulu supaya Claude aktif" : ""}. Harga = USD per 1 juta token masuk / keluar.</p>
       <b>💳 Anggaran AI berbayar (Argon + Claude) · ${esc(d.bulan)}</b>
@@ -7804,7 +7806,7 @@ $$("#s3Seg button").forEach(b => b.onclick = () => { S3_J = b.dataset.s3; S3_DAR
 function s3Render() {
   const d = S3; if (!d) return;
   $("#s3Buat").hidden = !d.buat; $("#labMesin").hidden = !d.admin;
-  const info = `<p class="mu" style="font-size:12.5px">Mesin: ${esc({claude: "Claude", gemini: "Gemini", argon: "Gemini 4 Argon", hydrogen: "Gemini 4 Hydrogen", groq: "Groq", cerebras: "Cerebras", openrouter: "OpenRouter", mistral: "Mistral"}[d.mesin] || d.mesin)}${d.kuota ? ` · jatah hari ini ${d.kuota.pakai} dari ${d.kuota.batas}` : ""}${d.buat ? "" : " · jabatan atau divisimu hanya bisa melihat dan mengunduh"}</p>`;
+  const info = `<p class="mu" style="font-size:12.5px">Mesin: ${esc({claude: "Claude", gemini: "Gemini", argon: d.mesin_berat || "Gemini 4 Argon", hydrogen: "Gemini 4 Hydrogen", groq: "Groq", cerebras: "Cerebras", openrouter: "OpenRouter", mistral: "Mistral"}[d.mesin] || d.mesin)}${d.kuota ? ` · jatah hari ini ${d.kuota.pakai} dari ${d.kuota.batas}` : ""}${d.buat ? "" : " · jabatan atau divisimu hanya bisa melihat dan mengunduh"}</p>`;
   if (S3_J === "3d") $("#s3Box").innerHTML = info + (d.model.length ? `<div class="s3g">${d.model.map(m => { const u = (m.laporan.ukuran_mm || {}), w = m.laporan.peringatan || [];
     return `<article class="it2" data-sorot="3d:${m.id}"><img src="/api/studio/3d/${m.id}.svg" alt="Pratinjau ${esc(m.judul)}" loading="lazy" width="520" height="400">${m.sketsa ? `<details style="margin-top:6px"><summary class="mu" style="font-size:12.5px;cursor:pointer">✏️ Lihat sketsa acuan (bandingkan)</summary><img src="/api/studio/3d/${m.id}.jpg" alt="Sketsa acuan ${esc(m.judul)}" loading="lazy" style="width:100%;margin-top:6px;border-radius:8px;border:1px solid var(--line,#ddd)"></details>` : ""}<h3 style="margin-top:10px">${esc(m.judul)}</h3>
     <div class="meta"><span>${u.panjang_x} × ${u.lebar_y} × ${u.tinggi_z} mm</span><span>${m.laporan.volume_cm3} cm³</span><span>${esc(m.oleh)} · ${esc(tglID(m.dibuat))}</span></div>
@@ -8157,8 +8159,8 @@ $("#pnGanti").onclick = async () => {
 
 
 /* ================= AI PLUS: meteran, cadangan, adu model ================= */
-const WRN = {gemini: "#3B6FD8", lite: "#7FA3EE", hydrogen: "#2BA39B", argon: "#8A5CD1", claude: "#C27C4E", groq: "#E0533D", mistral: "#E8A33A", nvidia: "#76B900", cloudflare: "#F38020", lain: "#9AA3B2"};
-const NMA = {gemini: "Gemini Flash", lite: "Flash Lite", hydrogen: "Hydrogen", argon: "Argon", claude: "Claude", groq: "Groq", mistral: "Mistral", nvidia: "NVIDIA", cloudflare: "Cloudflare", lain: "Lainnya"};
+const WRN = {gemini: "#3B6FD8", lite: "#7FA3EE", hydrogen: "#2BA39B", argon: "#8A5CD1", neon: "#D14F9E", claude: "#C27C4E", groq: "#E0533D", mistral: "#E8A33A", nvidia: "#76B900", cloudflare: "#F38020", lain: "#9AA3B2"};
+const NMA = {gemini: "Gemini Flash", lite: "Flash Lite", hydrogen: "Hydrogen", argon: "Argon", neon: "Neon", claude: "Claude", groq: "Groq", mistral: "Mistral", nvidia: "NVIDIA", cloudflare: "Cloudflare", lain: "Lainnya"};
 const rpx = n => "Rp" + Math.round(n || 0).toLocaleString("id-ID");
 const tglPendek = t => { const d = new Date(t + "T00:00:00"); return isNaN(d) ? t : d.toLocaleDateString("id-ID", {day: "numeric", month: "short"}); };
 function svgBatang(data, kunci, o = {}) {   // diagram batang (bertumpuk bila kunci > 1). data: [{label, nilai:{k:n}}]
@@ -8182,7 +8184,7 @@ function pnMeter(d) {
     return `<div class="r ${k.siap ? "" : "off"}"><span title="${esc(k.nama)}">${esc(k.nama)}${k.penuh ? ' <span class="ch r">penuh</span>' : ""}</span><div class="tr" role="meter" aria-valuemin="0" aria-valuemax="${k.batas}" aria-valuenow="${k.pakai}" aria-label="${esc(k.nama)}"><div class="bt2 ${kl}" style="width:${k.persen}%"></div></div>
       <span class="n">${k.pakai.toLocaleString("id-ID")} / ${k.asli ? k.batas.toLocaleString("id-ID") + " <small>asli</small>" : `<button type="button" data-kb="${k.id}" data-v="${k.batas}" title="Ubah batas perkiraan">${k.batas.toLocaleString("id-ID")}</button>`}</span></div>`; }).join("");
   const a = d.anggaran || {}, b = d.berbayar || {};
-  $("#pnBayar").innerHTML = `Berbayar hari ini: Argon ${b.argon || 0}× · Claude ${b.claude || 0}× · Anggaran bulan ini ${rpx(a.pakai)}${a.batas ? " dari " + rpx(a.batas) : ""}`;
+  $("#pnBayar").innerHTML = `Berbayar hari ini: Argon ${b.argon || 0}× · Neon ${b.neon || 0}× · Claude ${b.claude || 0}× · Anggaran bulan ini ${rpx(a.pakai)}${a.batas ? " dari " + rpx(a.batas) : ""}`;
   const hari = d.hari || [], ks = Object.keys(WRN).filter(k => hari.some(h => h.per[k]));
   $("#pnMeter7").innerHTML = hari.length ? svgBatang(hari.map(h => ({label: tglPendek(h.tanggal), nilai: h.per})), ks, {warna: WRN, nama: NMA, judul: "Panggilan AI 7 hari terakhir"}) : '<p class="mu" style="font-size:13px">Belum ada data.</p>';
 }

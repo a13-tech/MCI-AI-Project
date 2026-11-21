@@ -736,7 +736,7 @@ def usage_add(model, masuk, keluar, pikir):
                 (today(), model, masuk, keluar, pikir))
     except Exception:
         log.exception("Gagal menyimpan pemakaian token")
-    if "argon" in str(model).lower():
+    if "argon" in str(model).lower() or "neon" in str(model).lower():
         try:
             threading.Thread(target=argon_cek_peringatan, daemon=True).start()
         except Exception:
@@ -751,7 +751,7 @@ def usage_add(model, masuk, keluar, pikir):
 def gaya_model(model):
     """Karakter tiap model (butir 3): Hydrogen/Flash-Lite cepat & ringkas, Argon penalaran berat."""
     m = str(model or "").lower()
-    if "argon" in m:
+    if "argon" in m or "neon" in m:
         return ("\n\nMODE PENALARAN MENDALAM: kamu dipakai untuk soal berat (logika, rangkaian, kode). Pikirkan langkah demi langkah sebelum menjawab, "
                 "periksa ulang hitungan dan pin, sebut asumsi yang kamu pakai, dan beri kode lengkap kalau diminta.")
     if "hydrogen" in m or "lite" in m:
@@ -951,7 +951,7 @@ async def ask(key, text, history=None, parts=None, schema=None, model=None, act=
         if mt == "hydrogen" and kunci_hydrogen():
             model, kunci = HYDROGEN_MODEL, kunci_hydrogen()
         elif mt == "argon" and kunci_argon() and ARGON_AKTIF:
-            model, kunci = ARGON_MODEL, kunci_argon()
+            model, kunci = model_berat(), kunci_argon()
         elif not fungsi and not schema and not parts and rute_ringan(text):   # router pintar: pesan pendek & sederhana cukup Flash Lite
             model = MODEL_LITE
             STATS["router_hemat"] += 1
@@ -3297,7 +3297,7 @@ def api_sehat():
     return jsonify(sehat_data())
 
 
-SET_PRIVAT = {"kuota", "tg_users", "tg_izin", "iuran", "berita_ringkas", "hp_ringan", "argon_anggaran", "argon_harga", "argon_kabar", "vapid",
+SET_PRIVAT = {"kuota", "tg_users", "tg_izin", "iuran", "berita_ringkas", "hp_ringan", "argon_anggaran", "argon_harga", "argon_kabar", "neon_swap_kabar", "vapid",
               "backup_kunci", "kapal_alarm", "kabar", "harga", "harga_ingat", "neon", "sehat_ingat", "panel_log", "groq_ingat", "model_tugas", "tutup_ingat", "cadangan_absen_2026-11-15", "apex_judul"}   # tidak dikirim ke browser lewat /api/me
 
 
@@ -3344,6 +3344,7 @@ def api_argon_anggaran():
     rp = argon_biaya_bulan(True)
     return jsonify({"terpakai": round(rp), "anggaran": int(SET.get("argon_anggaran") or 0), "kurs": SET.get("kurs_usd"), "harga": SET.get("argon_harga"),
                     "habis": argon_habis(), "bulan": today()[:7], "kunci": bool(KUNCI_TIER1),
+                    "berat": {"nama": nama_berat(), "model": model_berat(), "harga": harga_model(model_berat()), "neon": pakai_neon(), "swap": NEON_SWAP_TANGGAL},
                     "mesin": ai_kode() or ("claude" if ANTHROPIC_KEY else "gemini"), "aktif": mesin_kode(), "claude_kunci": bool(ANTHROPIC_KEY),
                     "claude_model": claude_model(), "claude_pilihan": CLAUDE_PILIHAN, "claude_harga": {k: CLAUDE_HARGA[k] for k in CLAUDE_PILIHAN},
                     "lain": [{"id": k, "nama": v["nama"], "model": v["model"], "siap": bool(mesin_kunci(k)), "kunci": v["kunci"]} for k, v in MESIN_LAIN.items()]})
@@ -5967,6 +5968,31 @@ MESIN_LAIN = {
 # Gemini 4 Argon: model terkuat Google (rilis umum 13 Okt 2026), BERBAYAR saja (tidak ada di paket gratis).
 # Aktif hanya kalau ARGON_AKTIF=1 (tanda billing Gemini sudah dinyalakan). Gagal/ditolak -> otomatis jatuh ke mesin biasa.
 ARGON_MODEL = os.getenv("ARGON_MODEL", "gemini-4-argon")
+# Gemini 4 Neon (rilis 18 Nov 2026, berbayar $3/$15). Promo Argon ($2/$10) habis 30 Nov; mulai 1 Des Argon $4/$20,
+# jadi "mesin berat" otomatis pindah ke Neon pada NEON_SWAP_TANGGAL. Batalkan dengan NEON_SWAP=0 di Render.
+NEON_MODEL = os.getenv("NEON_MODEL", "gemini-4-neon")
+NEON_SWAP_TANGGAL = os.getenv("NEON_SWAP_TANGGAL", "2026-12-01")
+NEON_HARGA = [float(os.getenv("NEON_HARGA_MASUK", "3")), float(os.getenv("NEON_HARGA_KELUAR", "15"))]   # USD per 1 juta token
+
+
+def pakai_neon():
+    """True mulai NEON_SWAP_TANGGAL (WIB): mesin berat memakai Neon, bukan Argon."""
+    return os.getenv("NEON_SWAP", "1").strip().lower() not in ("0", "false", "tidak") and today() >= NEON_SWAP_TANGGAL
+
+
+def model_berat():
+    return NEON_MODEL if pakai_neon() else ARGON_MODEL
+
+
+def nama_berat():
+    return "Gemini 4 Neon" if pakai_neon() else "Gemini 4 Argon"
+
+
+def harga_model(model):
+    """Harga (masuk, keluar) USD per 1 juta token untuk model mesin berat."""
+    return list(NEON_HARGA) if "neon" in str(model).lower() else list(SET.get("argon_harga") or [2, 10])
+
+
 KUNCI_TIER1 = os.getenv("GEMINI_KEY_TIER1", "").strip()   # kunci Gemini berbayar (tier 1): dipakai Argon
 KUNCI_FREE = os.getenv("GEMINI_KEY_FREE", "").strip()     # kunci Gemini gratis: dipakai Hydrogen
 ARGON_AKTIF = bool(KUNCI_TIER1) or os.getenv("ARGON_AKTIF", "").strip() in ("1", "true", "ya")
@@ -5992,14 +6018,13 @@ def argon_biaya_bulan(segar=False):
     """Perkiraan tagihan Argon bulan ini (rupiah) dari catatan token. Disimpan 60 detik supaya tidak query terus."""
     if not segar and time.time() - _ARGON_BIAYA[0] < 60:
         return _ARGON_BIAYA[1]
-    hm, hk = SET.get("argon_harga") or [2, 10]
     try:
         with db() as c:
-            r = sql(c, "SELECT COALESCE(SUM(masuk),0), COALESCE(SUM(keluar),0), COALESCE(SUM(pikir),0) FROM pemakaian WHERE tanggal>=? AND model LIKE ?",
-                    (today()[:8] + "01", "%argon%")).fetchone()
+            br = sql(c, "SELECT model, COALESCE(SUM(masuk),0), COALESCE(SUM(keluar),0), COALESCE(SUM(pikir),0) FROM pemakaian WHERE tanggal>=? AND (model LIKE ? OR model LIKE ?) GROUP BY model",
+                     (today()[:8] + "01", "%argon%", "%neon%")).fetchall()   # mesin berat: Argon dan Neon, masing-masing dengan harganya
             cl = sql(c, "SELECT model, COALESCE(SUM(masuk),0), COALESCE(SUM(keluar),0) FROM pemakaian WHERE tanggal>=? AND model LIKE ? GROUP BY model",
                      (today()[:8] + "01", "claude%")).fetchall()
-        usd = (float(r[0]) * hm + (float(r[1]) + float(r[2])) * hk) / 1e6
+        usd = sum((float(a) * harga_model(m)[0] + (float(b) + float(p)) * harga_model(m)[1]) / 1e6 for m, a, b, p in br)
         usd += sum((float(a) * claude_harga(m)[0] + float(b) * claude_harga(m)[1]) / 1e6 for m, a, b in cl)   # Claude ikut satu anggaran AI berbayar
         rp = usd * float(SET.get("kurs_usd") or 16500)
     except Exception:
@@ -6054,7 +6079,7 @@ def mesin_daftar():
     out = [{"id": "gemini", "nama": "Gemini", "model": MODEL, "siap": bool(client("canvas"))},
            {"id": "hydrogen", "nama": "Gemini 4 Hydrogen", "model": HYDROGEN_MODEL, "siap": bool(kunci_hydrogen()),
             "catatan": "" if kunci_hydrogen() else "isi GEMINI_KEY_FREE di Render"},
-           {"id": "argon", "nama": "Gemini 4 Argon", "model": ARGON_MODEL, "siap": bool(kunci_argon()) and ARGON_AKTIF,
+           {"id": "argon", "nama": nama_berat(), "model": model_berat(), "siap": bool(kunci_argon()) and ARGON_AKTIF,
             "catatan": "" if ARGON_AKTIF else "berbayar: isi GEMINI_KEY_TIER1 (kunci tier 1) di Render"},
            {"id": "claude", "nama": CLAUDE_PILIHAN.get(claude_model(), "Claude"), "model": claude_model(), "siap": bool(ANTHROPIC_KEY),
             "catatan": "" if ANTHROPIC_KEY else "isi ANTHROPIC_API_KEY di Render"}]
@@ -6194,7 +6219,7 @@ async def kode_ai(sistem, prompt, act, schema=None, parts=None):
     if pilih in ("argon", "hydrogen"):
         try:
             return await ask("canvas", prompt, parts=parts, sistem=sistem, schema=schema, use_mcp=False, cache=False, act=f"{act} ({pilih.title()})",
-                             model=ARGON_MODEL if pilih == "argon" else HYDROGEN_MODEL, kunci=kunci_argon() if pilih == "argon" else kunci_hydrogen()), pilih
+                             model=model_berat() if pilih == "argon" else HYDROGEN_MODEL, kunci=kunci_argon() if pilih == "argon" else kunci_hydrogen()), pilih
         except Exception:
             log.exception("Gemini 4 %s gagal (billing / kuota / nama model?), pakai mesin cadangan", pilih)
     if pilih == "claude":
@@ -6887,7 +6912,7 @@ async def _mesin_jawab(mid, sistem, prompt, json_mode):
         return await ask("canvas", prompt, sistem=sistem, schema=Resep3D if json_mode else None, use_mcp=False, cache=False, act="Uji mesin AI", model=MODEL)
     if mid in ("argon", "hydrogen"):
         return await ask("canvas", prompt, sistem=sistem, schema=Resep3D if json_mode else None, use_mcp=False, cache=False, act=f"Uji mesin AI ({mid.title()})",
-                         model=ARGON_MODEL if mid == "argon" else HYDROGEN_MODEL, kunci=kunci_argon() if mid == "argon" else kunci_hydrogen())
+                         model=model_berat() if mid == "argon" else HYDROGEN_MODEL, kunci=kunci_argon() if mid == "argon" else kunci_hydrogen())
     if mid == "claude":
         return await asyncio.to_thread(_claude, sistem, prompt)
     return await asyncio.to_thread(_kompatibel, mid, sistem, prompt, 8000, json_mode)
@@ -7111,7 +7136,7 @@ def _studio_payload(r):
         g = sql(c, "SELECT id,prompt,mesin,oleh,dibuat FROM gambar_kode ORDER BY id DESC LIMIT 60").fetchall()
     k = SET.get("kuota", {})
     return {"model": m3d_rows(), "gambar": [{"id": int(a[0]), "prompt": a[1], "mesin": a[2] or "", "oleh": a[3] or "", "dibuat": a[4] or ""} for a in g],
-            "buat": is_admin(r) or boleh(r, "studio_buat"), "admin": is_admin(r), "mesin": mesin_kode(), "cetak": cetak_atur(),
+            "buat": is_admin(r) or boleh(r, "studio_buat"), "admin": is_admin(r), "mesin": mesin_kode(), "mesin_berat": nama_berat(), "cetak": cetak_atur(),
             "kuota": None if is_admin(r) else {"pakai": k.get(f"{r}:studio", 0) if k.get("tgl") == today() else 0, "batas": KUOTA["studio"]}}
 
 
@@ -11956,7 +11981,7 @@ def apex_model_daftar(r="admin"):
     L = [{"id": "gemini", "nama": "Gemini Flash", "model": MODEL, "siap": bool(client("apex")), "ket": "seimbang"},
          {"id": "hydrogen", "nama": "Gemini 4 Hydrogen", "model": HYDROGEN_MODEL, "siap": bool(kunci_hydrogen()), "ket": "cepat, ringan"},
          {"id": "lite", "nama": "Gemini Flash Lite", "model": MODEL_LITE, "siap": bool(client("apex")), "ket": "paling ringan"},
-         {"id": "argon", "nama": "Gemini 4 Argon", "model": ARGON_MODEL, "siap": bool(kunci_argon()) and ARGON_AKTIF, "ket": "penalaran berat, berbayar"}]
+         {"id": "argon", "nama": nama_berat(), "model": model_berat(), "siap": bool(kunci_argon()) and ARGON_AKTIF, "ket": "penalaran berat, berbayar"}]
     if is_admin(r):
         return L
     seri = {"gemini": ("7.5 Cipher", "terbaru, paling pintar"), "hydrogen": ("7 Cipher", "cepat"), "lite": ("4.9 Vertex", "paling ringan")}
@@ -14374,6 +14399,8 @@ def kuota_ember(model):
             return k
     if "argon" in m:
         return "argon"
+    if "neon" in m:
+        return "neon"
     if "hydrogen" in m:
         return "hydrogen"
     if "lite" in m:
@@ -14412,7 +14439,7 @@ def kuota_data():
         siap = {"gemini": bool(client("canvas")), "lite": bool(client("canvas")), "hydrogen": bool(kunci_hydrogen())}.get(e, cadangan_siap(e))
         out.append({"id": e, "nama": nama, "pakai": pakai, "batas": batas, "persen": min(100, round(pakai * 100 / batas)) if batas else 0,
                     "asli": asli, "penuh": penuh, "siap": siap})
-    berbayar = {"argon": per.get("argon", 0), "claude": per.get("claude", 0)}
+    berbayar = {"argon": per.get("argon", 0), "neon": per.get("neon", 0), "claude": per.get("claude", 0)}
     hari = []
     try:   # 7 hari terakhir per penyedia (untuk diagram batang bertumpuk)
         dari = (datetime.now(WIB) - timedelta(days=6)).strftime("%Y-%m-%d")
@@ -14571,7 +14598,7 @@ def adu_satu(m, prompt):
     t0 = time.time()
     try:
         if m in ("flash", "lite", "hydrogen", "argon"):
-            model = {"flash": MODEL, "lite": MODEL_LITE, "hydrogen": HYDROGEN_MODEL, "argon": ARGON_MODEL}[m]
+            model = {"flash": MODEL, "lite": MODEL_LITE, "hydrogen": HYDROGEN_MODEL, "argon": model_berat()}[m]
             cl = client_kunci(kunci_hydrogen()) if m == "hydrogen" else client_kunci(kunci_argon()) if m == "argon" else client("canvas")
             r = cl.models.generate_content(model=model, contents=prompt, config=types.GenerateContentConfig(system_instruction=ADU_SISTEM, max_output_tokens=1500))
             u = r.usage_metadata
@@ -14580,7 +14607,7 @@ def adu_satu(m, prompt):
             teks = (r.text or "").strip()
             biaya = ""
             if m == "argon":
-                hm, hk = SET.get("argon_harga") or [2, 10]
+                hm, hk = harga_model(model)
                 biaya = f"≈Rp{(masuk * hm + keluar * hk) / 1e6 * float(SET.get('kurs_usd') or 16500):,.0f}".replace(",", ".")
         elif m == "claude":
             teks, biaya = _claude(ADU_SISTEM, prompt, 1500), "berbayar"
@@ -15277,6 +15304,12 @@ def harga_ingat_cek():
         SET["argon_harga"] = [4.0, 20.0]
         ubah = True
         inbox_kirim(_dev_ids(), "info", "Harga Gemini 4 Argon naik", "Mulai 1 Des 2026 harga Argon $4 / $20 per 1 juta token. Hitungan anggaran Argon sudah ikut harga baru.")
+    if pakai_neon() and SET.get("neon_swap_kabar") != NEON_SWAP_TANGGAL:   # auto swap Argon -> Neon: kabari CEO sekali (Inbox + notifikasi PWA + Telegram)
+        SET["neon_swap_kabar"] = NEON_SWAP_TANGGAL
+        ubah = True
+        inbox_kirim(_dev_ids(), "info", "Mesin berat pindah ke Gemini 4 Neon",
+                    f"Mulai {NEON_SWAP_TANGGAL} semua fitur mesin berat memakai Gemini 4 Neon ({NEON_MODEL}, ${NEON_HARGA[0]:g} / ${NEON_HARGA[1]:g} per 1 juta token), "
+                    "bukan lagi Argon ($4 / $20). Anggaran AI berbayar ikut harga Neon. Kalau ada masalah, isi NEON_SWAP=0 di Render untuk kembali ke Argon.")
     for x in harga_list():
         try:
             sisa = (datetime.strptime(x.get("berakhir") or "", "%Y-%m-%d").date() - datetime.now(WIB).date()).days
