@@ -1056,10 +1056,10 @@ async def ask(key, text, history=None, parts=None, schema=None, model=None, act=
                     r = await call_safe(None)
         except Exception as e:
             # Gemini penuh/sibuk -> Groq menjawab supaya bot tidak diam (genset cadangan saat listrik utama padam)
-            if terkirim[0] or not cadangan_bisa(e, schema, fungsi, parts):
+            if terkirim[0] or not cadangan_bisa(e, schema, fungsi, parts, key):
                 raise
-            log.warning("Gemini penuh (%s), jawaban diambil dari Groq", str(e)[:100])
-            out = await asyncio.to_thread(cadangan_groq, sysp, contents, schema)
+            log.warning("Gemini penuh (%s), jawaban diambil dari mesin cadangan", str(e)[:100])
+            out = await asyncio.to_thread(cadangan_groq, sysp + (COPILOT_CADANGAN if fungsi else ""), contents, schema)
             if not out:
                 raise
             if not schema:
@@ -6266,7 +6266,65 @@ def ai_kode():
 
 
 def mesin_kunci(k):
-    return os.getenv(MESIN_LAIN[k]["kunci"], "").strip()
+    v = os.getenv(MESIN_LAIN[k]["kunci"], "").strip()
+    return v.split("|")[0].strip() if MESIN_LAIN[k].get("spare") else v
+
+# ---------- SLOT CADANGAN BEBAS: SPARE_1, SPARE_2, ... (permintaan CEO 21 Nov 2026) ----------
+# Isi SPARE_<n> (Panel CEO atau Render) dengan kunci API apa saja -> otomatis ikut antrean cadangan saat Gemini penuh.
+# Penyedia dikenali dari awalan kunci. Penyedia lain: tulis "kunci|model|url" (url = base URL kompatibel OpenAI),
+# atau isi SPARE_<n>_MODEL / SPARE_<n>_URL terpisah di Render. Analogi: colokan cadangan; alat apa pun yang dicolok, langsung jadi genset.
+SPARE_DETEKSI = [   # (awalan kunci, nama, base URL kompatibel OpenAI, model bawaan; "" = wajib tulis model)
+    ("sk-or-", "OpenRouter", "https://openrouter.ai/api/v1", "openrouter/free"),
+    ("sk-ant-", "Claude", "https://api.anthropic.com/v1", "claude-sonnet-5-5"),
+    ("gsk_", "Groq", "https://api.groq.com/openai/v1", "openai/gpt-oss-120b"),
+    ("nvapi-", "NVIDIA NIM", "https://integrate.api.nvidia.com/v1", "nvidia/nemotron-3-ultra-550b-a55b"),
+    ("csk-", "Cerebras", "https://api.cerebras.ai/v1", "gpt-oss-120b"),
+    ("xai-", "xAI", "https://api.x.ai/v1", ""),
+    ("sk-proj-", "OpenAI", "https://api.openai.com/v1", ""),
+]
+SPARE_PANEL = 6   # jumlah slot yang tampil di Panel CEO (di Render boleh lebih: SPARE_7, SPARE_8, ...)
+
+
+def spare_urai(env):
+    """SPARE_<n> -> dict info slot (tanpa isi kunci) atau None kalau kosong."""
+    v = os.getenv(env, "").strip()
+    if not v:
+        return None
+    bag = [x.strip() for x in v.split("|")]
+    kunci = bag[0]
+    model = (bag[1] if len(bag) > 1 else "") or os.getenv(env + "_MODEL", "").strip()
+    url = (bag[2] if len(bag) > 2 else "") or os.getenv(env + "_URL", "").strip()
+    det = next((d for d in SPARE_DETEKSI if kunci.startswith(d[0])), None)
+    nama = det[1] if det else "Kustom"
+    url = (url or (det[2] if det else "")).rstrip("/")
+    model = model or (det[3] if det else "")
+    kurang = ""
+    if kunci.startswith("AIza"):
+        kurang = "kunci Gemini tidak dipakai di slot cadangan: pakai slot Gemini yang sudah ada"
+    elif not url:
+        kurang = "penyedia tidak dikenali: tulis kunci|model|url"
+    elif not model:
+        kurang = f"{nama}: tulis nama modelnya (kunci|model)"
+    if url and not url.endswith("/chat/completions"):
+        url += "/chat/completions"
+    return {"nama": f"{env} · {nama}", "penyedia": nama, "url": url, "kunci": env, "model": model, "spare": True, "kurang": kurang,
+            "no_json": nama == "Claude"}
+
+
+def spare_sinkron():
+    """Samakan MESIN_LAIN dengan slot SPARE_<n> yang terisi sekarang (dipanggil tiap kali daftar cadangan dibaca)."""
+    ada = {}
+    for env in os.environ:
+        m = re.fullmatch(r"SPARE_(\d{1,2})", env)
+        if m:
+            info = spare_urai(env)
+            if info:
+                ada[f"spare{int(m.group(1))}"] = info
+    for k in [k for k, v in MESIN_LAIN.items() if v.get("spare") and k not in ada]:
+        MESIN_LAIN.pop(k)
+    MESIN_LAIN.update(ada)
+    return sorted(ada, key=lambda k: int(k[5:]))
+
 
 
 def mesin_daftar():
@@ -6298,12 +6356,14 @@ def _kompatibel(k, sistem, prompt, maks=8000, json_mode=False, pesan=None):
     """pesan: daftar [{"role","content"}] (riwayat obrolan) menggantikan prompt tunggal."""
     m = MESIN_LAIN[k]
     body = {"model": m["model"], "max_tokens": maks, "temperature": 0.2, "messages": [{"role": "system", "content": sistem}] + (pesan or [{"role": "user", "content": prompt}])}
-    if json_mode:
+    if json_mode and not m.get("no_json"):
         body["response_format"] = {"type": "json_object"}
     import urllib.request, urllib.error
     url = m["url"] or f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT}/ai/v1/chat/completions"
-    req = urllib.request.Request(url, method="POST", data=json.dumps(body).encode(),
-                                 headers={"Authorization": f"Bearer {mesin_kunci(k)}", "Content-Type": "application/json", "User-Agent": "MCI-HQ/1.0"})   # User-Agent bawaan urllib ditolak sebagian penyedia
+    hdr = {"Authorization": f"Bearer {mesin_kunci(k)}", "Content-Type": "application/json", "User-Agent": "MCI-HQ/1.0"}   # User-Agent bawaan urllib ditolak sebagian penyedia
+    if m.get("penyedia") == "Claude":   # lapisan kompatibel OpenAI milik Anthropic: kirim juga header resminya
+        hdr.update({"x-api-key": mesin_kunci(k), "anthropic-version": "2023-06-01"})
+    req = urllib.request.Request(url, method="POST", data=json.dumps(body).encode(), headers=hdr)
     try:
         with urllib.request.urlopen(req, timeout=240) as f:   # model "reasoning" besar bisa berpikir lama
             d = json.loads(f.read().decode())
@@ -6331,9 +6391,16 @@ CADANGAN_STAT = {"dipakai": 0, "terakhir": "", "gagal": 0}   # tampil di Kesehat
 _GEMINI_PENUH = ("429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE", "overloaded", "quota")
 
 
-def cadangan_bisa(e, schema, fungsi, parts):
-    """Boleh pindah ke Groq? Hanya saat Gemini penuh/sibuk, tanpa alat data (takut mengarang) dan tanpa gambar/suara."""
-    return bool(cadangan_daftar()) and not fungsi and not parts and any(t in str(e) for t in _GEMINI_PENUH)
+def cadangan_bisa(e, schema, fungsi, parts, key=""):
+    """Boleh pindah ke cadangan? Hanya saat Gemini penuh/sibuk dan tanpa gambar/suara. Dengan alat data hanya untuk Copilot
+    (key "apex"), dan itu pun dalam MODE TANPA DATA (lihat COPILOT_CADANGAN) supaya tidak mengarang angka."""
+    return bool(cadangan_daftar()) and (not fungsi or key == "apex") and not parts and any(t in str(e) for t in _GEMINI_PENUH)
+
+
+COPILOT_CADANGAN = ("\n\nMODE CADANGAN (penting): mesin utama sedang penuh, kamu dijalankan mesin cadangan TANPA akses alat dan data MCI. "
+                    "Jangan pernah menyebut angka stok, kas, tugas, jadwal, atau data organisasi lain dari ingatan atau tebakan. "
+                    "Kalau pertanyaan butuh data atau aksi di web MCI, bilang singkat: data MCI sedang tidak bisa dibaca karena mesin utama penuh, coba lagi beberapa menit lagi. "
+                    "Pertanyaan umum (penjelasan, ide, tulisan, kode) tetap boleh dijawab.")
 
 
 def cadangan_groq(sysp, contents, schema):
@@ -14222,7 +14289,7 @@ KUNCI_DAFTAR = [   # (nama env, label, kelompok, cara uji). Token login, SECRET_
     ("NEON_API_KEY", "Neon: API key (konektor Copilot)", "Konektor Copilot", "neon"),
     ("GITHUB_TOKEN", "GitHub: token fine-grained, baca saja (konektor Copilot)", "Konektor Copilot", "github"),
     ("GOOGLE_SA_JSON", "Google Drive: isi file kunci JSON akun robot (service account)", "Google Drive", "gdrive"),
-]
+] + [(f"SPARE_{i}", f"Cadangan bebas {i}: kunci API apa saja (atau kunci|model|url)", "Cadangan AI bebas", "spare") for i in range(1, SPARE_PANEL + 1)]
 TEKS_DAFTAR = [("ZOHO_DC", "Pusat data Zoho (com / in / eu, kosong = com)"), ("R2_BUCKET", "Nama bucket R2 (kosong = mci-dokumentasi)"), ("GROQ_MODEL", "ID model Groq"), ("NVIDIA_MODEL", "ID model NVIDIA"), ("MISTRAL_MODEL", "ID model Mistral")]   # bukan rahasia
 KUNCI_NAMA = {k for k, *_ in KUNCI_DAFTAR} | {k for k, _ in TEKS_DAFTAR}
 
@@ -14456,6 +14523,24 @@ def _uji_kunci(cara, nilai):
         req = urllib.request.Request(f"https://generativelanguage.googleapis.com/v1beta/models?pageSize=1&key={quote(nilai)}")
     elif cara == "claude":
         req = urllib.request.Request("https://api.anthropic.com/v1/models?limit=1", headers={"x-api-key": nilai, "anthropic-version": "2023-06-01"})
+    elif cara == "spare":   # uji sungguhan: minta jawaban 1 kata dari slot itu
+        lama = os.environ.get("SPARE_UJI")
+        os.environ["SPARE_UJI"] = nilai.strip()
+        try:
+            info = spare_urai("SPARE_UJI")
+            if info["kurang"]:
+                return False, info["kurang"]
+            MESIN_LAIN["spare_uji"] = info
+            out = _kompatibel("spare_uji", "Jawab satu kata.", "Balas: oke", 16)
+            return True, f"{info['penyedia']} · {info['model']} menjawab \"{out[:30]}\""
+        except Exception as e:
+            return False, str(e)[:160]
+        finally:
+            MESIN_LAIN.pop("spare_uji", None)
+            if lama is None:
+                os.environ.pop("SPARE_UJI", None)
+            else:
+                os.environ["SPARE_UJI"] = lama
     elif cara in MESIN_LAIN:
         req = urllib.request.Request(MESIN_LAIN[cara]["url"].replace("/chat/completions", "/models"), headers={"Authorization": f"Bearer {nilai}", "User-Agent": "MCI-HQ/1.0"})
     elif cara == "cloudflare":
@@ -14510,7 +14595,7 @@ def panel_data():
             "kunci": kunci, "teks": teks, "model": model, "riwayat": list(reversed(SET.get("panel_log") or []))[:60],
             "sidik_cocok": rh.get("sidik", _sidik()) == _sidik(), "pin_menit": PANEL_PIN_MENIT,
             "cadangan": {"urut": cadangan_urut(), "semua": [{"id": k, "nama": n, "siap": cadangan_siap(k), "stat": CAD_PER.get(k, {}),
-                                                             "istirahat": max(0, int(_CAD_ISTIRAHAT.get(k, 0) - time.time()))} for k, n in CADANGAN_SEMUA]},
+                                                             "istirahat": max(0, int(_CAD_ISTIRAHAT.get(k, 0) - time.time()))} for k, n in cadangan_semua()]},
             "hemat": {"router": STATS.get("router_hemat", 0), "cache": STATS.get("cache_hit", 0), "pi_cache": PI_CACHE_STAT["kena"], "pi_lokal": PI_CACHE_STAT["lokal"],
                       "graf": dict(GRAF_HEMAT)},
             "harga": harga_list(), "harga_per": HARGA_PER, "kurs": int(SET.get("kurs_usd") or 16500), "zoho": {"siap": zoho_siap(), "scope": ZOHO_SCOPE}, "kabar": SET.get("kabar"), "kabar_kat": {k: v[0] for k, v in KABAR_KAT.items()},
@@ -14576,9 +14661,11 @@ def api_panel():
             L.remove(x)
             panel_catat(f"Harga dihapus: {x['nama']}")
         elif aksi == "cadangan":
-            u = [k for k in dict.fromkeys(d.get("urut") or []) if k in dict(CADANGAN_SEMUA)]
+            semua = dict(cadangan_semua())
+            u = [k for k in dict.fromkeys(d.get("urut") or []) if k in semua]
             SET["cadangan_urut"] = u
-            panel_catat("Urutan cadangan: " + (" → ".join(dict(CADANGAN_SEMUA)[k] for k in u) or "semua dimatikan"))
+            SET["cadangan_lepas"] = [k for k in semua if k.startswith("spare") and k not in u]   # SPARE yang sengaja dimatikan
+            panel_catat("Urutan cadangan: " + (" → ".join(semua[k] for k in u) or "semua dimatikan"))
         elif aksi == "apex_kuota":
             b = int(d.get("batas") or 0)
             if not 0 <= b <= 500:
@@ -14637,22 +14724,30 @@ def api_panel():
 from array import array as _array
 
 # ---------- 1. Antrean cadangan berlapis: Gemini penuh -> penyedia gratis berikutnya (urutan diatur di Panel CEO) ----------
-CADANGAN_SEMUA = [("groq", "Groq"), ("mistral", "Mistral"), ("nvidia", "NVIDIA NIM"), ("cloudflare", "Cloudflare Workers AI")]
+CADANGAN_DASAR = [("groq", "Groq"), ("mistral", "Mistral"), ("nvidia", "NVIDIA NIM"), ("cloudflare", "Cloudflare Workers AI")]
+
+
+def cadangan_semua():
+    """Penyedia bawaan + slot SPARE_<n> yang terisi."""
+    return CADANGAN_DASAR + [(k, MESIN_LAIN[k]["nama"]) for k in spare_sinkron()]
 _CAD_ISTIRAHAT = {}   # penyedia -> waktu boleh dicoba lagi (habis kena batas / error)
 CAD_PER = {}          # penyedia -> {"dipakai", "gagal", "terakhir"} sejak server menyala
 
 
 def cadangan_urut():
+    semua = cadangan_semua()
     u = SET.get("cadangan_urut")
     if not isinstance(u, list):
-        u = [k for k, _ in CADANGAN_SEMUA]
-    return [k for k in u if k in dict(CADANGAN_SEMUA)]
+        u = [k for k, _ in semua]
+    lepas = set(SET.get("cadangan_lepas") or [])
+    u = u + [k for k, _ in semua if k.startswith("spare") and k not in u and k not in lepas]   # slot SPARE baru otomatis ikut di belakang
+    return [k for k in u if k in dict(semua)]
 
 
 def cadangan_siap(k):
     if k == "cloudflare":
         return bool(CF_ACCOUNT and CF_TOKEN)
-    return k in MESIN_LAIN and bool(mesin_kunci(k))
+    return k in MESIN_LAIN and bool(mesin_kunci(k)) and not MESIN_LAIN[k].get("kurang")
 
 
 def cadangan_daftar():
