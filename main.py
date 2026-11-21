@@ -8802,7 +8802,7 @@ def api_node():
         abort(403)
     i = node_info(segar=True) if node_siap() else None
     return jsonify({"diatur": node_siap(), "online": bool(i), "info": i, "backup": SET.get("node_backup_hasil", ""),
-                    "ollama_model": os.getenv("NODE_MODEL", "gemma3:4b")})
+                    "ollama_model": ", ".join(node_model_daftar())})
 
 
 def dok_link(u):
@@ -14524,7 +14524,7 @@ KUNCI_DAFTAR = [   # (nama env, label, kelompok, cara uji). Token login, SECRET_
     ("GOOGLE_SA_JSON", "Google Drive: isi file kunci JSON akun robot (service account)", "Google Drive", "gdrive"),
     ("NODE_URL", "MCI Node: alamat terowongan, mis. https://node.mci-ai.my.id", "MCI Node (HDD + Ollama markas)", ""),
     ("NODE_TOKEN", "MCI Node: token rahasia (sama dengan di MacBook, minimal 24 karakter)", "MCI Node (HDD + Ollama markas)", "node"),
-    ("NODE_MODEL", "MCI Node: model Ollama untuk cadangan AI (bawaan gemma3:4b)", "MCI Node (HDD + Ollama markas)", ""),
+    ("NODE_MODEL", "MCI Node: model Ollama cadangan, boleh banyak dipisah koma sesuai urutan (bawaan: gemma3:4b, qwen2.5:3b, qwen2.5-coder:3b, deepseek-safe:latest)", "MCI Node (HDD + Ollama markas)", ""),
 ] + [(f"SPARE_{i}", f"Cadangan bebas {i}: kunci API apa saja. Ganti model: kunci|model. Penyedia lain: kunci|model|url", "Cadangan AI bebas", "spare") for i in range(1, SPARE_PANEL + 1)]
 TEKS_DAFTAR = [("ZOHO_DC", "Pusat data Zoho (com / in / eu, kosong = com)"), ("R2_BUCKET", "Nama bucket R2 (kosong = mci-dokumentasi)"), ("GROQ_MODEL", "ID model Groq"), ("NVIDIA_MODEL", "ID model NVIDIA"), ("MISTRAL_MODEL", "ID model Mistral")]   # bukan rahasia
 KUNCI_NAMA = {k for k, *_ in KUNCI_DAFTAR} | {k for k, _ in TEKS_DAFTAR}
@@ -14768,8 +14768,11 @@ def _uji_kunci(cara, nilai):
             i = node_info(segar=True)
             if not i:
                 return False, "Node tidak menjawab atau token salah (laptop menyala? cloudflared & mci_node jalan?)"
+            ada = {node_tag(m) for m in (i.get("model") or [])}
+            hilang = [m for m in node_model_daftar() if m not in ada]
             return True, (f"Node {i.get('versi')} online · HDD kosong {int(i.get('kosong', 0)) / 1024 ** 3:.0f} GB · "
-                          + (f"Ollama: {', '.join(i.get('model') or []) or 'belum ada model'}" if i.get("ollama") else "Ollama mati"))
+                          + (f"Ollama: {', '.join(i.get('model') or []) or 'belum ada model'}" if i.get("ollama") else "Ollama mati")
+                          + (f" · belum terpasang: {', '.join(hilang)}" if i.get("ollama") and hilang else ""))
         finally:
             if lama is None:
                 os.environ.pop("NODE_TOKEN", None)
@@ -14917,7 +14920,7 @@ def api_panel():
             semua = dict(cadangan_semua())
             u = [k for k in dict.fromkeys(d.get("urut") or []) if k in semua]
             SET["cadangan_urut"] = u
-            SET["cadangan_lepas"] = [k for k in semua if (k.startswith("spare") or k == "node") and k not in u]   # slot yang sengaja dimatikan
+            SET["cadangan_lepas"] = [k for k in semua if (k.startswith("spare") or is_node(k)) and k not in u]   # slot yang sengaja dimatikan
             panel_catat("Urutan cadangan: " + (" → ".join(semua[k] for k in u) or "semua dimatikan"))
         elif aksi == "apex_kuota":
             b = int(d.get("batas") or 0)
@@ -14980,16 +14983,42 @@ from array import array as _array
 CADANGAN_DASAR = [("groq", "Groq"), ("mistral", "Mistral"), ("nvidia", "NVIDIA NIM"), ("cloudflare", "Cloudflare Workers AI")]
 
 
+NODE_MODEL_BAWAAN = "gemma3:4b, qwen2.5:3b, qwen2.5-coder:3b, deepseek-safe:latest"   # urutan bawaan: ringan dulu, deepseek-r1:7b sengaja tidak ikut (berat di RAM 8 GB)
+
+
+def node_tag(m):
+    """Samakan penulisan nama model dengan `ollama list` (tanpa tag = :latest)."""
+    m = m.strip()
+    return m if ":" in m else m + ":latest"
+
+
+def node_model_daftar():
+    """NODE_MODEL boleh banyak, dipisah koma. Urutan = urutan cadangan."""
+    v = os.getenv("NODE_MODEL", "").strip() or NODE_MODEL_BAWAAN
+    return list(dict.fromkeys(node_tag(x) for x in v.split(",") if x.strip()))[:8]
+
+
+def is_node(k):
+    """Kunci mesin Ollama MCI Node: 'node' (model pertama), 'node_2', 'node_3', ..."""
+    return k == "node" or str(k).startswith("node_")
+
+
 def node_ollama_sinkron():
-    """MCI Node terisi -> Ollama di MacBook jadi mesin cadangan 'node' (selalu paling belakang kecuali diatur lain)."""
-    u, t = node_cfg()
-    if node_siap():
-        mdl = os.getenv("NODE_MODEL", "").strip() or "gemma3:4b"
-        MESIN_LAIN["node"] = {"nama": f"MCI Node · Ollama · {mdl}", "penyedia": "Ollama", "url": u + "/v1/chat/completions", "kunci": "NODE_TOKEN", "model": mdl,
-                              "spare": False, "kurang": "", "no_json": False}
-        return ["node"]
-    MESIN_LAIN.pop("node", None)
-    return []
+    """MCI Node terisi -> tiap model Ollama di MacBook jadi mesin cadangan sendiri (selalu paling belakang kecuali diatur lain)."""
+    for k in [k for k in MESIN_LAIN if is_node(k)]:
+        MESIN_LAIN.pop(k, None)
+    if not node_siap():
+        return []
+    u, _t = node_cfg()
+    i = _NODE.get("info") if time.time() - _NODE["t"] < 600 else None   # pakai cache status Node saja (tanpa memanggil laptop)
+    ada = {node_tag(m) for m in (i.get("model") or [])} if i and i.get("ollama") else None
+    keys = []
+    for n, mdl in enumerate(node_model_daftar(), 1):
+        k = "node" if n == 1 else f"node_{n}"
+        MESIN_LAIN[k] = {"nama": f"MCI Node · Ollama · {mdl}", "penyedia": "Ollama", "url": u + "/v1/chat/completions", "kunci": "NODE_TOKEN", "model": mdl,
+                         "spare": False, "kurang": (f"{mdl} belum ada di laptop (ollama pull {mdl})" if ada is not None and mdl not in ada else ""), "no_json": False}
+        keys.append(k)
+    return keys
 
 
 def cadangan_semua():
@@ -15005,9 +15034,9 @@ def cadangan_urut():
     if not isinstance(u, list):
         u = [k for k, _ in semua]
     lepas = set(SET.get("cadangan_lepas") or [])
-    u = u + [k for k, _ in semua if (k.startswith("spare") or k == "node") and k not in u and k not in lepas]   # slot baru otomatis ikut di belakang
-    if "node" in u and u[-1] != "node" and not isinstance(SET.get("cadangan_urut"), list):
-        u = [k for k in u if k != "node"] + ["node"]   # Ollama laptop = cadangan terakhir
+    u = u + [k for k, _ in semua if (k.startswith("spare") or is_node(k)) and k not in u and k not in lepas]   # slot baru otomatis ikut di belakang
+    if not isinstance(SET.get("cadangan_urut"), list):
+        u = [k for k in u if not is_node(k)] + [k for k, _ in semua if is_node(k)]   # Ollama laptop = cadangan terakhir, urut sesuai NODE_MODEL
     return [k for k in u if k in dict(semua)]
 
 
@@ -15030,7 +15059,10 @@ def cadangan_jalan(sysp, pesan, maks=4000, json_mode=False, utamakan=None):
     if not urut:
         raise RuntimeError("Tidak ada AI cadangan yang siap (isi kuncinya di Panel CEO)")
     last = None
+    node_mati = False
     for k in urut:
+        if node_mati and is_node(k):
+            continue   # laptop markas tidak terjangkau: model Ollama lain di laptop yang sama pasti gagal juga
         st = CAD_PER.setdefault(k, {"dipakai": 0, "gagal": 0, "terakhir": ""})
         try:
             out = _kompatibel(k, sysp[:24000], "", maks, json_mode, pesan[-12:])
@@ -15044,6 +15076,8 @@ def cadangan_jalan(sysp, pesan, maks=4000, json_mode=False, utamakan=None):
             _CAD_ISTIRAHAT[k] = time.time() + (120 if penuh else 30)
             if penuh:
                 kuota_penuh_tandai(k)
+            if is_node(k) and not ("model" in str(e).lower() and "not found" in str(e).lower()):
+                node_mati = True
             log.warning("Cadangan %s gagal (%s), coba berikutnya", k, str(e)[:120])
             continue
         st["dipakai"] += 1
