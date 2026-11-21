@@ -1212,13 +1212,27 @@ textarea:focus,input:focus,select:focus{border-color:var(--aksen);box-shadow:0 0
  </section>
  <section id="p-panduan" class="pg" hidden>
   <div class="ey">AI &amp; Lab</div><h1>Buku Panduan Rakit</h1>
-  <details class="cara"><summary>Cara kerjanya</summary><p class="mu">Seperti buku manual Lego, tetapi untuk elektronika. (1) Tulis ide rakitanmu. (2) AI membuat <b>rencana singkat</b>: papan yang dipakai, perkiraan biaya, waktu, dan pertanyaan penting. (3) Kamu baca dan jawab pertanyaannya, atau minta rencananya diubah. (4) Setelah kamu konfirmasi, baru AI menulis panduan lengkap: isi kantong komponen dengan link beli, langkah demi langkah dengan diagram kabel, kode Arduino, dan cara mengatasi masalah. Setiap sambungan diperiksa mesin MCI terhadap peta pin papan sebelum panduan sampai ke kamu. Papan yang didukung: ESP32 DevKit V4, Arduino Nano, Arduino Uno. Harga adalah perkiraan AI; cek lagi di toko.</p></details>
+  <details class="cara"><summary>Cara kerjanya</summary><p class="mu">Seperti buku manual Lego, tetapi untuk elektronika. (1) Tulis ide rakitanmu. (2) AI membuat <b>rencana singkat</b>: papan yang dipakai, perkiraan biaya, waktu, dan pertanyaan penting. (3) Kamu baca dan jawab pertanyaannya, atau minta rencananya diubah. (4) Setelah kamu konfirmasi, baru AI menulis panduan lengkap: isi kantong komponen dengan link beli, langkah demi langkah dengan diagram kabel, kode Arduino, dan cara mengatasi masalah. Setiap sambungan diperiksa mesin MCI terhadap peta pin papan sebelum panduan sampai ke kamu. Papan yang didukung: ESP32 DevKit V4, Arduino Nano, Arduino Uno. Harga adalah perkiraan AI; cek lagi di toko.</p><p class="mu"><b>♻️ Dari barang bekas (BPR Scratch):</b> foto barang bekas yang kamu punya. AI mengenali barangnya dan bagian yang bisa diambil, memberi pilihan rakitan, atau menjawab "bisa nggak bikin X dari ini?". Setelah kamu pilih, alurnya sama seperti di atas; komponen dari barang bekas ditandai ♻️ (gratis), dan ada langkah membongkar yang aman. Foto tidak disimpan. Anggota: 3 analisis foto per hari.</p></details>
   <div id="pdAtas" class="cd">
+   <div class="seg" id="pdMode" style="margin:0 0 14px;background:#EFECE4"><button class="on" data-pdm="tulis" type="button">Tulis ide</button><button data-pdm="scratch" type="button">♻️ Dari barang bekas</button></div>
+   <div id="pdScr" hidden>
+    <p class="mu" style="margin:0 0 10px;font-size:13.5px">Foto barang bekas yang kamu punya (mainan rusak, kipas, botol, speaker, kardus…). AI mengenali barangnya, lalu kasih <b>pilihan rakitan</b>, atau jawab <b>"bisa nggak bikin X dari ini?"</b>. Kamu pilih dulu, baru dibuatkan panduan lengkap.</p>
+    <div class="bar" style="margin:0;flex-wrap:wrap"><label class="bt o" style="cursor:pointer;margin:0">🖼️ Pilih foto<input type="file" id="pdScrF" accept="image/*" multiple hidden></label>
+     <label class="bt o" style="cursor:pointer;margin:0">📷 Ambil foto<input type="file" id="pdScrK" accept="image/*" capture="environment" hidden></label><span class="mu" style="font-size:12.5px">Maks 6 foto, 8 MB per foto</span></div>
+    <div id="pdScrTh" style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"></div>
+    <label style="display:block;font-weight:600;margin:4px 0 6px" for="pdScrT">Mau bikin apa? <span class="mu" style="font-weight:400">(kosongkan kalau mau dikasih pilihan ide)</span></label>
+    <input type="text" id="pdScrT" maxlength="200" placeholder="Contoh: roket, robot pengikut garis, lampu tidur otomatis">
+    <input type="text" id="pdScrC" maxlength="500" placeholder="Catatan (opsional), mis. ada baterai AA 4 buah, anaknya kelas 5 SD" style="margin-top:8px">
+    <div class="bar" style="margin:12px 0 0;flex-wrap:wrap"><button class="bt g" id="pdScrGo" type="button">Cek barangku</button><span class="mu" id="pdScrMsg" style="font-size:13px"></span></div>
+    <div id="pdScrHasil"></div>
+   </div>
+   <div id="pdTulis">
    <label style="display:block;font-weight:600;margin-bottom:6px" for="pdMinta">Mau merakit apa?</label>
    <textarea id="pdMinta" rows="3" maxlength="1500" placeholder="Contoh: alat penyiram tanaman otomatis yang menyala kalau tanah kering, bisa dipantau dari hp."></textarea>
    <div class="bar" style="margin:12px 0 0;flex-wrap:wrap"><label class="mu" style="display:flex;gap:8px;align-items:center;font-size:13.5px">Papan
     <select id="pdPapan"><option value="">Biar AI pilihkan</option></select></label>
     <button class="bt g" id="pdGo" type="button">Buat rencana</button><span class="mu" id="pdMsg" style="font-size:13px"></span></div>
+   </div>
    <p class="mu" id="pdJatah" style="font-size:12.5px;margin:10px 0 0"></p></div>
   <div id="pdBox"><p class="mu">Memuat…</p></div>
  </section>
@@ -7585,13 +7599,13 @@ function pdDetail() {
   const war = (x.laporan || {}).peringatan || [];
   h += `<article class="it2"><div class="ey">Buku panduan · ${esc(d.papan_nama)}</div><h3>${esc(d.judul)}</h3>${chips}<div class="bd">${esc(d.ringkasan || "")}</div>
     <div class="meta" style="margin-top:10px"><span>Perkiraan biaya: <b>${pdRp(d.biaya.min, d.biaya.max)}</b></span><span>${L.length} langkah</span>${x.proyek ? `<span class="ch">Proyek: ${esc(x.proyek.nama)}</span>` : ""}</div>
-    <div class="ac"><button class="bt g" id="pdCetak" type="button">Cetak / simpan PDF</button><button class="bt o" id="pdTautBuka" type="button">${x.proyek ? "Ganti proyek" : "Tautkan ke proyek"}</button></div>
+    <div class="ac"><button class="bt g" id="pdCetak" type="button">Cetak / simpan PDF</button><button class="bt o" id="pdTautBuka" type="button">${x.proyek ? "Ganti proyek" : "Tautkan ke proyek"}</button>${can("studio_buat") || ADM() ? '<button class="bt o" id="pd3d" type="button">🧊 Bikin casing di Studio 3D</button>' : ""}</div>
     <div id="pdTaut"></div></article>`;
   if (war.length) h += `<div class="pdWarn"><b>Perhatikan sebelum merakit</b><ul>${war.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>`;
   h += `<h2 class="pdH">1 · Isi kantong</h2>` + (d.kantong || []).map(k => `<div class="cd pdKan"><h3 style="margin:0 0 10px;font-size:16px">${esc(k.nama)}</h3>${(k.komponen || []).map(c => `<div class="pdKom">
       <div class="pdKomA"><b>${esc(c.nama)}</b> <span class="mu">× ${Math.max(1, +c.jumlah || 1)}</span><div class="mu" style="font-size:13px">${esc(c.fungsi || "")}</div>
-      <div class="meta" style="margin-top:4px"><span>${pdRp(c.harga_min, c.harga_max)} / buah</span>${c.stok ? `<span class="ch ${c.stok.jumlah > 0 ? "g" : "n"}">Stok MCI: ${esc(c.stok.nama)} (${c.stok.jumlah} ${esc(c.stok.satuan)})</span>` : ""}</div></div>
-      <div class="pdBeli"><a class="bt o" href="${esc(c.beli.tokopedia)}" target="_blank" rel="noopener">Tokopedia</a><a class="bt o" href="${esc(c.beli.shopee)}" target="_blank" rel="noopener">Shopee</a></div></div>`).join("")}</div>`).join("")
+      <div class="meta" style="margin-top:4px">${pdBekas(c) ? `<span class="ch g">♻️ Dari barang bekas: ${esc(pdBekas(c))}</span>` : `<span>${pdRp(c.harga_min, c.harga_max)} / buah</span>`}${c.stok ? `<span class="ch ${c.stok.jumlah > 0 ? "g" : "n"}">Stok MCI: ${esc(c.stok.nama)} (${c.stok.jumlah} ${esc(c.stok.satuan)})</span>` : ""}</div></div>
+      ${pdBekas(c) ? "" : `<div class="pdBeli"><a class="bt o" href="${esc(c.beli.tokopedia)}" target="_blank" rel="noopener">Tokopedia</a><a class="bt o" href="${esc(c.beli.shopee)}" target="_blank" rel="noopener">Shopee</a></div>`}</div>`).join("")}</div>`).join("")
     + ((d.alat || []).length ? `<div class="cd"><b>Alat yang disiapkan:</b> ${d.alat.map(esc).join(" · ")}</div>` : "")
     + (can("catatan") ? `<div class="bar" style="margin:0 0 6px"><button class="bt o" id="pdBelanja" type="button">🛒 Masukkan semua komponen ke Daftar Belanja</button></div>` : "");
   h += `<h2 class="pdH">2 · Rakit langkah demi langkah</h2>
@@ -7650,6 +7664,9 @@ function pdPasang() {
     if (PD_L < x.data.langkah.length - 1) { PD_L++; pdDetail(); $(".pdStep").scrollIntoView({block: "start"}); } else { pdDetail(); pesan("Rangkaian selesai! Lanjut unggah kode di bagian 3."); } });
   on("#pdSalin", async () => { try { await navigator.clipboard.writeText(x.data.kode || ""); pesan("Kode disalin"); } catch (e) { pesan("Tidak bisa menyalin otomatis; blok kodenya lalu salin manual."); } });
   on("#pdCetak", pdCetak);
+  on("#pd3d", () => { const kom = (x.data.kantong || []).flatMap(k => k.komponen || []).map(c => c.nama).slice(0, 12).join(", ");
+    show("studio"); setTimeout(() => { const t3 = $('#s3Seg [data-s3="3d"]'); if (t3) t3.click();
+      $("#s3Minta").value = `Casing / rangka untuk "${x.data.judul}" dengan ${x.data.papan_nama}. Isi: ${kom}. Beri dinding 2 mm, lubang kabel USB papan, ventilasi, dan tiang baut M3. Tulis ukuran dalam mm.`; $("#s3Minta").focus(); }, 400); });
   on("#pdBelanja", async () => { try { await api("/api/belanja", {json: {dari_panduan: x.id}}); pesan("Komponen masuk Daftar Belanja"); $("#pdBelanja").textContent = "✓ Sudah masuk Daftar Belanja"; $("#pdBelanja").disabled = true; } catch (e) { alert(e.message); } });
   on("#pdTautBuka", async () => { const w = $("#pdTaut"); w.innerHTML = '<p class="mu">Memuat proyek…</p>';
     try { const r = await api("/api/r/proyek"), its = (r.items || []).filter(p => !["selesai"].includes(p.status));
@@ -7669,6 +7686,48 @@ function pdCetak() {
     <p style="margin-top:24px;font-size:12px">Dicetak dari MCI HQ. Panduan ditulis AI dan diperiksa mesin MCI.</p>`;
   document.body.classList.add("ctk"); window.print();
 }
+// ---- BPR Scratch: foto barang bekas -> pilihan ide / cek target -> pilih -> alur BPR biasa ----
+const pdBekas = c => { const k = String(c.kata_kunci || ""); return /^bekas:/i.test(k) ? k.replace(/^bekas:\s*/i, "") || "barang bekas" : ""; };
+let PD_SCR = [], PD_SCR_HASIL = null;
+$("#pdMode").onclick = e => { const b = e.target.closest("[data-pdm]"); if (!b) return; $$("#pdMode button").forEach(x => x.classList.toggle("on", x === b));
+  $("#pdScr").hidden = b.dataset.pdm !== "scratch"; $("#pdTulis").hidden = b.dataset.pdm === "scratch"; };
+function pdScrTh() {
+  $("#pdScrTh").innerHTML = PD_SCR.map((f, i) => `<span style="position:relative"><img src="${f.url}" alt="Foto barang ${i + 1}" style="width:76px;height:76px;object-fit:cover;border-radius:10px;border:1px solid var(--line)">
+    <button type="button" data-pdsx="${i}" aria-label="Hapus foto ${i + 1}" style="all:unset;position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:var(--paper);border:1px solid var(--line);display:grid;place-items:center;cursor:pointer;font-size:13px">×</button></span>`).join("");
+}
+const pdScrTambah = fs => { for (const f of [...fs]) { if (!/^image\//.test(f.type)) continue; if (PD_SCR.length >= 6) { $("#pdScrMsg").textContent = "Maksimal 6 foto."; break; } PD_SCR.push({f, url: URL.createObjectURL(f)}); } pdScrTh(); };
+$("#pdScrF").onchange = e => { pdScrTambah(e.target.files); e.target.value = ""; };
+$("#pdScrK").onchange = e => { pdScrTambah(e.target.files); e.target.value = ""; };
+$("#pdScrTh").onclick = e => { const b = e.target.closest("[data-pdsx]"); if (!b) return; const [x] = PD_SCR.splice(+b.dataset.pdsx, 1); URL.revokeObjectURL(x.url); pdScrTh(); };
+function pdScrRender() {
+  const d = PD_SCR_HASIL; if (!d) { $("#pdScrHasil").innerHTML = ""; return; }
+  const ck = d.cek, warna = {bisa: "g", sebagian: "y", tidak: "r"}[(ck && ck.hasil || "").toLowerCase()] || "n";
+  $("#pdScrHasil").innerHTML = `<h3 style="margin:18px 0 8px;font-size:16px">Barang yang terlihat</h3><div class="lst" style="gap:8px">${(d.barang || []).map(b => `<div class="it2" style="padding:10px 14px"><b>${esc(b.nama)}</b> <span class="mu">× ${b.jumlah}</span>${b.kondisi ? `<div class="mu" style="font-size:13px">${esc(b.kondisi)}</div>` : ""}${(b.bisa_diambil || []).length ? `<div class="meta" style="margin-top:4px">${b.bisa_diambil.map(x => `<span class="ch n">${esc(x)}</span>`).join("")}</div>` : ""}</div>`).join("") || '<p class="mu">Belum ada barang yang dikenali. Coba foto lebih dekat dan terang.</p>'}</div>
+    ${(d.peringatan || []).length ? `<div class="pdWarn" style="margin-top:12px"><b>⚠️ Hati-hati saat membongkar</b><ul>${d.peringatan.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
+    ${ck ? `<div class="cd" style="margin-top:12px"><div class="ey">Bisa nggak bikin ${esc(ck.target)}?</div><span class="ch ${warna}" style="font-size:14px">${esc({bisa: "Bisa", sebagian: "Bisa sebagian", tidak: "Belum bisa"}[(ck.hasil || "").toLowerCase()] || ck.hasil || "-")}</span>
+      <div class="bd" style="margin-top:8px">${esc(ck.penjelasan || "")}</div>${(ck.yang_kurang || []).length ? `<div style="margin-top:8px"><b>Yang masih kurang:</b><ul style="margin:4px 0 0">${ck.yang_kurang.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}${ck.saran ? `<div class="mu" style="margin-top:8px">💡 ${esc(ck.saran)}</div>` : ""}</div>` : ""}
+    <h3 style="margin:18px 0 8px;font-size:16px">${ck ? "Pilihan rakitan" : "Bisa dirakit jadi apa?"} <span class="mu" style="font-weight:400;font-size:13px">pilih salah satu</span></h3>
+    <div class="lst">${(d.ide || []).map((x, i) => `<article class="it2"><div class="ey">${esc(x.kesulitan || "")}${x.waktu ? " · " + esc(x.waktu) : ""} · ${esc(({esp32: "ESP32", nano: "Arduino Nano", uno: "Arduino Uno"})[x.papan] || x.papan)}</div><h3>${esc(x.judul)}</h3><div class="bd">${esc(x.ringkasan)}</div>
+      <div class="meta" style="margin-top:8px">${(x.barang_dipakai || []).map(y => `<span class="ch g">♻️ ${esc(y)}</span>`).join("")}</div>
+      ${(x.tambahan || []).length ? `<div class="mu" style="font-size:13px;margin-top:6px">Perlu tambahan: ${x.tambahan.map(esc).join(", ")} (${pdRp(x.biaya_tambahan_min, x.biaya_tambahan_max)})</div>` : '<div class="mu" style="font-size:13px;margin-top:6px">Tanpa beli komponen tambahan</div>'}
+      <div class="ac"><button class="bt g" data-pdide="${i}" type="button">Pilih ini, buat rencana</button></div></article>`).join("") || '<p class="mu">Belum ada ide. Tambah foto barang lain.</p>'}</div>`;
+}
+$("#pdScrGo").onclick = async () => {
+  if (!PD_SCR.length) return $("#pdScrMsg").textContent = "Foto dulu barang bekasnya.";
+  const b = $("#pdScrGo"); b.disabled = true; $("#pdScrMsg").textContent = "AI sedang melihat barang-barangmu… (15–40 detik)";
+  const fd = new FormData(); PD_SCR.forEach(x => fd.append("f", x.f, x.f.name || "foto.jpg")); fd.append("target", $("#pdScrT").value.trim()); fd.append("catatan", $("#pdScrC").value.trim());
+  try { PD_SCR_HASIL = await api("/api/panduan/scratch", {method: "POST", body: fd}); $("#pdScrMsg").textContent = ""; pdScrRender(); $("#pdScrHasil").scrollIntoView({behavior: "smooth", block: "start"}); }
+  catch (e) { $("#pdScrMsg").textContent = e.message; }
+  b.disabled = false;
+};
+$("#pdScrHasil").onclick = async e => {
+  const b = e.target.closest("[data-pdide]"); if (!b || !PD_SCR_HASIL) return; const x = PD_SCR_HASIL.ide[+b.dataset.pdide];
+  const barang = (PD_SCR_HASIL.barang || []).map(y => y.nama + (y.jumlah > 1 ? ` (${y.jumlah} buah)` : "") + ((y.bisa_diambil || []).length ? `: bisa diambil ${y.bisa_diambil.join(", ")}` : ""));
+  const minta = `${x.judul}. ${x.ringkasan}` + ((x.barang_dipakai || []).length ? ` Pakai barang bekas: ${x.barang_dipakai.join(", ")}.` : "") + ((x.tambahan || []).length ? ` Tambahan yang boleh dibeli: ${x.tambahan.join(", ")}.` : "");
+  b.disabled = true; $("#pdScrMsg").textContent = "AI sedang menyusun rencana… (10–30 detik)";
+  try { const d = await api("/api/panduan", {json: {permintaan: minta, papan: x.papan, scratch: {barang, ide: x.judul}}}); $("#pdScrMsg").textContent = ""; PD_X = d.panduan; PD_L = 0; PD_UBAH = false; await pdMuat(d.panduan.id); }
+  catch (er) { $("#pdScrMsg").textContent = er.message; b.disabled = false; }
+};
 $("#pdGo").onclick = async () => { const b = $("#pdGo"), t = $("#pdMinta").value.trim();
   if (t.length < 10) return $("#pdMsg").textContent = "Ceritakan lebih jelas mau merakit apa.";
   b.disabled = true; $("#pdMsg").textContent = "AI sedang menyusun rencana… (10–30 detik)";

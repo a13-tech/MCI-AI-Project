@@ -6946,11 +6946,12 @@ def panduan_tampil(x, r):
     return o
 
 
-async def panduan_rencana(permintaan, jawaban_lama=None, rencana_lama=None):
+async def panduan_rencana(permintaan, jawaban_lama=None, rencana_lama=None, scratch=False):
     prompt = f"PERMINTAAN ANGGOTA:\n{permintaan}"
     if rencana_lama:
         prompt += f"\n\nRENCANA SEBELUMNYA:\n{json.dumps(rencana_lama, ensure_ascii=False)}\n\nPERUBAHAN YANG DIMINTA ANGGOTA:\n{jawaban_lama}\n\nTulis rencana baru yang sudah disesuaikan."
-    teks, mesin = await kode_ai(SISTEM_RENCANA, prompt, "Rencana panduan rakit", schema=RencanaRakit)
+    scratch = scratch or bool((rencana_lama or {}).get("scratch"))
+    teks, mesin = await kode_ai(SISTEM_RENCANA + (SCRATCH_ATURAN if scratch else ""), prompt, "Rencana panduan rakit", schema=RencanaRakit)
     d = _pd_json(teks)
     d["papan"] = str(d.get("papan") or "").lower().strip()
     if d["papan"] not in rakit.PAPAN:
@@ -6969,7 +6970,7 @@ async def panduan_bangun(permintaan, rencana, jawaban):
              + (f"\n\nJAWABAN / CATATAN ANGGOTA:\n{jawaban}" if jawaban else "") + f"\n\nPapan WAJIB: {rencana.get('papan')}.")
     prompt, data, galat, waspada, mesin = dasar, None, [], [], "gemini"
     for putaran in range(3):
-        teks, mesin = await kode_ai(SISTEM_PANDUAN, prompt, "Menulis panduan rakit", schema=PanduanRakit)
+        teks, mesin = await kode_ai(SISTEM_PANDUAN + (SCRATCH_ATURAN if rencana.get("scratch") else ""), prompt, "Menulis panduan rakit", schema=PanduanRakit)
         try:
             data = _pd_json(teks)
             data["papan"] = rencana.get("papan") or data.get("papan")
@@ -7015,14 +7016,21 @@ def api_panduan():
         return jsonify({"error": "Ceritakan dulu apa yang mau dirakit, misalnya: lampu otomatis yang menyala saat gelap."}), 400
     if papan in rakit.PAPAN:
         minta += f"\n(Papan yang dipilih anggota: {rakit.PAPAN[papan]['nama']})"
+    sc = d.get("scratch") if isinstance(d.get("scratch"), dict) else None
+    if sc:   # dari BPR Scratch: bawa daftar barang bekas supaya rencana & panduan memakainya
+        barang = [str(b)[:120] for b in (sc.get("barang") or [])][:20]
+        sc = {"barang": barang, "ide": str(sc.get("ide") or "")[:100]}
+        minta = (minta + "\n\nBARANG BEKAS MILIK ANGGOTA (utamakan dipakai):\n- " + "\n- ".join(barang))[:3000]
     if not LOOP:
         return jsonify({"error": "Mesin AI belum siap"}), 503
     if not kuota_pakai(r, "panduan_rencana"):
         return jsonify({"error": f"Jatah membuat rencana hari ini sudah habis ({KUOTA['panduan_rencana']}x). Coba lagi besok."}), 429
     try:
-        rc, mesin = asyncio.run_coroutine_threadsafe(panduan_rencana(minta), LOOP).result(120)
+        rc, mesin = asyncio.run_coroutine_threadsafe(panduan_rencana(minta, scratch=bool(sc)), LOOP).result(120)
     except Exception as e:
         return jsonify({"error": f"Rencana gagal dibuat: {(str(e) or type(e).__name__)[:200]}"}), 502
+    if sc:
+        rc["scratch"] = sc
     with db() as c:
         q = "INSERT INTO panduan (oleh_id,oleh,judul,papan,status,permintaan,rencana,mesin,dibuat,diubah) VALUES (?,?,?,?,?,?,?,?,?,?)"
         p = (mid_of(r), nama_peran(r), str(rc.get("judul") or "")[:120], rc["papan"], "ditolak" if rc.get("ditolak") else "rencana", minta,
@@ -7030,6 +7038,118 @@ def api_panduan():
         i = int(sql(c, q + " RETURNING id", p).fetchone()[0] if PG else sql(c, q, p).lastrowid)
     audit("panduan", "rencana", str(rc.get("judul") or minta)[:120], oleh=nama_peran(r))
     return jsonify({"panduan": panduan_tampil(_pd_row(i), r), **panduan_payload(r)})
+
+
+# ---------- BPR SCRATCH: rakit dari barang bekas (permintaan CEO 21 Nov 2026) ----------
+# Foto barang bekas -> AI mengenali barang -> (a) beri beberapa pilihan ide, atau (b) jawab "bisa nggak bikin X dari ini?".
+# Anggota memilih dulu, baru masuk alur BPR biasa (rencana -> konfirmasi -> panduan). Foto tidak disimpan.
+KUOTA["panduan_scratch"] = max(1, int(os.getenv("KUOTA_PANDUAN_SCRATCH", "3")))
+SCRATCH_FOTO, SCRATCH_MB = 6, 8
+
+
+class BarangBekas(BaseModel):
+    nama: str
+    jumlah: int
+    kondisi: str
+    bisa_diambil: list[str]
+
+
+class IdeScratch(BaseModel):
+    judul: str
+    ringkasan: str
+    kesulitan: str
+    waktu: str
+    papan: str
+    barang_dipakai: list[str]
+    tambahan: list[str]
+    biaya_tambahan_min: int
+    biaya_tambahan_max: int
+
+
+class CekTarget(BaseModel):
+    target: str
+    hasil: str
+    penjelasan: str
+    yang_kurang: list[str]
+    saran: str
+
+
+class HasilScratch(BaseModel):
+    barang: list[BarangBekas]
+    peringatan: list[str]
+    cek: CekTarget
+    ide: list[IdeScratch]
+
+
+SISTEM_SCRATCH = """Kamu mentor elektronika MCI ahli daur ulang (upcycling). Anggota memotret BARANG BEKAS yang mereka punya.
+1. barang: kenali setiap barang di foto. nama jelas (mis. "Mainan mobil RC rusak", "Kipas angin USB", "Botol plastik 1,5 L"), jumlah perkiraan,
+   kondisi singkat, bisa_diambil = bagian berguna yang bisa diambil (mis. "motor DC 3-6V", "baterai 18650 (cek dulu tegangannya)", "LED", "speaker 8 ohm", "roda", "rangka").
+2. peringatan: bahaya saat membongkar barang di foto (mis. kapasitor besar di microwave/CRT/lampu kilat kamera = bisa menyetrum walau sudah dicabut;
+   baterai lithium bengkak/penyok jangan dipakai; kaca/logam tajam). Kosongkan kalau tidak ada.
+3. Kalau anggota menulis TARGET (mis. "roket"), isi cek: hasil "bisa" / "sebagian" / "tidak", penjelasan jujur (barang mana yang dipakai untuk apa),
+   yang_kurang = barang yang masih harus dicari/dibeli, saran = cara paling masuk akal atau alternatif. Kalau tidak ada target, isi cek dengan string kosong dan list kosong.
+4. ide: 3-5 pilihan rakitan ELEKTRONIK yang memakai sebanyak mungkin barang di foto, dengan papan "esp32", "nano", atau "uno" (papan dianggap sudah ada di MCI).
+   Kalau ada target, ide pertama = versi target yang paling mungkin (kalau targetnya non-elektronik, beri versi yang punya bagian elektronik, mis. roket air + peluncur servo
+   atau pencatat ketinggian). barang_dipakai = barang/bagian dari foto. tambahan = komponen murah yang masih perlu dibeli (sesedikit mungkin).
+   biaya_tambahan dalam Rupiah. kesulitan "pemula"/"menengah"/"mahir". Urutkan dari yang paling banyak memakai barang bekas.
+DILARANG: rakitan yang menyentuh listrik PLN/220V (termasuk memakai ulang trafo/catu daya dalam peralatan rumah), senjata, roket berbahan bakar/mesiu,
+penyadap, jammer, atau memakai baterai lithium rusak. Kalau target termasuk ini, hasil "tidak" dan beri alternatif aman.
+Bahasa Indonesia sederhana. JSON saja."""
+
+SCRATCH_ATURAN = ("\n\nMODE SCRATCH (rakit dari barang bekas): utamakan barang bekas milik anggota (daftar BARANG BEKAS di permintaan). "
+                  "Komponen yang diambil dari barang bekas: harga_min = harga_max = 0 dan kata_kunci diawali \"bekas:\" lalu nama barang asalnya "
+                  "(mis. \"bekas: mobil RC rusak\"). Kalau perlu membongkar, langkah pertama boleh langkah bongkar (tanpa sambungan) yang menjelaskan cara "
+                  "mengambil bagian itu dengan aman dan cara mengetesnya dulu (mis. motor dites ke baterai 3V). Komponen bekas yang ragu kondisinya beri cara cek di checkpoint.")
+
+
+@app.route("/api/panduan/scratch", methods=["POST"])
+def api_panduan_scratch():
+    """Analisis foto barang bekas. Tidak menyimpan apa pun; hasilnya dipilih anggota lalu dikirim ke /api/panduan."""
+    r = _pd_izin()
+    fs = [f for f in request.files.getlist("f") if f and f.filename][:SCRATCH_FOTO]
+    target = re.sub(r"\s+", " ", str(request.form.get("target") or "")).strip()[:200]
+    catatan = re.sub(r"\s+", " ", str(request.form.get("catatan") or "")).strip()[:500]
+    if not fs:
+        return jsonify({"error": "Foto dulu barang bekasnya (boleh beberapa foto sekaligus)."}), 400
+    if not LOOP:
+        return jsonify({"error": "Mesin AI belum siap"}), 503
+    parts = []
+    for f in fs:
+        data = f.read(SCRATCH_MB * 1024 * 1024 + 1)
+        mime = (f.mimetype or "").lower()
+        if not mime.startswith("image/") or mime == "image/svg+xml":
+            return jsonify({"error": f"{f.filename} bukan foto"}), 400
+        if len(data) > SCRATCH_MB * 1024 * 1024:
+            return jsonify({"error": f"{f.filename} lebih dari {SCRATCH_MB} MB"}), 400
+        parts.append(types.Part.from_bytes(data=data, mime_type=mime if mime in ("image/png", "image/jpeg", "image/webp", "image/heic", "image/heif") else "image/jpeg"))
+    if rakit.BERBAHAYA.search(target):
+        return jsonify({"error": "Rakitan yang menyentuh listrik PLN/220V tidak dibuatkan panduannya demi keselamatan."}), 400
+    if not kuota_pakai(r, "panduan_scratch"):
+        return jsonify({"error": f"Jatah analisis foto barang bekas hari ini habis ({KUOTA['panduan_scratch']}x). Coba lagi besok."}), 429
+    prompt = (f"Foto barang bekas: {len(parts)} foto." + (f"\nTARGET ANGGOTA: {target}" if target else "\nTidak ada target: beri pilihan ide.")
+              + (f"\nCatatan anggota: {catatan}" if catatan else ""))
+    try:
+        teks, mesin = asyncio.run_coroutine_threadsafe(kode_ai(SISTEM_SCRATCH, prompt, "BPR Scratch: membaca foto barang bekas", schema=HasilScratch, parts=parts), LOOP).result(150)
+        d = _pd_json(teks)
+    except Exception as e:
+        return jsonify({"error": f"Foto belum berhasil dibaca: {(str(e) or type(e).__name__)[:200]}"}), 502
+    d["barang"] = [{"nama": str(b.get("nama") or "")[:100], "jumlah": max(1, int(b.get("jumlah") or 1)), "kondisi": str(b.get("kondisi") or "")[:120],
+                    "bisa_diambil": [str(x)[:80] for x in (b.get("bisa_diambil") or [])][:8]} for b in (d.get("barang") or [])][:20]
+    d["peringatan"] = [str(x)[:240] for x in (d.get("peringatan") or [])][:6]
+    ide = []
+    for x in (d.get("ide") or [])[:5]:
+        pp = str(x.get("papan") or "").lower()
+        ide.append({"judul": str(x.get("judul") or "")[:100], "ringkasan": str(x.get("ringkasan") or "")[:400], "kesulitan": str(x.get("kesulitan") or "")[:20],
+                    "waktu": str(x.get("waktu") or "")[:30], "papan": pp if pp in rakit.PAPAN else "uno",
+                    "barang_dipakai": [str(y)[:80] for y in (x.get("barang_dipakai") or [])][:10], "tambahan": [str(y)[:80] for y in (x.get("tambahan") or [])][:10],
+                    "biaya_tambahan_min": max(0, int(x.get("biaya_tambahan_min") or 0)), "biaya_tambahan_max": max(0, int(x.get("biaya_tambahan_max") or 0))})
+    d["ide"] = ide
+    ck = d.get("cek") or {}
+    d["cek"] = {"target": target, "hasil": str(ck.get("hasil") or "")[:20], "penjelasan": str(ck.get("penjelasan") or "")[:800],
+                "yang_kurang": [str(y)[:100] for y in (ck.get("yang_kurang") or [])][:10], "saran": str(ck.get("saran") or "")[:500]} if target else None
+    d["mesin"] = mesin
+    audit("panduan", "scratch", (target or "pilihan ide") + f" ({len(parts)} foto)", oleh=nama_peran(r))
+    return jsonify(d)
 
 
 @app.route("/api/panduan/<int:i>/wokwi")
@@ -7091,6 +7211,8 @@ def api_panduan_ubah(i):
         rc, mesin = asyncio.run_coroutine_threadsafe(panduan_rencana(x["permintaan"], catatan, x.get("rencana")), LOOP).result(120)
     except Exception as e:
         return jsonify({"error": f"Rencana gagal diubah: {(str(e) or type(e).__name__)[:200]}"}), 502
+    if (x.get("rencana") or {}).get("scratch"):
+        rc["scratch"] = x["rencana"]["scratch"]   # tetap mode barang bekas setelah rencana diubah
     with db() as c:
         sql(c, "UPDATE panduan SET rencana=?, judul=?, papan=?, status=?, permintaan=?, laporan=NULL, mesin=?, diubah=? WHERE id=?",
             (json.dumps(rc, ensure_ascii=False), str(rc.get("judul") or "")[:120], rc["papan"], "ditolak" if rc.get("ditolak") else "rencana",
