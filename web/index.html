@@ -1656,6 +1656,7 @@ textarea:focus,input:focus,select:focus{border-color:var(--aksen);box-shadow:0 0
     <b style="display:block;margin-top:18px;font-size:13.5px">7 hari terakhir</b><div id="pnMeter7"></div></div>
    <div class="pnG" style="margin-top:16px">
     <div class="cd"><b>MCI Node (HDD + Ollama markas)</b><div class="mu" style="font-size:12.5px;margin:2px 0 8px">MacBook di markas: gudang video ukuran asli, backup database tiap malam, dan Ollama sebagai cadangan AI terakhir.</div><div id="pnNode" class="mu" style="font-size:13px">Memeriksa…</div></div>
+    <div class="cd" style="grid-column:1/-1"><b>AI Router · Lab Model (RnD)</b><div class="mu" style="font-size:12.5px;margin:2px 0 8px">Satu kunci router (mis. ClassAI) untuk banyak model. Centang <b>Lab</b> untuk membandingkan jawaban, <b>Copilot</b> untuk muncul di pemilih model Copilot (tanpa akses data MCI), <b>Cadangan</b> untuk ikut antrean cadangan.</div><div id="pnRouter" style="font-size:13px">Memeriksa…</div></div>
     <div class="cd"><b>Antrean cadangan</b><div class="mu" style="font-size:12.5px;margin:2px 0 0">Saat Gemini penuh, AI dioper ke penyedia berikutnya sesuai urutan ini. Yang kena batas diistirahatkan 2 menit.</div><div class="cdg" id="pnCad"></div><div class="mu" id="pnHemat" style="font-size:12.5px;margin-top:10px"></div></div>
     <div class="cd"><b>Adu model</b><div class="mu" style="font-size:12.5px;margin:2px 0 8px">Satu pertanyaan ke 2–3 model sekaligus. Model berbayar (Argon, Claude) memakai saldo sungguhan.</div>
      <textarea id="aduIn" rows="3" maxlength="3000" placeholder="contoh: Jelaskan beda ESP32 dan Arduino Nano untuk proyek kapal" style="width:100%" aria-label="Pertanyaan adu model"></textarea>
@@ -8277,7 +8278,7 @@ async function pnMuat() {
   try {
     const st = await api("/api/panel/pin");
     if (!st.terbuka) return pnKunciTampil(!st.ada_pin);
-    PND = await api("/api/panel"); pnRender(); pnNode();
+    PND = await api("/api/panel"); pnRender(); pnNode(); pnRouter();
   } catch (e) { if (e.kunci) return pnKunciTampil(false); $("#pnKMsg").textContent = e.message; }
 }
 async function pnNode() {
@@ -8309,6 +8310,60 @@ async function pnBuka() {
 }
 $("#pnBuka").onclick = pnBuka;
 ["#pnPin", "#pnPin2"].forEach(q => $(q).onkeydown = e => { if (e.key === "Enter") pnBuka(); });
+let RTD = null, RT_LAB = [];
+async function pnRouter(segar) {
+  const w = $("#pnRouter"); if (!w) return;
+  try { RTD = await api("/api/router" + (segar ? "?segar=1" : "")); } catch (e) { w.textContent = e.message; return; }
+  if (!RTD.siap) { w.innerHTML = '<span class="mu">Belum aktif. Isi <b>ROUTER_KEY</b> di Kunci AI, grup <b>AI Router (RnD)</b>, lalu klik Uji.</span>'; return; }
+  if (!RTD.model.length) { w.innerHTML = `<span class="ch r">Katalog model tidak terbaca</span> ${esc(RTD.err || "")} <button class="bt o" id="rtSegar">Coba lagi</button>`; $("#rtSegar").onclick = () => pnRouter(true); return; }
+  RT_LAB = RT_LAB.filter(m => RTD.model.includes(m));
+  w.innerHTML = `<div class="mu" style="margin-bottom:6px">${RTD.model.length} model · ${esc(RTD.url)} <button class="bt o" id="rtSegar" style="padding:3px 10px;font-size:12px">Muat ulang katalog</button></div>
+    <input id="rtCari" placeholder="Cari model, mis. claude, gpt, deepseek" aria-label="Cari model" style="width:100%;margin-bottom:6px">
+    <div id="rtList" style="max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px"></div>
+    <div style="display:flex;gap:10px;align-items:center;margin:8px 0 14px;flex-wrap:wrap"><button class="bt" id="rtSimpan">Simpan pilihan Copilot &amp; Cadangan</button><span class="mu" id="rtJml" style="font-size:12.5px"></span></div>
+    <b>Lab Model</b><div class="mu" style="font-size:12.5px;margin:2px 0 6px">Kirim satu prompt ke model yang dicentang Lab (maks 4). Jangan masukkan data rahasia MCI: prompt diproses penyedia router di luar negeri.</div>
+    <div id="rtLabPil" class="mu" style="font-size:12.5px;margin-bottom:6px"></div>
+    <textarea id="rtPrompt" rows="4" placeholder="Tulis prompt yang mau dibandingkan…" style="width:100%"></textarea>
+    <details style="margin:6px 0"><summary class="mu" style="font-size:12.5px;cursor:pointer">Instruksi sistem (opsional)</summary><textarea id="rtSistem" rows="2" placeholder="mis. Jawab singkat maksimal 3 kalimat" style="width:100%;margin-top:6px"></textarea></details>
+    <button class="bt" id="rtJalan">Bandingkan</button>
+    <div id="rtHasil" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:12px"></div>`;
+  const fav = new Set(RTD.fav), cad = new Set(RTD.cad);
+  const daftar = () => {
+    const q = $("#rtCari").value.trim().toLowerCase();
+    const L = RTD.model.filter(m => !q || m.toLowerCase().includes(q));
+    $("#rtList").innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="position:sticky;top:0;background:var(--paper)"><th style="text-align:left;padding:6px 8px">Model</th><th>Lab</th><th>Copilot</th><th>Cadangan</th></tr></thead><tbody>`
+      + L.map(m => `<tr style="border-top:1px solid var(--line)"><td style="padding:5px 8px;word-break:break-all">${esc(m)}</td>`
+        + ["lab", "fav", "cad"].map(j => `<td style="text-align:center"><input type="checkbox" data-rt="${j}" data-m="${esc(m)}" aria-label="${j} ${esc(m)}" ${(j === "lab" ? RT_LAB.includes(m) : j === "fav" ? fav.has(m) : cad.has(m)) ? "checked" : ""}></td>`).join("") + "</tr>").join("")
+      + `</tbody></table>${L.length ? "" : '<div class="mu" style="padding:10px">Tidak ada model yang cocok.</div>'}`;
+    $("#rtJml").textContent = `Copilot: ${fav.size}/12 · Cadangan: ${cad.size}/12`;
+    $("#rtLabPil").textContent = RT_LAB.length ? "Lab: " + RT_LAB.join(", ") : "Belum ada model Lab yang dicentang.";
+  };
+  daftar();
+  $("#rtCari").oninput = daftar;
+  $("#rtSegar").onclick = () => pnRouter(true);
+  $("#rtList").onchange = e => {
+    const c = e.target.closest("[data-rt]"); if (!c) return; const m = c.dataset.m, j = c.dataset.rt;
+    if (j === "lab") { if (c.checked && RT_LAB.length >= 4) { c.checked = false; pesan("Lab maksimal 4 model sekaligus"); return; } RT_LAB = c.checked ? [...RT_LAB, m] : RT_LAB.filter(x => x !== m); }
+    else { const S = j === "fav" ? fav : cad; if (c.checked && S.size >= 12) { c.checked = false; pesan("Maksimal 12 model"); return; } c.checked ? S.add(m) : S.delete(m); }
+    daftar();
+  };
+  $("#rtSimpan").onclick = async () => {
+    try { RTD = await api("/api/router", {json: {fav: [...fav], cad: [...cad]}}); pesan("Pilihan AI Router disimpan"); } catch (e) { if (e.kunci) return pnKunciTampil(false); alert(e.message); }
+  };
+  $("#rtJalan").onclick = async () => {
+    const prompt = $("#rtPrompt").value.trim();
+    if (!prompt) return pesan("Tulis prompt dulu"); if (!RT_LAB.length) return pesan("Centang minimal 1 model di kolom Lab");
+    const b = $("#rtJalan"), h = $("#rtHasil"); b.disabled = true; b.textContent = "Menunggu jawaban…";
+    h.innerHTML = RT_LAB.map(m => `<div class="cd" style="margin:0"><b style="word-break:break-all">${esc(m)}</b><div class="mu" style="margin-top:6px">Menunggu…</div></div>`).join("");
+    try {
+      const d = await api("/api/router/lab", {json: {prompt, sistem: $("#rtSistem").value, model: RT_LAB}});
+      h.innerHTML = d.hasil.map(x => `<div class="cd" style="margin:0"><b style="word-break:break-all">${esc(x.model)}</b>
+        <div class="mu" style="font-size:12px;margin:2px 0 8px">${(x.ms / 1000).toFixed(1)} detik${x.keluar != null ? ` · ${x.masuk} token masuk · ${x.keluar} token keluar` : ""}</div>
+        ${x.error ? `<div class="ch r" style="white-space:normal">Gagal: ${esc(x.error)}</div>` : `<div style="white-space:pre-wrap;line-height:1.55;max-height:420px;overflow:auto">${esc(x.jawab)}</div>`}</div>`).join("");
+    } catch (e) { if (e.kunci) return pnKunciTampil(false); h.innerHTML = `<div class="ch r">${esc(e.message)}</div>`; }
+    b.disabled = false; b.textContent = "Bandingkan";
+  };
+}
 async function pnKirim(body, ok) {
   try { PND = await api("/api/panel", {json: body}); pnRender(); if (ok) pesan(ok); return PND; }
   catch (e) { if (e.kunci) { pnKunciTampil(false); return; } alert(e.message); pnRender(); }

@@ -6352,8 +6352,8 @@ def mesin_kode():
     return "claude" if ANTHROPIC_KEY and not argon_habis() else "gemini"   # Claude juga berhenti saat anggaran AI berbayar habis
 
 
-def _kompatibel(k, sistem, prompt, maks=8000, json_mode=False, pesan=None):
-    """pesan: daftar [{"role","content"}] (riwayat obrolan) menggantikan prompt tunggal."""
+def _kompatibel(k, sistem, prompt, maks=8000, json_mode=False, pesan=None, info=None):
+    """pesan: daftar [{"role","content"}] (riwayat obrolan) menggantikan prompt tunggal. info: dict diisi pemakaian token (Lab Model)."""
     m = MESIN_LAIN[k]
     body = {"model": m["model"], "max_tokens": maks, "temperature": 0.2, "messages": [{"role": "system", "content": sistem}] + (pesan or [{"role": "user", "content": prompt}])}
     if json_mode and not m.get("no_json"):
@@ -6380,9 +6380,72 @@ def _kompatibel(k, sistem, prompt, maks=8000, json_mode=False, pesan=None):
     try:
         u = d.get("usage") or {}
         usage_add(f"{k}:{m['model']}", int(u.get("prompt_tokens") or 0), int(u.get("completion_tokens") or 0), 0)
+        if info is not None:
+            info.update(masuk=int(u.get("prompt_tokens") or 0), keluar=int(u.get("completion_tokens") or 0))
     except Exception:
         pass
     return teks
+
+
+# ---------- AI ROUTER (RnD): satu kunci (mis. ClassAI Router, OpenRouter) -> banyak model (permintaan CEO 22 Nov 2026) ----------
+# Dipakai untuk 3 hal: Lab Model (bandingkan jawaban beberapa model di Panel CEO), pilihan model di MCI Copilot (khusus CEO,
+# tanpa alat data), dan model yang dicentang ikut antrean cadangan. Analogi: satu kartu akses untuk banyak ruang lab.
+ROUTER_URL_BAWAAN = "https://router.classai.id/v1"
+_RT = {"t": 0, "model": [], "err": ""}
+
+
+def router_cfg():
+    return os.getenv("ROUTER_KEY", "").strip(), (os.getenv("ROUTER_URL", "").strip() or ROUTER_URL_BAWAAN).rstrip("/")
+
+
+def router_siap():
+    k, u = router_cfg()
+    return bool(k) and u.startswith("https://")
+
+
+def router_models(segar=False):
+    """Katalog model dari GET {url}/models (format OpenAI), disimpan 1 jam."""
+    if not router_siap():
+        return []
+    if not segar and time.time() - _RT["t"] < 3600 and _RT["model"]:
+        return _RT["model"]
+    import urllib.request, urllib.error
+    k, u = router_cfg()
+    try:
+        req = urllib.request.Request(u + "/models", headers={"Authorization": f"Bearer {k}", "User-Agent": "MCI-HQ/1.0"})
+        with urllib.request.urlopen(req, timeout=15) as f:
+            d = json.loads(f.read().decode())
+        L = sorted({str(m.get("id")) for m in (d.get("data") or d.get("models") or []) if isinstance(m, dict) and m.get("id")})
+        _RT.update(t=time.time(), model=L[:400], err="" if L else "katalog model kosong")
+    except urllib.error.HTTPError as e:
+        _RT.update(t=time.time(), err=f"ditolak ({e.code})")
+    except Exception as e:
+        _RT.update(t=time.time(), err=str(e)[:120])
+    return _RT["model"]
+
+
+def router_mesin(model):
+    """Daftarkan satu model router sebagai mesin kompatibel OpenAI. Balik kuncinya (rt_<nama>)."""
+    _k, u = router_cfg()
+    k = "rt_" + (re.sub(r"[^a-z0-9]+", "_", model.lower()).strip("_")[:48] or "model")
+    MESIN_LAIN[k] = {"nama": f"Router · {model}", "penyedia": "Router", "url": u + "/chat/completions", "kunci": "ROUTER_KEY", "model": model,
+                     "spare": False, "kurang": "", "no_json": False}
+    return k
+
+
+def router_sinkron():
+    """Model yang dicentang 'Cadangan' di Panel CEO -> ikut antrean cadangan (sebelum Ollama laptop)."""
+    for k in [k for k in MESIN_LAIN if k.startswith("rt_")]:
+        MESIN_LAIN.pop(k, None)
+    if not router_siap():
+        return []
+    return [router_mesin(m) for m in (SET.get("router_cad") or [])[:12]]
+
+
+COPILOT_ROUTER = ("\n\nMODE RnD (penting): CEO sedang mencoba model ini lewat AI Router. Di mode ini kamu TIDAK punya akses alat maupun data MCI "
+                  "(stok, kas, tugas, jadwal, anggota, dll). Jangan pernah menyebut angka atau data organisasi dari ingatan atau tebakan. "
+                  "Kalau pertanyaan butuh data atau aksi di web MCI, bilang singkat bahwa mode RnD tidak bisa membaca data, dan sarankan ganti ke model Gemini di pemilih model. "
+                  "Pertanyaan umum (penjelasan, ide, tulisan, kode) boleh dijawab.")
 
 
 # ---------- GROQ: cadangan otomatis saat Gemini kena batas + Whisper (suara -> teks) ----------
@@ -9053,6 +9116,49 @@ def api_dok_putar_info(i):
     except Exception:
         pass
     return jsonify(out)
+
+
+@app.route("/api/router", methods=["GET", "POST"])
+def api_router():
+    """AI Router (Panel CEO): katalog model + pilihan Copilot/Cadangan. POST {fav:[...], cad:[...]}."""
+    need_panel()
+    if request.method == "POST":
+        d = request.get_json(silent=True) or {}
+        bersih = lambda L: list(dict.fromkeys(str(x).strip()[:80] for x in (L or []) if str(x).strip()))[:12]
+        SET["router_fav"], SET["router_cad"] = bersih(d.get("fav")), bersih(d.get("cad"))
+        panel_catat(f"AI Router: Copilot {len(SET['router_fav'])} model, cadangan {len(SET['router_cad'])} model")
+    L = router_models(segar=bool(request.args.get("segar")))
+    k, u = router_cfg()
+    return jsonify({"siap": router_siap(), "url": u, "model": L, "err": _RT["err"] if router_siap() else "",
+                    "fav": SET.get("router_fav") or [], "cad": SET.get("router_cad") or []})
+
+
+@app.route("/api/router/lab", methods=["POST"])
+def api_router_lab():
+    """Lab Model: satu prompt ke beberapa model sekaligus (maks 4), hasil berdampingan + waktu + token."""
+    need_panel()
+    if not router_siap():
+        return jsonify({"error": "Isi ROUTER_KEY dulu di Kunci AI (grup AI Router)"}), 400
+    d = request.get_json(silent=True) or {}
+    prompt = str(d.get("prompt") or "").strip()[:12000]
+    sistem = str(d.get("sistem") or "").strip()[:4000] or "Kamu asisten AI yang membantu. Jawab dalam bahasa yang dipakai pengguna."
+    models = list(dict.fromkeys(str(x).strip()[:80] for x in (d.get("model") or []) if str(x).strip()))[:4]
+    if not prompt or not models:
+        return jsonify({"error": "Tulis prompt dan pilih minimal 1 model"}), 400
+
+    def satu(m):
+        info, t0 = {}, time.time()
+        try:
+            teks = _kompatibel(router_mesin(m), sistem, prompt, 3000, False, None, info)
+            return {"model": m, "jawab": teks, "ms": int((time.time() - t0) * 1000), **info}
+        except Exception as e:
+            return {"model": m, "error": str(e)[:300], "ms": int((time.time() - t0) * 1000)}
+
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=len(models)) as ex:
+        hasil = list(ex.map(satu, models))
+    panel_catat(f"Lab Model: {', '.join(models)}")
+    return jsonify({"hasil": hasil})
 
 
 @app.route("/api/hutang", methods=["GET", "POST"])
@@ -12529,7 +12635,8 @@ def apex_model_daftar(r="admin"):
          {"id": "lite", "nama": "Gemini Flash Lite", "model": MODEL_LITE, "siap": bool(client("apex")), "ket": "paling ringan"},
          {"id": "argon", "nama": "Gemini 4 Argon", "model": ARGON_MODEL, "siap": bool(kunci_argon()) and ARGON_AKTIF, "ket": "penalaran berat, berbayar"}]
     if is_admin(r):
-        return L
+        return L + [{"id": "rt:" + m, "nama": f"{m} · Router", "model": m, "siap": router_siap(), "ket": "RnD, tanpa akses data MCI"}
+                    for m in (SET.get("router_fav") or [])[:12]]
     seri = {"gemini": ("7.5 Cipher", "terbaru, paling pintar"), "hydrogen": ("7 Cipher", "cepat"), "lite": ("4.9 Vertex", "paling ringan")}
     return [{**m, "nama": seri[m["id"]][0], "ket": seri[m["id"]][1]} for m in L if m["id"] in seri]
 
@@ -12555,6 +12662,18 @@ async def apex_tanya(pesan, riwayat, model_id="gemini", alir=None, r="admin", ta
         fns, gagal = await konektor_fungsi(konektor)
         fungsi += fns
         jejak += [{"alat": "konektor_gagal", "arg": {"konektor": g}} for g in gagal]
+    if pil["id"].startswith("rt:"):   # model RnD lewat AI Router (khusus CEO): tanpa alat & data MCI
+        if lampiran:
+            jejak.append({"alat": "lampiran", "arg": {"file": [m["nama"] for m in lampiran], "catatan": "tidak dikirim: mode RnD hanya teks"}})
+            pesan += "\n\n(Catatan sistem: pengguna melampirkan file, tapi mode RnD hanya bisa membaca teks. Sampaikan singkat.)"
+        msgs = [{"role": "assistant" if h.get("role") == "model" else "user", "content": str(h.get("text"))[:3000]}
+                for h in riwayat[-APEX_RIWAYAT:] if isinstance(h, dict) and h.get("text") and h.get("role") in ("user", "model")]
+        jawab = await asyncio.to_thread(_kompatibel, router_mesin(pil["model"]), apex_sistem_untuk(r) + tambahan + COPILOT_ROUTER, "", 6000, False,
+                                        msgs + [{"role": "user", "content": pesan}])
+        jejak.append({"alat": "router", "arg": {"model": pil["model"]}})
+        if alir and jawab:
+            alir(jawab)
+        return latex_bersih(jawab), jejak, pil["id"]
     parts = None
     if lampiran:   # tombol +: foto/file/video ikut dikirim di giliran ini
         parts, gagal_l = await lamp_parts(lampiran, kunci)
@@ -14566,8 +14685,9 @@ KUNCI_DAFTAR = [   # (nama env, label, kelompok, cara uji). Token login, SECRET_
     ("NODE_URL", "MCI Node: alamat terowongan, mis. https://node.mci-ai.my.id", "MCI Node (HDD + Ollama markas)", ""),
     ("NODE_TOKEN", "MCI Node: token rahasia (sama dengan di MacBook, minimal 24 karakter)", "MCI Node (HDD + Ollama markas)", "node"),
     ("NODE_MODEL", "MCI Node: model Ollama cadangan, boleh banyak dipisah koma sesuai urutan (bawaan: gemma3:4b, qwen2.5:3b, qwen2.5-coder:3b, deepseek-safe:latest)", "MCI Node (HDD + Ollama markas)", ""),
+    ("ROUTER_KEY", "AI Router: kunci API (mis. ClassAI Router sk_live_..., atau OpenRouter). Satu kunci untuk Lab Model, pilihan Copilot, dan cadangan", "AI Router (RnD)", "router"),
 ] + [(f"SPARE_{i}", f"Cadangan bebas {i}: kunci API apa saja. Ganti model: kunci|model. Penyedia lain: kunci|model|url", "Cadangan AI bebas", "spare") for i in range(1, SPARE_PANEL + 1)]
-TEKS_DAFTAR = [("ZOHO_DC", "Pusat data Zoho (com / in / eu, kosong = com)"), ("R2_BUCKET", "Nama bucket R2 (kosong = mci-dokumentasi)"), ("GROQ_MODEL", "ID model Groq"), ("NVIDIA_MODEL", "ID model NVIDIA"), ("MISTRAL_MODEL", "ID model Mistral")]   # bukan rahasia
+TEKS_DAFTAR = [("ZOHO_DC", "Pusat data Zoho (com / in / eu, kosong = com)"), ("R2_BUCKET", "Nama bucket R2 (kosong = mci-dokumentasi)"), ("GROQ_MODEL", "ID model Groq"), ("NVIDIA_MODEL", "ID model NVIDIA"), ("MISTRAL_MODEL", "ID model Mistral"), ("ROUTER_URL", "AI Router: base URL (kosong = https://router.classai.id/v1)")]   # bukan rahasia
 KUNCI_NAMA = {k for k, *_ in KUNCI_DAFTAR} | {k for k, _ in TEKS_DAFTAR}
 
 FITUR_DAFTAR = [
@@ -14820,6 +14940,18 @@ def _uji_kunci(cara, nilai):
             else:
                 os.environ["NODE_TOKEN"] = lama
             _NODE.update(t=0)
+    elif cara == "router":
+        lama = os.environ.get("ROUTER_KEY")
+        os.environ["ROUTER_KEY"] = nilai.strip()
+        try:
+            L = router_models(segar=True)
+            return (True, f"Router online · {len(L)} model tersedia") if L else (False, f"Router: {_RT['err'] or 'tidak ada model'}")
+        finally:
+            if lama is None:
+                os.environ.pop("ROUTER_KEY", None)
+            else:
+                os.environ["ROUTER_KEY"] = lama
+            _RT.update(t=0)
     elif cara == "spare":   # uji sungguhan: minta jawaban 1 kata dari slot itu
         lama = os.environ.get("SPARE_UJI")
         os.environ["SPARE_UJI"] = nilai.strip()
@@ -14961,7 +15093,7 @@ def api_panel():
             semua = dict(cadangan_semua())
             u = [k for k in dict.fromkeys(d.get("urut") or []) if k in semua]
             SET["cadangan_urut"] = u
-            SET["cadangan_lepas"] = [k for k in semua if (k.startswith("spare") or is_node(k)) and k not in u]   # slot yang sengaja dimatikan
+            SET["cadangan_lepas"] = [k for k in semua if (k.startswith("spare") or k.startswith("rt_") or is_node(k)) and k not in u]   # slot yang sengaja dimatikan
             panel_catat("Urutan cadangan: " + (" → ".join(semua[k] for k in u) or "semua dimatikan"))
         elif aksi == "node_hemat":
             SET["node_hemat"] = bool(d.get("nyala"))
@@ -15067,7 +15199,7 @@ def node_ollama_sinkron():
 
 def cadangan_semua():
     """Penyedia bawaan + slot SPARE_<n> yang terisi + Ollama di MCI Node."""
-    return CADANGAN_DASAR + [(k, MESIN_LAIN[k]["nama"]) for k in spare_sinkron() + node_ollama_sinkron()]
+    return CADANGAN_DASAR + [(k, MESIN_LAIN[k]["nama"]) for k in spare_sinkron() + router_sinkron() + node_ollama_sinkron()]
 _CAD_ISTIRAHAT = {}   # penyedia -> waktu boleh dicoba lagi (habis kena batas / error)
 CAD_PER = {}          # penyedia -> {"dipakai", "gagal", "terakhir"} sejak server menyala
 
@@ -15078,7 +15210,7 @@ def cadangan_urut():
     if not isinstance(u, list):
         u = [k for k, _ in semua]
     lepas = set(SET.get("cadangan_lepas") or [])
-    u = u + [k for k, _ in semua if (k.startswith("spare") or is_node(k)) and k not in u and k not in lepas]   # slot baru otomatis ikut di belakang
+    u = u + [k for k, _ in semua if (k.startswith("spare") or k.startswith("rt_") or is_node(k)) and k not in u and k not in lepas]   # slot baru otomatis ikut di belakang
     if not isinstance(SET.get("cadangan_urut"), list):
         u = [k for k in u if not is_node(k)] + [k for k, _ in semua if is_node(k)]   # Ollama laptop = cadangan terakhir, urut sesuai NODE_MODEL
     return [k for k in u if k in dict(semua)]
