@@ -120,6 +120,20 @@ Kalau ingin melihat log Node: `tail -f "/Volumes/HDD/MCI-Node/node.log"`. Log di
 4. Di **Antrean cadangan**, sekarang muncul **MCI Node · Ollama**, otomatis paling belakang.
 5. Di halaman **Dokumentasi**, tab **Video** akan menulis "Disimpan ukuran asli di HDD markas MCI".
 
+## Tahap 7: Hemat kuota video (salinan ringan + Mode Hemat)
+
+1. Pasang ffmpeg di MacBook: `brew install ffmpeg`.
+2. Perbarui MCI Node ke versi 1.1, lalu muat ulang servicenya. Token lama tetap dipakai:
+
+   ```bash
+   cd ~/MCI-AI-Project && git pull
+   bash node/pasang_node.sh "/Volumes/MCI/MCI-Node" "/Volumes/MCI/Database Server MCI"
+   ```
+
+3. Node otomatis membuat **salinan ringan 720p** untuk setiap video, termasuk video lama, satu per satu di belakang layar. Encoder hardware Mac dipakai supaya CPU tidak berat. File asli tetap utuh.
+4. Di web, video dari HDD tidak langsung diputar. Penonton melihat ukurannya dulu, lalu memilih **Putar versi ringan** atau **Putar kualitas asli**. Tombol Unduh selalu mengambil file asli dan meminta konfirmasi ukuran.
+5. **Mode Hemat Kuota**: tombolnya ada di Panel CEO, kartu MCI Node. Nyalakan saat Mac memakai hotspot HP. Selama nyala, video dan unduhan dari HDD ditunda untuk semua anggota. Foto dan video link tetap bisa dibuka.
+
 ---
 
 ## Kalau ada masalah
@@ -132,6 +146,7 @@ Kalau ingin melihat log Node: `tail -f "/Volumes/HDD/MCI-Node/node.log"`. Log di
 | Log berisi "Operation not permitted" | macOS butuh izin akses HDD. Pilih **Allow** kalau muncul pertanyaan "python3 would like to access files on a removable volume". Kalau tidak muncul: System Settings, Privacy & Security, Full Disk Access, tambahkan `python3`, lalu jalankan lagi `pasang_node.sh` |
 | Video tidak bisa diputar | Laptop tidur atau mati, atau HDD dicabut. Web menampilkan "HDD markas sedang offline" |
 | Email Zoho macet setelah pindah DNS | Cek lagi catatan MX, SPF, DKIM di Cloudflare (Tahap 1, langkah 2) |
+| Panel: "ffmpeg belum terpasang di Mac" | Jalankan `brew install ffmpeg`, lalu jalankan lagi `pasang_node.sh` supaya video lama ikut dibuatkan salinan ringan |
 | Ganti token | Hapus `~/MCI-Node/.token`, jalankan lagi `pasang_node.sh`, lalu tempel token baru di Panel |
 
 **Catatan Cloudflare:** aturan paket gratis Cloudflare tidak mengizinkan jaringannya dipakai untuk streaming video dalam jumlah besar. Untuk album dokumentasi internal MCI yang ditonton belasan anggota, risikonya kecil. Kalau suatu saat Cloudflare memberi peringatan atau memblokir, pindahkan penyimpanan video ke Cloudflare R2 (kodenya sudah ada di web; isi kunci R2 di Panel CEO).

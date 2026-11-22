@@ -8802,7 +8802,7 @@ def api_node():
         abort(403)
     i = node_info(segar=True) if node_siap() else None
     return jsonify({"diatur": node_siap(), "online": bool(i), "info": i, "backup": SET.get("node_backup_hasil", ""),
-                    "ollama_model": ", ".join(node_model_daftar())})
+                    "ollama_model": ", ".join(node_model_daftar()), "hemat": node_hemat()})
 
 
 def dok_link(u):
@@ -8836,6 +8836,8 @@ def dok_list():
         if x["jenis"] == "link":
             info = dok_link(url) or ("Link", url, "")
             x.update(sumber=info[0], embed=info[1], thumb=info[2], url=url)
+        elif x["jenis"] == "video" and (url or "").startswith("node:"):
+            x["node"] = True   # disimpan di HDD markas: diputar lewat Mac (kena kuota internet Mac)
         out.append(x)
     return out
 
@@ -8843,7 +8845,15 @@ def dok_list():
 def _dok_balas(r):
     nd = node_siap() and node_video_bisa()
     return jsonify({"items": dok_list(), "kelola": can("dok_kelola", r), "video_upload": nd or r2_siap(), "video_tempat": "node" if nd else "r2",
-                    "video_maks_mb": (NODE_VIDEO_MAKS if nd else R2_VIDEO_MAKS) // (1024 * 1024)})
+                    "video_maks_mb": (NODE_VIDEO_MAKS if nd else R2_VIDEO_MAKS) // (1024 * 1024), "hemat": node_hemat()})
+
+
+def node_hemat():
+    """Mode Hemat Kuota (saklar CEO): video di HDD markas tidak diputar/diunduh, mis. saat Mac memakai hotspot HP."""
+    return bool(SET.get("node_hemat"))
+
+
+NODE_HEMAT_PESAN = "Mode Hemat Kuota sedang nyala: Mac markas sedang memakai kuota internet terbatas, jadi video di HDD ditunda dulu. Coba lagi nanti."
 
 
 def _dok_cek_ruang(c):
@@ -9001,9 +9011,13 @@ def api_dok_one(i):
                 abort(404)
             return foto_kirim(base64.b64decode(data), "image/jpeg", {"Cache-Control": "private, max-age=86400"}, ("dokp", i))
         if url.startswith("node:"):   # diputar langsung dari HDD markas lewat Cloudflare Tunnel (tautan 6 jam)
+            if node_hemat():
+                return Response(NODE_HEMAT_PESAN, 423, mimetype="text/plain; charset=utf-8")
             if not node_siap() or not node_info():
                 return Response("Video ini disimpan di HDD markas MCI yang sedang offline (laptop mati/tidur). Coba lagi nanti.", 503, mimetype="text/plain; charset=utf-8")
-            return redirect(node_url("GET", url[5:], 6 * 3600, 0, "&unduh=1" if request.args.get("unduh") else ""))
+            if request.args.get("unduh"):   # unduhan selalu file asli
+                return redirect(node_url("GET", url[5:], 6 * 3600, 0, "&unduh=1"))
+            return redirect(node_url("GET", url[5:], 6 * 3600, 0, "" if request.args.get("asli") else "&v=ringan"))   # bawaan: salinan ringan 720p kalau sudah ada
         if not r2_siap():
             return jsonify({"error": "Penyimpanan video belum tersambung"}), 503
         ex = {"response-content-disposition": f'attachment; filename="mci-dokumentasi-{i}.{url.rsplit(".", 1)[-1]}"'} if request.args.get("unduh") else None
@@ -9012,6 +9026,33 @@ def api_dok_one(i):
     if request.args.get("unduh"):
         h["Content-Disposition"] = f"attachment; filename=mci-dokumentasi-{i}.jpg"
     return foto_kirim(base64.b64decode(data), mime, h, ("dok", i))
+
+
+@app.route("/api/dokumentasi/<int:i>/putar-info")
+def api_dok_putar_info(i):
+    """Sebelum memutar video dari HDD: ukuran asli & salinan ringan, supaya penonton tahu berapa kuota yang terpakai."""
+    need_perm("dok_lihat")
+    with db() as c:
+        row = sql(c, "SELECT jenis, url, ukuran FROM dokumentasi WHERE id=?", (i,)).fetchone()
+    if not row or row[0] != "video":
+        abort(404)
+    out = {"node": (row[1] or "").startswith("node:"), "hemat": False, "online": True, "asli": int(row[2] or 0), "ringan": 0}
+    if not out["node"]:
+        return jsonify(out)
+    out["hemat"] = node_hemat()
+    if out["hemat"]:
+        return jsonify(out)
+    if not node_siap() or not node_info():
+        out["online"] = False
+        return jsonify(out)
+    try:
+        _st, h, _ = node_panggil("HEAD", "/berkas/" + quote(row[1][5:], safe="/-_.~") + "?v=ringan", timeout=8)
+        h = {k.lower(): v for k, v in h.items()}
+        if h.get("x-varian") == "ringan":
+            out["ringan"] = int(h.get("content-length") or 0)
+    except Exception:
+        pass
+    return jsonify(out)
 
 
 @app.route("/api/hutang", methods=["GET", "POST"])
@@ -14922,6 +14963,9 @@ def api_panel():
             SET["cadangan_urut"] = u
             SET["cadangan_lepas"] = [k for k in semua if (k.startswith("spare") or is_node(k)) and k not in u]   # slot yang sengaja dimatikan
             panel_catat("Urutan cadangan: " + (" → ".join(semua[k] for k in u) or "semua dimatikan"))
+        elif aksi == "node_hemat":
+            SET["node_hemat"] = bool(d.get("nyala"))
+            panel_catat("Mode Hemat Kuota MCI Node: " + ("NYALA (video HDD ditunda)" if SET["node_hemat"] else "mati"))
         elif aksi == "apex_kuota":
             b = int(d.get("batas") or 0)
             if not 0 <= b <= 500:

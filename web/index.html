@@ -987,6 +987,10 @@ details.cara p{line-height:1.65}
 #vdBox iframe.tall{display:block;aspect-ratio:9/16;max-width:min(420px,100%);max-height:78vh;width:auto;height:78vh;margin:0 auto}
 #vdBox .tp{display:flex;justify-content:space-between;align-items:center;color:#E6E9EF;gap:12px}
 #vdBox .tp button{all:unset;cursor:pointer;font-size:26px;line-height:1;padding:4px 8px;color:#fff}
+#vdBox .vdT{background:#0F1E3A;color:#E6E9EF;border:1px solid rgba(201,206,214,.18);border-radius:12px;padding:28px 22px;text-align:center;line-height:1.6;max-width:560px;margin:0 auto;width:100%}
+#vdBox .vdT b{color:#fff;font-size:17px}
+#dkHemat{background:#FFF4DC;color:#5A3D00;border:1px solid #E8C77A;border-radius:10px;padding:10px 14px;margin:0 0 10px;font-size:13.5px}
+:root[data-tema=gelap] #dkHemat{background:#3A2C0C;color:#F6E2B0;border-color:#7A5E1E}
 .dkPg{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:10px}
 .dkPg>i{display:block;height:100%;width:0;background:#2E8B57;transition:width .3s}
 /* Panel CEO: kabar & harga */
@@ -1518,7 +1522,7 @@ textarea:focus,input:focus,select:focus{border-color:var(--aksen);box-shadow:0 0
    <div class="dkPg" id="dkPg" hidden><i></i></div>
    <div class="bar" style="margin:12px 0 0"><button class="bt g" id="dkSave">Unggah</button><span id="dkMsg" class="mu"></span></div>
   </div>
-  <div class="cd"><div class="seg" id="dkFilt" style="margin:0 0 4px;background:#EFECE4"><button type="button" class="on" data-dkt="">Semua</button><button type="button" data-dkt="foto">Foto</button><button type="button" data-dkt="video">Video</button></div><div class="gal" id="dkList"></div></div>
+  <div class="cd"><div class="seg" id="dkFilt" style="margin:0 0 4px;background:#EFECE4"><button type="button" class="on" data-dkt="">Semua</button><button type="button" data-dkt="foto">Foto</button><button type="button" data-dkt="video">Video</button></div><div id="dkHemat" hidden role="status"><b>Mode Hemat Kuota nyala.</b> Video yang disimpan di HDD markas ditunda dulu karena Mac sedang memakai internet terbatas. Foto dan video link tetap bisa dibuka.</div><div class="gal" id="dkList"></div></div>
   <div id="vdBox" hidden role="dialog" aria-modal="true" aria-label="Putar video"><div class="in"><div class="tp"><b id="vdJudul"></b><button type="button" id="vdTutup" aria-label="Tutup">×</button></div><div id="vdIsi"></div></div></div>
  </section>
 
@@ -3101,22 +3105,38 @@ function renderDok() {
   $("#dkVidInfo").textContent = !DKD.video_upload ? "Upload video belum aktif (HDD markas offline dan R2 belum diisi). Sementara pakai Tempel link."
     : DKD.video_tempat === "node" ? `Disimpan ukuran asli di HDD markas MCI (maks ${mbStr(DKD.video_maks_mb * 1048576)} per video). Diputar saat laptop markas menyala.` : `Maksimal ${DKD.video_maks_mb} MB per video. Diputar langsung dari penyimpanan Cloudflare R2.`;
   const L = DKD.items.filter(x => !DK_FILT || (DK_FILT === "video" ? x.jenis !== "foto" : x.jenis === "foto"));
+  $("#dkHemat").hidden = !(DKD.hemat && DKD.items.some(x => x.node));
   $("#dkList").innerHTML = L.map(x => {
     const cap = `<figcaption title="${esc(x.keterangan)}"><b>${esc(x.judul)}</b> · ${esc(x.tanggal)}${x.keterangan ? "<br>" + esc(x.keterangan) : ""}</figcaption>`;
     const hapus = DKD.kelola ? `<button class="bt o" data-dkd="${x.id}">Hapus</button>` : "";
     if (x.jenis === "foto") return `<figure><img src="${fotoKecil(dkImg(x.id), 480)}" alt="${esc(x.judul)}" loading="lazy" decoding="async" data-dkz="${x.id}">${cap}<div class="bar"><a class="bt o" href="${dkImg(x.id)}?unduh=1" download>Unduh</a>${hapus}</div></figure>`;
     const thumb = x.jenis === "video" ? `<img src="${fotoKecil(dkImg(x.id) + "?poster=1", 480)}" alt="" loading="lazy" onerror="this.remove()">` : x.thumb ? `<img src="${esc(x.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : "";
     return `<figure><div class="vd" data-dkv="${x.id}" role="button" tabindex="0" aria-label="Putar ${esc(x.judul)}">${thumb}<span class="src">${x.jenis === "video" ? "Video · " + mbStr(x.ukuran) : esc(x.sumber)}</span><span class="ply"></span></div>${cap}
-      <div class="bar">${x.jenis === "video" ? `<a class="bt o" href="${dkImg(x.id)}?unduh=1">Unduh</a>` : `<a class="bt o" href="${esc(x.url)}" target="_blank" rel="noopener">Buka</a>`}${hapus}</div></figure>`;
+      <div class="bar">${x.jenis === "video" ? (x.node && DKD.hemat ? "" : `<a class="bt o" href="${dkImg(x.id)}?unduh=1" ${x.node ? `data-dku="${x.ukuran}"` : ""}>Unduh</a>`) : `<a class="bt o" href="${esc(x.url)}" target="_blank" rel="noopener">Buka</a>`}${hapus}</div></figure>`;
   }).join("") || `<div class="mu">${DK_FILT === "video" ? "Belum ada video kegiatan." : DK_FILT === "foto" ? "Belum ada foto kegiatan." : "Belum ada dokumentasi kegiatan."}</div>`;
   $$("[data-dkz]").forEach(i => i.onclick = () => vwBuka(fotoBesar(dkImg(i.dataset.dkz)), i.alt || "Foto"));
   $$("[data-dkv]").forEach(v => { v.onclick = () => dkPutar(+v.dataset.dkv); v.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); dkPutar(+v.dataset.dkv); } }; });
+  $$("[data-dku]").forEach(a => a.onclick = e => { if (!confirm(`Unduh file asli ${mbStr(+a.dataset.dku)}? File dikirim dari HDD markas dan memakai kuota internet Mac.`)) e.preventDefault(); });
   $$("[data-dkd]").forEach(b => b.onclick = async () => { if (!confirm("Hapus dokumentasi ini?")) return; DKD = await api("/api/dokumentasi/" + b.dataset.dkd, {method: "DELETE"}); renderDok(); });
+}
+function dkVid(src) { $("#vdIsi").innerHTML = `<video controls autoplay playsinline preload="metadata" src="${src}"></video>`; }
+async function dkTanya(x) {   // video di HDD markas: tampilkan ukuran dulu, putar hanya setelah dipilih (hemat kuota Mac & penonton)
+  const w = $("#vdIsi"); w.innerHTML = '<div class="vdT">Mengecek ukuran video…</div>';
+  let d; try { d = await api(`/api/dokumentasi/${x.id}/putar-info`); } catch (e) { w.innerHTML = `<div class="vdT">${esc(e.message)}</div>`; return; }
+  if (d.hemat) { w.innerHTML = '<div class="vdT"><b>Mode Hemat Kuota sedang nyala</b><br>Mac markas sedang memakai internet terbatas, jadi video di HDD ditunda dulu. Coba lagi nanti.</div>'; return; }
+  if (!d.online) { w.innerHTML = '<div class="vdT"><b>HDD markas sedang offline</b><br>Laptop markas mati atau tidur. Coba lagi nanti.</div>'; return; }
+  const r = d.ringan > 0 && d.ringan < d.asli;
+  w.innerHTML = `<div class="vdT"><b>${r ? `Versi ringan 720p: ${mbStr(d.ringan)}` : `Ukuran video: ${mbStr(d.asli)}`}</b><br>${r ? `File asli ${mbStr(d.asli)}. Versi ringan cukup untuk ditonton dan jauh lebih hemat kuota.` : "Salinan ringan belum tersedia, jadi yang diputar file asli."}<br><span style="font-size:12.5px">Video dikirim dari HDD markas: memakai kuota internet kamu dan Mac markas.</span>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px"><button class="bt" id="vdPutar">Putar${r ? " versi ringan" : ""}</button>${r ? `<button class="bt o" id="vdAsli">Putar kualitas asli (${mbStr(d.asli)})</button>` : ""}<button class="bt o" id="vdBatal">Batal</button></div></div>`;
+  $("#vdPutar").onclick = () => dkVid(dkImg(x.id));
+  if (r) $("#vdAsli").onclick = () => dkVid(dkImg(x.id) + "?asli=1");
+  $("#vdBatal").onclick = dkTutup; $("#vdPutar").focus();
 }
 function dkPutar(id) {
   const x = DKD.items.find(y => y.id === id); if (!x) return;
   $("#vdJudul").textContent = x.judul + (x.tanggal ? " · " + x.tanggal : "");
-  if (x.jenis === "video" || x.sumber === "Video") $("#vdIsi").innerHTML = `<video controls autoplay playsinline preload="metadata" src="${x.jenis === "video" ? dkImg(id) : esc(x.embed)}"></video>`;
+  if (x.node) dkTanya(x);
+  else if (x.jenis === "video" || x.sumber === "Video") $("#vdIsi").innerHTML = `<video controls autoplay playsinline preload="metadata" src="${x.jenis === "video" ? dkImg(id) : esc(x.embed)}"></video>`;
   else $("#vdIsi").innerHTML = `<iframe class="${/Instagram|TikTok/.test(x.sumber) ? "tall" : ""}" src="${esc(x.embed)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" title="${esc(x.judul)}"></iframe>`;
   if ($("#vdBox").parentNode !== document.body) document.body.appendChild($("#vdBox"));   // keluar dari halaman yang beranimasi supaya benar-benar layar penuh
   $("#vdBox").hidden = false; $("#vdTutup").focus();
@@ -8266,7 +8286,11 @@ async function pnNode() {
     w.innerHTML = !d.diatur ? "Belum diatur. Isi NODE_URL dan NODE_TOKEN di Kunci AI, grup MCI Node."
       : !d.online ? '<span class="ch r">Offline</span> Laptop markas mati/tidur, atau cloudflared/mci_node belum jalan. Web tetap normal; video di HDD sementara tidak bisa diputar.'
       : `<span class="ch g">Online</span> versi ${esc(i.versi || "")} · HDD kosong <b>${(i.kosong / 1073741824).toFixed(0)} GB</b><br>Ollama: ${i.ollama ? `${esc((i.model || []).join(", ") || "belum ada model")} (dipakai: ${esc(d.ollama_model)})` : '<span class="ch r">mati</span>'}<br>Backup terakhir di HDD: ${esc(i.backup_terakhir || "belum ada")} (${i.backup_jumlah || 0} tersimpan)`
-      + (d.backup ? `<br><span style="font-size:12px">Kiriman terakhir: ${esc(d.backup)}</span>` : "");
+      + (d.backup ? `<br><span style="font-size:12px">Kiriman terakhir: ${esc(d.backup)}</span>` : "")
+      + (d.online && i.ffmpeg !== undefined ? `<br>Salinan ringan video 720p: ${i.ffmpeg ? (i.antrean ? `sedang dibuat, ${i.antrean} video antre` : "siap") : '<span class="ch r">ffmpeg belum terpasang di Mac</span> (brew install ffmpeg)'}` : "");
+    if (d.diatur) w.innerHTML += `<div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="bt ${d.hemat ? "" : "o"}" id="pnHemat" aria-pressed="${d.hemat}">${d.hemat ? "Matikan Mode Hemat Kuota" : "Nyalakan Mode Hemat Kuota"}</button>
+      <span style="font-size:12.5px">${d.hemat ? '<span class="ch r">Nyala</span> Video di HDD ditunda untuk semua anggota.' : "Nyalakan saat Mac memakai hotspot HP, supaya video HDD tidak menyedot kuota."}</span></div>`;
+    const hb = $("#pnHemat"); if (hb) hb.onclick = async () => { hb.disabled = true; await pnKirim({aksi: "node_hemat", nyala: !d.hemat}, d.hemat ? "Mode Hemat Kuota dimatikan" : "Mode Hemat Kuota dinyalakan"); pnNode(); };
   } catch (e) { w.textContent = e.message; }
 }
 function pnKunciTampil(baru) {

@@ -8,6 +8,8 @@ Fungsi:
   2. Menerima backup database dari web tiap malam dan menyimpan 30 backup terakhir.
   3. Meneruskan permintaan AI ke Ollama lokal (format kompatibel OpenAI, /v1/...) dengan token,
      supaya web bisa memakai Ollama sebagai cadangan terakhir.
+  4. Membuat salinan ringan 720p tiap video (butuh ffmpeg: brew install ffmpeg). Pemutaran di web memakai
+     salinan ini supaya hemat kuota; file asli tetap utuh untuk diunduh atau diputar "kualitas asli".
 
 Tanpa pustaka tambahan: cukup Python 3.9+ bawaan macOS.
 Keamanan: semua akses butuh token rahasia (NODE_TOKEN) yang sama dengan di Panel CEO web, atau tautan bertanda
@@ -27,7 +29,9 @@ import hmac
 import json
 import os
 import re
+import queue
 import shutil
+import subprocess
 import sys
 import threading
 import time
@@ -37,7 +41,7 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlsplit
 
-VERSI = "1.0"
+VERSI = "1.1"
 TOKEN = os.getenv("NODE_TOKEN", "").strip()
 DIR = os.path.abspath(os.path.expanduser(os.getenv("NODE_DIR", "~/MCI-Node")))
 BERKAS = os.path.join(DIR, "berkas")
@@ -52,6 +56,10 @@ BACKUP_SIMPAN = 30
 KEY_OK = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9_./-]{0,199}")
 _KUNCI_TULIS = threading.Lock()
 _SALAH = []                                     # waktu percobaan token salah (rem kasar terhadap tebak-tebakan)
+VIDEO_EXT = ("mp4", "m4v", "mov", "webm", "3gp")
+RINGAN = ".ringan.mp4"                          # salinan 720p di sebelah file asli: <key>.ringan.mp4
+_ANTRE = queue.Queue()
+_DIANTRE = set()
 
 
 LOG_MAKS = 2 * 1024 * 1024   # log disimpan di HDD (bukan storage internal Mac), dibatasi 2 MB lalu diputar
@@ -90,6 +98,82 @@ def ruang_kosong():
     return shutil.disk_usage(DIR).free
 
 
+# ---------- salinan ringan 720p (hemat kuota saat diputar) ----------
+def cari_ffmpeg():
+    """launchd tidak membawa PATH Homebrew, jadi cek lokasi umumnya juga."""
+    for p in (shutil.which("ffmpeg"), "/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"):
+        if p and os.path.isfile(p) and os.access(p, os.X_OK):
+            return p
+    return ""
+
+
+def video_asli(p):
+    nama = os.path.basename(p)
+    return nama.rsplit(".", 1)[-1].lower() in VIDEO_EXT and not nama.endswith(RINGAN) and ".ringan." not in nama
+
+
+def antre_ringan(p):
+    if video_asli(p) and p not in _DIANTRE and not os.path.exists(p + RINGAN) and not os.path.exists(p + ".ringan.lewati"):
+        _DIANTRE.add(p)
+        _ANTRE.put(p)
+
+
+def buat_ringan(p, ff):
+    """Satu video -> <p>.ringan.mp4 (720p, H.264). Coba encoder hardware Mac dulu (ringan untuk CPU), lalu software."""
+    tmp = p + ".ringan.tmp.mp4"
+    umum = ["-vf", "scale=-2:'min(720,ih)'", "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart"]
+    for enc in (["-c:v", "h264_videotoolbox", "-b:v", "2200k"], ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28"]):
+        try:
+            os.path.exists(tmp) and os.remove(tmp)
+            r = subprocess.run([ff, "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", p, *enc, *umum, tmp],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=4 * 3600,
+                               preexec_fn=lambda: os.nice(10))   # prioritas rendah: Mac tetap enak dipakai
+        except Exception as e:
+            log("salinan ringan gagal:", os.path.basename(p), e)
+            continue
+        if r.returncode == 0 and os.path.isfile(tmp) and os.path.getsize(tmp) > 0:
+            if not os.path.exists(p):   # file asli dihapus saat sedang dikonversi
+                os.remove(tmp)
+                return
+            if os.path.getsize(tmp) >= os.path.getsize(p) * 0.8:   # tidak jauh lebih kecil: tidak ada gunanya
+                os.remove(tmp)
+                open(p + ".ringan.lewati", "w").close()
+                log("salinan ringan dilewati (tidak lebih kecil):", os.path.basename(p))
+                return
+            os.replace(tmp, p + RINGAN)
+            log("salinan ringan siap:", os.path.basename(p), os.path.getsize(p) // 1048576, "MB ->", os.path.getsize(p + RINGAN) // 1048576, "MB")
+            return
+        log("encoder", enc[1], "gagal untuk", os.path.basename(p), (r.stderr or b"")[-200:].decode(errors="replace"))
+    os.path.exists(tmp) and os.remove(tmp)
+
+
+def pekerja_ringan():
+    """Satu video dikerjakan bergantian (bukan bersamaan) supaya Mac tidak berat."""
+    while True:
+        p = _ANTRE.get()
+        try:
+            ff = cari_ffmpeg()
+            if ff and os.path.isfile(p):
+                buat_ringan(p, ff)
+        except Exception as e:
+            log("pekerja salinan ringan error:", e)
+        finally:
+            _DIANTRE.discard(p)
+
+
+def pindai_ringan():
+    """Saat Node menyala: video lama yang belum punya salinan ringan dimasukkan antrean."""
+    if not cari_ffmpeg():
+        log("ffmpeg belum terpasang: salinan ringan video tidak dibuat (brew install ffmpeg)")
+        return
+    for akar, _d, files in os.walk(BERKAS):
+        for f in sorted(files):
+            if f.endswith(".ringan.tmp.mp4"):
+                os.remove(os.path.join(akar, f))   # sisa konversi yang terputus
+            else:
+                antre_ringan(os.path.join(akar, f))
+
+
 class Node(BaseHTTPRequestHandler):
     server_version = "MCI-Node/" + VERSI
     protocol_version = "HTTP/1.1"
@@ -105,7 +189,7 @@ class Node(BaseHTTPRequestHandler):
             self.send_header("Vary", "Origin")
             self.send_header("Access-Control-Allow-Methods", "GET, HEAD, PUT, OPTIONS")
             self.send_header("Access-Control-Allow-Headers", "Content-Type, Range")
-            self.send_header("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges")
+            self.send_header("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges, X-Varian")
             self.send_header("Access-Control-Max-Age", "600")
 
     def balas(self, kode, data=None, tipe="application/json"):
@@ -189,7 +273,7 @@ class Node(BaseHTTPRequestHandler):
         p = path_key(unquote(u.path[8:]))
         if not p:
             return self.balas(400, {"error": "nama berkas tidak sah"})
-        for x in (p, p + ".part"):
+        for x in (p, p + ".part", p + RINGAN, p + ".ringan.lewati", p + ".ringan.tmp.mp4"):
             if os.path.exists(x):
                 os.remove(x)
         return self.balas(200, {"ok": True})
@@ -209,7 +293,8 @@ class Node(BaseHTTPRequestHandler):
         os.makedirs(BACKUP, exist_ok=True)
         cad = sorted(x for x in os.listdir(BACKUP) if x.startswith("MCI-backup-"))
         return self.balas(200, {"ok": True, "nama": "MCI Node", "versi": VERSI, "kosong": ruang_kosong(), "sisa_jaga": SISA,
-                                "ollama": ollama, "model": models, "backup_terakhir": cad[-1] if cad else "", "backup_jumlah": len(cad)})
+                                "ollama": ollama, "model": models, "backup_terakhir": cad[-1] if cad else "", "backup_jumlah": len(cad),
+                                "ffmpeg": bool(cari_ffmpeg()), "antrean": len(_DIANTRE)})
 
     def ambil(self, key, q):
         p = path_key(key)
@@ -219,6 +304,9 @@ class Node(BaseHTTPRequestHandler):
             return self.salah(403, "Tautan kedaluwarsa atau salah")
         if not os.path.isfile(p):
             return self.balas(404, {"error": "berkas tidak ada"})
+        varian = "asli"
+        if q.get("v", [""])[0] == "ringan" and not q.get("unduh") and os.path.isfile(p + RINGAN):
+            p, key, varian = p + RINGAN, key + RINGAN, "ringan"   # salinan 720p (lebih hemat kuota); kalau belum ada: file asli
         uk = os.path.getsize(p)
         mulai, akhir, kode = 0, uk - 1, 200
         m = re.match(r"bytes=(\d*)-(\d*)$", self.headers.get("Range", "").strip())
@@ -245,6 +333,7 @@ class Node(BaseHTTPRequestHandler):
         self.send_header("Accept-Ranges", "bytes")
         self.send_header("Content-Length", str(akhir - mulai + 1))
         self.send_header("Cache-Control", "private, max-age=3600")
+        self.send_header("X-Varian", varian)
         if q.get("unduh"):
             self.send_header("Content-Disposition", f'attachment; filename="{os.path.basename(p)}"')
         if kode == 206:
@@ -299,6 +388,7 @@ class Node(BaseHTTPRequestHandler):
             if ada == total:
                 os.replace(part, p)
                 log("berkas lengkap:", key, total, "byte")
+                antre_ringan(p)
         return self.balas(200, {"ok": True, "terima": ada, "selesai": ada == total})
 
     def backup(self, q):
@@ -353,7 +443,9 @@ def main():
         sys.exit("NODE_TOKEN belum diisi atau terlalu pendek (minimal 24 karakter). Lihat node/PANDUAN.md")
     os.makedirs(BERKAS, exist_ok=True)
     os.makedirs(BACKUP, exist_ok=True)
-    log(f"MCI Node {VERSI} jalan di http://127.0.0.1:{PORT}  gudang={DIR}  backup={BACKUP}  ollama={OLLAMA}")
+    log(f"MCI Node {VERSI} jalan di http://127.0.0.1:{PORT}  gudang={DIR}  backup={BACKUP}  ollama={OLLAMA}  ffmpeg={cari_ffmpeg() or 'belum ada'}")
+    threading.Thread(target=pekerja_ringan, daemon=True).start()
+    threading.Thread(target=pindai_ringan, daemon=True).start()
     srv = ThreadingHTTPServer(("127.0.0.1", PORT), Node)   # hanya bisa dihubungi dari Mac ini; internet lewat Cloudflare Tunnel
     srv.daemon_threads = True
     try:
