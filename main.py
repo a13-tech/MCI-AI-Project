@@ -15461,7 +15461,19 @@ ADU_MESIN = [("flash", "Gemini Flash"), ("lite", "Gemini Flash Lite"), ("hydroge
 ADU_SISTEM = "Kamu asisten AI MCI (Mahardika Cakrawala Indonesia). Jawab dalam Bahasa Indonesia yang jelas dan ringkas."
 
 
+def adu_mesin():
+    """Daftar mesin Adu model: bawaan + model Ollama di HDD markas (MCI Node) + slot SPARE yang terisi."""
+    L = list(ADU_MESIN)
+    for k, _n in cadangan_semua():
+        if is_node(k) or k.startswith("spare"):
+            m = MESIN_LAIN.get(k) or {}
+            L.append((k, f"HDD · {m.get('model')}" if is_node(k) else m.get("nama", k)))
+    return L
+
+
 def adu_siap(m):
+    if is_node(m) or m.startswith("spare"):
+        return m in MESIN_LAIN and cadangan_siap(m) and not (MESIN_LAIN[m].get("kurang"))
     if m in ("flash", "lite"):
         return bool(client("canvas"))
     if m == "hydrogen":
@@ -15491,7 +15503,7 @@ def adu_satu(m, prompt):
         elif m == "claude":
             teks, biaya = _claude(ADU_SISTEM, prompt, 1500), "berbayar"
         else:
-            teks, biaya = _kompatibel(m, ADU_SISTEM, prompt, 1500), "gratis"
+            teks, biaya = _kompatibel(m, ADU_SISTEM, prompt, 1500), ("lokal, gratis" if is_node(m) else "gratis")
         return {"mesin": m, "ok": True, "teks": latex_bersih(teks)[:6000], "detik": round(time.time() - t0, 1), "biaya": biaya or "gratis/sangat murah"}
     except Exception as e:
         return {"mesin": m, "ok": False, "teks": str(e)[:300], "detik": round(time.time() - t0, 1), "biaya": ""}
@@ -15502,26 +15514,38 @@ def api_panel_adu():
     need_panel()
     skor = SET.get("adu_skor") or {}
     if request.method == "GET":
-        return jsonify({"mesin": [{"id": k, "nama": n, "siap": adu_siap(k)} for k, n in ADU_MESIN], "skor": skor})
+        node_info()   # segarkan status HDD markas supaya model yang belum terpasang ditandai
+        return jsonify({"mesin": [{"id": k, "nama": n, "siap": adu_siap(k)} for k, n in adu_mesin()], "skor": skor})
     d = request.get_json(silent=True) or {}
+    semua = dict(adu_mesin())
     if d.get("pilih"):
         m = str(d["pilih"])
-        if m not in dict(ADU_MESIN):
+        if m not in semua:
             return jsonify({"error": "Mesin tidak dikenal"}), 400
         skor[m] = int(skor.get(m, 0)) + 1
         SET["adu_skor"] = skor
-        panel_catat(f"Adu model: {dict(ADU_MESIN)[m]} dipilih paling bagus")
+        panel_catat(f"Adu model: {semua[m]} dipilih paling bagus")
         set_save()
         return jsonify({"skor": skor})
     prompt = str(d.get("prompt") or "").strip()[:3000]
-    pilih = [m for m in dict.fromkeys(d.get("mesin") or []) if m in dict(ADU_MESIN) and adu_siap(m)][:3]
+    pilih = [m for m in dict.fromkeys(d.get("mesin") or []) if m in semua and adu_siap(m)][:3]
     if not prompt or len(pilih) < 2:
         return jsonify({"error": "Tulis pertanyaan dan pilih 2–3 model yang siap"}), 400
     from concurrent.futures import ThreadPoolExecutor
+    lokal = [m for m in pilih if is_node(m)]   # RAM Mac 8 GB: model HDD dijalankan bergantian, bukan bersamaan
+
+    def kerja(m):
+        if m == "_lokal":
+            return [adu_satu(x, prompt) for x in lokal]
+        return [adu_satu(m, prompt)]
+
+    tugas = [m for m in pilih if not is_node(m)] + (["_lokal"] if lokal else [])
     with ThreadPoolExecutor(max_workers=3) as ex:
-        hasil = list(ex.map(lambda m: adu_satu(m, prompt), pilih))
+        per = dict(zip(tugas, ex.map(kerja, tugas)))
+    urut = {h["mesin"]: h for L in per.values() for h in L}
+    hasil = [urut[m] for m in pilih]
     for h in hasil:
-        h["nama"] = dict(ADU_MESIN)[h["mesin"]]
+        h["nama"] = semua[h["mesin"]]
     return jsonify({"hasil": hasil, "skor": skor})
 
 

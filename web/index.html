@@ -14,7 +14,7 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{margin:0}
-body{font:14px/1.45 'Plus Jakarta Sans',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink)}
+body{font:14px/1.45 'Instrument Sans',Inter,system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink)}
 button,input,select,textarea{font:inherit}
 #app{display:flex;min-height:100vh}
 #sd{width:236px;flex:none;background:var(--navy);padding:24px 14px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(212,175,90,.45) transparent}
@@ -460,13 +460,18 @@ td{border-top:1px solid var(--line)}
 #fabCatat:focus-visible{outline:3px solid #F1D58A;outline-offset:2px}
 @media (max-width:900px){#fabCatat{bottom:calc(84px + env(safe-area-inset-bottom));right:14px;width:50px;height:50px}.bjIt{flex-wrap:wrap}.bjIt .bjB{width:100%;justify-content:flex-start;padding-left:34px}}
 .pagiK{background:linear-gradient(135deg,#0F1E3A,#1B3A6B);color:#F2EBDD;border-radius:16px;padding:18px 18px 14px;margin:16px 0 4px}.pagiK h2{color:#F1D58A;margin:0 0 6px;font-size:18px}
-.pagiK pre{white-space:pre-wrap;font:14px/1.6 inherit;font-family:inherit;margin:8px 0 0;max-height:none}.pagiK.tutup pre{max-height:190px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent)}
+.pagiK .pagiIsi{margin:8px 0 0;font-size:14px}.pagiK.tutup .pagiIsi{max-height:190px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
+.md{white-space:normal!important;line-height:1.6;overflow-wrap:anywhere}.md p{margin:0 0 8px}.md>:last-child{margin-bottom:0}.md ul,.md ol{margin:4px 0 8px;padding-left:20px}.md li{margin:2px 0}
+.md h3,.md h4{font:600 15px/1.35 'Instrument Sans',Inter,system-ui,sans-serif;margin:12px 0 6px;color:inherit}.md a{color:inherit;text-decoration:underline}
+.md table{border-collapse:collapse;margin:8px 0;font-size:.95em;display:block;overflow-x:auto}.md th,.md td{border:1px solid var(--line2);padding:5px 8px;text-align:left;vertical-align:top}
+.md pre{background:#0F1B33;color:#E6EDF7;border-radius:8px;padding:10px 12px;overflow:auto;white-space:pre;margin:8px 0;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.md code{font:.92em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:rgba(127,127,127,.16);padding:1px 4px;border-radius:4px}.md pre code{background:none;padding:0;color:inherit}
 .pagiK .bt{padding:6px 12px;min-height:34px;font-size:13px;background:rgba(255,255,255,.1);color:#F2EBDD;border-color:rgba(255,255,255,.25)}
 /* ===== CARI HALAMAN (Ctrl K / tombol 🔍) ===== */
 #nvCari{display:none!important}
 #cariBuka{display:flex;align-items:center;gap:9px;width:calc(100% - 4px);box-sizing:border-box;margin:4px 2px 14px;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);color:#AFC2EA;font:inherit;font-size:14px;cursor:pointer;text-align:left}
 #cariBuka:hover{background:rgba(255,255,255,.12);color:#fff}#cariBuka:focus-visible{outline:2px solid #F1D58A}
-#cariBuka .ct{flex:1}#cariBuka kbd{font:600 11px/1 system-ui,sans-serif;padding:4px 6px;border-radius:6px;border:1px solid rgba(255,255,255,.22);color:#C9D7F5}
+#cariBuka .ct{flex:1}#cariBuka kbd{font:600 11px/1 'Instrument Sans',Inter,system-ui,sans-serif;padding:4px 6px;border-radius:6px;border:1px solid rgba(255,255,255,.22);color:#C9D7F5}
 .ci{width:15px;height:15px;flex:none;border:2px solid currentColor;border-radius:50%;position:relative;box-sizing:border-box}.ci::after{content:"";position:absolute;width:2px;height:7px;background:currentColor;right:-4px;bottom:-6px;transform:rotate(-45deg);border-radius:1px}
 #sd.vw #cariBuka{display:none!important}
 .ctk3{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;padding:8px 10px;border-radius:10px;background:#F6F1E4;font-size:13px}.ctk3 b:first-child{width:100%}
@@ -479,7 +484,7 @@ html.ringan *,html.ringan *::before,html.ringan *::after{animation:none!importan
 .chBox{width:100%;max-width:560px;background:var(--paper);border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden;display:flex;flex-direction:column;max-height:76vh}
 .chIn{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #EAE6DC;color:#6B7A99}
 .chIn input{flex:1;border:0;outline:0;font-size:17px;padding:8px 2px;background:transparent;color:var(--judul);min-width:0}
-.chIn button{border:1px solid #E1DCCF;background:#F7F5EF;border-radius:8px;padding:6px 9px;font:600 12px system-ui,sans-serif;color:#6B7A99;cursor:pointer}
+.chIn button{border:1px solid #E1DCCF;background:#F7F5EF;border-radius:8px;padding:6px 9px;font:600 12px 'Instrument Sans',Inter,system-ui,sans-serif;color:#6B7A99;cursor:pointer}
 #chList{list-style:none;margin:0;padding:6px;overflow:auto}
 #chList li{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:10px;cursor:pointer}
 #chList li b{font-size:15px;color:var(--judul)}#chList li small{font-size:12.5px;color:#6B7A99}
@@ -1170,7 +1175,7 @@ textarea:focus,input:focus,select:focus{border-color:var(--aksen);box-shadow:0 0
 <div class="adm" id="adm" hidden><form id="admF"><b>MASUK</b><p>Masukkan token pribadi kamu (diawali nama depan) atau token admin.</p>
  <input type="text" name="username" id="admU" autocomplete="username" value="MCI HQ" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
  <input type="password" name="password" id="admT" autocomplete="current-password" aria-label="Token akses" placeholder="Token akses">
- <p style="font-size:12.5px;margin:6px 0 0;opacity:.85">Login tersimpan di hp ini. Kalau hp menawarkan "Simpan kata sandi", pilih Simpan.</p>
+ <p style="font-size:12.5px;margin:6px 0 0;opacity:.85">Akunmu tetap masuk di HP ini. Kalau HP menawarkan "Simpan kata sandi", pilih Simpan.</p>
  <div class="er" id="admE" role="alert"></div><div class="bar"><button type="button" class="bt o" id="admX">Batal</button><button class="bt g">Masuk</button></div></form></div>
 <div id="viewer" hidden role="dialog" aria-modal="true" aria-label="Penampil"><div class="vh"><button type="button" id="vwTutup">← Kembali</button><b id="vwJudul"></b><a id="vwUnduh" href="#" download>Unduh</a></div><div class="vb2" id="vwIsi"></div></div>
 <div class="tst" id="tst" hidden></div>
@@ -3801,7 +3806,7 @@ $("#rkkAturan").onclick = e => { e.preventDefault(); show("uu"); setTimeout(() =
 $("#uuTanya").onclick = async () => {
   const q = $("#uuTanyaQ").value.trim(); if (q.length < 4) { $("#uuJawab").hidden = false; $("#uuJawab").textContent = "Tulis pertanyaannya dulu."; return; }
   const b = $("#uuTanya"); b.disabled = true; $("#uuJawab").hidden = false; $("#uuJawab").textContent = "MCI.Scribe sedang membaca UU…"; $("#uuRujuk").innerHTML = "";
-  try { const d = await api("/api/uu/tanya", {json: {q}}); $("#uuJawab").textContent = d.jawab || d.pesan || "Tidak ada jawaban.";
+  try { const d = await api("/api/uu/tanya", {json: {q}}); if (d.jawab) { $("#uuJawab").innerHTML = `<div class="md">${axMd(d.jawab)}</div>`; } else $("#uuJawab").textContent = d.pesan || "Tidak ada jawaban.";
     $("#uuRujuk").innerHTML = (d.rujuk || []).map(x => `<button class="ch" type="button" data-uugo="${x.nomor}" data-uudok="${x.dok || "uu"}" style="border:0;cursor:pointer;background:#24385E;color:#E9E4D8">${x.dok === "kas" ? "Peraturan Kas " : "UU "}Pasal ${x.nomor}. ${esc(x.judul)}</button>`).join("");
     $$("#uuRujuk [data-uugo]").forEach(c => c.onclick = () => uuKe(c.dataset.uudok, c.dataset.uugo));
   } catch (e) { $("#uuJawab").textContent = e.message; }
@@ -4206,7 +4211,8 @@ function renderBerita() {
   $("#brList").innerHTML = it.map((x, i) => `<a class="cd bri" href="${esc(x.link)}" target="_blank" rel="noopener noreferrer"><span class="brn">${i + 1}</span><span><b>${esc(x.judul)}</b><span class="mu" style="display:block;font-size:12.5px;margin-top:4px">${esc(x.sumber || "Google News")}${x.waktu ? " · " + relW(x.waktu) : ""}</span></span></a>`).join("") || `<p class="mu">${BRD.error ? esc(BRD.error) : "Tidak ada berita yang cocok."}</p>`;
   $("#brInfo").textContent = BRD.diambil ? "Diperbarui " + new Date(BRD.diambil).toLocaleTimeString("id-ID", {hour: "2-digit", minute: "2-digit"}) + " WIB · sumber: Google News" : "";
   const r = BRD.ringkas;
-  $("#brRT").textContent = r ? r.teks : "Belum ada ringkasan hari ini. Tekan tombol untuk meminta MCI.Herald merangkum berita utama dan teknologi.";
+  $("#brRT").classList.toggle("md", !!r);
+  if (r) $("#brRT").innerHTML = axMd(r.teks); else $("#brRT").textContent = "Belum ada ringkasan hari ini. Tekan tombol untuk meminta MCI.Herald merangkum berita utama dan teknologi.";
   $("#brRI").textContent = r ? `Dirangkum ${relW(r.t)}${r.oleh ? " atas permintaan " + r.oleh : ""}. Ringkasan dibuat dari judul berita, cek situs aslinya untuk detail.` : "";
   $("#brRB").hidden = !BRD.bisa_ringkas;
 }
@@ -4387,7 +4393,7 @@ function renderTanya() {
   $("#prTanya").innerHTML = PRT.map(x => `<div style="border-top:1px solid var(--line);padding:12px 0">
     <div class="bar" style="margin:0;justify-content:space-between"><span><b>${esc(x.nama || "Pembeli")}</b>${x.kontak ? ` · <span class="mu">${esc(x.kontak)}</span>` : ""}${x.produk ? ` · ${esc(x.produk)}` : ""}</span><span><span class="ch ${(TS[x.status] || TS.proses)[0]}">${(TS[x.status] || TS.proses)[1]}</span> <span class="mu" style="font-size:12px">${relW(x.dibuat)}</span></span></div>
     <div style="margin-top:6px;background:#EEF3FC;border-radius:10px;padding:8px 11px">${esc(x.pesan)}</div>
-    ${x.jawaban_ai ? `<div class="mu" style="font-size:12.5px;margin-top:6px;white-space:pre-wrap">Jawaban otomatis: ${esc(x.jawaban_ai)}</div>` : ""}
+    ${x.jawaban_ai ? `<div class="mu md" style="font-size:12.5px;margin-top:6px"><b>Jawaban otomatis:</b> ${axMd(x.jawaban_ai)}</div>` : ""}
     ${x.balasan ? `<div style="margin-top:6px;background:#E3F8EC;border-radius:10px;padding:8px 11px;white-space:pre-wrap"><span class="mu" style="font-size:12px">Balasan ${esc(x.dibalas_oleh)}:</span> ${esc(x.balasan)}</div>` : ""}
     ${x.status === "menunggu_admin" || x.status === "dijawab_ai" ? `<div class="bar" style="margin:8px 0 0"><input type="text" data-prbi="${x.id}" maxlength="2000" placeholder="Tulis balasan untuk pembeli (muncul di halaman katalog)…" style="flex:1;min-width:200px"><button class="bt g" data-prb="${x.id}">Kirim balasan</button>${x.status === "menunggu_admin" ? `<button class="bt o" data-prs="${x.id}">Tandai selesai</button>` : ""}</div>` : ""}</div>`).join("") || '<p class="mu">Belum ada pertanyaan dari pembeli.</p>';
   $$("[data-prb]").forEach(b => b.onclick = async () => { const v = $(`[data-prbi="${b.dataset.prb}"]`).value.trim(); if (!v) return; b.disabled = true;
@@ -7652,7 +7658,7 @@ function pdDetail() {
   h += `<h2 class="pdH">2 · Rakit langkah demi langkah</h2>
     <div class="cd pdStep"><div class="pdNav">${L.map((_, i) => `<button type="button" data-pdl="${i}" class="${i === PD_L ? "on" : ""} ${sudah.includes(i) ? "ok" : ""}" aria-label="Langkah ${i + 1}">${sudah.includes(i) ? "✓" : i + 1}</button>`).join("")}</div>
       <div class="ey" style="margin-top:12px">Langkah ${PD_L + 1} dari ${L.length}</div><h3 style="margin:2px 0 8px;font:700 20px/1.3 var(--serif);color:var(--judul)">${esc(lg.judul || "")}</h3>
-      <p style="white-space:pre-wrap;line-height:1.65;margin:0 0 12px">${esc(lg.penjelasan || "")}</p>
+      <div class="md" style="line-height:1.65;margin:0 0 12px">${axMd(lg.penjelasan || "")}</div>
       <div class="pdSvg">${lg.diagram || ""}</div><p class="mu pdGeser" style="font-size:12px;margin:4px 0 0">Geser gambar ke samping untuk melihat semuanya.</p>
       ${(lg.sambungan || []).length ? `<ol class="pdKabel">${lg.sambungan.map(s => `<li><span class="pdDot" style="background:${PD_W[String(s.warna || "").toLowerCase()] || "#1570EF"}"></span>${pdUjung(s.dari, d)} <span class="mu">→</span> ${pdUjung(s.ke, d)}${s.warna ? ` <span class="mu">(kabel ${esc(s.warna)})</span>` : ""}${s.pembagi_tegangan ? ' <span class="ch y">lewat pembagi tegangan</span>' : ""}</li>`).join("")}</ol>` : ""}
       ${lg.peringatan ? `<div class="pdWarn r"><b>Hati-hati:</b> ${esc(lg.peringatan)}</div>` : ""}
@@ -7663,7 +7669,7 @@ function pdDetail() {
   h += `<h2 class="pdH">3 · Kode program</h2><div class="cd">${(d.pustaka || []).length ? `<p style="margin:0 0 8px"><b>Pasang library dulu</b> (Arduino IDE → Tools → Manage Libraries): ${d.pustaka.map(p => `<span class="ch n">${esc(p)}</span>`).join(" ")}</p>` : ""}
     ${x.papan === "esp32" ? '<p class="mu" style="font-size:13px;margin:0 0 8px">Pilih board "ESP32 CEO Module" di Arduino IDE (pasang dulu paket board ESP32 dari Boards Manager).</p>' : `<p class="mu" style="font-size:13px;margin:0 0 8px">Pilih board "${x.papan === "nano" ? "Arduino Nano" : "Arduino Uno"}" di Arduino IDE.${x.papan === "nano" ? " Kalau gagal unggah, coba Processor: ATmega328P (Old Bootloader)." : ""}</p>`}
     <div class="pdKode"><button class="bt o" id="pdSalin" type="button">Salin kode</button><pre><code>${esc(d.kode || "")}</code></pre></div>
-    ${d.penjelasan_kode ? `<p style="white-space:pre-wrap;line-height:1.6;margin:12px 0 0">${esc(d.penjelasan_kode)}</p>` : ""}</div>`;
+    ${d.penjelasan_kode ? `<div class="md" style="margin:12px 0 0">${axMd(d.penjelasan_kode)}</div>` : ""}</div>`;
   h += `<div class="cd" style="background:#EEF6EE;border-color:#B9DDB9"><b>🧪 Uji dulu di Wokwi (simulator gratis)</b>
     <p class="mu" style="font-size:13px;margin:6px 0 10px">Coba rangkaian dan kodenya di browser sebelum membeli komponen. Buka Wokwi, lalu tempel <b>diagram.json</b> di tab <i>diagram.json</i> dan kode di tab <i>sketch.ino</i>, terakhir tekan ▶.</p>
     <div class="bar" style="margin:0;flex-wrap:wrap"><button class="bt g" id="wkBuka" type="button">1 · Buka Wokwi</button><button class="bt o" id="wkDiag" type="button">2 · Salin diagram.json</button><button class="bt o" id="wkKode" type="button">3 · Salin kode</button><button class="bt o" id="wkZip" type="button">⬇ Unduh ZIP</button></div>
@@ -7864,7 +7870,7 @@ async function brMuat() {
   $("#brHari").textContent = d.hari; $("#brHalo").textContent = "Halo, " + d.nama.split(" ")[0];
   const baris = (x, i) => `<button data-brh="${esc(x.hal)}" class="${x.penting ? "pt" : ""}"><span><b>${esc(x.judul)}</b>${x.ket ? `<small>${esc(x.ket)}</small>` : ""}</span><i aria-hidden="true">›</i></button>`;
   const pg = d.pagi ? `<div class="pagiK tutup" id="pagiK"><h2>☀️ Laporan Pagi Apex</h2><div style="font-size:12.5px;opacity:.8">${d.pagi.waktu ? "Dibuat " + esc(tglID(d.pagi.waktu.slice(0, 10))) + " pukul " + esc(d.pagi.waktu.slice(11, 16)) : "Belum ada laporan"} · otomatis tiap hari pukul ${String(d.pagi.jam).padStart(2, "0")}.00 ke Telegram &amp; Inbox</div>
-    ${d.pagi.isi ? `<pre>${esc(d.pagi.isi)}</pre>` : ""}<div class="bar" style="margin:10px 0 0;flex-wrap:wrap">${d.pagi.isi ? '<button class="bt o" id="pagiLebar" type="button">Lihat semua</button>' : ""}<button class="bt o" id="pagiBuat" type="button">Buat ulang sekarang</button><span id="pagiMsg" style="font-size:12.5px;opacity:.85"></span></div></div>` : "";
+    ${d.pagi.isi ? `<div class="md pagiIsi">${axMd(d.pagi.isi)}</div>` : ""}<div class="bar" style="margin:10px 0 0;flex-wrap:wrap">${d.pagi.isi ? '<button class="bt o" id="pagiLebar" type="button">Lihat semua</button>' : ""}<button class="bt o" id="pagiBuat" type="button">Buat ulang sekarang</button><span id="pagiMsg" style="font-size:12.5px;opacity:.85"></span></div></div>` : "";
   const jam = new Date().getHours(), waktu = jam < 11 ? "pagi" : jam < 15 ? "siang" : jam < 18 ? "sore" : "malam";
   const rata = d.proyek.length ? Math.round(d.proyek.reduce((a, x) => a + (+x.progres || 0), 0) / d.proyek.length) : 0;
   const copilot = $("#nvApex") && $("#nvApex").style.display !== "none";
@@ -8359,7 +8365,7 @@ async function pnRouter(segar) {
       const d = await api("/api/router/lab", {json: {prompt, sistem: $("#rtSistem").value, model: RT_LAB}});
       h.innerHTML = d.hasil.map(x => `<div class="cd" style="margin:0"><b style="word-break:break-all">${esc(x.model)}</b>
         <div class="mu" style="font-size:12px;margin:2px 0 8px">${(x.ms / 1000).toFixed(1)} detik${x.keluar != null ? ` · ${x.masuk} token masuk · ${x.keluar} token keluar` : ""}</div>
-        ${x.error ? `<div class="ch r" style="white-space:normal">Gagal: ${esc(x.error)}</div>` : `<div style="white-space:pre-wrap;line-height:1.55;max-height:420px;overflow:auto">${esc(x.jawab)}</div>`}</div>`).join("");
+        ${x.error ? `<div class="ch r" style="white-space:normal">Gagal: ${esc(x.error)}</div>` : `<div class="md" style="max-height:420px;overflow:auto">${axMd(x.jawab)}</div>`}</div>`).join("");
     } catch (e) { if (e.kunci) return pnKunciTampil(false); h.innerHTML = `<div class="ch r">${esc(e.message)}</div>`; }
     b.disabled = false; b.textContent = "Bandingkan";
   };
@@ -8463,7 +8469,7 @@ $("#aduJalan").onclick = async () => {
   const q = $("#aduIn").value.trim(); if (!q) return $("#aduIn").focus(); if (ADU.pilih.length < 2) return $("#aduMsg").textContent = "Pilih 2–3 model.";
   $("#aduJalan").disabled = true; $("#aduMsg").textContent = "Menunggu jawaban…"; $("#aduHasil").innerHTML = "";
   try { const d = await api("/api/panel/adu", {json: {prompt: q, mesin: ADU.pilih}}); $("#aduMsg").textContent = "";
-    $("#aduHasil").innerHTML = d.hasil.map(h => `<div class="cd"><div><b>${esc(h.nama)}</b> <span class="mu" style="font-size:12px">${h.detik} dtk${h.biaya ? " · " + esc(h.biaya) : ""}</span></div><div class="tx ${h.ok ? "" : "er"}">${esc(h.teks)}</div>${h.ok ? `<button class="bt o" type="button" data-adp="${h.mesin}">Paling bagus</button>` : ""}</div>`).join(""); }
+    $("#aduHasil").innerHTML = d.hasil.map(h => `<div class="cd"><div><b>${esc(h.nama)}</b> <span class="mu" style="font-size:12px">${h.detik} dtk${h.biaya ? " · " + esc(h.biaya) : ""}</span></div><div class="tx ${h.ok ? "md" : "er"}">${h.ok ? axMd(h.teks) : esc(h.teks)}</div>${h.ok ? `<button class="bt o" type="button" data-adp="${h.mesin}">Paling bagus</button>` : ""}</div>`).join(""); }
   catch (e) { if (e.kunci) return pnKunciTampil(false); $("#aduMsg").textContent = e.message; }
   $("#aduJalan").disabled = false;
 };
