@@ -15507,12 +15507,19 @@ ADU_SISTEM = "Kamu asisten AI MCI (Mahardika Cakrawala Indonesia). Jawab dalam B
 
 
 def adu_mesin():
-    """Daftar mesin Adu model: bawaan + model Ollama di HDD markas (MCI Node) + slot SPARE yang terisi."""
+    """Daftar mesin Adu model, dibangun otomatis dari SEMUA AI yang terdaftar (aturan CEO 23 Nov 2026: AI baru selalu langsung ikut):
+    Gemini bawaan + model Gemini tambahan per kunci + semua mesin cadangan (Groq, SPARE, HDD, Router cadangan, dll) + model Router favorit."""
     L = list(ADU_MESIN) + [("g1:" + m, f"{gemini_nama(m)} · Tier 1") for m in gemini_tambahan("tier1")] + [("gf:" + m, gemini_nama(m)) for m in gemini_tambahan("free")]
-    for k, _n in cadangan_semua():
-        if is_node(k) or k.startswith("spare"):
-            m = MESIN_LAIN.get(k) or {}
-            L.append((k, f"HDD · {m.get('model')}" if is_node(k) else m.get("nama", k)))
+    ada = {k for k, _ in L}
+    for k, n in cadangan_semua():
+        if k in ada or k not in MESIN_LAIN:
+            continue
+        m = MESIN_LAIN[k]
+        L.append((k, f"HDD · {m.get('model')}" if is_node(k) else n))
+        ada.add(k)
+    for m in (SET.get("router_fav") or [])[:12]:
+        if router_mesin(m) not in ada:
+            L.append(("rf:" + m, f"{m} · Router"))
     return L
 
 
@@ -15521,8 +15528,10 @@ def adu_siap(m):
         return bool(KUNCI_TIER1) and not argon_habis()
     if m.startswith("gf:"):
         return bool(kunci_hydrogen())
-    if is_node(m) or m.startswith("spare"):
-        return m in MESIN_LAIN and cadangan_siap(m) and not (MESIN_LAIN[m].get("kurang"))
+    if m.startswith("rf:"):
+        return router_siap()
+    if m in MESIN_LAIN and m not in dict(ADU_MESIN):   # semua mesin lain yang terdaftar (SPARE, HDD, Router, mesin baru)
+        return cadangan_siap(m) and not MESIN_LAIN[m].get("kurang")
     if m in ("flash", "lite"):
         return bool(client("canvas"))
     if m == "hydrogen":
@@ -15552,8 +15561,10 @@ def adu_satu(m, prompt):
                 biaya = f"≈Rp{(masuk * hm + keluar * hk) / 1e6 * float(SET.get('kurs_usd') or 16500):,.0f}".replace(",", ".")
         elif m == "claude":
             teks, biaya = _claude(ADU_SISTEM, prompt, 1500), "berbayar"
+        elif m.startswith("rf:"):
+            teks, biaya = _kompatibel(router_mesin(m[3:]), ADU_SISTEM, prompt, 1500), "kredit router"
         else:
-            teks, biaya = _kompatibel(m, ADU_SISTEM, prompt, 1500), ("lokal, gratis" if is_node(m) else "gratis")
+            teks, biaya = _kompatibel(m, ADU_SISTEM, prompt, 1500), ("lokal, gratis" if is_node(m) else "kredit router" if m.startswith("rt_") else "gratis")
         return {"mesin": m, "ok": True, "teks": latex_bersih(teks)[:6000], "detik": round(time.time() - t0, 1), "biaya": biaya or "gratis/sangat murah"}
     except Exception as e:
         return {"mesin": m, "ok": False, "teks": str(e)[:300], "detik": round(time.time() - t0, 1), "biaya": ""}
