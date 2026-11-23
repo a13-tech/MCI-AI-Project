@@ -329,9 +329,9 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 .axModelW{position:relative}
 .axModel{all:unset;display:inline-flex;align-items:center;gap:4px;padding:6px 8px 6px 10px;border-radius:9px;font-size:13px;color:var(--mute);cursor:pointer}
 .axModel:hover,.axModel[aria-expanded=true]{background:var(--hov);color:var(--ink)}.axModel svg{width:15px;height:15px}
-.axMenuModel{position:absolute;right:0;bottom:calc(100% + 6px);z-index:20;min-width:240px;padding:6px;border-radius:14px;border:1px solid var(--line);background:var(--paper);box-shadow:0 10px 30px rgba(15,25,45,.16)}
+.axMenuModel{position:absolute;right:0;bottom:calc(100% + 6px);z-index:20;min-width:240px;max-height:min(62vh,460px);overflow-y:auto;overscroll-behavior:contain;padding:6px;border-radius:14px;border:1px solid var(--line);background:var(--paper);box-shadow:0 10px 30px rgba(15,25,45,.16)}
 .axMenuModel button{all:unset;display:flex;flex-direction:column;gap:1px;width:calc(100% - 20px);padding:8px 10px;border-radius:9px;cursor:pointer;font-size:13.5px;font-weight:500;position:relative}
-.axMenuModel button small{font-size:12px;font-weight:400;color:var(--mute)}
+.axMenuModel button small{font-size:12px;font-weight:400;color:var(--mute)}.axMenuModel .axMGrup{font-size:11.5px;color:var(--mute);padding:10px 10px 4px;border-top:1px solid var(--line);margin-top:4px}
 .axMenuModel button:hover:not(:disabled){background:var(--hov)}.axMenuModel button:disabled{opacity:.45;cursor:not-allowed}
 .axMenuModel button[aria-selected=true]::after{content:"";position:absolute;right:10px;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:9px;background:var(--gold)}
 .axKirim{all:unset;display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--navy2);color:#fff;cursor:pointer}
@@ -4539,7 +4539,8 @@ function apxRender() {
   $("#axKon").innerHTML = AX_INFO.ceo ? AX_KONEKTOR.map(k => `<button type="button" data-axk="${k.id}" aria-pressed="${AX_KON.has(k.id) && k.siap}" ${k.siap ? "" : 'disabled title="Isi kuncinya dulu di Panel CEO → Kunci AI"'}>${esc(k.nama)}</button>`).join("") : "";
   const cur = AX_DAFTAR.find(o => o.id === AX_C); $("#axJudul").textContent = kosong ? "" : (cur ? cur.judul : (APX[0] && APX[0].text || (APX[0] && APX[0].lamp && APX[0].lamp.length ? "📎 " + APX[0].lamp[0].nama : "")).replace(/\n?\[📎 .+\]$/, "").slice(0, 60));
   const pm = APX_MODEL.find(m => m.id === APX_PILIH); $("#axModelNama").textContent = pm ? pm.nama : (APX_MODEL[0] || {}).nama || "";
-  $("#apxModel").innerHTML = APX_MODEL.map(m => `<button type="button" role="option" data-apm="${m.id}" aria-selected="${m.id === APX_PILIH}" ${m.siap ? "" : "disabled"}>${esc(m.nama)}<small>${esc(m.ket)}${m.siap ? "" : " · belum aktif"}</small></button>`).join("");
+  let grupX = false;
+  $("#apxModel").innerHTML = APX_MODEL.map(m => (!grupX && /tanpa akses data/.test(m.ket) && (grupX = true) ? '<div class="axMGrup" role="presentation">AI lain · hanya obrolan, tanpa data MCI</div>' : "") + `<button type="button" role="option" data-apm="${m.id}" aria-selected="${m.id === APX_PILIH}" ${m.siap ? "" : "disabled"}>${esc(m.nama)}<small>${esc(m.ket)}${m.siap ? "" : " · belum aktif"}</small></button>`).join("");
   const akhir = APX.length - 1;
   $("#axPesan").innerHTML = APX.map((x, i) => x.role === "user" ? axBubbleU(x)
     : `<div class="axM axA${x.galat ? " galat" : ""}">${x.alir && !x.text ? `<div class="axCek">${AX_IK.terbit}Copilot lagi mengecek data…</div>` : `<div class="axIsi">${axMd(x.text)}${x.alir ? '<span class="axKursor"></span>' : ""}</div>`}

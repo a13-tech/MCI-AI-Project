@@ -6195,6 +6195,27 @@ ARGON_AKTIF = bool(KUNCI_TIER1) or os.getenv("ARGON_AKTIF", "").strip() in ("1",
 HYDROGEN_MODEL = os.getenv("HYDROGEN_MODEL", "gemini-4-hydrogen")
 
 
+def gemini_tambahan(jenis):
+    """Model Gemini tambahan per kunci yang sudah ada (permintaan CEO 23 Nov 2026: tidak perlu kunci baru, cukup tulis nama model).
+    jenis 'tier1' -> GEMINI_KEY_TIER1 (berbayar, kena anggaran AI berbayar); 'free' -> GEMINI_KEY_FREE. Pisah koma."""
+    v = (os.getenv("MODEL_TIER1", "").strip() or "gemini-4-carbon") if jenis == "tier1" else os.getenv("MODEL_FREE", "")
+    if v.strip() == "-":   # tulis "-" untuk mematikan semua model tambahan
+        return []
+    return list(dict.fromkeys(x.strip() for x in v.split(",") if x.strip() and x.strip() not in (ARGON_MODEL, HYDROGEN_MODEL)))[:8]
+
+
+def gemini_nama(m):
+    """gemini-4-carbon -> Gemini 4 Carbon."""
+    return " ".join(w.capitalize() if not w[:1].isdigit() else w for w in re.split(r"[-_]+", m)) if m.startswith("gemini") else m
+
+
+def harga_tier1(model):
+    """USD per 1 juta token (masuk, keluar) untuk model berbayar di kunci tier 1."""
+    if "carbon" in model:
+        return (2.0, 10.0) if today() < "2026-12-01" else (4.0, 20.0)   # harga perkenalan sampai 30 Nov 2026
+    return tuple(SET.get("argon_harga") or [2, 10])
+
+
 def kunci_argon():
     """Kunci Argon. Kosong kalau anggaran bulan ini habis -> semua fitur otomatis memakai mesin biasa (Flash)."""
     if argon_habis():
@@ -6220,7 +6241,10 @@ def argon_biaya_bulan(segar=False):
                     (today()[:8] + "01", "%argon%")).fetchone()
             cl = sql(c, "SELECT model, COALESCE(SUM(masuk),0), COALESCE(SUM(keluar),0) FROM pemakaian WHERE tanggal>=? AND model LIKE ? GROUP BY model",
                      (today()[:8] + "01", "claude%")).fetchall()
+            t1 = [sql(c, "SELECT ?, COALESCE(SUM(masuk),0), COALESCE(SUM(keluar),0), COALESCE(SUM(pikir),0) FROM pemakaian WHERE tanggal>=? AND model=?",
+                      (m, today()[:8] + "01", m)).fetchone() for m in gemini_tambahan("tier1")]
         usd = (float(r[0]) * hm + (float(r[1]) + float(r[2])) * hk) / 1e6
+        usd += sum((float(a) * harga_tier1(m)[0] + (float(b) + float(pk)) * harga_tier1(m)[1]) / 1e6 for m, a, b, pk in t1)   # Carbon dkk ikut anggaran AI berbayar
         usd += sum((float(a) * claude_harga(m)[0] + float(b) * claude_harga(m)[1]) / 1e6 for m, a, b in cl)   # Claude ikut satu anggaran AI berbayar
         rp = usd * float(SET.get("kurs_usd") or 16500)
     except Exception:
@@ -6442,7 +6466,7 @@ def router_sinkron():
     return [router_mesin(m) for m in (SET.get("router_cad") or [])[:12]]
 
 
-COPILOT_ROUTER = ("\n\nMODE RnD (penting): CEO sedang mencoba model ini lewat AI Router. Di mode ini kamu TIDAK punya akses alat maupun data MCI "
+COPILOT_ROUTER = ("\n\nMODE RnD (penting): CEO sedang mencoba model ini (di luar keluarga Gemini). Di mode ini kamu TIDAK punya akses alat maupun data MCI "
                   "(stok, kas, tugas, jadwal, anggota, dll). Jangan pernah menyebut angka atau data organisasi dari ingatan atau tebakan. "
                   "Kalau pertanyaan butuh data atau aksi di web MCI, bilang singkat bahwa mode RnD tidak bisa membaca data, dan sarankan ganti ke model Gemini di pemilih model. "
                   "Pertanyaan umum (penjelasan, ide, tulisan, kode) boleh dijawab.")
@@ -12634,7 +12658,19 @@ def apex_model_daftar(r="admin"):
          {"id": "hydrogen", "nama": "Gemini 4 Hydrogen", "model": HYDROGEN_MODEL, "siap": bool(kunci_hydrogen()), "ket": "cepat, ringan"},
          {"id": "lite", "nama": "Gemini Flash Lite", "model": MODEL_LITE, "siap": bool(client("apex")), "ket": "paling ringan"},
          {"id": "argon", "nama": "Gemini 4 Argon", "model": ARGON_MODEL, "siap": bool(kunci_argon()) and ARGON_AKTIF, "ket": "penalaran berat, berbayar"}]
-    if is_admin(r):
+    if is_admin(r):   # CEO: semua AI yang ada (permintaan 23 Nov 2026)
+        L += [{"id": "g1:" + m, "nama": f"{gemini_nama(m)} · Tier 1", "model": m, "siap": bool(KUNCI_TIER1) and not argon_habis(),
+               "ket": "berbayar, akses data penuh"} for m in gemini_tambahan("tier1")]
+        L += [{"id": "gf:" + m, "nama": gemini_nama(m), "model": m, "siap": bool(kunci_hydrogen()), "ket": "kunci gratis, akses data penuh"}
+              for m in gemini_tambahan("free")]
+        if ANTHROPIC_KEY:
+            L.append({"id": "x:claude", "nama": "Claude", "model": "claude", "siap": True, "ket": "tanpa akses data MCI"})
+        for k, n in cadangan_semua():
+            if k.startswith("rt_") or k not in MESIN_LAIN:
+                continue
+            m = MESIN_LAIN[k]
+            L.append({"id": "x:" + k, "nama": (f"HDD · {m.get('model')}" if is_node(k) else n), "model": m.get("model", k),
+                      "siap": cadangan_siap(k) and not m.get("kurang"), "ket": "tanpa akses data MCI" + (", laptop markas" if is_node(k) else "")})
         return L + [{"id": "rt:" + m, "nama": f"{m} · Router", "model": m, "siap": router_siap(), "ket": "RnD, tanpa akses data MCI"}
                     for m in (SET.get("router_fav") or [])[:12]]
     seri = {"gemini": ("7.5 Cipher", "terbaru, paling pintar"), "hydrogen": ("7 Cipher", "cepat"), "lite": ("4.9 Vertex", "paling ringan")}
@@ -12643,7 +12679,9 @@ def apex_model_daftar(r="admin"):
 
 def _apex_mesin(mid, r="admin"):
     pil = next((m for m in apex_model_daftar(r) if m["id"] == mid and m["siap"]), None) or apex_model_daftar(r)[0]
-    kunci = kunci_hydrogen() if pil["id"] == "hydrogen" else kunci_argon() if pil["id"] == "argon" else None
+    i = pil["id"]
+    kunci = (kunci_hydrogen() if i == "hydrogen" or i.startswith("gf:") else kunci_argon() if i == "argon"
+             else (KUNCI_TIER1 if not argon_habis() else "") if i.startswith("g1:") else None)
     return pil, kunci
 
 
@@ -12662,15 +12700,20 @@ async def apex_tanya(pesan, riwayat, model_id="gemini", alir=None, r="admin", ta
         fns, gagal = await konektor_fungsi(konektor)
         fungsi += fns
         jejak += [{"alat": "konektor_gagal", "arg": {"konektor": g}} for g in gagal]
-    if pil["id"].startswith("rt:"):   # model RnD lewat AI Router (khusus CEO): tanpa alat & data MCI
+    if pil["id"].startswith(("rt:", "x:")):   # model non-Gemini (Router, Claude, Groq, SPARE, HDD, dll; khusus CEO): tanpa alat & data MCI
         if lampiran:
             jejak.append({"alat": "lampiran", "arg": {"file": [m["nama"] for m in lampiran], "catatan": "tidak dikirim: mode RnD hanya teks"}})
             pesan += "\n\n(Catatan sistem: pengguna melampirkan file, tapi mode RnD hanya bisa membaca teks. Sampaikan singkat.)"
         msgs = [{"role": "assistant" if h.get("role") == "model" else "user", "content": str(h.get("text"))[:3000]}
                 for h in riwayat[-APEX_RIWAYAT:] if isinstance(h, dict) and h.get("text") and h.get("role") in ("user", "model")]
-        jawab = await asyncio.to_thread(_kompatibel, router_mesin(pil["model"]), apex_sistem_untuk(r) + tambahan + COPILOT_ROUTER, "", 6000, False,
-                                        msgs + [{"role": "user", "content": pesan}])
-        jejak.append({"alat": "router", "arg": {"model": pil["model"]}})
+        sysp = apex_sistem_untuk(r) + tambahan + COPILOT_ROUTER
+        if pil["id"] == "x:claude":   # Claude lewat kunci Anthropic: riwayat digabung jadi satu teks
+            teks = "\n\n".join(("CEO: " if h["role"] == "user" else "Kamu: ") + h["content"] for h in msgs) + "\n\nCEO: " + pesan
+            jawab = await asyncio.to_thread(_claude, sysp, teks, 6000)
+        else:
+            k = router_mesin(pil["model"]) if pil["id"].startswith("rt:") else pil["id"][2:]
+            jawab = await asyncio.to_thread(_kompatibel, k, sysp, "", 6000, False, msgs + [{"role": "user", "content": pesan}])
+        jejak.append({"alat": "router" if pil["id"].startswith("rt:") else "mesin", "arg": {"model": pil["nama"]}})
         if alir and jawab:
             alir(jawab)
         return latex_bersih(jawab), jejak, pil["id"]
@@ -14687,7 +14730,9 @@ KUNCI_DAFTAR = [   # (nama env, label, kelompok, cara uji). Token login, SECRET_
     ("NODE_MODEL", "MCI Node: model Ollama cadangan, boleh banyak dipisah koma sesuai urutan (bawaan: gemma3:4b, qwen2.5:3b, qwen2.5-coder:3b, deepseek-safe:latest)", "MCI Node (HDD + Ollama markas)", ""),
     ("ROUTER_KEY", "AI Router: kunci API (mis. ClassAI Router sk_live_..., atau OpenRouter). Satu kunci untuk Lab Model, pilihan Copilot, dan cadangan", "AI Router (RnD)", "router"),
 ] + [(f"SPARE_{i}", f"Cadangan bebas {i}: kunci API apa saja. Ganti model: kunci|model. Penyedia lain: kunci|model|url", "Cadangan AI bebas", "spare") for i in range(1, SPARE_PANEL + 1)]
-TEKS_DAFTAR = [("ZOHO_DC", "Pusat data Zoho (com / in / eu, kosong = com)"), ("R2_BUCKET", "Nama bucket R2 (kosong = mci-dokumentasi)"), ("GROQ_MODEL", "ID model Groq"), ("NVIDIA_MODEL", "ID model NVIDIA"), ("MISTRAL_MODEL", "ID model Mistral"), ("ROUTER_URL", "AI Router: base URL (kosong = https://router.classai.id/v1)")]   # bukan rahasia
+TEKS_DAFTAR = [("ZOHO_DC", "Pusat data Zoho (com / in / eu, kosong = com)"), ("R2_BUCKET", "Nama bucket R2 (kosong = mci-dokumentasi)"), ("GROQ_MODEL", "ID model Groq"), ("NVIDIA_MODEL", "ID model NVIDIA"), ("MISTRAL_MODEL", "ID model Mistral"), ("ROUTER_URL", "AI Router: base URL (kosong = https://router.classai.id/v1)"),
+               ("MODEL_TIER1", "Model Gemini tambahan untuk kunci tier 1 (berbayar), pisah koma. Kosong = gemini-4-carbon"),
+               ("MODEL_FREE", "Model Gemini tambahan untuk kunci gratis, pisah koma")]   # bukan rahasia
 KUNCI_NAMA = {k for k, *_ in KUNCI_DAFTAR} | {k for k, _ in TEKS_DAFTAR}
 
 FITUR_DAFTAR = [
@@ -15463,7 +15508,7 @@ ADU_SISTEM = "Kamu asisten AI MCI (Mahardika Cakrawala Indonesia). Jawab dalam B
 
 def adu_mesin():
     """Daftar mesin Adu model: bawaan + model Ollama di HDD markas (MCI Node) + slot SPARE yang terisi."""
-    L = list(ADU_MESIN)
+    L = list(ADU_MESIN) + [("g1:" + m, f"{gemini_nama(m)} · Tier 1") for m in gemini_tambahan("tier1")] + [("gf:" + m, gemini_nama(m)) for m in gemini_tambahan("free")]
     for k, _n in cadangan_semua():
         if is_node(k) or k.startswith("spare"):
             m = MESIN_LAIN.get(k) or {}
@@ -15472,6 +15517,10 @@ def adu_mesin():
 
 
 def adu_siap(m):
+    if m.startswith("g1:"):
+        return bool(KUNCI_TIER1) and not argon_habis()
+    if m.startswith("gf:"):
+        return bool(kunci_hydrogen())
     if is_node(m) or m.startswith("spare"):
         return m in MESIN_LAIN and cadangan_siap(m) and not (MESIN_LAIN[m].get("kurang"))
     if m in ("flash", "lite"):
@@ -15488,17 +15537,18 @@ def adu_siap(m):
 def adu_satu(m, prompt):
     t0 = time.time()
     try:
-        if m in ("flash", "lite", "hydrogen", "argon"):
-            model = {"flash": MODEL, "lite": MODEL_LITE, "hydrogen": HYDROGEN_MODEL, "argon": ARGON_MODEL}[m]
-            cl = client_kunci(kunci_hydrogen()) if m == "hydrogen" else client_kunci(kunci_argon()) if m == "argon" else client("canvas")
+        if m in ("flash", "lite", "hydrogen", "argon") or m.startswith(("g1:", "gf:")):
+            model = m[3:] if ":" in m else {"flash": MODEL, "lite": MODEL_LITE, "hydrogen": HYDROGEN_MODEL, "argon": ARGON_MODEL}[m]
+            cl = (client_kunci(kunci_hydrogen()) if m == "hydrogen" or m.startswith("gf:") else client_kunci(kunci_argon()) if m == "argon"
+                  else client_kunci(KUNCI_TIER1) if m.startswith("g1:") else client("canvas"))
             r = cl.models.generate_content(model=model, contents=prompt, config=types.GenerateContentConfig(system_instruction=ADU_SISTEM, max_output_tokens=1500))
             u = r.usage_metadata
             masuk, keluar = int(getattr(u, "prompt_token_count", 0) or 0), int(getattr(u, "candidates_token_count", 0) or 0)
             usage_add(model, masuk, keluar, int(getattr(u, "thoughts_token_count", 0) or 0))
             teks = (r.text or "").strip()
             biaya = ""
-            if m == "argon":
-                hm, hk = SET.get("argon_harga") or [2, 10]
+            if m == "argon" or m.startswith("g1:"):
+                hm, hk = harga_tier1(model) if m.startswith("g1:") else (SET.get("argon_harga") or [2, 10])
                 biaya = f"≈Rp{(masuk * hm + keluar * hk) / 1e6 * float(SET.get('kurs_usd') or 16500):,.0f}".replace(",", ".")
         elif m == "claude":
             teks, biaya = _claude(ADU_SISTEM, prompt, 1500), "berbayar"
