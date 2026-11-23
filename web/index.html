@@ -7632,7 +7632,7 @@ function pdDetail() {
   const x = PD_X, rc = x.rencana || {}, kembali = `<button class="bt o" id="pdKembali" type="button">← Semua panduan</button>`;
   let h = `<div class="bar" style="margin:0 0 14px">${kembali}${x.milik && !["proses", "menyusun"].includes(x.status) ? `<button class="bt o" id="pdHapus" type="button">Hapus</button>` : ""}</div>`;
   const chips = `<div class="meta">${pdCh(x.status)}<span class="ch">${esc(x.papan_nama || rc.papan || "-")}</span>${rc.kesulitan ? `<span>Tingkat: ${esc(rc.kesulitan)}</span>` : ""}${rc.waktu ? `<span>Waktu: ${esc(rc.waktu)}</span>` : ""}<span>Oleh ${esc(x.oleh)}</span></div>`;
-  if (x.status !== "jadi") {
+  if (x.status !== "jadi" && !(x.draf && x.data)) {
     h += `<article class="it2"><div class="ey">Rencana · tahap 1 dari 2</div><h3>${esc(rc.judul || "Rencana")}</h3>${chips}
       <div class="bd">${esc(rc.ringkasan || "")}</div>
       ${rc.alasan_papan ? `<p class="mu" style="margin:10px 0 0"><b>Kenapa ${esc(x.papan_nama)}:</b> ${esc(rc.alasan_papan)}</p>` : ""}
@@ -7658,6 +7658,7 @@ function pdDetail() {
   PD_L = Math.max(0, Math.min(PD_L, L.length - 1));
   const lg = L[PD_L] || {};
   const war = (x.laporan || {}).peringatan || [];
+  if (x.draf) h += `<div class="pdWarn r" style="margin:0 0 12px"><b>Draf gagal pemeriksaan sambungan, jangan dirakit apa adanya.</b> Ini versi terakhir buatan model sebelum Adu BPR berhenti. Masalah yang ditemukan: ${esc(((x.laporan || {}).galat || []).join(" · "))}</div>`;
   h += `<article class="it2"><div class="ey">Buku panduan · ${esc(d.papan_nama)}</div><h3>${esc(d.judul)}</h3>${chips}<div class="bd">${esc(d.ringkasan || "")}</div>
     <div class="meta" style="margin-top:10px"><span>Perkiraan biaya: <b>${pdRp(d.biaya.min, d.biaya.max)}</b></span><span>${L.length} langkah</span>${x.proyek ? `<span class="ch">Proyek: ${esc(x.proyek.nama)}</span>` : ""}</div>
     <div class="ac"><button class="bt g" id="pdCetak" type="button">Cetak / simpan PDF</button><button class="bt o" id="pdTautBuka" type="button">${x.proyek ? "Ganti proyek" : "Tautkan ke proyek"}</button>${can("studio_buat") || ADM() ? '<button class="bt o" id="pd3d" type="button">🧊 Bikin casing di Studio 3D</button>' : ""}</div>
@@ -8485,12 +8486,15 @@ function adbRender() {
     <div class="tb"><table style="font-size:13px"><thead><tr><th style="text-align:left">Model</th><th>Hasil</th><th>Putaran</th><th>Kesalahan per putaran</th><th>Langkah</th><th>Komponen</th><th>Waktu</th><th></th></tr></thead><tbody>`
     + [...b.item].sort((p, q) => ((q.uji || {}).lolos ? 1 : 0) - ((p.uji || {}).lolos ? 1 : 0) || ((p.uji || {}).putaran || 9) - ((q.uji || {}).putaran || 9)).map(x => { const u = x.uji || {};
       return `<tr><td style="text-align:left">${esc(x.nama)}</td><td>${st(x)}</td><td>${u.putaran || "–"}</td><td>${(u.kesalahan || []).join(" → ") || "–"}</td><td>${u.langkah ?? "–"}</td><td>${u.komponen ?? "–"}</td><td>${u.detik ? u.detik + " dtk" : "–"}</td>
-        <td>${x.status === "jadi" || x.status === "gagal" ? `<button class="bt o" type="button" data-adbb="${x.pid}" style="padding:4px 10px;font-size:12.5px">Buka</button>` : ""}</td></tr>`
+        <td style="white-space:nowrap">${x.status === "jadi" || x.status === "gagal" ? `<button class="bt o" type="button" data-adbb="${x.pid}" style="padding:4px 10px;font-size:12.5px">${x.status === "gagal" && !u.draf ? "Detail" : u.draf ? "Buka draf" : "Buka"}</button>` : ""}${x.status === "gagal" ? ` <button class="bt o" type="button" data-adbu="${x.pid}" style="padding:4px 10px;font-size:12.5px">Coba lagi</button>` : ""}</td></tr>`
         + (u.galat ? `<tr><td colspan="8" class="mu" style="text-align:left;font-size:12px;padding-top:0">${esc(u.galat)}</td></tr>` : ""); }).join("") + "</tbody></table></div></div>").join("");
 }
 $("#adbPil").onclick = e => { const b = e.target.closest("[data-adbm]"); if (!b || b.disabled) return; const m = b.dataset.adbm;
   ADB.pilih = ADB.pilih.includes(m) ? ADB.pilih.filter(x => x !== m) : [...ADB.pilih, m].slice(-8); adbRender(); };
-$("#adbHasil").onclick = e => { const b = e.target.closest("[data-adbb]"); if (!b) return; show("panduan"); setTimeout(() => pdBuka(+b.dataset.adbb), 300); };
+$("#adbHasil").onclick = async e => {
+  const u = e.target.closest("[data-adbu]");
+  if (u) { u.disabled = true; try { await api("/api/adu/bpr", {json: {ulang: +u.dataset.adbu}}); pesan("Model ini diulang. Hasil muncul otomatis."); adbMuat(); } catch (er) { alert(er.message); u.disabled = false; } return; }
+  const b = e.target.closest("[data-adbb]"); if (!b) return; show("panduan"); setTimeout(() => pdBuka(+b.dataset.adbb), 300); };
 $("#adbJalan").onclick = async () => {
   const ide = $("#adbIn").value.trim(); if (ide.length < 10) return pesan("Tulis ide rakitan dulu, minimal 10 huruf"); if (!ADB.pilih.length) return pesan("Pilih minimal 1 model");
   const bayar = ADB.pilih.filter(m => /^(argon|claude|g1:|rf:|rt_)/.test(m)).map(m => (ADU.mesin.find(x => x.id === m) || {}).nama || m);

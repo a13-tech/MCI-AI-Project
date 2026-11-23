@@ -6376,7 +6376,7 @@ def mesin_kode():
     return "claude" if ANTHROPIC_KEY and not argon_habis() else "gemini"   # Claude juga berhenti saat anggaran AI berbayar habis
 
 
-def _kompatibel(k, sistem, prompt, maks=8000, json_mode=False, pesan=None, info=None):
+def _kompatibel(k, sistem, prompt, maks=8000, json_mode=False, pesan=None, info=None, timeout=240):
     """pesan: daftar [{"role","content"}] (riwayat obrolan) menggantikan prompt tunggal. info: dict diisi pemakaian token (Lab Model)."""
     m = MESIN_LAIN[k]
     body = {"model": m["model"], "max_tokens": maks, "temperature": 0.2, "messages": [{"role": "system", "content": sistem}] + (pesan or [{"role": "user", "content": prompt}])}
@@ -6389,7 +6389,7 @@ def _kompatibel(k, sistem, prompt, maks=8000, json_mode=False, pesan=None, info=
         hdr.update({"x-api-key": mesin_kunci(k), "anthropic-version": "2023-06-01"})
     req = urllib.request.Request(url, method="POST", data=json.dumps(body).encode(), headers=hdr)
     try:
-        with urllib.request.urlopen(req, timeout=240) as f:   # model "reasoning" besar bisa berpikir lama
+        with urllib.request.urlopen(req, timeout=timeout) as f:   # model "reasoning" besar bisa berpikir lama
             d = json.loads(f.read().decode())
             try:   # sisa jatah asli dari header (Groq dkk.) untuk meteran kuota di Panel CEO
                 sisa, batas = f.headers.get("x-ratelimit-remaining-requests"), f.headers.get("x-ratelimit-limit-requests")
@@ -6565,8 +6565,33 @@ _KODE_PAKSA = contextvars.ContextVar("kode_paksa", default="")   # Adu BPR: paks
 _BPR_INFO = contextvars.ContextVar("bpr_info", default=None)    # Adu BPR: catat putaran perbaikan & kesalahan
 
 
+ADU_COBA = 3   # Adu BPR: gangguan sementara (429 jatah/menit, 503 server penuh, timeout) dicoba ulang dengan jeda
+
+
+def _sementara(e):
+    t = str(e).lower()
+    return any(x in t for x in ("429", "rate limit", "rate_limit", "503", "unavailable", "overloaded", "high demand", "timed out", "timeout", "502", "504"))
+
+
 async def _kode_paksa(m, sistem, prompt, act, schema):
-    """Jalankan satu mesin tertentu (id dari adu_mesin()). Gagal = error, tidak pindah mesin, supaya adu-nya jujur."""
+    """Mesin tertentu saja (tidak pindah ke mesin lain, supaya adu-nya jujur), tapi gangguan sementara dicoba ulang:
+    429/503/timeout -> tunggu 20 lalu 45 detik; JSON mode ditolak penyedia (mis. Groq json_validate_failed) -> ulang tanpa JSON mode."""
+    json_mode = schema is not None
+    for coba in range(ADU_COBA):
+        try:
+            return await _kode_paksa_sekali(m, sistem, prompt, act, schema, json_mode)
+        except Exception as e:
+            t = str(e).lower()
+            if json_mode and ("json_validate_failed" in t or "response_format" in t or "failed to generate json" in t):
+                json_mode = False   # biarkan model menulis bebas; _pd_json mengambil objek JSON dari teksnya
+                continue
+            if coba < ADU_COBA - 1 and _sementara(e):
+                await asyncio.sleep(20 if coba == 0 else 45)
+                continue
+            raise
+
+
+async def _kode_paksa_sekali(m, sistem, prompt, act, schema, json_mode):
     if m in ("flash", "lite", "hydrogen", "argon") or m.startswith(("g1:", "gf:")):
         model = m[3:] if ":" in m else {"flash": MODEL, "lite": MODEL_LITE, "hydrogen": HYDROGEN_MODEL, "argon": ARGON_MODEL}[m]
         kunci = (kunci_hydrogen() if m == "hydrogen" or m.startswith("gf:") else kunci_argon() if m == "argon"
@@ -6575,7 +6600,7 @@ async def _kode_paksa(m, sistem, prompt, act, schema):
     if m == "claude":
         return await asyncio.to_thread(_claude, sistem, prompt, 16000, None, schema)
     k = router_mesin(m[3:]) if m.startswith("rf:") else m
-    return await asyncio.to_thread(_kompatibel, k, sistem, prompt, 12000, schema is not None)
+    return await asyncio.to_thread(_kompatibel, k, sistem, prompt, 12000, json_mode, None, None, 600)   # model besar (NVIDIA dll) bisa >4 menit
 
 
 async def kode_ai(sistem, prompt, act, schema=None, parts=None):
@@ -7034,19 +7059,29 @@ def panduan_tampil(x, r):
     o = {k: x.get(k) for k in ("id", "oleh", "oleh_id", "judul", "papan", "status", "permintaan", "jawaban", "rencana", "laporan", "mesin", "proyek_id", "dibuat", "diubah")}
     o["milik"] = _pd_milik(x, r)
     o["papan_nama"] = rakit.PAPAN.get(x.get("papan") or "", {}).get("nama", "")
-    if x["status"] == "jadi" and x.get("data"):
-        d = rakit.lengkapi(x["data"])
+    draf = x["status"] == "gagal" and x.get("data") and isinstance(x.get("laporan"), dict) and (x["laporan"].get("uji") or {}).get("draf")
+    if (x["status"] == "jadi" or draf) and x.get("data"):
+        try:
+            d = rakit.lengkapi(x["data"])
+        except Exception:
+            d = None
+    if (x["status"] == "jadi" or draf) and x.get("data") and d is not None:
         tot_min = tot_max = 0
-        for kt in d.get("kantong") or []:
-            for k in kt.get("komponen") or []:
-                q = str(k.get("kata_kunci") or k.get("nama") or "").strip()
-                k["beli"] = {t: u + quote(q) for t, u in TOKO_CARI.items()}
-                k["stok"] = _stok_cocok(k)
-                n = max(1, int(k.get("jumlah") or 1))
-                tot_min += max(0, int(k.get("harga_min") or 0)) * n
-                tot_max += max(0, int(k.get("harga_max") or 0)) * n
+        try:
+            for kt in d.get("kantong") or []:
+                for k in kt.get("komponen") or []:
+                    q = str(k.get("kata_kunci") or k.get("nama") or "").strip()
+                    k["beli"] = {t: u + quote(q) for t, u in TOKO_CARI.items()}
+                    k["stok"] = _stok_cocok(k)
+                    n = max(1, int(k.get("jumlah") or 1))
+                    tot_min += max(0, int(k.get("harga_min") or 0)) * n
+                    tot_max += max(0, int(k.get("harga_max") or 0)) * n
+        except (TypeError, ValueError, AttributeError):
+            if not draf:
+                raise
         d["biaya"] = {"min": tot_min, "max": tot_max}
         o["data"] = d
+        o["draf"] = bool(draf)
     if x.get("proyek_id"):
         p = rk_get("proyek", x["proyek_id"])
         o["proyek"] = {"id": x["proyek_id"], "nama": (p or {}).get("nama", "(proyek dihapus)")}
@@ -7088,6 +7123,8 @@ async def panduan_bangun(permintaan, rencana, jawaban):
         if info is not None:
             info["putaran"] = putaran + 1
             info["kesalahan"].append(len(galat))
+            if data is not None:
+                info["draf"], info["galat"] = data, galat   # draf terakhir disimpan supaya ide model tetap bisa dibaca walau gagal
         if data is not None and not galat:
             break
         if putaran == 2:
@@ -15653,12 +15690,13 @@ ADU_BPR_MAKS = 8
 async def adu_bpr_satu(pid, m, ide):
     """Satu model: rencana -> panduan (maks 3 putaran perbaikan). Catat waktu, putaran, kesalahan."""
     _KODE_PAKSA.set(m)
-    info = {"putaran": 0, "kesalahan": [], "mulai": time.time()}
+    info = {"putaran": 0, "kesalahan": [], "mulai": time.time(), "draf": None, "galat": []}
     _BPR_INFO.set(info)
     try:
         rc, _ = await panduan_rencana(ide)
         if rc.get("ditolak"):
-            raise RuntimeError(rc.get("alasan_tolak") or "Rencana ditolak demi keselamatan")
+            raise RuntimeError("Model ini menolak idenya karena menganggap berbahaya, padahal pemeriksa MCI menilai aman (salah paham keselamatan)."
+                               + (f" Alasan model: {rc.get('alasan_tolak')}" if rc.get("alasan_tolak") else ""))
         with db() as c:
             sql(c, "UPDATE panduan SET rencana=?, papan=?, diubah=? WHERE id=?", (json.dumps(rc, ensure_ascii=False), rc["papan"], _now(), pid))
         data, waspada, _ = await panduan_bangun(ide, rc, "(Uji Adu BPR: tidak ada jawaban tambahan, pakai pilihan paling umum dan aman.)")
@@ -15670,10 +15708,15 @@ async def adu_bpr_satu(pid, m, ide):
                 (json.dumps(data, ensure_ascii=False), json.dumps({"peringatan": waspada, "uji": uji}, ensure_ascii=False),
                  f"Uji · {nm}: {str(data.get('judul') or rc.get('judul') or ide)}"[:120], _now(), pid))
     except Exception as e:
-        uji = {"lolos": False, "putaran": info["putaran"], "kesalahan": info["kesalahan"], "detik": round(time.time() - info["mulai"]), "galat": (str(e) or type(e).__name__)[:400]}
+        g = (str(e) or type(e).__name__)[:400]
+        if "timed out" in g.lower():
+            g = f"Model terlalu lama menjawab (lebih dari 10 menit per putaran), sudah dicoba {ADU_COBA}x. " + ("Draf putaran terakhir tetap bisa dibuka." if info["draf"] else "")
+        uji = {"lolos": False, "putaran": info["putaran"], "kesalahan": info["kesalahan"], "detik": round(time.time() - info["mulai"]), "galat": g, "draf": bool(info["draf"])}
         with db() as c:
-            sql(c, "UPDATE panduan SET status='gagal', laporan=?, diubah=? WHERE id=?",
-                (json.dumps({"galat": [uji["galat"]], "uji": uji}, ensure_ascii=False), _now(), pid))
+            sql(c, "UPDATE panduan SET status='gagal', data=?, laporan=?, judul=COALESCE(?, judul), diubah=? WHERE id=?",
+                (json.dumps(info["draf"], ensure_ascii=False) if info["draf"] else None,
+                 json.dumps({"galat": [g] + [x for x in info["galat"] if x not in g][:6], "uji": uji}, ensure_ascii=False),
+                 (f"Uji · {dict(adu_mesin()).get(m, m)}: {info['draf'].get('judul')}"[:120] if info["draf"] and info["draf"].get("judul") else None), _now(), pid))
 
 
 async def adu_bpr_jalan(tugas, ide):
@@ -15689,6 +15732,16 @@ def api_adu_bpr():
     r = need_ceo()
     if request.method == "POST":
         d = request.get_json(silent=True) or {}
+        if d.get("ulang"):   # ulangi satu model di satu adu
+            x = _pd_row(int(d["ulang"]))
+            if not x or not str(x.get("judul") or "").startswith("Uji ·") or x["status"] == "proses":
+                return jsonify({"error": "BPR uji ini tidak bisa diulang (sedang jalan atau bukan hasil Adu BPR)"}), 400
+            if not adu_siap(x["mesin"]):
+                return jsonify({"error": "Model ini sedang tidak siap"}), 400
+            with db() as c:
+                sql(c, "UPDATE panduan SET status='proses', data=NULL, laporan=NULL, diubah=? WHERE id=?", (_now(), x["id"]))
+            asyncio.run_coroutine_threadsafe(adu_bpr_jalan([(x["id"], x["mesin"])], x["permintaan"]), LOOP)
+            return jsonify({"ok": True})
         ide = str(d.get("ide") or "").strip()[:1500]
         semua = dict(adu_mesin())
         pilih = [m for m in dict.fromkeys(d.get("mesin") or []) if m in semua and adu_siap(m)][:ADU_BPR_MAKS]
