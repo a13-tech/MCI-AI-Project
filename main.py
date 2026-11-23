@@ -1056,7 +1056,7 @@ async def ask(key, text, history=None, parts=None, schema=None, model=None, act=
                     r = await call_safe(None)
         except Exception as e:
             # Gemini penuh/sibuk -> Groq menjawab supaya bot tidak diam (genset cadangan saat listrik utama padam)
-            if terkirim[0] or not cadangan_bisa(e, schema, fungsi, parts, key):
+            if terkirim[0] or _KODE_PAKSA.get() or not cadangan_bisa(e, schema, fungsi, parts, key):   # Adu BPR: jangan diam-diam pindah mesin
                 raise
             log.warning("Gemini penuh (%s), jawaban diambil dari mesin cadangan", str(e)[:100])
             out = await asyncio.to_thread(cadangan_groq, sysp + (COPILOT_CADANGAN if fungsi else ""), contents, schema)
@@ -6561,9 +6561,29 @@ def _claude(sistem, prompt, maks=16000, parts=None, schema=None):
     return "".join(b.get("text", "") for b in d.get("content", []) if b.get("type") == "text").strip()
 
 
+_KODE_PAKSA = contextvars.ContextVar("kode_paksa", default="")   # Adu BPR: paksa satu mesin (id daftar Adu model), tanpa jatuh ke mesin lain
+_BPR_INFO = contextvars.ContextVar("bpr_info", default=None)    # Adu BPR: catat putaran perbaikan & kesalahan
+
+
+async def _kode_paksa(m, sistem, prompt, act, schema):
+    """Jalankan satu mesin tertentu (id dari adu_mesin()). Gagal = error, tidak pindah mesin, supaya adu-nya jujur."""
+    if m in ("flash", "lite", "hydrogen", "argon") or m.startswith(("g1:", "gf:")):
+        model = m[3:] if ":" in m else {"flash": MODEL, "lite": MODEL_LITE, "hydrogen": HYDROGEN_MODEL, "argon": ARGON_MODEL}[m]
+        kunci = (kunci_hydrogen() if m == "hydrogen" or m.startswith("gf:") else kunci_argon() if m == "argon"
+                 else KUNCI_TIER1 if m.startswith("g1:") else None)
+        return await ask("canvas", prompt, sistem=sistem, schema=schema, use_mcp=False, cache=False, act=f"{act} (adu {m})", model=model, kunci=kunci)
+    if m == "claude":
+        return await asyncio.to_thread(_claude, sistem, prompt, 16000, None, schema)
+    k = router_mesin(m[3:]) if m.startswith("rf:") else m
+    return await asyncio.to_thread(_kompatibel, k, sistem, prompt, 12000, schema is not None)
+
+
 async def kode_ai(sistem, prompt, act, schema=None, parts=None):
     """Kembalikan teks mentah dari mesin kode. Urutan: mesin pilihan (AI_KODE) -> Claude kalau kuncinya ada -> Gemini. Yang gagal dilewati.
     parts = lampiran gambar; hanya keluarga Gemini (Argon/Hydrogen/Flash) yang bisa melihatnya, mesin lain dilewati."""
+    if _KODE_PAKSA.get():
+        m = _KODE_PAKSA.get()
+        return await _kode_paksa(m, sistem, prompt, act, schema), m
     pilih = mesin_kode()
     if pilih in ("argon", "hydrogen"):
         try:
@@ -7056,6 +7076,7 @@ async def panduan_bangun(permintaan, rencana, jawaban):
     dasar = (f"PERMINTAAN ANGGOTA:\n{permintaan}\n\nRENCANA YANG SUDAH DIKONFIRMASI:\n{json.dumps(rencana, ensure_ascii=False)}"
              + (f"\n\nJAWABAN / CATATAN ANGGOTA:\n{jawaban}" if jawaban else "") + f"\n\nPapan WAJIB: {rencana.get('papan')}.")
     prompt, data, galat, waspada, mesin = dasar, None, [], [], "gemini"
+    info = _BPR_INFO.get()
     for putaran in range(3):
         teks, mesin = await kode_ai(SISTEM_PANDUAN + (SCRATCH_ATURAN if rencana.get("scratch") else ""), prompt, "Menulis panduan rakit", schema=PanduanRakit)
         try:
@@ -7064,6 +7085,9 @@ async def panduan_bangun(permintaan, rencana, jawaban):
             galat, waspada = rakit.periksa(data)
         except (ValueError, KeyError, TypeError) as e:
             data, galat, waspada = None, [f"JSON tidak sah: {str(e)[:200]}"], []
+        if info is not None:
+            info["putaran"] = putaran + 1
+            info["kesalahan"].append(len(galat))
         if data is not None and not galat:
             break
         if putaran == 2:
@@ -15570,9 +15594,19 @@ def adu_satu(m, prompt):
         return {"mesin": m, "ok": False, "teks": str(e)[:300], "detik": round(time.time() - t0, 1), "biaya": ""}
 
 
+def need_ceo():
+    """CEO saja (tanpa PIN Panel): halaman Adu Model dipisah dari Panel CEO (permintaan 23 Nov 2026)."""
+    r = role()
+    if not r:
+        abort(401)
+    if not is_admin(r):
+        abort(403)
+    return r
+
+
 @app.route("/api/panel/adu", methods=["GET", "POST"])
 def api_panel_adu():
-    need_panel()
+    need_ceo()
     skor = SET.get("adu_skor") or {}
     if request.method == "GET":
         node_info()   # segarkan status HDD markas supaya model yang belum terpasang ditandai
@@ -15608,6 +15642,83 @@ def api_panel_adu():
     for h in hasil:
         h["nama"] = semua[h["mesin"]]
     return jsonify({"hasil": hasil, "skor": skor})
+
+
+# ---------- 6b. Adu BPR: semua model disuruh membuat Buku Panduan Rakit yang sama (permintaan CEO 23 Nov 2026) ----------
+# Tiap model menulis rencana + panduan sendiri; mesin pemeriksa sambungan (rakit.periksa) jadi juri objektif.
+# Hasil yang lolos tersimpan sebagai BPR biasa (judul "Uji · <model>: ...") dan terlihat semua anggota.
+ADU_BPR_MAKS = 8
+
+
+async def adu_bpr_satu(pid, m, ide):
+    """Satu model: rencana -> panduan (maks 3 putaran perbaikan). Catat waktu, putaran, kesalahan."""
+    _KODE_PAKSA.set(m)
+    info = {"putaran": 0, "kesalahan": [], "mulai": time.time()}
+    _BPR_INFO.set(info)
+    try:
+        rc, _ = await panduan_rencana(ide)
+        if rc.get("ditolak"):
+            raise RuntimeError(rc.get("alasan_tolak") or "Rencana ditolak demi keselamatan")
+        with db() as c:
+            sql(c, "UPDATE panduan SET rencana=?, papan=?, diubah=? WHERE id=?", (json.dumps(rc, ensure_ascii=False), rc["papan"], _now(), pid))
+        data, waspada, _ = await panduan_bangun(ide, rc, "(Uji Adu BPR: tidak ada jawaban tambahan, pakai pilihan paling umum dan aman.)")
+        uji = {"lolos": True, "putaran": info["putaran"], "kesalahan": info["kesalahan"], "detik": round(time.time() - info["mulai"]), "peringatan": len(waspada),
+               "langkah": len(data.get("langkah") or []), "komponen": sum(len(k.get("komponen") or []) for k in (data.get("kantong") or []) if isinstance(k, dict))}
+        nm = dict(adu_mesin()).get(m, m)
+        with db() as c:
+            sql(c, "UPDATE panduan SET status='jadi', data=?, laporan=?, judul=?, diubah=? WHERE id=?",
+                (json.dumps(data, ensure_ascii=False), json.dumps({"peringatan": waspada, "uji": uji}, ensure_ascii=False),
+                 f"Uji · {nm}: {str(data.get('judul') or rc.get('judul') or ide)}"[:120], _now(), pid))
+    except Exception as e:
+        uji = {"lolos": False, "putaran": info["putaran"], "kesalahan": info["kesalahan"], "detik": round(time.time() - info["mulai"]), "galat": (str(e) or type(e).__name__)[:400]}
+        with db() as c:
+            sql(c, "UPDATE panduan SET status='gagal', laporan=?, diubah=? WHERE id=?",
+                (json.dumps({"galat": [uji["galat"]], "uji": uji}, ensure_ascii=False), _now(), pid))
+
+
+async def adu_bpr_jalan(tugas, ide):
+    """Model cloud jalan bersamaan; model HDD bergantian (RAM Mac 8 GB)."""
+    async def lokal():
+        for pid, m in [t for t in tugas if is_node(t[1])]:
+            await adu_bpr_satu(pid, m, ide)
+    await asyncio.gather(*[adu_bpr_satu(pid, m, ide) for pid, m in tugas if not is_node(m)], lokal())
+
+
+@app.route("/api/adu/bpr", methods=["GET", "POST"])
+def api_adu_bpr():
+    r = need_ceo()
+    if request.method == "POST":
+        d = request.get_json(silent=True) or {}
+        ide = str(d.get("ide") or "").strip()[:1500]
+        semua = dict(adu_mesin())
+        pilih = [m for m in dict.fromkeys(d.get("mesin") or []) if m in semua and adu_siap(m)][:ADU_BPR_MAKS]
+        if len(ide) < 10 or not pilih:
+            return jsonify({"error": "Tulis ide rakitan (minimal 10 huruf) dan pilih minimal 1 model yang siap"}), 400
+        if rakit.BERBAHAYA.search(ide):
+            return jsonify({"error": "Rangkaian yang menyentuh listrik PLN/220V tidak dibuatkan panduannya demi keselamatan."}), 400
+        if not LOOP:
+            return jsonify({"error": "Mesin AI belum siap"}), 503
+        tugas = []
+        with db() as c:
+            for m in pilih:
+                q = "INSERT INTO panduan (oleh_id,oleh,judul,papan,status,permintaan,rencana,mesin,dibuat,diubah) VALUES (?,?,?,?,?,?,?,?,?,?)"
+                p = (mid_of(r), nama_peran(r), f"Uji · {semua[m]}: {ide}"[:120], "uno", "proses", ide, "{}", m, _now(), _now())
+                tugas.append((int(sql(c, q + " RETURNING id", p).fetchone()[0] if PG else sql(c, q, p).lastrowid), m))
+        L = SET.setdefault("adu_bpr", [])
+        L.append({"id": int(time.time()), "ide": ide, "waktu": _now(), "item": [{"pid": pid, "mesin": m, "nama": semua[m]} for pid, m in tugas]})
+        SET["adu_bpr"] = L[-10:]
+        set_save()
+        asyncio.run_coroutine_threadsafe(adu_bpr_jalan(tugas, ide), LOOP)
+        audit("panduan", "adu_bpr", ide[:120], oleh=nama_peran(r))
+    out = []
+    for b in reversed(SET.get("adu_bpr") or []):
+        item = []
+        for it in b.get("item") or []:
+            x = _pd_row(it["pid"])
+            lap = (x or {}).get("laporan") or {}
+            item.append({**it, "status": (x or {}).get("status", "dihapus"), "judul": (x or {}).get("judul") or "", "uji": lap.get("uji") if isinstance(lap, dict) else None})
+        out.append({**b, "item": item})
+    return jsonify({"batch": out})
 
 
 # ---------- 7. Apex bertindak dengan persetujuan CEO ----------

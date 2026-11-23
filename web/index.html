@@ -882,14 +882,14 @@ details.cara p{line-height:1.65}
 .sk[aria-checked=true]::after{transform:translateX(18px)}
 .sk:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .sk:disabled{opacity:.5;cursor:wait}
-#p-panel .pnM{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px}
-#p-panel .pnM button{all:unset;box-sizing:border-box;cursor:pointer;padding:8px 12px;border-radius:10px;border:1px solid var(--line2);font-size:13.5px;line-height:1.25;color:var(--ink);background:var(--paper)}
-#p-panel .pnM button small{display:block;color:var(--mute);font-size:11.5px}
-#p-panel .pnM button:hover{border-color:var(--judul)}
-#p-panel .pnM button.on{border-color:var(--judul);box-shadow:inset 0 0 0 1px var(--judul);font-weight:600}
-#p-panel .pnM button.on::before{content:"✓ "}
-#p-panel .pnM button:disabled{opacity:.45;cursor:not-allowed}
-#p-panel .pnM button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+:is(#p-panel,#p-adu) .pnM{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px}
+:is(#p-panel,#p-adu) .pnM button{all:unset;box-sizing:border-box;cursor:pointer;padding:8px 12px;border-radius:10px;border:1px solid var(--line2);font-size:13.5px;line-height:1.25;color:var(--ink);background:var(--paper)}
+:is(#p-panel,#p-adu) .pnM button small{display:block;color:var(--mute);font-size:11.5px}
+:is(#p-panel,#p-adu) .pnM button:hover{border-color:var(--judul)}
+:is(#p-panel,#p-adu) .pnM button.on{border-color:var(--judul);box-shadow:inset 0 0 0 1px var(--judul);font-weight:600}
+:is(#p-panel,#p-adu) .pnM button.on::before{content:"✓ "}
+:is(#p-panel,#p-adu) .pnM button:disabled{opacity:.45;cursor:not-allowed}
+:is(#p-panel,#p-adu) .pnM button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 #p-panel .pnKy{display:grid;grid-template-columns:1fr;gap:6px;padding:12px 0;border-top:1px solid var(--line)}
 #p-panel .pnKy .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 #p-panel .pnKy input{flex:1;min-width:160px}
@@ -1166,6 +1166,7 @@ textarea:focus,input:focus,select:focus{border-color:var(--aksen);box-shadow:0 0
  <button class="nv" data-p="tim">Tim &amp; Token</button>
  <button class="ng" type="button">Lainnya</button>
  <button class="nv" data-p="panel" id="nvPanel">Panel CEO</button>
+ <button class="nv" data-p="adu" id="nvAdu">Adu Model</button>
  <button class="nv" data-p="berita">Berita Hari Ini</button>
  <button class="nv" data-p="tentang">Tentang Kami</button>
  <button class="nv inst" id="pasangApp" hidden>Pasang aplikasi</button>
@@ -1663,13 +1664,7 @@ textarea:focus,input:focus,select:focus{border-color:var(--aksen);box-shadow:0 0
     <div class="cd"><b>MCI Node (HDD + Ollama markas)</b><div class="mu" style="font-size:12.5px;margin:2px 0 8px">MacBook di markas: gudang video ukuran asli, backup database tiap malam, dan Ollama sebagai cadangan AI terakhir.</div><div id="pnNode" class="mu" style="font-size:13px">Memeriksa…</div></div>
     <div class="cd" style="grid-column:1/-1"><b>AI Router · Lab Model (RnD)</b><div class="mu" style="font-size:12.5px;margin:2px 0 8px">Satu kunci router (mis. ClassAI) untuk banyak model. Centang <b>Lab</b> untuk membandingkan jawaban, <b>Copilot</b> untuk muncul di pemilih model Copilot (tanpa akses data MCI), <b>Cadangan</b> untuk ikut antrean cadangan.</div><div id="pnRouter" style="font-size:13px">Memeriksa…</div></div>
     <div class="cd"><b>Antrean cadangan</b><div class="mu" style="font-size:12.5px;margin:2px 0 0">Saat Gemini penuh, AI dioper ke penyedia berikutnya sesuai urutan ini. Yang kena batas diistirahatkan 2 menit.</div><div class="cdg" id="pnCad"></div><div class="mu" id="pnHemat" style="font-size:12.5px;margin-top:10px"></div></div>
-    <div class="cd"><b>Adu model</b><div class="mu" style="font-size:12.5px;margin:2px 0 8px">Satu pertanyaan ke 2–3 model sekaligus. Model berbayar (Argon, Claude) memakai saldo sungguhan.</div>
-     <textarea id="aduIn" rows="3" maxlength="3000" placeholder="contoh: Jelaskan beda ESP32 dan Arduino Nano untuk proyek kapal" style="width:100%" aria-label="Pertanyaan adu model"></textarea>
-     <div class="pnM" id="aduPil"></div>
-     <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="bt g" type="button" id="aduJalan">Adu sekarang</button><span class="mu" id="aduMsg" style="font-size:12.5px"></span></div>
-     <div id="aduSkor" class="mu" style="font-size:12.5px;margin-top:8px"></div></div>
    </div>
-   <div class="adu" id="aduHasil"></div>
    <div class="cd" style="margin-top:16px"><b>Kunci AI</b><div class="mu" style="font-size:12.5px;margin:2px 0 4px">Disimpan terenkripsi, tidak ikut backup, dan tidak pernah ditampilkan utuh. Kunci dari panel mengalahkan nilai di Render; "Pakai nilai Render" menghapus isian panel.</div><div id="pnKey"></div></div>
    <div class="cd" style="margin-top:16px"><b>Hubungkan Email Zoho ke Inbox web</b> <span id="zhSt"></span>
     <ol class="mu" style="font-size:13px;line-height:1.7;margin:8px 0 0 18px;padding:0">
@@ -1748,6 +1743,23 @@ textarea:focus,input:focus,select:focus{border-color:var(--aksen);box-shadow:0 0
   <div id="zmBox" hidden role="dialog" aria-modal="true" aria-label="Baca email"><div class="in"><div class="tp"><div><b id="zmJudul"></b><div class="mu" id="zmDari" style="font-size:12.5px;margin-top:2px"></div></div><button type="button" id="zmTutup" aria-label="Tutup">×</button></div><iframe id="zmIsi" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" title="Isi email"></iframe></div></div>
  </section>
 
+ <section id="p-adu" class="pg" hidden>
+  <h1>Adu Model</h1>
+  <p class="mu" style="margin:-4px 0 14px;font-size:13.5px">Bandingkan semua AI MCI: jawaban pertanyaan biasa, atau Buku Panduan Rakit lengkap yang dicek mesin pemeriksa sambungan.</p>
+  <div class="pnG">
+    <div class="cd"><b>Adu model</b><div class="mu" style="font-size:12.5px;margin:2px 0 8px">Satu pertanyaan ke 2–3 model sekaligus. Semua AI yang terdaftar otomatis muncul di sini. Model berbayar (Argon, Claude) memakai saldo sungguhan.</div>
+     <textarea id="aduIn" rows="3" maxlength="3000" placeholder="contoh: Jelaskan beda ESP32 dan Arduino Nano untuk proyek kapal" style="width:100%" aria-label="Pertanyaan adu model"></textarea>
+     <div class="pnM" id="aduPil"></div>
+     <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="bt g" type="button" id="aduJalan">Adu sekarang</button><span class="mu" id="aduMsg" style="font-size:12.5px"></span></div>
+     <div id="aduSkor" class="mu" style="font-size:12.5px;margin-top:8px"></div></div>
+    <div class="cd"><b>Adu BPR</b><div class="mu" style="font-size:12.5px;margin:2px 0 8px">Tiap model membuat Buku Panduan Rakit sendiri dari ide yang sama, lalu dicek mesin pemeriksa sambungan (maks 3 putaran perbaikan). BPR yang lolos tersimpan di Buku Panduan Rakit dan terlihat semua anggota. Model berbayar memakai saldo sungguhan.</div>
+     <textarea id="adbIn" rows="3" maxlength="1500" placeholder="contoh: lampu otomatis yang menyala saat gelap pakai LDR" style="width:100%" aria-label="Ide rakitan untuk Adu BPR"></textarea>
+     <div class="pnM" id="adbPil"></div>
+     <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="bt g" type="button" id="adbJalan">Mulai Adu BPR</button><span class="mu" id="adbMsg" style="font-size:12.5px"></span></div></div>
+  </div>
+  <div class="adu" id="aduHasil"></div>
+  <div id="adbHasil" style="margin-top:16px"></div>
+ </section>
  <section id="p-berita" class="pg" hidden>
   <h1>Berita Hari Ini</h1>
   <p class="mu">Berita terbaru dari Google News Indonesia, diperbarui tiap 20 menit. Klik judul untuk membaca di situs aslinya.</p>
@@ -2402,6 +2414,7 @@ function show(p) {
   if (p === "hutang") loadHutang();
   if (p === "anggota") loadAnggota();
   if (p === "panel") pnMuat();
+  if (p === "adu") { aduMuat(); adbMuat(); }
   if (p === "catatan") { loadCatatan(); ctTab(CT_TAB); }
   if (p === "blacklist") loadBlacklist();
   if (p === "sp") loadSP();
@@ -8392,7 +8405,7 @@ function pnRender() {
   const mati = new Set(d.hal_mati || []), fh = new Set(); d.fitur.filter(f => !f.aktif).forEach(f => (FITUR_HAL[f.id] || []).forEach(p => fh.add(p)));
   const hal = $$("#sd .nv[data-p]").filter(b => !["panel", "beranda"].includes(b.dataset.p)).map(b => ({p: b.dataset.p, nama: (b.childNodes[0] || b).textContent.trim()}));
   $("#pnHal").innerHTML = hal.map(h => `<div class="pnR"><div class="tx">${esc(h.nama)}${fh.has(h.p) ? '<small>mati karena fiturnya dimatikan</small>' : ""}</div>${pnSk(!mati.has(h.p) && !fh.has(h.p), `data-pnh="${h.p}" data-nama="${esc(h.nama)}" aria-label="${esc(h.nama)}" ${fh.has(h.p) ? "disabled" : ""}`)}</div>`).join("");
-  pnMeter(d); pnCad(d); pnKabar(d); pnHarga(d); pnZoho(d); if (!ADU.mesin.length) aduMuat();
+  pnMeter(d); pnCad(d); pnKabar(d); pnHarga(d); pnZoho(d);
   $("#pnRiwayat").innerHTML = d.riwayat.map(r => `<div><span class="mu">${esc(String(r.t || "").slice(0, 16).replace("T", " "))}</span> · ${esc(r.aksi)}</div>`).join("") || '<span class="mu">Belum ada perubahan.</span>';
 }
 $("#p-panel").addEventListener("click", async e => {
@@ -8458,6 +8471,35 @@ function pnCad(d) {
     + (g.tanya ? `<br><b>Graphify:</b> ${g.jalur} dari ${g.tanya} pertanyaan Pusat Info memakai jalur data; data yang dikirim ke AI ≈${Math.round(g.kirim / 4).toLocaleString("id-ID")} token dari ≈${Math.round(g.tanpa_peta / 4).toLocaleString("id-ID")} token tanpa peta (<b>hemat ${hm}%</b>).` : "<br>Graphify: belum ada pertanyaan Pusat Info sejak server menyala.");
 }
 let ADU = {mesin: [], skor: {}, pilih: []};
+let ADB = {pilih: [], batch: []}, ADB_T = null;
+async function adbMuat() {
+  clearTimeout(ADB_T);
+  try { if (!ADU.mesin.length) await aduMuat(); const d = await api("/api/adu/bpr"); ADB.batch = d.batch || []; adbRender(); } catch (e) { $("#adbMsg").textContent = e.message; }
+  if (ADB.batch.some(b => b.item.some(x => x.status === "proses")) && !$("#p-adu").hidden) ADB_T = setTimeout(adbMuat, 6000);
+}
+function adbRender() {
+  $("#adbPil").innerHTML = ADU.mesin.map(m => `<button type="button" class="${ADB.pilih.includes(m.id) ? "on" : ""}" data-adbm="${m.id}" ${m.siap ? "" : "disabled title=\"Belum aktif\""}>${esc(m.nama)}</button>`).join("");
+  $("#adbMsg").textContent = ADB.pilih.length ? `${ADB.pilih.length} dari maks 8 model dipilih` : "Centang model yang mau diuji";
+  const st = x => x.status === "proses" ? '<span class="ch">Sedang membuat…</span>' : x.status === "jadi" ? '<span class="ch g">Lolos</span>' : x.status === "gagal" ? '<span class="ch r">Gagal</span>' : `<span class="ch">${esc(x.status)}</span>`;
+  $("#adbHasil").innerHTML = ADB.batch.map(b => `<div class="cd" style="margin:0 0 12px"><b>${esc(b.ide)}</b><div class="mu" style="font-size:12px;margin:2px 0 8px">${esc(tglID((b.waktu || "").slice(0, 10)))} ${esc((b.waktu || "").slice(11, 16))}</div>
+    <div class="tb"><table style="font-size:13px"><thead><tr><th style="text-align:left">Model</th><th>Hasil</th><th>Putaran</th><th>Kesalahan per putaran</th><th>Langkah</th><th>Komponen</th><th>Waktu</th><th></th></tr></thead><tbody>`
+    + [...b.item].sort((p, q) => ((q.uji || {}).lolos ? 1 : 0) - ((p.uji || {}).lolos ? 1 : 0) || ((p.uji || {}).putaran || 9) - ((q.uji || {}).putaran || 9)).map(x => { const u = x.uji || {};
+      return `<tr><td style="text-align:left">${esc(x.nama)}</td><td>${st(x)}</td><td>${u.putaran || "–"}</td><td>${(u.kesalahan || []).join(" → ") || "–"}</td><td>${u.langkah ?? "–"}</td><td>${u.komponen ?? "–"}</td><td>${u.detik ? u.detik + " dtk" : "–"}</td>
+        <td>${x.status === "jadi" || x.status === "gagal" ? `<button class="bt o" type="button" data-adbb="${x.pid}" style="padding:4px 10px;font-size:12.5px">Buka</button>` : ""}</td></tr>`
+        + (u.galat ? `<tr><td colspan="8" class="mu" style="text-align:left;font-size:12px;padding-top:0">${esc(u.galat)}</td></tr>` : ""); }).join("") + "</tbody></table></div></div>").join("");
+}
+$("#adbPil").onclick = e => { const b = e.target.closest("[data-adbm]"); if (!b || b.disabled) return; const m = b.dataset.adbm;
+  ADB.pilih = ADB.pilih.includes(m) ? ADB.pilih.filter(x => x !== m) : [...ADB.pilih, m].slice(-8); adbRender(); };
+$("#adbHasil").onclick = e => { const b = e.target.closest("[data-adbb]"); if (!b) return; show("panduan"); setTimeout(() => pdBuka(+b.dataset.adbb), 300); };
+$("#adbJalan").onclick = async () => {
+  const ide = $("#adbIn").value.trim(); if (ide.length < 10) return pesan("Tulis ide rakitan dulu, minimal 10 huruf"); if (!ADB.pilih.length) return pesan("Pilih minimal 1 model");
+  const bayar = ADB.pilih.filter(m => /^(argon|claude|g1:|rf:|rt_)/.test(m)).map(m => (ADU.mesin.find(x => x.id === m) || {}).nama || m);
+  if (bayar.length && !confirm(`Model berbayar ikut diuji: ${bayar.join(", ")}. Satu BPR bisa memakai belasan ribu token per model. Lanjut?`)) return;
+  const b = $("#adbJalan"); b.disabled = true;
+  try { const d = await api("/api/adu/bpr", {json: {ide, mesin: ADB.pilih}}); ADB.batch = d.batch || []; adbRender(); pesan("Adu BPR dimulai. Hasil muncul otomatis di bawah."); ADB_T = setTimeout(adbMuat, 6000); }
+  catch (e) { alert(e.message); }
+  b.disabled = false;
+};
 async function aduMuat() { try { ADU = Object.assign(ADU, await api("/api/panel/adu")); ADU.pilih = ADU.pilih.length ? ADU.pilih : ADU.mesin.filter(m => m.siap).slice(0, 2).map(m => m.id); aduRender(); } catch (e) {} }
 function aduRender() {
   $("#aduPil").innerHTML = ADU.mesin.map(m => `<button type="button" class="${ADU.pilih.includes(m.id) ? "on" : ""}" data-adm="${m.id}" ${m.siap ? "" : "disabled title=\"Kunci belum diisi\""}>${esc(m.nama)}</button>`).join("");
@@ -8737,7 +8779,7 @@ const rpUsd = (t, kurs) => esc(t).replace(/\$(\d+(?:[.,]\d+)?)/g, (m, n) => { co
   if (RINGAN) { const vw = $("#voWrap"); if (vw) vw.hidden = true; const sl = $("#sl"); if (sl) sl.insertAdjacentHTML("beforebegin", '<p class="cd mu" id="voRingan" style="margin:0 0 12px">📱 <b>Mode HP Ringan</b> aktif: gedung 3D dimatikan supaya HP tidak berat. Status semua bot tetap tampil di bawah.</p>'); }
   $$(".nv").forEach(b => { const p = PAGE_PERM[b.dataset.p]; if (p && !can(p)) b.style.display = "none"; });
   if (!PUNYA_INBOX()) ["inbox", "bayarkas"].forEach(p => $(`.nv[data-p=${p}]`).style.display = "none");   // viewer tidak punya inbox & iuran
-  if (!ADM()) { $("#nvPanel").style.display = "none"; $("#nvGraf").style.display = "none"; }   // Panel CEO & Peta khusus CEO
+  if (!ADM()) { $("#nvPanel").style.display = "none"; $("#nvGraf").style.display = "none"; $("#nvAdu").style.display = "none"; }   // Panel CEO & Peta khusus CEO
   if (ME.role !== "viewer" && !(ME.fitur_mati || []).includes("absen")) api("/api/absen").then(d => { AB = d; const nb = $("#nbAbsen"); if (nb) nb.hidden = !(d.status === "belum"); }).catch(() => {});   // tanda "!" kalau belum absen
   if (!ADM() && !ME.anggota) $("#nvApex").style.display = "none";   // Tanya Apex: CEO + anggota (viewer tidak)
   inboxBadge(); setInterval(() => { if (!document.hidden && !layarDiam()) inboxBadge(); }, 20000);
