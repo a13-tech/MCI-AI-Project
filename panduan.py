@@ -92,7 +92,7 @@ def _volt_rentang(t):
     return (min(angka), max(angka))
 
 
-VERSI_ATURAN = 2   # naikkan setiap aturan pemeriksa diperketat: BPR lama dicek ulang otomatis
+VERSI_ATURAN = 3   # naikkan setiap aturan pemeriksa diperketat: BPR lama dicek ulang otomatis
 
 # Beban berat: arusnya jauh di atas kemampuan pin papan (maks ~20-40 mA), wajib lewat driver/MOSFET/relay.
 BEBAN_BERAT = re.compile(r"\b(motor|dinamo|dynamo|pompa|pump|kipas|fan|solenoid|stepper|vibrat\w*|getar|propeller|baling)", re.I)
@@ -126,6 +126,14 @@ def periksa(data):
     teks_semua = " ".join([str(data.get("judul", "")), str(data.get("ringkasan", ""))] + [str(x.get("nama", "")) for x in komp.values()])
     if BERBAHAYA.search(teks_semua):
         galat.append("Panduan menyentuh listrik tegangan tinggi (PLN/220V). Ini dilarang demi keselamatan; ganti dengan rangkaian tegangan rendah.")
+    papan_dobel = set()   # model sering menulis papan utama sebagai komponen; sambungannya diperlakukan sebagai PAPAN supaya pesan lain tidak berisik
+    for kid, x in list(komp.items()):
+        nmk = str(x.get("nama", ""))
+        if re.search(r"esp32|arduino\s*(uno|nano)|devkit|\buno\b|\bnano\b", nmk, re.I) and not re.search(r"shield|modul|module|cam|expansion|base|breakout|sensor|kabel|cable|usb", nmk, re.I):
+            papan_dobel.add(kid)
+            komp.pop(kid)
+            galat.append(f"{nmk} (id \"{kid}\") ditulis sebagai komponen di kantong. Papan utama JANGAN dimasukkan ke daftar komponen: "
+                         f"hapus komponen itu dan ganti setiap ujung \"{kid}:PIN\" menjadi \"PAPAN:PIN\" (mis. PAPAN:3V3, PAPAN:GND, PAPAN:GPIO21).")
     pinkomp = {}
     for kid, x in komp.items():
         pinkomp[kid] = {}
@@ -158,7 +166,7 @@ def periksa(data):
                 continue
             ujung = []
             for sisi in (a, b):
-                if sisi[0].upper() == "PAPAN":
+                if sisi[0].upper() == "PAPAN" or sisi[0].strip() in papan_dobel:
                     nm = normal_pin(pid, sisi[1])
                     info = P["pin"].get(nm)
                     if not info:

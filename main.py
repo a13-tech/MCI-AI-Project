@@ -6565,7 +6565,8 @@ _KODE_PAKSA = contextvars.ContextVar("kode_paksa", default="")   # Adu BPR: paks
 _BPR_INFO = contextvars.ContextVar("bpr_info", default=None)    # Adu BPR: catat putaran perbaikan & kesalahan
 
 
-ADU_COBA = 3   # Adu BPR: gangguan sementara (429 jatah/menit, 503 server penuh, timeout) dicoba ulang dengan jeda
+ADU_COBA = 4   # Adu BPR: gangguan sementara (429 jatah/menit, 503 server penuh, timeout) dicoba ulang dengan jeda 20/45/90 detik
+ADU_BASI_MENIT = 40   # Adu BPR tanpa kabar selama ini = terputus (mis. server dimulai ulang saat pembaruan)
 
 
 def _sementara(e):
@@ -6585,9 +6586,15 @@ async def _kode_paksa(m, sistem, prompt, act, schema):
             if json_mode and ("json_validate_failed" in t or "response_format" in t or "failed to generate json" in t):
                 json_mode = False   # biarkan model menulis bebas; _pd_json mengambil objek JSON dari teksnya
                 continue
+            if "413" in t or "tokens per minute" in t or "request too large" in t:
+                raise RuntimeError("Batas paket gratis penyedia ini (token per menit) lebih kecil dari ukuran satu BPR, jadi model ini tidak sanggup membuat BPR "
+                                   "kecuali paketnya dinaikkan.") from e
             if coba < ADU_COBA - 1 and _sementara(e):
-                await asyncio.sleep(20 if coba == 0 else 45)
+                await asyncio.sleep((20, 45, 90)[min(coba, 2)])
                 continue
+            if _sementara(e):
+                raise RuntimeError(f"Penyedia masih menolak setelah {ADU_COBA}x percobaan (jatah per menit/bulan habis atau server penuh). "
+                                   f"Coba lagi nanti. Pesan asli: {str(e)[:160]}") from e
             raise
 
 
@@ -7030,7 +7037,7 @@ def _pd_basi():
     """Panduan yang macet di status 'proses' (mis. server mulai ulang) ditandai gagal, dan jatahnya kembali."""
     batas = (datetime.now(WIB) - timedelta(minutes=9)).isoformat(timespec="seconds")
     with db() as c:
-        sql(c, "UPDATE panduan SET status='gagal', laporan=?, diubah=? WHERE status IN ('proses','menyusun') AND diubah<?",
+        sql(c, "UPDATE panduan SET status='gagal', laporan=?, diubah=? WHERE status IN ('proses','menyusun') AND diubah<? AND judul NOT LIKE 'Uji ·%'",   # Adu BPR punya penjaga sendiri (bisa >9 menit)
             (json.dumps({"galat": ["Pembuatan terhenti (server dimulai ulang atau terlalu lama). Jatahmu tidak terpakai; coba konfirmasi lagi."]}), _now(), batas))
 
 
@@ -7188,6 +7195,12 @@ async def panduan_bangun(permintaan, rencana, jawaban):
         if info is not None:
             info["putaran"] = putaran + 1
             info["kesalahan"].append(len(galat))
+            if info.get("pid"):   # tanda masih hidup untuk penjaga Adu BPR
+                try:
+                    with db() as c:
+                        sql(c, "UPDATE panduan SET diubah=? WHERE id=? AND status='proses'", (_now(), info["pid"]))
+                except Exception:
+                    pass
             if data is not None:
                 info["draf"], info["galat"] = data, galat   # draf terakhir disimpan supaya ide model tetap bisa dibaca walau gagal
         if data is not None and not galat:
@@ -15802,7 +15815,7 @@ ADU_BPR_MAKS = 8
 async def adu_bpr_satu(pid, m, ide):
     """Satu model: rencana -> panduan (maks 3 putaran perbaikan). Catat waktu, putaran, kesalahan."""
     _KODE_PAKSA.set(m)
-    info = {"putaran": 0, "kesalahan": [], "mulai": time.time(), "draf": None, "galat": []}
+    info = {"putaran": 0, "kesalahan": [], "mulai": time.time(), "draf": None, "galat": [], "pid": pid}
     _BPR_INFO.set(info)
     try:
         rc, _ = await panduan_rencana(ide)
@@ -15831,6 +15844,15 @@ async def adu_bpr_satu(pid, m, ide):
                 (json.dumps(info["draf"], ensure_ascii=False) if info["draf"] else None,
                  json.dumps({"galat": [g] + [x for x in info["galat"] if x not in g][:6], "uji": uji}, ensure_ascii=False),
                  (f"Uji · {dict(adu_mesin()).get(m, m)}: {info['draf'].get('judul')}"[:120] if info["draf"] and info["draf"].get("judul") else None), _now(), pid))
+
+
+def adu_bpr_basi(semua=False):
+    """Adu BPR yang macet 'proses' (server dimulai ulang / tanpa kabar ADU_BASI_MENIT menit) ditandai gagal supaya bisa dicoba lagi."""
+    batas = (datetime.now(WIB) - timedelta(minutes=0 if semua else ADU_BASI_MENIT)).isoformat(timespec="seconds")
+    g = "Pembuatan terputus: server web dimulai ulang (mis. saat pembaruan) atau model tidak memberi kabar terlalu lama. Klik Coba lagi."
+    with db() as c:
+        sql(c, "UPDATE panduan SET status='gagal', laporan=?, diubah=? WHERE status='proses' AND judul LIKE 'Uji ·%' AND diubah<=?",
+            (json.dumps({"galat": [g], "uji": {"lolos": False, "putaran": 0, "kesalahan": [], "detik": 0, "galat": g, "draf": False}}, ensure_ascii=False), _now(), batas))
 
 
 async def adu_bpr_jalan(tugas, ide):
@@ -15877,6 +15899,7 @@ def api_adu_bpr():
         set_save()
         asyncio.run_coroutine_threadsafe(adu_bpr_jalan(tugas, ide), LOOP)
         audit("panduan", "adu_bpr", ide[:120], oleh=nama_peran(r))
+    adu_bpr_basi()
     out = []
     for b in reversed(SET.get("adu_bpr") or []):
         item = []
@@ -17463,6 +17486,10 @@ if __name__ == "__main__":
             SET["mig_kas_tunda_1118"] = True
             set_save()
         threading.Thread(target=bpr_cek_ulang, daemon=True).start()   # aturan pemeriksa BPR diperketat -> cek ulang BPR lama
+        try:
+            adu_bpr_basi(semua=True)   # server baru menyala: pekerjaan Adu BPR lama pasti sudah mati
+        except Exception:
+            log.exception("Penjaga Adu BPR gagal")
         if "fitur_mati" not in SET:   # pertama kali Panel CEO aktif: absen langsung dimatikan (permintaan CEO, 16 Nov 2026)
             SET["fitur_mati"] = ["absen"]
             panel_catat("Absen dimatikan (awal Panel CEO)")
