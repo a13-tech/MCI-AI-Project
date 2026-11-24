@@ -7124,12 +7124,58 @@ async def panduan_rencana(permintaan, jawaban_lama=None, rencana_lama=None, scra
     return d, mesin
 
 
+SISTEM_MENTOR = """Kamu MENTOR elektronika MCI. Model lain sedang menulis Buku Panduan Rakit (data JSON) dan mesin pemeriksa MCI menemukan kesalahan.
+Tugasmu RINGAN: JANGAN menulis ulang panduan. Beri petunjuk perbaikan singkat dan konkret untuk SETIAP kesalahan, maksimal 12 butir, masing-masing 1-2 kalimat.
+Sebut persis apa yang diganti, mis. "Pindahkan sambungan hcsr04:ECHO dari PAPAN:GPIO34 ke PAPAN:GPIO18 dan ubah const int PIN_ECHO = 18;" atau
+"Tambahkan komponen r1 (Resistor 220 ohm) lalu sambung PAPAN:D9 -> r1:1 dan r1:2 -> led1:A".
+Periksa terhadap peta pin papan dan aturan keamanan (LED wajib resistor, motor wajib driver, GND bersama, pin kode = pin kabel). Jangan menambah fitur baru. Bahasa Indonesia, teks biasa (bukan JSON)."""
+
+
+def bpr_mentor():
+    """Model mentor BPR (atur di Panel CEO > Model per tugas). Bawaan Gemini Flash; 'mati' = tanpa mentor."""
+    m = str(SET.get("bpr_mentor") or "flash")
+    return "" if m == "mati" else m
+
+
+def _mentor_ringkas(data, galat):
+    """Potongan seperlunya untuk mentor: komponen + pin, daftar kabel, dan kode hanya kalau kesalahannya soal kode."""
+    komp = [{"id": x.get("id"), "nama": x.get("nama"), "pin": [{k: p.get(k) for k in ("nama", "jenis", "arah", "tegangan", "level", "analog", "pwm", "bus") if p.get(k) not in (None, "", False, 0)}
+                                                           for p in (x.get("pin") or []) if isinstance(p, dict)]}
+            for k in (data.get("kantong") or []) if isinstance(k, dict) for x in (k.get("komponen") or []) if isinstance(x, dict)]
+    kabel = [f"L{i}: {sb.get('dari')} -> {sb.get('ke')}" + (" (pembagi_tegangan)" if sb.get("pembagi_tegangan") else "")
+             for i, lg in enumerate(data.get("langkah") or [], 1) if isinstance(lg, dict) for sb in (lg.get("sambungan") or []) if isinstance(sb, dict)]
+    teks = f"PAPAN: {data.get('papan')}\nKOMPONEN: {json.dumps(komp, ensure_ascii=False)[:9000]}\nKABEL:\n" + "\n".join(kabel)[:6000]
+    if any(re.search(r"kode|pin \w+ disambung ke komponen, tetapi|Serial|pustaka|Wire", g, re.I) for g in galat):
+        teks += "\n\nKODE:\n" + str(data.get("kode") or "")[:9000]
+    return teks
+
+
+async def bpr_minta_mentor(data, teks_mentah, galat, pekerja):
+    """Mentor memberi petunjuk singkat (bukan menulis ulang). Gagal/mentor sama dengan pekerja -> tanpa petunjuk, BPR tetap jalan."""
+    m = bpr_mentor()
+    alias = {"gemini": "flash"}
+    if not m or m == alias.get(pekerja, pekerja) or m not in dict(adu_mesin()) or not adu_siap(m):
+        return "", ""
+    isi = _mentor_ringkas(data, galat) if data else f"(Jawaban model belum berupa JSON sah. Potongan jawabannya:)\n{str(teks_mentah)[:3000]}"
+    prompt = isi + "\n\nKESALAHAN DARI MESIN PEMERIKSA:\n- " + "\n- ".join(galat[:15]) + "\n\nBeri petunjuk perbaikan singkat untuk setiap kesalahan."
+    lama = _KODE_PAKSA.set("")   # mentor tidak ikut aturan "paksa satu mesin" milik pekerja
+    try:
+        jawab = await asyncio.wait_for(_kode_paksa_sekali(m, SISTEM_MENTOR, prompt, "Mentor BPR", None, False), timeout=180)
+        return str(jawab or "").strip()[:4000], dict(adu_mesin()).get(m, m)
+    except Exception as e:
+        log.warning("Mentor BPR %s gagal: %s", m, str(e)[:150])
+        return "", ""
+    finally:
+        _KODE_PAKSA.reset(lama)
+
+
 async def panduan_bangun(permintaan, rencana, jawaban):
     """AI menulis panduan -> mesin memeriksa sambungan -> kalau ada galat, AI memperbaiki (maks 3 putaran)."""
     dasar = (f"PERMINTAAN ANGGOTA:\n{permintaan}\n\nRENCANA YANG SUDAH DIKONFIRMASI:\n{json.dumps(rencana, ensure_ascii=False)}"
              + (f"\n\nJAWABAN / CATATAN ANGGOTA:\n{jawaban}" if jawaban else "") + f"\n\nPapan WAJIB: {rencana.get('papan')}.")
     prompt, data, galat, waspada, mesin = dasar, None, [], [], "gemini"
     info = _BPR_INFO.get()
+    bantu = {"kali": 0, "model": ""}
     batas = 4 if info is not None else 3   # Adu BPR: satu kesempatan perbaikan tambahan supaya model yang lebih lambat belajar tetap terukur
     for putaran in range(batas):
         teks, mesin = await kode_ai(SISTEM_PANDUAN + (SCRATCH_ATURAN if rencana.get("scratch") else ""), prompt, "Menulis panduan rakit", schema=PanduanRakit)
@@ -7148,11 +7194,19 @@ async def panduan_bangun(permintaan, rencana, jawaban):
             break
         if putaran == batas - 1:
             break
+        petunjuk, nama_m = await bpr_minta_mentor(data, teks, galat, _KODE_PAKSA.get() or mesin)
+        if petunjuk:
+            bantu = {"kali": bantu["kali"] + 1, "model": nama_m}
+            if info is not None:
+                info["mentor"], info["mentor_model"] = bantu["kali"], nama_m
         prompt = (f"{dasar}\n\nPANDUAN KAMU SEBELUMNYA:\n{json.dumps(data, ensure_ascii=False)[:30000] if data else teks[:4000]}\n\n"
                   "MESIN PEMERIKSA MENEMUKAN KESALAHAN:\n- " + "\n- ".join(galat) + "\n\nPerbaiki SEMUA kesalahan di atas tanpa membuat kesalahan baru: cek peta pin papan, "
-                  "pastikan pin di kode sama persis dengan sambungan, dan ikuti aturan KEAMANAN. Keluarkan panduan LENGKAP yang benar dalam JSON yang sah.")
+                  "pastikan pin di kode sama persis dengan sambungan, dan ikuti aturan KEAMANAN. Keluarkan panduan LENGKAP yang benar dalam JSON yang sah."
+                  + (f"\n\nPETUNJUK DARI MENTOR ({nama_m}), ikuti kalau sesuai peta pin:\n{petunjuk}" if petunjuk else ""))
     if data is None or galat:
         raise RuntimeError("; ".join(galat[:6]) or "AI belum berhasil membuat panduan yang sah.")
+    if bantu["kali"]:
+        data["mentor_bantu"] = bantu   # ditampilkan di halaman BPR: "Diperbaiki dengan bantuan mentor ..."
     return data, waspada, mesin
 
 
@@ -15171,6 +15225,11 @@ def panel_data():
     teks = [{"env": k, "label": label, "nilai": os.getenv(k, ""), "sumber": "panel" if k in simpan else ("render" if ENV_ASLI.get(k) else "")} for k, label in TEKS_DAFTAR]
     model = [{"id": t, "judul": m["judul"], "ket": m["ket"], "dipakai": model_tugas(t),
               "pilihan": [{"id": p, "nama": n, "harga": h, "siap": _model_siap(t, p)} for p, n, h in m["pilihan"]]} for t, m in MODEL_TUGAS.items()]
+    model.append({"id": "mentor_bpr", "judul": "Mentor Buku Panduan Rakit",
+                         "ket": "Kalau mesin pemeriksa menemukan kesalahan, model ini memberi petunjuk singkat perbaikan; model pembuat BPR yang memperbaiki. Ringan: tidak menulis ulang panduan.",
+                         "dipakai": SET.get("bpr_mentor") or "flash",
+                         "pilihan": [{"id": "mati", "nama": "Tanpa mentor", "harga": "", "siap": True}]
+                                    + [{"id": k, "nama": n, "harga": "", "siap": adu_siap(k)} for k, n in adu_mesin()]})
     return {"fitur": [{"id": k, "nama": n, "ket": ket, "aktif": fitur_on(k)} for k, n, ket in FITUR_DAFTAR], "hal_mati": SET.get("hal_mati") or [],
             "kunci": kunci, "teks": teks, "model": model, "riwayat": list(reversed(SET.get("panel_log") or []))[:60],
             "sidik_cocok": rh.get("sidik", _sidik()) == _sidik(), "pin_menit": PANEL_PIN_MENIT,
@@ -15203,6 +15262,14 @@ def api_panel():
                 return jsonify({"error": "Halaman ini tidak bisa dimatikan"}), 400
             SET["hal_mati"] = [x for x in (SET.get("hal_mati") or []) if x != p] + ([] if on else [p])
             panel_catat(f"Halaman {str(d.get('nama') or p)[:40]} {'dinyalakan' if on else 'dimatikan'}")
+        elif aksi == "model" and str(d.get("tugas")) == "mentor_bpr":
+            p = str(d.get("id") or "")
+            if p != "mati" and p not in dict(adu_mesin()):
+                return jsonify({"error": "Pilihan tidak dikenal"}), 400
+            if p != "mati" and not adu_siap(p):
+                return jsonify({"error": "Model ini belum siap (kunci kosong atau anggaran habis)"}), 400
+            SET["bpr_mentor"] = p
+            panel_catat("Mentor BPR: " + ("dimatikan" if p == "mati" else dict(adu_mesin())[p]))
         elif aksi == "model":
             t, p = str(d.get("tugas") or ""), str(d.get("id") or "")
             if t not in MODEL_TUGAS or p not in [x[0] for x in MODEL_TUGAS[t]["pilihan"]]:
@@ -15746,6 +15813,7 @@ async def adu_bpr_satu(pid, m, ide):
             sql(c, "UPDATE panduan SET rencana=?, papan=?, diubah=? WHERE id=?", (json.dumps(rc, ensure_ascii=False), rc["papan"], _now(), pid))
         data, waspada, _ = await panduan_bangun(ide, rc, "(Uji Adu BPR: tidak ada jawaban tambahan, pakai pilihan paling umum dan aman.)")
         uji = {"lolos": True, "putaran": info["putaran"], "kesalahan": info["kesalahan"], "detik": round(time.time() - info["mulai"]), "peringatan": len(waspada),
+               "mentor": info.get("mentor", 0), "mentor_model": info.get("mentor_model", ""),
                "langkah": len(data.get("langkah") or []), "komponen": sum(len(k.get("komponen") or []) for k in (data.get("kantong") or []) if isinstance(k, dict))}
         nm = dict(adu_mesin()).get(m, m)
         with db() as c:
@@ -15756,7 +15824,8 @@ async def adu_bpr_satu(pid, m, ide):
         g = (str(e) or type(e).__name__)[:400]
         if "timed out" in g.lower():
             g = f"Model terlalu lama menjawab (lebih dari 10 menit per putaran), sudah dicoba {ADU_COBA}x. " + ("Draf putaran terakhir tetap bisa dibuka." if info["draf"] else "")
-        uji = {"lolos": False, "putaran": info["putaran"], "kesalahan": info["kesalahan"], "detik": round(time.time() - info["mulai"]), "galat": g, "draf": bool(info["draf"])}
+        uji = {"lolos": False, "putaran": info["putaran"], "kesalahan": info["kesalahan"], "detik": round(time.time() - info["mulai"]), "galat": g, "draf": bool(info["draf"]),
+               "mentor": info.get("mentor", 0), "mentor_model": info.get("mentor_model", "")}
         with db() as c:
             sql(c, "UPDATE panduan SET status='gagal', data=?, laporan=?, judul=COALESCE(?, judul), diubah=? WHERE id=?",
                 (json.dumps(info["draf"], ensure_ascii=False) if info["draf"] else None,
