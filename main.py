@@ -6639,7 +6639,16 @@ def _json_dari(teks):
     a, b = t.find("{"), t.rfind("}")
     if a < 0 or b <= a:
         raise ValueError("AI tidak mengembalikan JSON")
-    return json.loads(t[a:b + 1])
+    inti = t[a:b + 1]
+    try:
+        return json.loads(inti)
+    except ValueError as e:   # perbaiki kesalahan JSON yang sering dibuat model kecil, lalu coba sekali lagi
+        r = re.sub(r",\s*([}\]])", r"\1", inti)                 # koma sisa sebelum } atau ]
+        r = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", " ", r)   # karakter kontrol nyasar
+        try:
+            return json.loads(r, strict=False)              # strict=False: izinkan baris baru mentah di dalam string (kode Arduino)
+        except ValueError:
+            raise e
 
 
 class Irisan3D(BaseModel):
@@ -6953,6 +6962,14 @@ ATURAN DATA (wajib, mesin akan menolak kalau salah):
 8. langkah: 4-10 langkah, tiap langkah 1-6 kabel. Langkah 1 biasanya memasang papan di breadboard. penjelasan: apa yang dilakukan dan KENAPA (beri perumpamaan sederhana). checkpoint: cara memastikan langkah ini benar sebelum lanjut. peringatan: kosongkan kalau tidak ada.
 9. kode: sketsa Arduino lengkap yang bisa langsung diunggah, pin di kode SAMA dengan sambungan, komentar bahasa Indonesia. pustaka: nama library di Library Manager (kosong kalau tidak perlu).
 10. uji: 3-6 masalah umum (mis. "Serial Monitor menampilkan tulisan aneh") beserta penyebab dan solusinya.
+11. KEAMANAN (mesin MCI menolak kalau dilanggar):
+   - LED biasa WAJIB lewat resistor 220Ω seri (tulis resistornya sebagai komponen dan sambungkan GPIO -> resistor -> LED).
+   - Motor DC, dinamo, pompa, kipas, solenoid, stepper TIDAK BOLEH langsung ke pin papan: pakai driver (L298N/TB6612/ULN2003), MOSFET, atau relay, dengan catu terpisah dan GND bersama.
+   - Lebih dari 1 servo: daya dari catu 5V terpisah (mis. modul step-down), GND disambung ke GND papan.
+   - Setiap GND komponen harus nyambung ke GND papan (langsung atau lewat GND catu daya). Jangan pernah satukan 5V dengan 3V3, atau daya dengan GND, walau lewat kabel berantai.
+12. KODE (mesin MCI memeriksa): wajib void setup() dan void loop(); kurung harus seimbang; definisikan setiap pin sebagai konstanta (mis. const int PIN_TRIG = 5;) dan pakai di kode;
+   SETIAP pin GPIO yang disambung harus dipakai di kode dan SETIAP pin di kode harus disambung. Uno/Nano tidak boleh memakai WiFi/ledc/esp_. ESP32 pakai ESP32Servo.h, bukan Servo.h. Serial.begin(115200).
+   Semua #include selain pustaka bawaan harus tercantum di "pustaka".
 DILARANG: listrik PLN/220V, senjata, penyadap, jammer. Bahasa Indonesia sederhana. JSON saja."""
 
 
@@ -7022,7 +7039,8 @@ def _pd_ringkas(x):
     return {"id": x["id"], "judul": x.get("judul") or rc.get("judul") or str(x.get("permintaan") or "Panduan")[:80], "papan": x.get("papan") or rc.get("papan") or "",
             "papan_nama": rakit.PAPAN.get(x.get("papan") or "", {}).get("nama", ""), "status": x["status"], "oleh": x.get("oleh") or "",
             "oleh_id": x.get("oleh_id"), "dibuat": x.get("dibuat") or "", "diubah": x.get("diubah") or "", "proyek_id": x.get("proyek_id"),
-            "kesulitan": rc.get("kesulitan", ""), "langkah": len((x.get("data") or {}).get("langkah") or [])}
+            "kesulitan": rc.get("kesulitan", ""), "langkah": len((x.get("data") or {}).get("langkah") or []),
+            "perlu_cek": bool(((x.get("laporan") or {}).get("cek_ulang") or {}).get("galat")) if isinstance(x.get("laporan"), dict) else False}
 
 
 def panduan_payload(r):
@@ -7112,7 +7130,8 @@ async def panduan_bangun(permintaan, rencana, jawaban):
              + (f"\n\nJAWABAN / CATATAN ANGGOTA:\n{jawaban}" if jawaban else "") + f"\n\nPapan WAJIB: {rencana.get('papan')}.")
     prompt, data, galat, waspada, mesin = dasar, None, [], [], "gemini"
     info = _BPR_INFO.get()
-    for putaran in range(3):
+    batas = 4 if info is not None else 3   # Adu BPR: satu kesempatan perbaikan tambahan supaya model yang lebih lambat belajar tetap terukur
+    for putaran in range(batas):
         teks, mesin = await kode_ai(SISTEM_PANDUAN + (SCRATCH_ATURAN if rencana.get("scratch") else ""), prompt, "Menulis panduan rakit", schema=PanduanRakit)
         try:
             data = _pd_json(teks)
@@ -7127,13 +7146,39 @@ async def panduan_bangun(permintaan, rencana, jawaban):
                 info["draf"], info["galat"] = data, galat   # draf terakhir disimpan supaya ide model tetap bisa dibaca walau gagal
         if data is not None and not galat:
             break
-        if putaran == 2:
+        if putaran == batas - 1:
             break
         prompt = (f"{dasar}\n\nPANDUAN KAMU SEBELUMNYA:\n{json.dumps(data, ensure_ascii=False)[:30000] if data else teks[:4000]}\n\n"
-                  "MESIN PEMERIKSA MENEMUKAN KESALAHAN:\n- " + "\n- ".join(galat) + "\n\nPerbaiki semua kesalahan di atas (periksa peta pin papan), lalu keluarkan panduan LENGKAP yang benar.")
+                  "MESIN PEMERIKSA MENEMUKAN KESALAHAN:\n- " + "\n- ".join(galat) + "\n\nPerbaiki SEMUA kesalahan di atas tanpa membuat kesalahan baru: cek peta pin papan, "
+                  "pastikan pin di kode sama persis dengan sambungan, dan ikuti aturan KEAMANAN. Keluarkan panduan LENGKAP yang benar dalam JSON yang sah.")
     if data is None or galat:
         raise RuntimeError("; ".join(galat[:6]) or "AI belum berhasil membuat panduan yang sah.")
     return data, waspada, mesin
+
+
+def bpr_cek_ulang():
+    """Saat aturan pemeriksa diperketat (rakit.VERSI_ATURAN naik), BPR lama dicek ulang. Yang ketahuan salah diberi label, tidak dihapus."""
+    if SET.get("bpr_versi_cek") == rakit.VERSI_ATURAN:
+        return
+    with db() as c:
+        rows = sql(c, "SELECT id, data, laporan FROM panduan WHERE status='jadi' AND data IS NOT NULL").fetchall()
+    jumlah = 0
+    for i, d, lp in rows:
+        try:
+            data = json.loads(d) if isinstance(d, str) else d
+            lap = (json.loads(lp) if isinstance(lp, str) else lp) or {}
+            galat, waspada = rakit.periksa(data)
+        except Exception:
+            log.exception("cek ulang BPR %s gagal", i)
+            continue
+        lap["cek_ulang"] = {"versi": rakit.VERSI_ATURAN, "tanggal": _now(), "galat": galat}
+        if galat:
+            jumlah += 1
+        with db() as c:
+            sql(c, "UPDATE panduan SET laporan=? WHERE id=?", (json.dumps(lap, ensure_ascii=False), i))
+    SET["bpr_versi_cek"] = rakit.VERSI_ATURAN
+    set_save()
+    panel_catat(f"Pemeriksa BPR v{rakit.VERSI_ATURAN}: {len(rows)} BPR lama dicek ulang, {jumlah} perlu diperbaiki")
 
 
 def _pd_selesai(i, oleh_id, fut):
@@ -17348,6 +17393,7 @@ if __name__ == "__main__":
             iuran_set()["keluar_tunda"] = True
             SET["mig_kas_tunda_1118"] = True
             set_save()
+        threading.Thread(target=bpr_cek_ulang, daemon=True).start()   # aturan pemeriksa BPR diperketat -> cek ulang BPR lama
         if "fitur_mati" not in SET:   # pertama kali Panel CEO aktif: absen langsung dimatikan (permintaan CEO, 16 Nov 2026)
             SET["fitur_mati"] = ["absen"]
             panel_catat("Absen dimatikan (awal Panel CEO)")

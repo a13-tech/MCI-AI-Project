@@ -7607,7 +7607,7 @@ function pdDaftar() {
   PD_X = null; $("#pdAtas").hidden = false;
   const saya = PD.daftar.filter(x => x.oleh_id === PD.me && PD.me != null), lain = PD.daftar.filter(x => !(x.oleh_id === PD.me && PD.me != null));
   const kartu = x => `<article class="it2 pdK" data-pdb="${x.id}" tabindex="0" role="button"><div class="ey">${esc(x.papan_nama || "Papan dipilih AI")}${x.kesulitan ? " · " + esc(x.kesulitan) : ""}</div><h3>${esc(x.judul)}</h3>
-    <div class="meta">${pdCh(x.status)}${x.langkah ? `<span>${x.langkah} langkah</span>` : ""}<span>Oleh ${esc(x.oleh)}</span><span>${esc(tglID(x.diubah || x.dibuat))}</span>${x.proyek_id ? '<span class="ch">Tertaut ke proyek</span>' : ""}</div></article>`;
+    <div class="meta">${pdCh(x.status)}${x.langkah ? `<span>${x.langkah} langkah</span>` : ""}<span>Oleh ${esc(x.oleh)}</span><span>${esc(tglID(x.diubah || x.dibuat))}</span>${x.proyek_id ? '<span class="ch">Tertaut ke proyek</span>' : ""}${x.perlu_cek ? '<span class="ch r">Perlu dicek ulang</span>' : ""}</div></article>`;
   let h = "";
   if (saya.length) h += `<h2 class="pdH">Panduanku</h2><div class="pdG">${saya.map(kartu).join("")}</div>`;
   if (lain.length) h += `<h2 class="pdH">${PD.admin ? "Semua panduan" : "Panduan anggota lain"}</h2><div class="pdG">${lain.map(kartu).join("")}</div>`;
@@ -7658,6 +7658,8 @@ function pdDetail() {
   PD_L = Math.max(0, Math.min(PD_L, L.length - 1));
   const lg = L[PD_L] || {};
   const war = (x.laporan || {}).peringatan || [];
+  const cu = (x.laporan || {}).cek_ulang;
+  if (cu && (cu.galat || []).length) h += `<div class="pdWarn r" style="margin:0 0 12px"><b>Pemeriksa MCI versi ${esc(cu.versi)} menemukan masalah di panduan ini.</b> Panduan dibuat sebelum aturan diperketat. Perbaiki dulu sebelum merakit:<ul style="margin:6px 0 0;padding-left:18px">${cu.galat.slice(0, 8).map(g => `<li>${esc(g)}</li>`).join("")}</ul></div>`;
   if (x.draf) h += `<div class="pdWarn r" style="margin:0 0 12px"><b>Draf gagal pemeriksaan sambungan, jangan dirakit apa adanya.</b> Ini versi terakhir buatan model sebelum Adu BPR berhenti. Masalah yang ditemukan: ${esc(((x.laporan || {}).galat || []).join(" · "))}</div>`;
   h += `<article class="it2"><div class="ey">Buku panduan · ${esc(d.papan_nama)}</div><h3>${esc(d.judul)}</h3>${chips}<div class="bd">${esc(d.ringkasan || "")}</div>
     <div class="meta" style="margin-top:10px"><span>Perkiraan biaya: <b>${pdRp(d.biaya.min, d.biaya.max)}</b></span><span>${L.length} langkah</span>${x.proyek ? `<span class="ch">Proyek: ${esc(x.proyek.nama)}</span>` : ""}</div>

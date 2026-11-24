@@ -92,6 +92,15 @@ def _volt_rentang(t):
     return (min(angka), max(angka))
 
 
+VERSI_ATURAN = 2   # naikkan setiap aturan pemeriksa diperketat: BPR lama dicek ulang otomatis
+
+# Beban berat: arusnya jauh di atas kemampuan pin papan (maks ~20-40 mA), wajib lewat driver/MOSFET/relay.
+BEBAN_BERAT = re.compile(r"\b(motor|dinamo|dynamo|pompa|pump|kipas|fan|solenoid|stepper|vibrat\w*|getar|propeller|baling)", re.I)
+PENGENDALI = re.compile(r"(driver|l298|l293|l9110|tb6612|drv88|uln2003|a4988|drv8825|mosfet|irf\d|transistor|tip12|relay|relai|\besc\b|modul\s*motor|motor\s*shield)", re.I)
+SERVO = re.compile(r"\bservo\b|sg90|mg90|mg996", re.I)
+SUMBER_DAYA = re.compile(r"(baterai|battery|batre|\baki\b|regulator|buck|boost|step\s*(up|down)|lm2596|ams1117|mt3608|xl6009|tp4056|adaptor|adapter|power\s*supply|catu|\bpsu\b|holder|18650|li-?ion|solar|panel\s*surya|powerbank|modul\s*daya|usb\s*power)", re.I)
+RESISTOR = re.compile(r"resist|hambatan|ohm|Ω", re.I)
+
 BERBAHAYA = re.compile(r"\b(220\s*v|230\s*v|110\s*v|listrik\s*(pln|rumah)|tegangan\s*tinggi|stop\s*kontak|colokan\s*listrik|mains|ac\s*220)\b", re.I)
 
 
@@ -129,6 +138,15 @@ def periksa(data):
     gnd_papan = set()     # komponen yang GND-nya nyambung ke GND board (langsung/lewat komponen lain dicek sederhana)
     sambung_komp = {}     # komponen -> set komponen tetangga
     led_langsung = set()
+    papan_sambung = {}    # komponen -> [(pin papan, tipe pin papan, pin komponen, jenis pin komponen)]
+    induk = {}            # union-find jaringan kabel: simpul "P:<pin papan>" atau "K:<id>:<PIN>"
+
+    def akar(x):
+        induk.setdefault(x, x)
+        while induk[x] != x:
+            induk[x] = induk[induk[x]]
+            x = induk[x]
+        return x
     nomor = 0
     for li, lg in enumerate(data.get("langkah") or [], 1):
         for s in lg.get("sambungan") or []:
@@ -167,6 +185,9 @@ def periksa(data):
             if None in ujung or len(ujung) != 2:
                 continue
             u1, u2 = ujung
+            k1 = f"P:{u1[1]}" if u1[0] == "PAPAN" else f"K:{u1[0]}:{u1[1]}"
+            k2 = f"P:{u2[1]}" if u2[0] == "PAPAN" else f"K:{u2[0]}:{u2[1]}"
+            induk[akar(k1)] = akar(k2)
             if u1[0] == "PAPAN" and u2[0] == "PAPAN":
                 galat.append(f"{label}: dua pin board disambung langsung (bisa korsleting).")
                 continue
@@ -184,6 +205,7 @@ def periksa(data):
                 continue
             jenis = str(pk.get("jenis", "")).lower()
             nkomp = komp[kid].get("nama", kid)
+            papan_sambung.setdefault(kid, []).append((nm, info["tipe"], pn, jenis))
             if info["tipe"] == "gnd":
                 if jenis == "daya":
                     galat.append(f"{label}: pin daya {nkomp} ({pn}) disambung ke GND (korsleting).")
@@ -258,8 +280,16 @@ def periksa(data):
                 galat.append(f"Pin {pn} pada {nkomp} belum disambung. Setiap pin daya dan GND wajib tersambung.")
     for kid in led_langsung:
         tetangga = sambung_komp.get(kid, set())
-        if not any(re.search(r"resist|hambatan|ohm|Ω", str(komp[t].get("nama", "")), re.I) for t in tetangga):
-            waspada.append(f"{komp[kid].get('nama', kid)} tersambung langsung ke pin board. Pastikan ada resistor 220Ω seri supaya LED dan pin tidak rusak.")
+        nmk = str(komp[kid].get("nama", kid))
+        if re.search(r"modul|module", nmk, re.I):   # modul LED sudah punya resistor di papannya
+            continue
+        if not any(RESISTOR.search(str(komp[t].get("nama", ""))) for t in tetangga):
+            galat.append(f"{nmk} tersambung langsung ke pin GPIO tanpa resistor seri. Tambahkan resistor 220Ω di antara pin papan dan kaki anoda LED "
+                         "supaya arus tidak melebihi batas pin dan LED tidak terbakar.")
+    galat += _cek_jaringan(induk, akar, P, komp, pinkomp)
+    g2, w2 = _cek_beban(komp, papan_sambung, pid)
+    galat += g2
+    waspada += w2
     sumber = [kid for kid, pins in pinkomp.items() if any(str(p.get("jenis", "")).lower() == "sumber_gnd" for p in pins.values())]
     for kid in sumber:
         if not any(str(pinkomp[kid][pn].get("jenis", "")).lower() == "sumber_gnd" and (kid, pn) in terhubung for pn in pinkomp[kid]):
@@ -268,7 +298,191 @@ def periksa(data):
         galat.append("Panduan belum punya langkah.")
     if len(str(data.get("kode") or "").strip()) < 40:
         galat.append("Kode Arduino belum ditulis.")
-    return list(dict.fromkeys(galat))[:25], list(dict.fromkeys(waspada))[:20]
+    else:
+        g3, w3 = periksa_kode(data, pid, set(pakai_gpio), {nm for nm, isi in pakai_gpio.items() if any(b for _, _, b in isi)})
+        galat += g3
+        waspada += w3
+    return list(dict.fromkeys(galat))[:30], list(dict.fromkeys(waspada))[:24]
+
+
+def _cek_jaringan(induk, akar, P, komp, pinkomp):
+    """Lacak kabel berantai (A ke B, B ke C = satu jaringan). Menangkap korsleting tidak langsung yang lolos dari cek per kabel."""
+    galat, jar = [], {}
+    for x in list(induk):
+        jar.setdefault(akar(x), []).append(x)
+
+    def jenis_k(x):
+        _, kid, pn = x.split(":", 2)
+        return str((pinkomp.get(kid, {}).get(pn) or {}).get("jenis", "")).lower()
+
+    def nama_simpul(x):
+        if x.startswith("P:"):
+            return f"pin papan {x[2:]}"
+        _, kid, pn = x.split(":", 2)
+        return f"{komp.get(kid, {}).get('nama', kid)} ({pn})"
+
+    for isi in jar.values():
+        daya, gnd, gpio, kdaya, kgnd, ksumber, sgnd = set(), False, set(), [], [], False, False
+        for x in isi:
+            if x.startswith("P:"):
+                t = (P["pin"].get(x[2:]) or {}).get("tipe")
+                if t == "daya":
+                    daya.add(x[2:])
+                elif t == "gnd":
+                    gnd = True
+                elif t == "gpio":
+                    gpio.add(x[2:])
+            else:
+                j = jenis_k(x)
+                if j == "daya":
+                    kdaya.append(x)
+                    if SUMBER_DAYA.search(str(komp.get(x.split(":", 2)[1], {}).get("nama", ""))):
+                        ksumber = True
+                elif j in ("gnd", "sumber_gnd"):
+                    kgnd.append(x)
+                    sgnd = sgnd or j == "sumber_gnd"
+        rantai = len(isi) > 2   # sambungan langsung 2 simpul sudah dicek per kabel
+        ringkas = ", ".join(nama_simpul(x) for x in sorted(isi)[:6])
+        volt = {P["pin"][d].get("volt") for d in daya if not P["pin"][d].get("vin")}
+        if len(volt) > 1:
+            galat.append(f"Jaringan kabel menyatukan {' dan '.join(sorted(daya))} (dua tegangan berbeda bertemu, korsleting): {ringkas}.")
+        if (daya or ksumber) and (gnd or kgnd) and rantai:
+            galat.append(f"Korsleting lewat kabel berantai: jalur daya dan GND bertemu di satu jaringan ({ringkas}).")
+        if gpio and (daya or gnd) and rantai:
+            galat.append(f"Pin {', '.join(sorted(gpio))} tersambung langsung ke {'daya' if daya else 'GND'} lewat kabel berantai ({ringkas}). Pin GPIO bisa rusak.")
+        if len(gpio) > 1:
+            galat.append(f"Dua pin papan ({', '.join(sorted(gpio))}) tersambung menjadi satu jaringan ({ringkas}). Satu jalur sinyal hanya untuk satu pin papan.")
+        if kgnd and not gnd and not sgnd:
+            galat.append(f"GND {', '.join(nama_simpul(x) for x in kgnd[:3])} tidak tersambung ke GND papan maupun GND catu daya. Rangkaian tidak punya ground bersama.")
+        if kdaya and not daya and not ksumber:
+            galat.append(f"Pin daya {', '.join(nama_simpul(x) for x in kdaya[:3])} tidak mendapat tegangan: jaringannya tidak tersambung ke 5V/3V3 papan atau catu daya.")
+    return galat
+
+
+def _jumlah(x):
+    try:
+        return max(1, int(x.get("jumlah") or 1))
+    except (TypeError, ValueError):
+        return 1
+
+
+def _cek_beban(komp, papan_sambung, pid):
+    """Motor/pompa/kipas/solenoid tidak boleh langsung ke pin papan; lebih dari 1 servo butuh catu terpisah."""
+    galat, waspada, servo = [], [], 0
+    for kid, x in komp.items():
+        nm = str(x.get("nama", kid))
+        langsung = papan_sambung.get(kid, [])
+        if BEBAN_BERAT.search(nm) and not PENGENDALI.search(nm) and not SERVO.search(nm):
+            for pin_papan, tipe, pn, _j in langsung:
+                if tipe in ("gpio", "daya"):
+                    galat.append(f"{nm} ({pn}) disambung langsung ke {pin_papan}. Motor, pompa, kipas, dan solenoid menarik arus ratusan mA dan bisa merusak papan. "
+                                 "Pakai driver motor (mis. L298N/TB6612), MOSFET, atau relay, dengan catu daya terpisah dan GND bersama.")
+                    break
+        if SERVO.search(nm) and any(t == "daya" for _, t, _, _ in langsung):
+            servo += _jumlah(x)
+            if pid == "esp32" and any(pp == "3V3" for pp, t, _, _ in langsung):
+                waspada.append(f"{nm} diberi daya dari 3V3. Servo butuh 5V; pakai pin 5V atau catu terpisah.")
+    if servo >= 2:
+        galat.append(f"{servo} servo diberi daya dari pin papan. Lebih dari 1 servo bisa membuat papan reset atau regulatornya panas. "
+                     "Pakai catu 5V terpisah (mis. modul step-down 2A) dan sambungkan GND-nya ke GND papan.")
+    return galat, waspada
+
+
+# ---------- PEMERIKSA KODE (tanpa compiler: struktur, kurung, pin kode = pin kabel, API khusus papan, pustaka) ----------
+_PUSTAKA_INTI = {"arduino.h", "wire.h", "spi.h", "eeprom.h", "softwareserial.h", "wifi.h", "wificlient.h", "wifiudp.h", "webserver.h", "httpclient.h",
+                 "preferences.h", "bluetoothserial.h", "spiffs.h", "fs.h", "littlefs.h", "update.h", "math.h", "string.h", "stdlib.h", "time.h",
+                 "wificlientsecure.h", "dnsserver.h", "ticker.h", "sd.h", "bledevice.h", "bleserver.h", "bleutils.h", "ble2902.h", "servo.h"}
+_KHUSUS_ESP32 = re.compile(r"#include\s*[<\"](WiFi|WebServer|HTTPClient|BluetoothSerial|esp_now|esp_wifi|Preferences|BLEDevice|WiFiClientSecure)\.h|\bledc(Attach|Setup|Write)\b|\besp_\w+\s*\(|\bxTaskCreate", re.I)
+_PANGGIL_PIN = re.compile(r"\b(pinMode|digitalWrite|digitalRead|analogRead|analogWrite|tone|noTone|pulseIn|attachInterrupt|ledcAttach|ledcAttachPin|digitalPinToInterrupt|shiftOut|shiftIn)\s*\(\s*([A-Za-z_]\w*|\d+)")
+_DEFINE = re.compile(r"#define\s+([A-Za-z_]\w*)\s+\(?\s*([A-Za-z_]?\w+)")
+_KONST = re.compile(r"\b(?:const\s+|static\s+|constexpr\s+)*(?:int|uint8_t|byte|short|long|unsigned\s+int|int8_t|uint16_t|gpio_num_t)\s+([A-Za-z_]\w*)\s*=\s*([A-Za-z_]?\w+)\s*;")
+
+
+_TOKEN_KODE = re.compile(r'R"([^()\\\s]{0,16})\((?:.|\n)*?\)\1"'   # raw string C++ (mis. halaman HTML), isinya bisa berisi { } dan //
+                         r'|"(?:\\.|[^"\\\n])*"'                  # string biasa ("http://..." bukan komentar)
+                         r"|'(?:\\.|[^'\\\n])'"                   # karakter
+                         r"|/\*(?:.|\n)*?\*/"                     # komentar blok
+                         r"|//[^\n]*")                            # komentar baris
+
+
+def _buang_komentar(k):
+    """Kosongkan string dan komentar dalam SATU kali baca (urutan penting: '//' di dalam string bukan komentar)."""
+    return _TOKEN_KODE.sub(lambda m: '""' if m.group(0)[:1] in ('"', "R") else ("' '" if m.group(0)[:1] == "'" else " "), k)
+
+
+def _pin_kode(pid, v, peta, kedalaman=0):
+    """Token pin di kode (angka, A0, LED_BUILTIN, nama konstanta) -> nama pin papan, atau None kalau bukan pin."""
+    v = str(v).strip()
+    if v in peta and kedalaman < 4:
+        return _pin_kode(pid, peta[v], peta, kedalaman + 1)
+    if v == "LED_BUILTIN":
+        return "GPIO2" if pid == "esp32" else "D13"
+    if re.fullmatch(r"A\d", v):
+        return v if pid != "esp32" else None
+    m = re.fullmatch(r"(?:GPIO_NUM_|GPIO|D)?(\d{1,2})", v)
+    if not m:
+        return None
+    n = int(m.group(1))
+    if pid == "esp32":
+        return f"GPIO{n}"
+    if n <= 13:
+        return f"D{n}"
+    if 14 <= n <= 21:
+        return f"A{n - 14}"
+    return None
+
+
+def periksa_kode(data, pid, gpio_kabel, gpio_bus):
+    galat, waspada = [], []
+    asli = str(data.get("kode") or "")
+    k = _buang_komentar(asli)
+    if not re.search(r"\bvoid\s+setup\s*\(", k) or not re.search(r"\bvoid\s+loop\s*\(", k):
+        galat.append("Kode wajib punya fungsi void setup() dan void loop().")
+    for buka, tutup, nama in (("{", "}", "kurung kurawal { }"), ("(", ")", "kurung ( )"), ("[", "]", "kurung siku [ ]")):
+        if k.count(buka) != k.count(tutup):
+            galat.append(f"Kode tidak seimbang: {nama} buka {k.count(buka)}, tutup {k.count(tutup)}. Kode tidak akan bisa dikompilasi.")
+    if pid != "esp32" and _KHUSUS_ESP32.search(asli):
+        galat.append(f"Kode memakai fungsi atau pustaka khusus ESP32 (WiFi, ledc, esp_...), padahal papannya {PAPAN[pid]['nama']}. Kode tidak akan bisa dikompilasi.")
+    if pid == "esp32" and re.search(r"#include\s*[<\"]Servo\.h", asli):
+        galat.append("Di ESP32, pustaka Servo.h tidak jalan. Pakai ESP32Servo.h (pustaka \"ESP32Servo\") dan cantumkan di daftar pustaka.")
+    if re.search(r"Serial\.begin\s*\(\s*\)", k):
+        galat.append("Serial.begin() harus diberi kecepatan, mis. Serial.begin(115200).")
+    peta = {}
+    for a, b in _DEFINE.findall(k) + _KONST.findall(k):
+        peta.setdefault(a, b)
+    dipakai = set()
+    for fn, v in _PANGGIL_PIN.findall(k):
+        nm = _pin_kode(pid, v, peta)
+        if not nm:
+            continue
+        dipakai.add(nm)
+        if nm not in gpio_kabel and nm not in ("GPIO2", "D13"):
+            galat.append(f"Kode memakai pin {v}{'' if v == nm else f' ({nm})'} di {fn}(), tetapi pin itu tidak disambung ke komponen mana pun. Samakan pin di kode dengan sambungan.")
+    sebut = set()   # pin yang disebut di mana pun: konstanta pin yang dipakai, atau angka/A0 di argumen fungsi (pustaka sensor, servo.attach, dll)
+    for nama, v in peta.items():
+        nm = _pin_kode(pid, v, peta)
+        if nm and len(re.findall(rf"\b{re.escape(nama)}\b", k)) >= 2:
+            sebut.add(nm)
+    for v in re.findall(r"[(,]\s*(A\d|\d{1,2})\s*(?=[,)])", k):
+        nm = _pin_kode(pid, v, peta)
+        if nm:
+            sebut.add(nm)
+    for nm in sorted(gpio_kabel - gpio_bus):
+        if nm not in dipakai and nm not in sebut:
+            galat.append(f"Pin {nm} disambung ke komponen, tetapi tidak dipakai di kode. Pin di kode harus SAMA dengan sambungan (buat konstanta pin dan pakai di pinMode atau pustaka).")
+    if pid == "esp32" and gpio_bus - {"GPIO21", "GPIO22"} and "Wire.begin(" not in k.replace(" ", ""):
+        galat.append(f"I2C memakai pin non-bawaan ({', '.join(sorted(gpio_bus - {'GPIO21', 'GPIO22'}))}), tetapi kode tidak memanggil Wire.begin(SDA, SCL).")
+    pustaka = {re.sub(r"[\s_\-]", "", str(x).lower()) for x in (data.get("pustaka") or [])}
+    for inc in re.findall(r"#include\s*[<\"]([^>\"]+)[>\"]", asli):
+        il = inc.lower()
+        if il in _PUSTAKA_INTI or il.startswith(("esp", "freertos", "driver/", "soc/", "avr/", "util/", "arduino")):
+            continue
+        dasar = re.sub(r"[\s_\-]", "", il.rsplit("/", 1)[-1].replace(".h", ""))
+        if not any(dasar in p or p in dasar or dasar[:5] == p[:5] for p in pustaka if p):
+            waspada.append(f"Kode memakai {inc}, tetapi namanya belum ada di daftar pustaka. Pasang dulu lewat Library Manager sebelum mengunggah.")
+    if re.search(r"\bdelay\s*\(\s*\d{5,}\s*\)", k):
+        waspada.append("Ada delay sangat panjang (puluhan detik) di kode. Selama itu papan tidak merespons apa pun.")
+    return galat, waspada
 
 
 # ---------- DIAGRAM BREADBOARD (SVG) ----------
