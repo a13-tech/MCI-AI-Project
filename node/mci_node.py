@@ -41,7 +41,7 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlsplit
 
-VERSI = "1.1"
+VERSI = "1.2"
 TOKEN = os.getenv("NODE_TOKEN", "").strip()
 DIR = os.path.abspath(os.path.expanduser(os.getenv("NODE_DIR", "~/MCI-Node")))
 BERKAS = os.path.join(DIR, "berkas")
@@ -418,6 +418,12 @@ class Node(BaseHTTPRequestHandler):
         req = urllib.request.Request(OLLAMA + urlsplit(self.path).path, data=body, method=self.command,
                                      headers={"Content-Type": self.headers.get("Content-Type", "application/json")})
         try:
+            stream = bool(json.loads(body or b"{}").get("stream"))
+        except (ValueError, AttributeError):
+            stream = False
+        if self.command == "POST" and not stream:
+            return self.ollama_sabar(req)
+        try:
             with urllib.request.urlopen(req, timeout=600) as f:
                 self.send_response(f.status)
                 self.cors()
@@ -436,6 +442,49 @@ class Node(BaseHTTPRequestHandler):
             return self.balas(e.code, e.read() or b"{}")
         except Exception as e:
             return self.balas(502, {"error": f"Ollama tidak menjawab: {e}"})
+
+    def ollama_sabar(self, req):
+        """Jawaban non-streaming bisa >100 detik (model dimuat dari HDD + Mac 8 GB), padahal Cloudflare memutus (error 524)
+        kalau server diam 100 detik. Jadi header dikirim SEGERA, lalu spasi tiap 10 detik sebagai detak (spasi di depan JSON
+        tetap JSON sah), dan jawaban Ollama dikirim begitu jadi. Kesalahan dikirim sebagai JSON {"error": ...}."""
+        hasil = {}
+
+        def kerja():
+            try:
+                with urllib.request.urlopen(req, timeout=900) as f:
+                    hasil["isi"], hasil["kode"] = f.read(), f.status
+            except urllib.error.HTTPError as e:
+                hasil["isi"], hasil["kode"] = e.read() or b"{}", e.code
+            except Exception as e:
+                hasil["isi"], hasil["kode"] = json.dumps({"error": f"Ollama tidak menjawab: {e}"}).encode(), 502
+
+        t = threading.Thread(target=kerja, daemon=True)
+        t.start()
+        try:
+            self.send_response(200)
+            self.cors()
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.flush()
+            while t.is_alive():
+                t.join(10)
+                if t.is_alive():
+                    self.wfile.write(b"1\r\n \r\n")   # detak: satu spasi
+                    self.wfile.flush()
+            isi = hasil.get("isi") or b"{}"
+            if hasil.get("kode", 200) >= 400:
+                try:
+                    d = json.loads(isi)
+                    if not isinstance(d, dict) or "error" not in d:
+                        raise ValueError
+                except ValueError:
+                    isi = json.dumps({"error": f"Ollama {hasil.get('kode')}: {isi[:300].decode(errors='replace')}"}).encode()
+            self.wfile.write(f"{len(isi):X}\r\n".encode() + isi + b"\r\n0\r\n\r\n")
+            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            log("klien Ollama memutus sebelum jawaban selesai")
 
 
 def main():

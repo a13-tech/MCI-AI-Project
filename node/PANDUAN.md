@@ -147,6 +147,7 @@ Kalau ingin melihat log Node: `tail -f "/Volumes/HDD/MCI-Node/node.log"`. Log di
 | Video tidak bisa diputar | Laptop tidur atau mati, atau HDD dicabut. Web menampilkan "HDD markas sedang offline" |
 | Email Zoho macet setelah pindah DNS | Cek lagi catatan MX, SPF, DKIM di Cloudflare (Tahap 1, langkah 2) |
 | Panel: "ffmpeg belum terpasang di Mac" | Jalankan `brew install ffmpeg`, lalu jalankan lagi `pasang_node.sh` supaya video lama ikut dibuatkan salinan ringan |
+| Copilot/Adu model: "Ollama menolak (524)" | Cloudflare memutus jawaban yang lebih dari 100 detik. Perbarui MCI Node ke versi 1.2 (`git pull` lalu jalankan lagi `pasang_node.sh`): Node mengirim detak supaya tidak diputus |
 | Ganti token | Hapus `~/MCI-Node/.token`, jalankan lagi `pasang_node.sh`, lalu tempel token baru di Panel |
 
 **Catatan Cloudflare:** aturan paket gratis Cloudflare tidak mengizinkan jaringannya dipakai untuk streaming video dalam jumlah besar. Untuk album dokumentasi internal MCI yang ditonton belasan anggota, risikonya kecil. Kalau suatu saat Cloudflare memberi peringatan atau memblokir, pindahkan penyimpanan video ke Cloudflare R2 (kodenya sudah ada di web; isi kunci R2 di Panel CEO).

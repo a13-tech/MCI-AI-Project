@@ -6390,7 +6390,10 @@ def _kompatibel(k, sistem, prompt, maks=8000, json_mode=False, pesan=None, info=
     req = urllib.request.Request(url, method="POST", data=json.dumps(body).encode(), headers=hdr)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as f:   # model "reasoning" besar bisa berpikir lama
-            d = json.loads(f.read().decode())
+            d = json.loads(f.read().decode())   # MCI Node mengirim spasi sebagai detak sebelum JSON: tetap terbaca
+            if isinstance(d, dict) and d.get("error") and not d.get("choices"):   # MCI Node meneruskan kesalahan Ollama dengan status 200
+                err = d["error"] if isinstance(d["error"], str) else json.dumps(d["error"], ensure_ascii=False)
+                raise RuntimeError(f"{m['nama']} menolak: {err[:300]}")
             try:   # sisa jatah asli dari header (Groq dkk.) untuk meteran kuota di Panel CEO
                 sisa, batas = f.headers.get("x-ratelimit-remaining-requests"), f.headers.get("x-ratelimit-limit-requests")
                 if sisa and batas and str(sisa).isdigit() and str(batas).isdigit():
