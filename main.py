@@ -7037,8 +7037,8 @@ def _pd_basi():
     """Panduan yang macet di status 'proses' (mis. server mulai ulang) ditandai gagal, dan jatahnya kembali."""
     batas = (datetime.now(WIB) - timedelta(minutes=9)).isoformat(timespec="seconds")
     with db() as c:
-        sql(c, "UPDATE panduan SET status='gagal', laporan=?, diubah=? WHERE status IN ('proses','menyusun') AND diubah<? AND judul NOT LIKE 'Uji ·%'",   # Adu BPR punya penjaga sendiri (bisa >9 menit)
-            (json.dumps({"galat": ["Pembuatan terhenti (server dimulai ulang atau terlalu lama). Jatahmu tidak terpakai; coba konfirmasi lagi."]}), _now(), batas))
+        sql(c, "UPDATE panduan SET status='gagal', laporan=?, diubah=? WHERE status IN ('proses','menyusun') AND diubah<? AND judul NOT LIKE ?",   # Adu BPR punya penjaga sendiri (bisa >9 menit). Pola LIKE lewat parameter: '%' literal merusak placeholder Postgres
+            (json.dumps({"galat": ["Pembuatan terhenti (server dimulai ulang atau terlalu lama). Jatahmu tidak terpakai; coba konfirmasi lagi."]}), _now(), batas, "Uji ·%"))
 
 
 def _pd_ringkas(x):
@@ -15851,8 +15851,8 @@ def adu_bpr_basi(semua=False):
     batas = (datetime.now(WIB) - timedelta(minutes=0 if semua else ADU_BASI_MENIT)).isoformat(timespec="seconds")
     g = "Pembuatan terputus: server web dimulai ulang (mis. saat pembaruan) atau model tidak memberi kabar terlalu lama. Klik Coba lagi."
     with db() as c:
-        sql(c, "UPDATE panduan SET status='gagal', laporan=?, diubah=? WHERE status='proses' AND judul LIKE 'Uji ·%' AND diubah<=?",
-            (json.dumps({"galat": [g], "uji": {"lolos": False, "putaran": 0, "kesalahan": [], "detik": 0, "galat": g, "draf": False}}, ensure_ascii=False), _now(), batas))
+        sql(c, "UPDATE panduan SET status='gagal', laporan=?, diubah=? WHERE status='proses' AND judul LIKE ? AND diubah<=?",
+            (json.dumps({"galat": [g], "uji": {"lolos": False, "putaran": 0, "kesalahan": [], "detik": 0, "galat": g, "draf": False}}, ensure_ascii=False), _now(), "Uji ·%", batas))
 
 
 async def adu_bpr_jalan(tugas, ide):
