@@ -284,6 +284,12 @@ pre.code{background:#0B1F4D;color:#DCE6FB;border-radius:12px;padding:16px;paddin
 .axIsi h3,.axIsi h4{font-family:var(--axJudul);font-weight:700;margin:1.1em 0 .35em;line-height:1.25}.axIsi h3{font-size:24px}.axIsi h4{font-size:20.5px}
 .axIsi ul,.axIsi ol{margin:0 0 .8em;padding-left:1.4em}.axIsi li{margin:.25em 0}
 .axIsi code{font:13.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--hov);padding:1px 5px;border-radius:5px}
+.kodeBox{margin:.6em 0 1em;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--bg)}
+.kodeAtas{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px 6px 14px;border-bottom:1px solid var(--line);font:600 11.5px/1 'Instrument Sans',Inter,system-ui,sans-serif;color:var(--mute);text-transform:none}
+.kodeSalin{all:unset;cursor:pointer;font:600 12px/1 'Instrument Sans',Inter,system-ui,sans-serif;padding:6px 10px;border-radius:8px;color:var(--ink);border:1px solid var(--line)}
+.kodeSalin:hover{background:rgba(127,127,127,.12)}.kodeSalin:focus-visible{outline:2px solid var(--acc,#2563EB);outline-offset:2px}
+.kodeBox pre{margin:0!important;border:0!important;border-radius:0!important}
+.md .kodeBox{background:#0F1B33;border-color:#0F1B33}.md .kodeAtas{color:#9FB0CC;border-bottom-color:rgba(255,255,255,.12)}.md .kodeSalin{color:#E6EDF7;border-color:rgba(255,255,255,.22)}.md .kodeSalin:hover{background:rgba(255,255,255,.1)}
 .axIsi pre{margin:.6em 0 1em;padding:14px 16px;border-radius:12px;background:var(--bg);border:1px solid var(--line);overflow:auto}.axIsi pre code{background:none;padding:0;font-size:13px}
 .axIsi a{color:var(--judul);text-decoration:underline;text-underline-offset:2px;word-break:break-all}
 .axIsi table{border-collapse:collapse;margin:.4em 0 1em;font-family:var(--axSans);font-size:14px;display:block;overflow:auto;max-width:100%}
@@ -2674,6 +2680,10 @@ $("#iotSave").onclick = async () => {
   setTimeout(() => $("#iotMsg").textContent = "", 3000);
 };
 $("#iotShow").onclick = () => { iotKeyOn = !iotKeyOn; $("#iotShow").textContent = iotKeyOn ? "Sembunyikan" : "Lihat"; if (IOTA && IOTA.key) $("#iotKey").textContent = iotKeyOn ? IOTA.key : "•".repeat(Math.min(24, IOTA.key.length)); };
+document.addEventListener("click", e => {   // tombol Salin di semua blok kode jawaban AI (Copilot, Adu model, Lab, BPR, UU, dll)
+  const b = e.target.closest("[data-salinkode]"); if (!b) return;
+  const pre = b.closest(".kodeBox").querySelector("pre"); if (pre) copyTo(pre.innerText.replace(/\n$/, ""), b);
+});
 const copyTo = async (txt, btn) => { try { await navigator.clipboard.writeText(txt); } catch (e) { const t = document.createElement("textarea"); t.value = txt; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); } const o = btn.textContent; btn.textContent = "Tersalin ✓"; setTimeout(() => btn.textContent = o, 1500); };
 $$("[data-cp]").forEach(b => b.onclick = () => copyTo(b.dataset.cp === "iotKey" ? (IOTA && IOTA.key || "") : $("#" + b.dataset.cp).textContent, b));
 $("#iotCopy").onclick = () => copyTo(espCode(), $("#iotCopy"));
@@ -4496,7 +4506,9 @@ function axInline(s) {   // s sudah di-escape
 }
 function axMd(t) {   // markdown ringan & aman: semua teks di-escape dulu
   const kode = [];
-  t = String(t || "").replace(/```[\w-]*\n?([\s\S]*?)(?:```|$)/g, (m, c) => { kode.push(`<pre><code>${esc(c.replace(/\n$/, ""))}</code></pre>`); return `\n\u0000${kode.length - 1}\u0000\n`; });
+  t = String(t || "").replace(/```([\w+#.-]*)[ \t]*\n?([\s\S]*?)(?:```|$)/g, (m, lang, c) => {   // blok kode selalu dapat tombol Salin
+    kode.push(`<div class="kodeBox"><div class="kodeAtas"><span>${esc(lang || "kode")}</span><button type="button" class="kodeSalin" data-salinkode aria-label="Salin kode ${esc(lang || "")}">Salin</button></div><pre><code>${esc(c.replace(/\n$/, ""))}</code></pre></div>`);
+    return `\n\u0000${kode.length - 1}\u0000\n`; });
   const baris = t.split("\n"), out = []; let para = [], daftar = null, tabel = [];
   const tutupPara = () => { if (para.length) { out.push(`<p>${axInline(esc(para.join("\n"))).replace(/\n/g, "<br>")}</p>`); para = []; } };
   const tutupDaftar = () => { if (daftar) { out.push(`<${daftar.t}>${daftar.i.map(x => `<li>${axInline(esc(x))}</li>`).join("")}</${daftar.t}>`); daftar = null; } };
