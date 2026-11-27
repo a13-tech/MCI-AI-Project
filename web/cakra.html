@@ -1,0 +1,751 @@
+<!doctype html>
+<html lang="id" data-tema="gelap">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>MCI Cakra</title>
+<link rel="icon" href="/aset/logo-mci-192.webp">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+@font-face{font-family:"MCI Serif";src:url(/aset/mci-serif-roman.woff) format("woff");font-weight:400 600;font-style:normal;font-display:swap}
+@font-face{font-family:"MCI Serif";src:url(/aset/mci-serif-italic.woff) format("woff");font-weight:400 600;font-style:italic;font-display:swap}
+:root[data-tema=gelap]{--bg:#081428;--panel:#0F1F3B;--panel2:#0B1A33;--ink:#F1E8D6;--mute:#9AA6BA;--line:#294167;--line2:#1C2E4E;--accent:#38D6FF;--accentInk:#061229;--accentText:#38D6FF;--signal:#F2A65A;--hi:#13284A;
+  --side:#081428;--sideInk:#F1E8D6;--sideMute:#9AA6BA;--sideLine:#1C2E4E;--sideLine2:#294167;--sideAccent:#38D6FF;--ok:#7FE0A8;--bad:#F59A8E;color-scheme:dark}
+:root[data-tema=terang]{--bg:#E7EDEF;--panel:#FFFFFF;--panel2:#EEF3F4;--ink:#0D2B36;--mute:#4E6670;--line:#C9D6DB;--line2:#DCE5E8;--accent:#0E5A6B;--accentInk:#FFFFFF;--accentText:#0E5A6B;--signal:#E8702A;--hi:#DCEBEE;
+  --side:#0D2B36;--sideInk:#E2ECEF;--sideMute:#9FB8C1;--sideLine:#23485A;--sideLine2:#3A6272;--sideAccent:#9FE3F0;--ok:#17703F;--bad:#B4321F;color-scheme:light}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Instrument Sans",system-ui,sans-serif;font-size:16px}
+a{color:inherit}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.serif{font-family:"MCI Serif",Georgia,serif}
+.mute{color:var(--mute)}
+.sr{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.app{min-height:100vh;display:flex;flex-wrap:wrap}
+/* sisi kiri */
+.side{flex:1 1 240px;max-width:264px;padding:24px 18px;background:var(--side);color:var(--sideInk);border-right:1px solid var(--sideLine);display:flex;flex-direction:column;gap:20px;min-height:100vh}
+.merek{display:flex;align-items:center;gap:10px;text-decoration:none}
+.merek img{width:34px;height:34px}
+.merek b{font-family:"MCI Serif",serif;font-size:25px;font-weight:600}
+.baru{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 14px;border:1px solid var(--sideLine2);border-radius:10px;background:transparent;color:var(--sideInk);font-weight:500;text-align:left}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{text-decoration:none;padding:10px 12px;border-radius:8px;font-size:15px;color:var(--sideInk)}
+.nav a[aria-current=page]{background:var(--sideLine);font-weight:600}
+.riw{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;overflow:auto;max-height:42vh}
+.riw li{display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--sideLine)}
+.riw button.buka{flex:1;text-align:left;background:none;border:0;padding:10px 0;color:var(--sideInk);font-size:14px;line-height:1.35;min-height:44px}
+.riw button.buka.on{font-weight:600}
+.riw button.hapus{background:none;border:0;color:var(--sideMute);width:32px;height:32px;border-radius:6px}
+.riw small{display:block;color:var(--sideMute);font-size:12px;font-weight:400}
+.side .kaki{margin-top:auto;font-size:13px;line-height:1.5;color:var(--sideMute)}
+.side .kaki a{color:var(--sideAccent)}
+/* area utama */
+.utama{flex:999 1 560px;min-width:0;display:flex;flex-direction:column}
+.atas{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:10px;padding:16px 26px 0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--ink);font-size:14.5px;text-decoration:none}
+.btn.utama-b{background:var(--accent);border-color:var(--accent);color:var(--accentInk);font-weight:600}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.link{background:none;border:0;padding:10px 0;min-height:44px;color:var(--ink);text-decoration:underline;text-underline-offset:5px;text-decoration-color:var(--line);font-size:14.5px}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 0;min-height:44px;font-weight:600;font-size:15px;color:var(--mute)}
+.tab[aria-selected=true]{border-bottom-color:var(--accent);color:var(--ink)}
+.tabs{display:flex;flex-wrap:wrap;gap:22px;border-bottom:1px solid var(--line)}
+.kotak{background:var(--panel);border:1px solid var(--line);border-radius:14px}
+input[type=text],input[type=url],input[type=password],select,textarea.isi{width:100%;padding:0 12px;min-height:44px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);font-size:15px}
+textarea.isi{padding:10px 12px;line-height:1.5;resize:vertical}
+label.f{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:500}
+.view{display:none}
+.view.on{display:flex}
+/* tanya */
+#v-tanya{flex:1 1 auto;flex-wrap:wrap}
+.obrol{flex:999 1 560px;min-width:0;display:flex;flex-direction:column}
+.isiobrol{flex:1 1 auto;width:100%;max-width:780px;margin:0 auto;padding:26px 34px 10px}
+.sambut h1{font-family:"MCI Serif",serif;font-weight:400;font-size:clamp(34px,5vw,52px);line-height:1.08;margin:48px 0 12px}
+.sambut p{font-size:17px;line-height:1.6;color:var(--mute);max-width:560px;margin:0 0 30px}
+.saran a{display:flex;justify-content:space-between;gap:16px;padding:15px 0;border-bottom:1px solid var(--line);text-decoration:none;font-size:16px}
+.saran a span{font-size:13.5px;color:var(--mute);white-space:nowrap}
+.tanyaku{margin:26px 0 6px;font-size:14px;color:var(--mute)}
+.tanyaku+h2{font-family:"MCI Serif",serif;font-weight:400;font-size:clamp(24px,3vw,32px);line-height:1.22;margin:0 0 22px}
+.jwb{font-family:"MCI Serif",serif;font-size:19px;line-height:1.65}
+.jwb p{margin:0 0 14px}
+.jwb ul,.jwb ol{margin:0 0 14px;padding-left:24px}
+.jwb li{margin-bottom:6px}
+.jwb h3{font-family:"Instrument Sans",sans-serif;font-size:17px;margin:20px 0 8px}
+.jwb code{font-family:ui-monospace,Menlo,monospace;font-size:14.5px;background:var(--panel2);padding:1px 5px;border-radius:4px}
+.jwb pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px;overflow-x:auto;font-size:14px;line-height:1.55}
+.jwb pre code{background:none;padding:0}
+sup.rj a{font-family:"Instrument Sans",sans-serif;font-size:11.5px;font-weight:600;color:var(--accentText);text-decoration:none;padding:0 1px}
+.aksi{display:flex;flex-wrap:wrap;gap:22px;margin:4px 0 8px}
+.catat{font-size:13.5px;color:var(--mute);margin:0 0 10px}
+.tunggu{font-size:15px;color:var(--mute);display:flex;align-items:center;gap:10px;padding:10px 0}
+.titik{width:10px;height:10px;border-radius:50%;background:var(--accent);animation:dyut 1.2s infinite}
+@keyframes dyut{0%,100%{opacity:.25}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.titik{animation:none}}
+.galat{color:var(--bad);font-size:14.5px}
+.tulis{width:100%;max-width:780px;margin:0 auto;padding:0 34px 26px}
+.tulis .kotak{padding:14px 14px 10px 18px}
+.tulis textarea{width:100%;border:0;outline:none;resize:none;background:transparent;color:var(--ink);font-size:16.5px;line-height:1.5;min-height:52px;max-height:220px}
+.tulis .bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:4px}
+.cek{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--mute);min-height:44px}
+.cek input{width:18px;height:18px;accent-color:var(--accent)}
+.kirim{width:44px;height:44px;border:0;border-radius:10px;background:var(--accent);display:grid;place-items:center}
+.kirim:disabled{opacity:.5}
+.panelkanan{flex:1 1 300px;max-width:340px;padding:24px 24px;border-left:1px solid var(--line);background:var(--panel2)}
+.sumberl{list-style:none;margin:16px 0 0;padding:0}
+.sumberl li{display:grid;grid-template-columns:26px 1fr;gap:4px;padding:12px 0;border-bottom:1px solid var(--line);font-size:14.5px;line-height:1.45}
+.sumberl .no{color:var(--accentText);font-weight:600}
+.sumberl .no.redup{color:var(--mute)}
+.sumberl a{font-weight:600;text-decoration:none;word-break:break-word}
+.sumberl li.sorot{background:var(--hi)}
+.jalur{list-style:none;margin:18px 0 0;padding:0 0 0 24px;border-left:2px solid var(--accent);display:flex;flex-direction:column;gap:20px;font-size:14.5px;line-height:1.45}
+.jalur li{position:relative}
+.jalur li::before{content:"";position:absolute;left:-32px;top:3px;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid var(--panel2)}
+.jalur li:last-child::before{background:var(--signal)}
+/* halaman umum */
+.hal{flex:1 1 auto;width:100%;max-width:1180px;margin:0 auto;padding:30px 34px 50px;flex-direction:column;gap:24px}
+.hal h1{font-family:"MCI Serif",serif;font-weight:400;font-size:clamp(30px,4vw,42px);line-height:1.12;margin:0}
+.hal .lead{margin:6px 0 0;font-size:16px;line-height:1.6;color:var(--mute);max-width:660px}
+/* adu */
+#v-adu{flex:1 1 auto;flex-wrap:wrap;align-items:stretch}
+.adukiri{flex:1 1 320px;max-width:33.333%;min-width:290px;padding:22px 20px;border-right:1px solid var(--line);background:var(--panel2)}
+.adukanan{flex:2 1 600px;min-width:0;padding:22px 30px 40px;display:flex;flex-direction:column;gap:20px}
+table.t{width:100%;border-collapse:collapse;font-size:13.5px;line-height:1.4}
+table.t th{text-align:left;font-weight:500;color:var(--mute);padding:8px 6px;border-bottom:1px solid var(--line)}
+table.t td{padding:9px 6px;border-bottom:1px solid var(--line2);vertical-align:top}
+.sel{min-width:34px;min-height:32px;border:1px solid var(--line);border-radius:6px;background:transparent;font-weight:700;font-size:13px}
+.sel.L{color:var(--ok);border-color:var(--ok)}
+.sel.G{color:var(--bad);border-color:var(--bad)}
+.mesinl{display:flex;flex-wrap:wrap;gap:8px}
+.mesinl label{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;background:var(--panel);min-height:44px}
+.mesinl label.mati{opacity:.5}
+.mesinl input{accent-color:var(--accent);width:16px;height:16px}
+.mesinl small{color:var(--mute)}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.kartu{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:16px;display:flex;flex-direction:column;gap:10px}
+.kartu.pilih{border-color:var(--accent)}
+.kartu .jwb{font-size:16px;line-height:1.6;max-height:420px;overflow:auto}
+.kartu .bawah{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding-top:10px;border-top:1px solid var(--line2)}
+.kecil{min-height:40px;padding:0 12px;font-size:13.5px}
+.lebar2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.kunci{font-size:14px;line-height:1.55;padding:12px 14px;border-radius:10px;background:var(--hi)}
+code.blok{display:block;font-size:13px;padding:10px 12px;border-radius:8px;background:var(--panel2);overflow-x:auto;white-space:nowrap;font-family:ui-monospace,Menlo,monospace}
+/* rakit */
+#v-rakit{flex-wrap:wrap;align-items:flex-start;gap:36px}
+.rakitkiri{flex:1 1 300px;max-width:370px;display:flex;flex-direction:column;gap:16px}
+.rakitkanan{flex:999 1 600px;min-width:0}
+.lencana{display:flex;align-items:center;gap:10px;padding:9px 13px;border-radius:12px;border:1px solid var(--ok);color:var(--ok);font-weight:600;font-size:14.5px}
+.lencana.gagal{border-color:var(--bad);color:var(--bad)}
+.bpr-isi{padding:22px 28px 26px}
+.bpr-isi table.t{font-size:14.5px}
+.daftarbpr{list-style:none;margin:0;padding:0}
+.daftarbpr button{width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:10px 0;min-height:44px;font-size:14px;color:var(--ink)}
+.daftarbpr small{display:block;color:var(--mute)}
+/* paket */
+.paket{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--panel)}
+.paket article{padding:26px 24px;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:14px}
+.paket article:first-child{border-left:0}
+.paket .harga{font-family:"MCI Serif",serif;font-size:32px}
+.paket ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:7px;font-size:14.5px;line-height:1.5;flex:1}
+.paket .data{margin:0;padding:12px 14px;border-radius:10px;background:var(--hi);font-size:13.5px;line-height:1.5}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:9;display:none}
+@media (max-width:800px){
+  .side{max-width:none;min-height:auto;flex-basis:100%;border-right:0;border-bottom:1px solid var(--sideLine)}
+  .riw{max-height:200px}
+  .panelkanan,.adukiri{max-width:none;border-left:0;border-right:0;flex-basis:100%}
+  .isiobrol,.tulis{padding-left:18px;padding-right:18px}
+  .adukanan,.hal{padding-left:18px;padding-right:18px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Menu Cakra">
+    <a class="merek" href="#tanya"><img src="/aset/logo-mci-192.webp" alt="Logo MCI"><b>Cakra</b></a>
+    <button type="button" class="baru" id="btnBaru"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Pertanyaan baru</button>
+    <nav class="nav" aria-label="Halaman">
+      <a href="#tanya" data-v="tanya">Tanya</a>
+      <a href="#adu" data-v="adu">Adu Model</a>
+      <a href="#rakit" data-v="rakit">Rakit</a>
+      <a href="#paket" data-v="paket">Paket dan kuota</a>
+    </nav>
+    <div>
+      <div style="font-size:13px;color:var(--sideMute);margin-bottom:4px">Riwayat di perangkat ini</div>
+      <ul class="riw" id="riw"></ul>
+    </div>
+    <div class="kaki">Tahap uji: hanya akun CEO yang bisa membuka Cakra.<br><a href="/">Kembali ke MCI HQ</a></div>
+  </aside>
+
+  <div class="utama">
+    <div class="atas">
+      <button type="button" class="btn" id="btnTema"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><span id="temaLabel">Tema terang</span></button>
+    </div>
+
+    <!-- TANYA -->
+    <section class="view" id="v-tanya" aria-label="Tanya">
+      <div class="obrol">
+        <div class="isiobrol" id="isiObrol" aria-live="polite"></div>
+        <form class="tulis" id="fTanya">
+          <div class="kotak">
+            <label for="tq" class="sr">Pertanyaan</label>
+            <textarea id="tq" rows="2" placeholder="Tanyakan apa saja kepada Cakra"></textarea>
+            <div class="bar">
+              <label class="cek" for="tqDalam"><input id="tqDalam" type="checkbox" checked>Riset mendalam (telusuri web)</label>
+              <button type="submit" class="kirim" id="tqKirim" aria-label="Kirim"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accentInk)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+            </div>
+          </div>
+          <p class="mute" style="margin:10px 0 0;font-size:13px">Cakra bisa keliru. Periksa sumbernya sebelum mengutip.</p>
+        </form>
+      </div>
+      <aside class="panelkanan" id="panelKanan" aria-label="Panel riset" hidden>
+        <div class="tabs" role="tablist" aria-label="Isi panel">
+          <button type="button" class="tab" role="tab" aria-selected="true" data-pt="sumber">Sumber</button>
+          <button type="button" class="tab" role="tab" aria-selected="false" data-pt="jalur">Jalur riset</button>
+        </div>
+        <div id="ptSumber"></div>
+        <div id="ptJalur" hidden></div>
+      </aside>
+    </section>
+
+    <!-- SUMBER -->
+    <section class="view hal" id="v-sumber" aria-label="Halaman sumber">
+      <a href="#tanya" class="link" style="align-self:flex-start;text-decoration:none">Kembali ke jawaban</a>
+      <div><p class="mute" style="margin:0 0 6px;font-size:14px">Sumber untuk pertanyaan</p><h1 id="sbJudul">Belum ada jawaban</h1></div>
+      <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:14px;border-bottom:1px solid var(--line)">
+        <div class="tabs" style="border:0" role="group" aria-label="Saring sumber" id="sbFilter"></div>
+        <label class="cek" for="sbGaya">Gaya sitasi
+          <select id="sbGaya" style="width:auto;min-height:40px"><option value="apa">APA</option><option value="mla">MLA</option><option value="ieee">IEEE</option></select>
+        </label>
+      </div>
+      <ol class="sumberl" id="sbDaftar" style="margin:0"></ol>
+    </section>
+
+    <!-- ADU MODEL -->
+    <section class="view" id="v-adu" aria-label="Adu Model">
+      <aside class="adukiri" id="aduKiri" aria-label="Checklist dan hasil">
+        <div class="tabs" role="tablist" aria-label="Isi panel">
+          <button type="button" class="tab" role="tab" aria-selected="true" data-at="cek">Checklist</button>
+          <button type="button" class="tab" role="tab" aria-selected="false" data-at="hasil">Hasil</button>
+        </div>
+        <div id="atCek">
+          <p class="mute" style="font-size:13.5px;line-height:1.5;margin:12px 0">Tandai L (lulus) atau G (gagal) per mesin. Klik kotak untuk mengganti. Tersimpan di akunmu.</p>
+          <div style="overflow-x:auto"><table class="t" id="tblCek"></table></div>
+          <form id="fCek" style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            <label for="cekNama" class="sr">Kemampuan baru</label>
+            <input id="cekNama" type="text" placeholder="Kemampuan baru, misalnya hitung resistor" style="flex:1 1 180px">
+            <button type="submit" class="btn kecil">Tambah</button>
+          </form>
+          <button type="button" class="link" id="cekEkspor">Ekspor tabel (CSV)</button>
+        </div>
+        <div id="atHasil" hidden></div>
+      </aside>
+      <div class="adukanan">
+        <div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px">
+          <div><h1 class="serif" style="margin:0;font-weight:400;font-size:34px">Adu Model</h1><p class="mute" style="margin:4px 0 0">Beri soal yang sama ke beberapa AI, lalu pilih jawaban terbaik.</p></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button type="button" class="btn kecil" id="btnPanel">Sembunyikan tabel</button>
+            <div role="group" aria-label="Jenis uji" style="display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden">
+              <button type="button" class="btn kecil" style="border:0;border-radius:0" data-mode="jawab" aria-pressed="true">Jawaban</button>
+              <button type="button" class="btn kecil" style="border:0;border-radius:0" data-mode="bpr" aria-pressed="false">Adu BPR</button>
+            </div>
+          </div>
+        </div>
+
+        <section aria-label="Mesin yang diadu">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px"><b style="font-size:15px">Mesin</b><button type="button" class="link" id="btnTambahMesin">Tambah mesin milikmu</button></div>
+          <div class="mesinl" id="mesinL"><span class="mute">Memuat daftar mesin…</span></div>
+          <p class="mute" id="mesinInfo" style="font-size:13px;margin:8px 0 0"></p>
+        </section>
+
+        <section class="kotak" id="tambahMesin" hidden style="padding:16px 18px" aria-label="Tambah mesin">
+          <div class="tabs" role="tablist" aria-label="Sumber mesin">
+            <button type="button" class="tab" role="tab" aria-selected="true" data-tm="kunci">Kunci API milikmu</button>
+            <button type="button" class="tab" role="tab" aria-selected="false" data-tm="lokal">AI lokal</button>
+          </div>
+          <form id="fKunci" style="margin-top:14px;display:flex;flex-direction:column;gap:12px">
+            <div class="lebar2">
+              <label class="f" for="kPenyedia">Penyedia
+                <select id="kPenyedia">
+                  <option value="https://openrouter.ai/api/v1">OpenRouter</option>
+                  <option value="https://api.groq.com/openai/v1">Groq</option>
+                  <option value="https://api.openai.com/v1">OpenAI</option>
+                  <option value="https://generativelanguage.googleapis.com/v1beta/openai">Google Gemini</option>
+                  <option value="https://api.mistral.ai/v1">Mistral</option>
+                  <option value="">Lainnya (kompatibel OpenAI)</option>
+                </select>
+              </label>
+              <label class="f" for="kBase">Alamat API
+                <input id="kBase" type="url" placeholder="https://..." value="https://openrouter.ai/api/v1">
+              </label>
+              <label class="f" for="kModel">Nama model
+                <input id="kModel" type="text" placeholder="nama model di penyedia itu">
+              </label>
+              <label class="f" for="kKunci">Kunci API
+                <input id="kKunci" type="password" autocomplete="off" placeholder="Tempel kuncimu">
+              </label>
+            </div>
+            <p class="mute" style="font-size:13px;margin:0;line-height:1.5">Tahap uji: kunci disimpan di browser ini saja dan dipanggil langsung dari browser, jadi tidak pernah lewat server MCI. Biaya ditagih penyedia ke akunmu. Simpan terenkripsi di akun menyusul di versi umum.</p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap"><button type="submit" class="btn utama-b">Tes dan simpan</button><span id="kStatus" class="mute" style="align-self:center;font-size:14px"></span></div>
+          </form>
+          <form id="fLokal" hidden style="margin-top:14px;display:flex;flex-direction:column;gap:12px">
+            <p style="margin:0;font-size:14.5px;line-height:1.55">Cakra memanggil AI di laptopmu langsung dari browser. Jawabannya tidak lewat server MCI. Nyalakan sekali di laptopmu, lalu jalankan ulang Ollama:</p>
+            <code class="blok" id="kodeOrigins"></code>
+            <div class="lebar2">
+              <label class="f" for="lBase">Alamat AI lokal<input id="lBase" type="url" value="http://localhost:11434"></label>
+              <label class="f" for="lModel">Nama model<input id="lModel" type="text" placeholder="misalnya llama3.1:8b"></label>
+            </div>
+            <p class="mute" style="font-size:13px;margin:0;line-height:1.5">Browser mungkin meminta izin mengakses jaringan lokal; izinkan. Safari kadang memblokir; pakai Chrome atau Edge. Cara lewat terowongan (untuk uji panjang) menyusul.</p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap"><button type="submit" class="btn utama-b">Tes dan simpan</button><span id="lStatus" class="mute" style="align-self:center;font-size:14px"></span></div>
+          </form>
+        </section>
+
+        <section class="kotak" style="padding:16px 18px" aria-label="Soal">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
+            <label for="aduSoal" style="font-size:14.5px;font-weight:600" id="aduSoalLbl">Soal</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap" id="mintaSoalBox">
+              <label for="aduKat" class="sr">Kategori soal</label>
+              <select id="aduKat" style="width:auto;min-height:40px"><option value="">Semua kategori</option></select>
+              <button type="button" class="btn kecil" id="btnMintaSoal">Minta soal</button>
+            </div>
+          </div>
+          <textarea id="aduSoal" class="isi" rows="3" style="border:0;padding:0;background:transparent" placeholder="Tulis soal sendiri atau tekan Minta soal"></textarea>
+          <details id="aduKunci" hidden style="margin-top:8px"><summary style="cursor:pointer;font-size:14px;min-height:32px">Lihat kunci jawaban</summary><div class="kunci" id="aduKunciIsi" style="margin-top:8px"></div></details>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:10px">
+            <span class="mute" id="aduCatatan" style="font-size:13px">Mesin di laptop markas dijalankan bergantian.</span>
+            <button type="button" class="btn utama-b" id="btnAdu">Mulai adu</button>
+          </div>
+        </section>
+
+        <section aria-label="Hasil adu" id="aduHasil" class="grid3"></section>
+      </div>
+    </section>
+
+    <!-- RAKIT -->
+    <section class="view hal" id="v-rakit" aria-label="Rakit">
+      <div class="rakitkiri">
+        <div><h1>Rakit dengan Cakra</h1><p class="lead">Ceritakan proyekmu. Cakra menyusun Buku Panduan Rakit, lalu mesin pemeriksa MCI mengecek kabel dan kodenya sebelum sampai ke kamu.</p></div>
+        <form id="fRakit" style="display:flex;flex-direction:column;gap:14px">
+          <label class="f" for="rkMinta">Proyek yang ingin dirakit<textarea id="rkMinta" class="isi" rows="4" placeholder="misalnya lampu yang menyala otomatis saat ruangan gelap"></textarea></label>
+          <label class="f" for="rkPapan">Papan<select id="rkPapan"><option value="">Biar Cakra yang pilih</option><option value="uno">Arduino Uno</option><option value="nano">Arduino Nano</option><option value="esp32">ESP32 DevKit</option></select></label>
+          <button type="submit" class="btn utama-b" id="rkBtn">Susun rencana</button>
+          <p class="mute" id="rkJatah" style="font-size:13px;margin:0"></p>
+        </form>
+        <div><b style="font-size:15px">Panduan terakhir</b><ul class="daftarbpr" id="rkDaftar"></ul></div>
+      </div>
+      <div class="rakitkanan" id="rkKanan"><div class="kotak bpr-isi mute">Panduan akan tampil di sini.</div></div>
+    </section>
+
+    <!-- PAKET -->
+    <section class="view hal" id="v-paket" aria-label="Paket dan kuota">
+      <div><h1>Paket dan kuota</h1><p class="lead">Pakai mesin AI MCI dengan masuk akun, atau bawa mesinmu sendiri. Ini rancangan untuk versi umum; selama tahap uji, kuota belum berlaku untuk akun CEO.</p></div>
+      <div class="paket">
+        <article><div><h2 style="margin:0 0 6px;font-size:19px">Gratis</h2><div class="harga">Rp0</div><div class="mute" style="font-size:13.5px">Wajib masuk akun</div></div>
+          <ul><li>Chat riset dengan mesin MCI</li><li>Riset mendalam terbatas per hari</li><li>Buku Panduan Rakit terbatas per hari</li><li>Uji Adu Model terbatas per hari</li></ul>
+          <p class="data"><b>Data:</b> soal dan hasil dari mesin MCI dipakai MCI untuk riset, tanpa nama dan email.</p></article>
+        <article><div><h2 style="margin:0 0 6px;font-size:19px">Bawa mesin sendiri</h2><div class="harga">Rp0</div><div class="mute" style="font-size:13.5px">Kunci API atau AI lokal milikmu</div></div>
+          <ul><li>Adu Model tanpa batas dengan mesinmu</li><li>Kunci disimpan di perangkat atau terenkripsi di akun</li><li>AI lokal lewat browser atau terowongan</li><li>Tetap bisa memakai kuota Gratis</li></ul>
+          <p class="data"><b>Data:</b> tidak dipakai MCI, kecuali kamu sendiri mengizinkannya.</p></article>
+        <article><div><h2 style="margin:0 0 6px;font-size:19px">Pro</h2><div class="harga">[HARGA]</div><div class="mute" style="font-size:13.5px">per bulan</div></div>
+          <ul><li>Riset mendalam jauh lebih banyak</li><li>Buku Panduan Rakit lebih banyak</li><li>Adu BPR untuk semua mesin</li><li>Antrean lebih cepat saat ramai</li></ul>
+          <p class="data"><b>Data:</b> soal dan hasil dari mesin MCI dipakai MCI untuk riset, tanpa nama dan email.</p></article>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const simpan = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+const ambil = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
+function toast(t) { const el = $("#toast"); el.textContent = t; el.style.display = "block"; clearTimeout(toast.h); toast.h = setTimeout(() => el.style.display = "none", 2600); }
+async function api(path, opt = {}) {
+  const o = { credentials: "same-origin", headers: { "X-MCI": "1" }, ...opt };
+  if (opt.body && typeof opt.body !== "string") { o.body = JSON.stringify(opt.body); o.headers["Content-Type"] = "application/json"; }
+  const r = await fetch(path, o);
+  if (r.status === 401) { location.href = "/login"; throw new Error("Perlu masuk lagi"); }
+  let d = {}; try { d = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error(d.error || ("Galat " + r.status));
+  return d;
+}
+function salin(t) { (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast("Tersalin"), () => toast("Gagal menyalin")); }
+function tglPendek(iso) { try { return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short" }); } catch (e) { return ""; } }
+
+/* markdown sederhana: semua teks di-escape dulu, baru diberi format */
+function md(t) {
+  const blok = []; t = String(t || "");
+  t = t.replace(/```[\w+-]*\n?([\s\S]*?)```/g, (_, k) => { blok.push(k); return "\u0000B" + (blok.length - 1) + "\u0000"; });
+  let h = esc(t);
+  h = h.replace(/`([^`\n]+)`/g, "<code>$1</code>").replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>").replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<i>$2</i>");
+  h = h.replace(/\[(\d{1,2})\]/g, '<sup class="rj"><a href="#" data-rj="$1" aria-label="Sumber $1">$1</a></sup>');
+  const out = []; let list = null;
+  for (const baris of h.split("\n")) {
+    const ul = baris.match(/^\s*[-*•]\s+(.*)/), ol = baris.match(/^\s*\d+[.)]\s+(.*)/), hd = baris.match(/^#{1,4}\s+(.*)/);
+    if (ul || ol) { const tag = ul ? "ul" : "ol"; if (!list || list.tag !== tag) { if (list) out.push("</" + list.tag + ">"); list = { tag }; out.push("<" + tag + ">"); } out.push("<li>" + (ul || ol)[1] + "</li>"); continue; }
+    if (list) { out.push("</" + list.tag + ">"); list = null; }
+    if (hd) out.push("<h3>" + hd[1] + "</h3>");
+    else if (baris.trim()) out.push("<p>" + baris + "</p>");
+  }
+  if (list) out.push("</" + list.tag + ">");
+  return out.join("").replace(/\u0000B(\d+)\u0000/g, (_, i) => "<pre><code>" + esc(blok[+i]) + "</code></pre>").replace(/<p>(<pre>[\s\S]*?<\/pre>)<\/p>/g, "$1");
+}
+
+/* ---------- tema ---------- */
+function pasangTema(t) { document.documentElement.dataset.tema = t; $("#temaLabel").textContent = t === "gelap" ? "Tema terang" : "Tema gelap"; simpan("cakra_tema", t); }
+pasangTema(ambil("cakra_tema", null) || (matchMedia("(prefers-color-scheme: light)").matches ? "terang" : "gelap"));
+$("#btnTema").onclick = () => pasangTema(document.documentElement.dataset.tema === "gelap" ? "terang" : "gelap");
+
+/* ---------- navigasi ---------- */
+const VIEWS = ["tanya", "sumber", "adu", "rakit", "paket"];
+function buka() {
+  const v = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "tanya";
+  $$(".view").forEach(el => el.classList.toggle("on", el.id === "v-" + v));
+  $$(".nav a").forEach(a => { if (a.dataset.v === v) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+  if (v === "sumber") renderSumberHal();
+  if (v === "adu") aduMuat();
+  if (v === "rakit") rkMuat();
+  document.title = { tanya: "MCI Cakra", sumber: "Sumber · MCI Cakra", adu: "Adu Model · MCI Cakra", rakit: "Rakit · MCI Cakra", paket: "Paket · MCI Cakra" }[v];
+}
+addEventListener("hashchange", buka);
+
+/* ---------- TANYA ---------- */
+let OB = ambil("cakra_obrolan", []), AKTIF = null, PILIH = null, SIBUK = false;
+const SARAN = [["Bagaimana sensor HC-SR04 mengukur jarak, dan seberapa akurat?", "Elektronika"], ["Apa beda ESP32 dan Arduino Uno untuk proyek IoT?", "Perbandingan"],
+  ["Jelaskan cara kerja panel surya dengan perumpamaan sederhana", "Sains"], ["Carikan ide judul karya ilmiah tentang energi terbarukan", "Ide riset"]];
+function obAktif() { return OB.find(o => o.id === AKTIF) || null; }
+function simpanOb() { OB = OB.slice(0, 30); simpan("cakra_obrolan", OB); renderRiw(); }
+function renderRiw() {
+  $("#riw").innerHTML = OB.length ? OB.map(o => `<li><button type="button" class="buka${o.id === AKTIF ? " on" : ""}" data-id="${esc(o.id)}">${esc(o.judul)}<small>${esc(tglPendek(o.waktu))}</small></button><button type="button" class="hapus" data-hapus="${esc(o.id)}" aria-label="Hapus ${esc(o.judul)}">×</button></li>`).join("")
+    : `<li style="border:0;color:var(--sideMute);font-size:14px;padding:6px 0">Belum ada riwayat.</li>`;
+}
+$("#riw").onclick = e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.hapus) { if (!confirm("Hapus obrolan ini dari perangkat?")) return; OB = OB.filter(o => o.id !== b.dataset.hapus); if (AKTIF === b.dataset.hapus) AKTIF = null; simpanOb(); renderObrol(); return; }
+  AKTIF = b.dataset.id; PILIH = null; location.hash = "#tanya"; renderRiw(); renderObrol();
+};
+$("#btnBaru").onclick = () => { AKTIF = null; PILIH = null; location.hash = "#tanya"; renderRiw(); renderObrol(); $("#tq").focus(); };
+function renderObrol() {
+  const o = obAktif(), box = $("#isiObrol");
+  if (!o) {
+    box.innerHTML = `<div class="sambut"><h1>Apa yang ingin kamu teliti hari ini?</h1><p>Cakra membaca sumber, mencocokkan isinya, lalu menjawab lengkap dengan rujukan yang bisa kamu periksa sendiri.</p>
+      <div class="saran"><p class="mute" style="margin:0 0 4px;font-size:14px">Coba mulai dari salah satu ini</p>${SARAN.map(([q, k]) => `<a href="#" data-saran="${esc(q)}">${esc(q)}<span>${esc(k)}</span></a>`).join("")}</div></div>`;
+    $("#panelKanan").hidden = true; return;
+  }
+  let h = "";
+  o.pesan.forEach((m, i) => {
+    if (m.role === "user") h += `<p class="tanyaku">Kamu bertanya</p><h2>${esc(m.text)}</h2>`;
+    else if (m.galat) h += `<p class="galat">${esc(m.galat)}</p><div class="aksi"><button type="button" class="link" data-ulang="${i}">Coba lagi</button></div>`;
+    else h += `${m.catatan ? `<p class="catat">${esc(m.catatan)}</p>` : ""}<div class="jwb" data-jwb="${i}">${md(m.text)}</div>
+      <div class="aksi"><button type="button" class="link" data-salin="${i}">Salin beserta sumber</button>${m.sumber && m.sumber.length ? `<button type="button" class="link" data-sumber="${i}">Lihat ${m.sumber.length} sumber</button>` : ""}<button type="button" class="link" data-ulang="${i}">Jawab ulang</button></div>`;
+  });
+  if (SIBUK) h += `<div class="tunggu"><span class="titik" aria-hidden="true"></span>${$("#tqDalam").checked ? "Cakra sedang menelusuri sumber dan menyusun jawaban…" : "Cakra sedang menyusun jawaban…"}</div>`;
+  box.innerHTML = h;
+  renderPanel();
+}
+function jwbTerpilih() { const o = obAktif(); if (!o) return null; const idx = PILIH ?? o.pesan.map((m, i) => m.role === "model" && !m.galat ? i : -1).filter(i => i >= 0).pop(); return idx == null || idx < 0 ? null : { i: idx, m: o.pesan[idx], q: (o.pesan[idx - 1] || {}).text || "" }; }
+function renderPanel() {
+  const j = jwbTerpilih(), p = $("#panelKanan");
+  if (!j) { p.hidden = true; return; }
+  p.hidden = false;
+  const S = j.m.sumber || [];
+  $("#ptSumber").innerHTML = S.length ? `<ol class="sumberl">${S.map((s, i) => `<li id="sb-${i + 1}"><span class="no${s.dikutip ? "" : " redup"}">${i + 1}</span><span><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.judul)}</a><br><span class="mute">${s.dikutip ? "Dikutip dalam jawaban" : "Dibaca untuk memeriksa"}</span></span></li>`).join("")}</ol>
+    <a href="#sumber" class="link" style="display:inline-block;color:var(--accentText);font-weight:600;text-decoration:none">Buka halaman sumber</a>`
+    : `<p class="mute" style="font-size:14.5px;line-height:1.55;margin-top:16px">${j.m.dicari ? "Penelusuran tidak menemukan sumber yang dipakai." : "Jawaban ini tanpa penelusuran web. Centang Riset mendalam untuk jawaban bersumber."}</p>`;
+  $("#ptJalur").innerHTML = `<ol class="jalur">${(j.m.jalur || []).map(x => `<li><b>${esc(x.judul)}</b><br><span class="mute">${esc(x.ket)}</span></li>`).join("")}</ol>`;
+}
+$$("[data-pt]").forEach(b => b.onclick = () => { $$("[data-pt]").forEach(x => x.setAttribute("aria-selected", x === b)); $("#ptSumber").hidden = b.dataset.pt !== "sumber"; $("#ptJalur").hidden = b.dataset.pt !== "jalur"; });
+$("#isiObrol").onclick = e => {
+  const a = e.target.closest("[data-saran],[data-rj],[data-salin],[data-sumber],[data-ulang]"); if (!a) return;
+  e.preventDefault();
+  if (a.dataset.saran) { $("#tq").value = a.dataset.saran; kirimTanya(); return; }
+  if (a.dataset.rj) {
+    const blk = a.closest("[data-jwb]"); if (blk) { PILIH = +blk.dataset.jwb; renderPanel(); }
+    $$("[data-pt]")[0].click();
+    const li = $("#sb-" + a.dataset.rj); if (li) { li.scrollIntoView({ block: "nearest", behavior: "smooth" }); li.classList.add("sorot"); setTimeout(() => li.classList.remove("sorot"), 1600); }
+    return;
+  }
+  const o = obAktif(); if (!o) return;
+  if (a.dataset.salin) { const m = o.pesan[+a.dataset.salin]; salin(m.text + (m.sumber && m.sumber.length ? "\n\nSumber:\n" + m.sumber.map((s, i) => `[${i + 1}] ${s.judul} - ${s.url}`).join("\n") : "")); return; }
+  if (a.dataset.sumber) { PILIH = +a.dataset.sumber; location.hash = "#sumber"; return; }
+  if (a.dataset.ulang) { const i = +a.dataset.ulang; const q = (o.pesan[i - 1] || {}).text; if (!q || SIBUK) return; o.pesan.splice(i - 1); simpanOb(); $("#tq").value = q; kirimTanya(); }
+};
+$("#tq").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); kirimTanya(); } });
+$("#tq").addEventListener("input", e => { e.target.style.height = "auto"; e.target.style.height = Math.min(220, e.target.scrollHeight) + "px"; });
+$("#fTanya").onsubmit = e => { e.preventDefault(); kirimTanya(); };
+async function kirimTanya() {
+  const q = $("#tq").value.trim(); if (!q || SIBUK) return;
+  let o = obAktif();
+  if (!o) { o = { id: Date.now().toString(36), judul: q.slice(0, 60), waktu: new Date().toISOString(), pesan: [] }; OB.unshift(o); AKTIF = o.id; }
+  const riwayat = o.pesan.filter(m => !m.galat).map(m => ({ role: m.role, text: m.text })).slice(-12);
+  o.pesan.push({ role: "user", text: q }); $("#tq").value = ""; $("#tq").style.height = "auto";
+  SIBUK = true; PILIH = null; $("#tqKirim").disabled = true; simpanOb(); renderObrol();
+  try {
+    const d = await api("/api/cakra/tanya", { method: "POST", body: { pesan: q, riwayat, dalam: $("#tqDalam").checked } });
+    o.pesan.push({ role: "model", text: d.jawaban, sumber: d.sumber || [], jalur: d.jalur || [], dicari: d.dicari, catatan: d.catatan || "" });
+  } catch (err) { o.pesan.push({ role: "model", text: "", galat: "Cakra gagal menjawab: " + err.message }); }
+  SIBUK = false; $("#tqKirim").disabled = false; o.waktu = new Date().toISOString(); simpanOb(); renderObrol();
+}
+
+/* ---------- HALAMAN SUMBER ---------- */
+let SBF = "semua";
+function sitasi(s, gaya) {
+  const tgl = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  if (gaya === "mla") return `"${s.judul}." ${s.url}. Diakses ${tgl}.`;
+  if (gaya === "ieee") return `"${s.judul}," [Daring]. Tersedia: ${s.url}. [Diakses: ${tgl}].`;
+  return `${s.judul}. (t.t.). Diakses ${tgl}, dari ${s.url}`;
+}
+function renderSumberHal() {
+  const j = jwbTerpilih();
+  $("#sbJudul").textContent = j ? j.q : "Belum ada jawaban";
+  const S = j ? (j.m.sumber || []) : [], nK = S.filter(s => s.dikutip).length;
+  const F = [["semua", `Semua (${S.length})`], ["kutip", `Dikutip (${nK})`], ["baca", `Hanya dibaca (${S.length - nK})`]];
+  $("#sbFilter").innerHTML = F.map(([k, l]) => `<button type="button" class="tab" aria-pressed="${SBF === k}" aria-selected="${SBF === k}" data-sbf="${k}">${l}</button>`).join("");
+  const L = S.map((s, i) => ({ ...s, no: i + 1 })).filter(s => SBF === "semua" || (SBF === "kutip" ? s.dikutip : !s.dikutip));
+  $("#sbDaftar").innerHTML = L.length ? L.map(s => `<li style="grid-template-columns:40px 1fr auto;gap:16px;padding:20px 0"><span class="serif no${s.dikutip ? "" : " redup"}" style="font-size:26px;line-height:1">${s.no}</span>
+      <span><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" style="font-size:17px">${esc(s.judul)}</a><br><span class="mute">${s.dikutip ? "Dikutip dalam jawaban" : "Dibaca untuk memeriksa"}</span></span>
+      <span style="display:flex;gap:16px;align-items:flex-start"><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" class="link" style="color:var(--accentText);text-decoration:none;font-weight:600">Buka</a><button type="button" class="link" data-sit="${s.no}">Salin sitasi</button></span></li>`).join("")
+    : `<li style="display:block" class="mute">Tidak ada sumber untuk ditampilkan.</li>`;
+}
+$("#sbFilter").onclick = e => { const b = e.target.closest("[data-sbf]"); if (b) { SBF = b.dataset.sbf; renderSumberHal(); } };
+$("#sbDaftar").onclick = e => { const b = e.target.closest("[data-sit]"); if (!b) return; const j = jwbTerpilih(); const s = j && j.m.sumber[+b.dataset.sit - 1]; if (s) salin(sitasi(s, $("#sbGaya").value)); };
+
+/* ---------- ADU MODEL ---------- */
+let ADU = { mesin: [], skor: {}, mode: "jawab", cek: [], soal: null, hasil: [], dimuat: false, bprTimer: null };
+let MILIK = ambil("cakra_mesin", []);
+const SIS_ADU = "Jawab dalam bahasa Indonesia, jelas dan ringkas. Kalau tidak tahu, katakan tidak tahu.";
+$("#kodeOrigins").textContent = (navigator.platform || "").toLowerCase().includes("mac") ? `launchctl setenv OLLAMA_ORIGINS "${location.origin}"` : `OLLAMA_ORIGINS=${location.origin}`;
+function panelTampil(t) { $("#aduKiri").hidden = !t; $("#btnPanel").textContent = t ? "Sembunyikan tabel" : "Tampilkan tabel"; simpan("cakra_panel", t); }
+panelTampil(ambil("cakra_panel", true));
+$("#btnPanel").onclick = () => panelTampil($("#aduKiri").hidden);
+$$("[data-at]").forEach(b => b.onclick = () => { $$("[data-at]").forEach(x => x.setAttribute("aria-selected", x === b)); $("#atCek").hidden = b.dataset.at !== "cek"; $("#atHasil").hidden = b.dataset.at !== "hasil"; });
+$$("[data-tm]").forEach(b => b.onclick = () => { $$("[data-tm]").forEach(x => x.setAttribute("aria-selected", x === b)); $("#fKunci").hidden = b.dataset.tm !== "kunci"; $("#fLokal").hidden = b.dataset.tm !== "lokal"; });
+$("#btnTambahMesin").onclick = () => { const s = $("#tambahMesin"); s.hidden = !s.hidden; $("#btnTambahMesin").textContent = s.hidden ? "Tambah mesin milikmu" : "Tutup"; };
+$("#kPenyedia").onchange = e => { $("#kBase").value = e.target.value; };
+$$("[data-mode]").forEach(b => b.onclick = () => {
+  ADU.mode = b.dataset.mode; $$("[data-mode]").forEach(x => { const on = x === b; x.setAttribute("aria-pressed", on); x.style.background = on ? "var(--accent)" : "transparent"; x.style.color = on ? "var(--accentInk)" : "var(--ink)"; });
+  const bpr = ADU.mode === "bpr";
+  $("#aduSoalLbl").textContent = bpr ? "Ide rakitan" : "Soal"; $("#mintaSoalBox").hidden = bpr; $("#aduKunci").hidden = bpr || !ADU.soal;
+  $("#aduSoal").placeholder = bpr ? "misalnya lampu otomatis saat gelap dengan Arduino Uno" : "Tulis soal sendiri atau tekan Minta soal";
+  $("#aduCatatan").textContent = bpr ? "Adu BPR hanya untuk mesin MCI (sampai 8 mesin). Hasil dinilai mesin pemeriksa MCI." : "Mesin di laptop markas dijalankan bergantian.";
+  renderMesin(); ADU.hasil = []; bpr ? bprPantau() : renderHasil();
+});
+$$("[data-mode]")[0].click();
+
+async function aduMuat() {
+  if (ADU.dimuat) return; ADU.dimuat = true;
+  try { const d = await api("/api/panel/adu"); ADU.mesin = d.mesin || []; ADU.skor = d.skor || {}; } catch (e) { $("#mesinL").innerHTML = `<span class="galat">${esc(e.message)}</span>`; }
+  try { const c = await api("/api/cakra/cek"); ADU.cek = c.items || []; } catch (e) {}
+  try { const s = await api("/api/cakra/soal"); $("#aduKat").innerHTML = `<option value="">Semua kategori</option>` + (s.kategori || []).map(k => `<option value="${esc(k.split(".")[0])}">${esc(k)}</option>`).join(""); } catch (e) {}
+  renderMesin(); renderCek(); renderPeringkat();
+}
+function renderMesin() {
+  const bpr = ADU.mode === "bpr";
+  const srv = ADU.mesin.map(m => `<label class="${m.siap ? "" : "mati"}"><input type="checkbox" data-m="${esc(m.id)}" ${m.siap ? "" : "disabled"}>${esc(m.nama)} <small>${m.siap ? "MCI" : "tidak siap"}</small></label>`).join("");
+  const mil = bpr ? "" : MILIK.map((m, i) => `<label><input type="checkbox" data-milik="${i}">${esc(m.nama)} <small>${m.jenis === "lokal" ? "laptop kamu" : "kunci kamu"}</small><button type="button" class="link" style="min-height:24px;padding:0 0 0 4px" data-buang="${i}" aria-label="Hapus ${esc(m.nama)}">×</button></label>`).join("");
+  $("#mesinL").innerHTML = srv + mil || `<span class="mute">Belum ada mesin.</span>`;
+  $("#mesinInfo").textContent = bpr ? "" : (MILIK.length ? "" : "Tambahkan kunci API atau AI lokal milikmu untuk ikut diadu.");
+}
+$("#mesinL").onclick = e => { const b = e.target.closest("[data-buang]"); if (!b) return; e.preventDefault(); MILIK.splice(+b.dataset.buang, 1); simpan("cakra_mesin", MILIK); renderMesin(); };
+async function panggilMilik(m, prompt) {
+  const t0 = performance.now();
+  if (m.jenis === "lokal") {
+    const r = await fetch(m.base.replace(/\/$/, "") + "/api/chat", { method: "POST", body: JSON.stringify({ model: m.model, stream: false, messages: [{ role: "system", content: SIS_ADU }, { role: "user", content: prompt }] }) });
+    if (!r.ok) throw new Error("AI lokal menjawab " + r.status);
+    const j = await r.json(); return { teks: (j.message && j.message.content) || "", detik: ((performance.now() - t0) / 1000).toFixed(1) };
+  }
+  const r = await fetch(m.base.replace(/\/$/, "") + "/chat/completions", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + m.kunci },
+    body: JSON.stringify({ model: m.model, max_tokens: 1500, messages: [{ role: "system", content: SIS_ADU }, { role: "user", content: prompt }] }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error((j.error && (j.error.message || j.error)) || ("Penyedia menjawab " + r.status));
+  return { teks: (((j.choices || [])[0] || {}).message || {}).content || "", detik: ((performance.now() - t0) / 1000).toFixed(1) };
+}
+$("#fKunci").onsubmit = async e => {
+  e.preventDefault();
+  const m = { jenis: "kunci", base: $("#kBase").value.trim(), model: $("#kModel").value.trim(), kunci: $("#kKunci").value.trim() };
+  if (!/^https:\/\//.test(m.base)) return $("#kStatus").textContent = "Alamat API harus diawali https://";
+  if (!m.model || !m.kunci) return $("#kStatus").textContent = "Isi nama model dan kunci.";
+  $("#kStatus").textContent = "Mengetes…";
+  try { await panggilMilik(m, "Balas dengan satu kata: siap"); m.nama = m.model; MILIK.push(m); simpan("cakra_mesin", MILIK); $("#kKunci").value = ""; $("#kStatus").textContent = "Tersimpan di browser ini."; renderMesin(); }
+  catch (err) { $("#kStatus").textContent = "Gagal: " + err.message + (err.message.includes("Failed to fetch") ? " (penyedia ini mungkin menolak panggilan dari browser)" : ""); }
+};
+$("#fLokal").onsubmit = async e => {
+  e.preventDefault();
+  const m = { jenis: "lokal", base: $("#lBase").value.trim(), model: $("#lModel").value.trim() };
+  if (!/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?\/?$/.test(m.base)) return $("#lStatus").textContent = "Untuk sekarang hanya alamat localhost.";
+  if (!m.model) return $("#lStatus").textContent = "Isi nama model.";
+  $("#lStatus").textContent = "Mengetes…";
+  try { await panggilMilik(m, "Balas dengan satu kata: siap"); m.nama = m.model; MILIK.push(m); simpan("cakra_mesin", MILIK); $("#lStatus").textContent = "Tersambung dan tersimpan."; renderMesin(); }
+  catch (err) { $("#lStatus").textContent = "Gagal tersambung. Pastikan Ollama menyala dan OLLAMA_ORIGINS sudah diatur. (" + err.message + ")"; }
+};
+$("#btnMintaSoal").onclick = async () => {
+  try { const d = await api("/api/cakra/soal?kat=" + encodeURIComponent($("#aduKat").value)); ADU.soal = d.soal; $("#aduSoal").value = d.soal.soal;
+    $("#aduKunciIsi").innerHTML = `<b>${esc(d.soal.id)} · ${esc(d.soal.kategori)}</b><br>${esc(d.soal.jawaban)}${(d.soal.kunci || []).length ? `<br><span class="mute">Kata kunci: ${esc(d.soal.kunci.join(", "))}</span>` : ""}`;
+    $("#aduKunci").hidden = false; $("#aduKunci").open = false; } catch (e) { toast(e.message); }
+};
+$("#aduSoal").addEventListener("input", () => { if (ADU.soal && $("#aduSoal").value !== ADU.soal.soal) { ADU.soal = null; $("#aduKunci").hidden = true; } });
+$("#btnAdu").onclick = async () => {
+  const soal = $("#aduSoal").value.trim();
+  const srv = $$("#mesinL [data-m]:checked").map(x => x.dataset.m), mil = $$("#mesinL [data-milik]:checked").map(x => MILIK[+x.dataset.milik]);
+  if (ADU.mode === "bpr") {
+    if (soal.length < 10 || !srv.length) return toast("Tulis ide rakitan dan pilih minimal 1 mesin MCI");
+    $("#btnAdu").disabled = true;
+    try { await api("/api/adu/bpr", { method: "POST", body: { ide: soal, mesin: srv } }); toast("Adu BPR dimulai. Hasil muncul bertahap."); bprPantau(); } catch (e) { toast(e.message); }
+    $("#btnAdu").disabled = false; return;
+  }
+  if (!soal) return toast("Tulis soal dulu");
+  if (srv.length > 3) return toast("Mesin MCI maksimal 3 sekaligus");
+  if (srv.length + mil.length < 2) return toast("Pilih minimal 2 mesin");
+  $("#btnAdu").disabled = true;
+  ADU.hasil = [...srv.map(id => ({ id, nama: (ADU.mesin.find(m => m.id === id) || {}).nama || id, tunggu: true, srv: true })), ...mil.map(m => ({ id: "milik:" + m.nama, nama: m.nama, tunggu: true, ket: m.jenis === "lokal" ? "laptop kamu" : "kunci kamu" }))];
+  ADU.pilih = null; renderHasil();
+  const kerja = [];
+  if (srv.length) kerja.push(api("/api/panel/adu", { method: "POST", body: { prompt: soal, mesin: srv, satu: true } }).then(d => {
+    (d.hasil || []).forEach(h => { const x = ADU.hasil.find(y => y.id === h.mesin); if (x) Object.assign(x, { tunggu: false, ok: h.ok, teks: h.teks, detik: h.detik, ket: h.biaya }); });
+    ADU.skor = d.skor || ADU.skor; renderPeringkat();
+  }).catch(e => ADU.hasil.filter(x => x.srv).forEach(x => Object.assign(x, { tunggu: false, ok: false, teks: e.message }))).then(renderHasil));
+  mil.forEach(m => kerja.push(panggilMilik(m, soal).then(r => Object.assign(ADU.hasil.find(y => y.id === "milik:" + m.nama), { tunggu: false, ok: true, teks: r.teks, detik: r.detik }))
+    .catch(e => Object.assign(ADU.hasil.find(y => y.id === "milik:" + m.nama), { tunggu: false, ok: false, teks: e.message }))).then(renderHasil));
+  await Promise.all(kerja); $("#btnAdu").disabled = false;
+};
+function renderHasil() {
+  if (ADU.mode === "bpr") return;
+  $("#aduHasil").innerHTML = ADU.hasil.map((h, i) => `<article class="kartu${ADU.pilih === i ? " pilih" : ""}">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b>${esc(h.nama)}</b><span class="mute" style="font-size:12.5px">${h.tunggu ? "menunggu…" : esc((h.detik ? h.detik + " detik" : "") + (h.ket ? " · " + h.ket : ""))}</span></div>
+    ${h.tunggu ? `<div class="tunggu"><span class="titik" aria-hidden="true"></span>Sedang menjawab</div>` : h.ok ? `<div class="jwb">${md(h.teks)}</div>` : `<p class="galat">${esc(h.teks)}</p>`}
+    ${h.tunggu ? "" : `<div class="bawah"><button type="button" class="btn kecil${ADU.pilih === i ? " utama-b" : ""}" data-pilih="${i}">${ADU.pilih === i ? "Terbaik" : "Pilih terbaik"}</button>
+      <span class="mute" style="font-size:13px">Checklist:</span><button type="button" class="sel L" data-nilai="L" data-i="${i}" aria-label="Lulus">L</button><button type="button" class="sel G" data-nilai="G" data-i="${i}" aria-label="Gagal">G</button></div>`}
+  </article>`).join("");
+}
+$("#aduHasil").onclick = async e => {
+  const p = e.target.closest("[data-pilih]"), n = e.target.closest("[data-nilai]");
+  if (p) { const i = +p.dataset.pilih, h = ADU.hasil[i]; ADU.pilih = i; renderHasil(); if (h.srv) { try { const d = await api("/api/panel/adu", { method: "POST", body: { pilih: h.id } }); ADU.skor = d.skor; renderPeringkat(); } catch (er) {} } return; }
+  if (n) {
+    const h = ADU.hasil[+n.dataset.i], soal = $("#aduSoal").value.trim(); if (!soal) return;
+    const nama = (ADU.soal ? ADU.soal.id + " " : "") + soal.slice(0, 80);
+    let row = ADU.cek.find(r => r.nama === nama);
+    if (!row) { row = { id: Math.random().toString(36).slice(2, 10), nama, kat: ADU.soal ? ADU.soal.kategori.split(".")[0] : "Soal sendiri", hasil: {} }; ADU.cek.unshift(row); }
+    row.hasil[h.nama.slice(0, 60)] = n.dataset.nilai; await simpanCek(); toast("Masuk checklist");
+  }
+};
+function kolomCek() { const k = []; ADU.cek.forEach(r => Object.keys(r.hasil || {}).forEach(m => { if (!k.includes(m)) k.push(m); })); return k.slice(0, 5); }
+function renderCek() {
+  const K = kolomCek();
+  $("#tblCek").innerHTML = `<thead><tr><th scope="col">Kemampuan</th>${K.map((k, i) => `<th scope="col" title="${esc(k)}">${String.fromCharCode(65 + i)}</th>`).join("")}<th scope="col"><span class="sr">Hapus</span></th></tr></thead>
+    <tbody>${ADU.cek.length ? ADU.cek.map((r, ri) => `<tr><td><div style="font-weight:500">${esc(r.nama)}</div><div class="mute" style="font-size:12.5px">${esc(r.kat || "")}</div></td>
+      ${K.map(k => { const v = (r.hasil || {})[k] || "-"; return `<td><button type="button" class="sel ${v === "-" ? "" : v}" data-ri="${ri}" data-k="${esc(k)}" aria-label="${esc(k)}: ${v === "L" ? "lulus" : v === "G" ? "gagal" : "belum"}">${v}</button></td>`; }).join("")}
+      <td><button type="button" class="link" style="min-height:32px;padding:0" data-hapusc="${ri}" aria-label="Hapus baris">×</button></td></tr>`).join("") : `<tr><td colspan="${K.length + 2}" class="mute">Belum ada. Tambahkan kemampuan, atau tandai L/G pada hasil adu.</td></tr>`}</tbody>`
+    + (K.length ? `<caption style="caption-side:bottom;text-align:left;padding-top:8px;font-size:12.5px" class="mute">${K.map((k, i) => `${String.fromCharCode(65 + i)} = ${esc(k)}`).join("; ")}</caption>` : "");
+}
+async function simpanCek() { try { const d = await api("/api/cakra/cek", { method: "POST", body: { items: ADU.cek } }); ADU.cek = d.items; } catch (e) { toast("Gagal menyimpan: " + e.message); } renderCek(); }
+$("#tblCek").onclick = e => {
+  const b = e.target.closest("[data-ri]"), h = e.target.closest("[data-hapusc]");
+  if (h) { if (confirm("Hapus baris ini?")) { ADU.cek.splice(+h.dataset.hapusc, 1); simpanCek(); } return; }
+  if (!b) return; const r = ADU.cek[+b.dataset.ri]; const v = (r.hasil || {})[b.dataset.k] || "-"; r.hasil = r.hasil || {}; r.hasil[b.dataset.k] = v === "-" ? "L" : v === "L" ? "G" : "-"; simpanCek();
+};
+$("#fCek").onsubmit = e => { e.preventDefault(); const n = $("#cekNama").value.trim(); if (!n) return; const K = kolomCek(); ADU.cek.push({ id: Math.random().toString(36).slice(2, 10), nama: n, kat: "Manual", hasil: Object.fromEntries(K.map(k => [k, "-"])) }); $("#cekNama").value = ""; simpanCek(); };
+$("#cekEkspor").onclick = () => {
+  const K = kolomCek(), q = s => '"' + String(s).replace(/"/g, '""') + '"';
+  const csv = [["Kemampuan", "Kategori", ...K].map(q).join(","), ...ADU.cek.map(r => [r.nama, r.kat, ...K.map(k => (r.hasil || {})[k] || "-")].map(q).join(","))].join("\n");
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv" })); a.download = "checklist-adu-model.csv"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
+function renderPeringkat() {
+  const L = Object.entries(ADU.skor || {}).map(([id, n]) => ({ nama: (ADU.mesin.find(m => m.id === id) || {}).nama || id, n: +n })).sort((a, b) => b.n - a.n);
+  const tot = L.reduce((s, x) => s + x.n, 0) || 1;
+  $("#atHasil").innerHTML = `<p class="mute" style="font-size:13.5px;margin:12px 0">Berapa kali tiap mesin MCI kamu pilih sebagai jawaban terbaik.</p>` + (L.length ? `<ol style="list-style:none;margin:0;padding:0">${L.map(x => `<li style="padding:12px 0;border-bottom:1px solid var(--line)"><div style="display:flex;justify-content:space-between;gap:10px"><b style="font-size:14.5px">${esc(x.nama)}</b><span class="serif" style="font-size:20px">${x.n}</span></div><div style="margin-top:8px;height:6px;border-radius:3px;background:var(--line2)"><div style="height:6px;border-radius:3px;width:${Math.round(x.n / tot * 100)}%;background:var(--accent)"></div></div></li>`).join("")}</ol>` : `<p class="mute">Belum ada pilihan.</p>`);
+}
+async function bprPantau() {
+  clearTimeout(ADU.bprTimer); if (ADU.mode !== "bpr") return;
+  try {
+    const d = await api("/api/adu/bpr"); const b = (d.batch || [])[0];
+    $("#aduHasil").innerHTML = b ? `<div style="grid-column:1/-1"><b>${esc(b.ide)}</b> <span class="mute" style="font-size:13px">${esc(tglPendek(b.waktu))}</span></div>` + b.item.map(it => {
+      const u = it.uji || {}, jalan = it.status === "proses";
+      return `<article class="kartu"><div style="display:flex;justify-content:space-between;gap:8px"><b>${esc(it.nama)}</b><span class="mute" style="font-size:12.5px">${jalan ? "sedang dirakit…" : esc((u.detik ? u.detik + " detik" : "") + (u.putaran ? " · " + u.putaran + " putaran" : ""))}</span></div>
+        ${jalan ? `<div class="tunggu"><span class="titik" aria-hidden="true"></span>Menyusun dan diperiksa</div>` : u.lolos ? `<div class="lencana" style="align-self:flex-start">Lulus pemeriksaan MCI${u.mentor ? " (dibantu mentor)" : ""}</div>` : `<p class="galat">${esc(u.galat || "Gagal")}</p>`}
+        ${jalan ? "" : `<div class="bawah"><a class="btn kecil" href="#rakit" data-bukapd="${it.pid}">Buka panduannya</a></div>`}</article>`; }).join("") : `<p class="mute">Belum ada Adu BPR.</p>`;
+    if (b && b.item.some(it => it.status === "proses")) ADU.bprTimer = setTimeout(bprPantau, 8000);
+  } catch (e) { $("#aduHasil").innerHTML = `<p class="galat">${esc(e.message)}</p>`; }
+}
+$("#aduHasil").addEventListener("click", e => { const a = e.target.closest("[data-bukapd]"); if (a) { RK.id = +a.dataset.bukapd; } });
+
+/* ---------- RAKIT ---------- */
+let RK = { id: null, data: null, tab: "komponen", timer: null };
+async function rkMuat() {
+  try {
+    const d = await api("/api/panduan");
+    const j = d.jatah || {}; $("#rkJatah").textContent = j.sisa == null ? "" : `Sisa jatah panduan: ${j.sisa} dari ${j.batas} per ${j.hari} hari.`;
+    const L = (d.daftar || []).filter(p => p.oleh_id === d.me || d.admin).slice(0, 10);
+    $("#rkDaftar").innerHTML = L.length ? L.map(p => `<li><button type="button" data-pd="${p.id}">${esc(p.judul || "(tanpa judul)")}<small>${esc({ jadi: "Jadi", proses: "Sedang dibuat", rencana: "Menunggu konfirmasi", gagal: "Gagal", ditolak: "Ditolak" }[p.status] || p.status)} · ${esc(tglPendek(p.dibuat))}</small></button></li>`).join("") : `<li class="mute" style="font-size:14px">Belum ada.</li>`;
+  } catch (e) { $("#rkDaftar").innerHTML = `<li class="galat">${esc(e.message)}</li>`; }
+  if (RK.id) rkBuka(RK.id);
+}
+$("#rkDaftar").onclick = e => { const b = e.target.closest("[data-pd]"); if (b) rkBuka(+b.dataset.pd); };
+$("#fRakit").onsubmit = async e => {
+  e.preventDefault(); const minta = $("#rkMinta").value.trim(); if (minta.length < 10) return toast("Ceritakan proyeknya minimal 10 huruf");
+  $("#rkBtn").disabled = true; $("#rkBtn").textContent = "Menyusun rencana…";
+  try { const d = await api("/api/panduan", { method: "POST", body: { permintaan: minta, papan: $("#rkPapan").value } }); RK.id = d.panduan.id; rkTampil(d.panduan); rkMuat(); }
+  catch (err) { toast(err.message); }
+  $("#rkBtn").disabled = false; $("#rkBtn").textContent = "Susun rencana";
+};
+async function rkBuka(id) { RK.id = id; clearTimeout(RK.timer); try { const d = await api("/api/panduan/" + id); rkTampil(d.panduan); } catch (e) { $("#rkKanan").innerHTML = `<div class="kotak bpr-isi galat">${esc(e.message)}</div>`; } }
+function rp(n) { return "Rp" + Number(n || 0).toLocaleString("id-ID"); }
+function rkTampil(p) {
+  RK.data = p; clearTimeout(RK.timer);
+  const rc = p.rencana || {}, k = $("#rkKanan");
+  const kepala = (badge) => `<div style="padding:24px 28px 0"><div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px"><div><p class="mute" style="margin:0 0 4px;font-size:13.5px">Buku Panduan Rakit${p.papan_nama ? " untuk " + esc(p.papan_nama) : ""}</p><h2 class="serif" style="margin:0;font-weight:600;font-size:28px">${esc(p.judul || rc.judul || "Panduan")}</h2></div>${badge || ""}</div></div>`;
+  if (p.status === "ditolak") { k.innerHTML = `<article class="kotak">${kepala(`<div class="lencana gagal">Ditolak demi keselamatan</div>`)}<div class="bpr-isi"><p>${esc(rc.alasan_tolak || "Permintaan ini tidak aman untuk dibuatkan panduan.")}</p></div></article>`; return; }
+  if (p.status === "rencana") {
+    k.innerHTML = `<article class="kotak">${kepala("")}<div class="bpr-isi"><p style="font-size:16px;line-height:1.6;margin-top:0">${esc(rc.ringkasan || "")}</p>
+      <table class="t" style="margin:14px 0"><tbody><tr><td class="mute">Papan</td><td>${esc(p.papan_nama || rc.papan || "")}${rc.alasan_papan ? ` <span class="mute">(${esc(rc.alasan_papan)})</span>` : ""}</td></tr><tr><td class="mute">Kesulitan</td><td>${esc(rc.kesulitan || "-")}</td></tr><tr><td class="mute">Waktu</td><td>${esc(rc.waktu || "-")}</td></tr><tr><td class="mute">Perkiraan biaya</td><td>${rp(rc.biaya_min)} sampai ${rp(rc.biaya_max)}</td></tr></tbody></table>
+      ${(rc.komponen_kira || []).length ? `<p style="margin:0 0 6px;font-weight:600">Komponen kira-kira</p><ul style="margin:0 0 16px;padding-left:20px;line-height:1.6">${rc.komponen_kira.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+      <form id="fKonfirm" style="display:flex;flex-direction:column;gap:12px">${(rc.pertanyaan || []).map((q, i) => `<label class="f" for="rq${i}">${esc(q)}<input id="rq${i}" type="text" placeholder="Kosongkan untuk pilihan paling umum"></label>`).join("")}
+        <label class="cek" for="rkSetuju"><input id="rkSetuju" type="checkbox">Rencananya sudah sesuai</label>
+        <button type="submit" class="btn utama-b" style="align-self:flex-start">Buat panduan lengkap</button></form></div></article>`;
+    $("#fKonfirm").onsubmit = async e => {
+      e.preventDefault(); if (!$("#rkSetuju").checked) return toast("Centang dulu bahwa rencananya sudah sesuai");
+      try { const d = await api(`/api/panduan/${p.id}/konfirmasi`, { method: "POST", body: { setuju: true, jawaban: (rc.pertanyaan || []).map((_, i) => $("#rq" + i).value) } }); rkTampil(d.panduan); rkMuat(); } catch (err) { toast(err.message); }
+    };
+    return;
+  }
+  if (p.status === "proses" || p.status === "menyusun") {
+    k.innerHTML = `<article class="kotak">${kepala("")}<div class="bpr-isi"><div class="tunggu"><span class="titik" aria-hidden="true"></span>Cakra sedang menyusun panduan, lalu mesin pemeriksa MCI mengecek kabel dan kodenya. Biasanya 1 sampai 3 menit.</div></div></article>`;
+    RK.timer = setTimeout(() => rkBuka(p.id), 6000); return;
+  }
+  const lap = p.laporan || {}, d = p.data;
+  if (!d) { k.innerHTML = `<article class="kotak">${kepala(`<div class="lencana gagal">Gagal dibuat</div>`)}<div class="bpr-isi"><ul>${(lap.galat || ["Panduan gagal dibuat."]).map(g => `<li class="galat">${esc(g)}</li>`).join("")}</ul></div></article>`; return; }
+  const lolos = p.status === "jadi";
+  const badge = lolos ? `<div class="lencana"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>Lulus pemeriksaan MCI</div>` : `<div class="lencana gagal">Draf, belum lolos pemeriksaan</div>`;
+  const TABS = [["komponen", "Komponen"], ["kabel", "Skema kabel"], ["kode", "Kode"], ["langkah", "Langkah"], ["periksa", "Pemeriksaan"]];
+  const komp = (d.kantong || []).flatMap(kt => (kt.komponen || []).map(x => ({ ...x, kantong: kt.nama })));
+  const samb = (d.langkah || []).flatMap((lg, i) => (lg.sambungan || []).map(s => ({ ...s, langkah: i + 1 })));
+  const isi = {
+    komponen: `<div style="overflow-x:auto"><table class="t"><thead><tr><th>Komponen</th><th>Jumlah</th><th>Gunanya</th><th>Perkiraan harga</th></tr></thead><tbody>${komp.map(x => `<tr><td>${esc(x.nama)}</td><td>${esc(x.jumlah)}</td><td>${esc(x.fungsi)}</td><td>${rp(x.harga_min)}–${rp(x.harga_max)}</td></tr>`).join("")}</tbody></table></div>${d.biaya ? `<p class="mute" style="margin:12px 0 0">Total perkiraan: ${rp(d.biaya.min)} sampai ${rp(d.biaya.max)}</p>` : ""}${(d.alat || []).length ? `<p style="margin:14px 0 0"><b>Alat:</b> ${esc(d.alat.join(", "))}</p>` : ""}`,
+    kabel: `<div style="overflow-x:auto"><table class="t"><thead><tr><th>Langkah</th><th>Dari</th><th>Ke</th><th>Warna kabel</th></tr></thead><tbody>${samb.map(s => `<tr><td>${s.langkah}</td><td>${esc(s.dari)}</td><td>${esc(s.ke)}</td><td>${esc(s.warna || "")}</td></tr>`).join("")}</tbody></table></div>`,
+    kode: `<div class="kotak" style="overflow:hidden"><div style="display:flex;justify-content:space-between;align-items:center;padding:6px 14px;background:var(--panel2);font-size:13.5px" class="mute">Kode Arduino<button type="button" class="link" id="rkSalinKode" style="min-height:36px;color:var(--accentText);text-decoration:none;font-weight:600">Salin</button></div><pre style="margin:0;padding:14px 16px;overflow-x:auto;font-size:14px;line-height:1.6"><code>${esc(d.kode || "")}</code></pre></div>${d.penjelasan_kode ? `<div class="jwb" style="font-size:16.5px;margin-top:14px">${md(d.penjelasan_kode)}</div>` : ""}${(d.pustaka || []).length ? `<p class="mute">Library: ${esc(d.pustaka.join(", "))}</p>` : ""}`,
+    langkah: `<ol style="margin:0;padding-left:22px;display:flex;flex-direction:column;gap:16px;line-height:1.6">${(d.langkah || []).map(lg => `<li><b>${esc(lg.judul)}</b><div>${esc(lg.penjelasan)}</div>${lg.checkpoint ? `<div class="mute" style="font-size:14.5px">Cek: ${esc(lg.checkpoint)}</div>` : ""}${lg.peringatan ? `<div style="font-size:14.5px;color:var(--signal)">Hati-hati: ${esc(lg.peringatan)}</div>` : ""}</li>`).join("")}</ol>`,
+    periksa: `${lolos ? `<p style="margin-top:0">Panduan ini lolos semua pemeriksaan wajib mesin MCI: sambungan, resistor LED, driver beban berat, catu daya servo, kecocokan pin kode dengan kabel, fungsi sesuai papan, dan library.</p>` : `<p class="galat" style="margin-top:0">Panduan ini masih draf karena belum lolos pemeriksaan.</p>`}
+      ${(lap.peringatan || []).length ? `<p style="font-weight:600;margin:14px 0 6px">Catatan pemeriksa</p><ul style="margin:0;padding-left:20px;line-height:1.6">${lap.peringatan.map(w => `<li>${esc(typeof w === "string" ? w : (w.pesan || JSON.stringify(w)))}</li>`).join("")}</ul>` : `<p class="mute">Tidak ada catatan tambahan.</p>`}
+      ${(d.uji || []).length ? `<p style="font-weight:600;margin:18px 0 6px">Kalau tidak jalan</p><ul style="margin:0;padding-left:20px;line-height:1.6">${d.uji.map(u => `<li><b>${esc(u.masalah)}</b>: ${esc(u.solusi)}</li>`).join("")}</ul>` : ""}`
+  };
+  k.innerHTML = `<article class="kotak">${kepala(badge)}<div style="padding:0 28px"><div class="tabs" role="tablist" aria-label="Bagian panduan" style="margin-top:18px">${TABS.map(([t, l]) => `<button type="button" class="tab" role="tab" aria-selected="${RK.tab === t}" data-rt="${t}">${l}</button>`).join("")}</div></div>
+    <div class="bpr-isi">${isi[RK.tab]}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;padding:16px 28px;border-top:1px solid var(--line)"><button type="button" class="btn utama-b" id="rkWokwi">Unduh berkas Wokwi</button><a class="btn" href="/" title="Buka MCI HQ">Buka di MCI HQ</a></div></article>`;
+  $$("[data-rt]").forEach(b => b.onclick = () => { RK.tab = b.dataset.rt; rkTampil(p); });
+  const sk = $("#rkSalinKode"); if (sk) sk.onclick = () => salin(d.kode || "");
+  $("#rkWokwi").onclick = async () => {
+    try { const w = await api(`/api/panduan/${p.id}/wokwi`);
+      const unduh = (nama, isi, tipe) => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([isi], { type: tipe })); a.download = nama; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
+      unduh("diagram.json", JSON.stringify(w.diagram, null, 2), "application/json"); setTimeout(() => unduh("sketch.ino", w.sketch || "", "text/plain"), 300);
+      if (w.libraries) setTimeout(() => unduh("libraries.txt", w.libraries, "text/plain"), 600);
+      toast("Berkas Wokwi terunduh. Buka wokwi.com, buat proyek baru, lalu tempel isinya.");
+    } catch (er) { toast(er.message); }
+  };
+}
+
+/* ---------- mulai ---------- */
+renderRiw(); renderObrol(); buka();
+</script>
+</body>
+</html>

@@ -15866,7 +15866,7 @@ def api_panel_adu():
         return jsonify({"skor": skor})
     prompt = str(d.get("prompt") or "").strip()[:3000]
     pilih = [m for m in dict.fromkeys(d.get("mesin") or []) if m in semua and adu_siap(m)][:3]
-    if not prompt or len(pilih) < 2:
+    if not prompt or len(pilih) < (1 if d.get("satu") else 2):   # satu: dipakai MCI Cakra saat mesin lain berjalan di browser (kunci API / AI lokal)
         return jsonify({"error": "Tulis pertanyaan dan pilih 2–3 model yang siap"}), 400
     from concurrent.futures import ThreadPoolExecutor
     lokal = [m for m in pilih if is_node(m)]   # RAM Mac 8 GB: model HDD dijalankan bergantian, bukan bersamaan
@@ -17506,6 +17506,180 @@ async def run_bots():
     asyncio.create_task(laporan_jadwal())
     log.info("Laporan mingguan otomatis: setiap %s %02d:00 WIB (%s)", HARI_ID[LAP_HARI], LAP_JAM, "aktif" if SET.get("laporan_on", True) else "nonaktif")
     await asyncio.Event().wait()
+
+
+# ---------- MCI CAKRA: app riset untuk umum (tahap uji: khusus CEO dulu, permintaan 27 Nov 2026) ----------
+# Dibuka di /cakra. Tampilan: web/cakra.html (dua tema: Samudra terang, Cakrawala Malam gelap).
+# Chat riset memakai penelusuran Google (grounding) supaya tiap jawaban punya sumber yang bisa dicek.
+# Adu Model & Rakit memakai mesin yang sudah ada (/api/panel/adu, /api/adu/bpr, /api/panduan).
+# Kunci API & AI lokal milik pengguna dipanggil langsung dari browser, jadi kuncinya tidak pernah lewat server MCI.
+CAKRA_SISTEM = """Kamu MCI Cakra, asisten riset buatan Mahardika Cakrawala Indonesia (MCI).
+Jawab dalam bahasa Indonesia yang jelas dan rapi. Utamakan fakta yang bisa diperiksa; kalau memakai hasil penelusuran, setiap klaim penting harus didukung sumber.
+Kalau tidak yakin atau sumbernya tidak ada, katakan terus terang, jangan mengarang angka, nama, atau kutipan.
+Susun jawaban: inti jawaban dulu dalam 1-2 kalimat, lalu penjelasan secukupnya. Pakai perumpamaan sederhana kalau membantu.
+Jangan menyebut nama model AI atau penyedia yang kamu pakai; kalau ditanya, jawab bahwa kamu MCI Cakra."""
+_CAKRA_BANK = {}
+_CAKRA_TABEL = {"siap": False}
+
+
+def _cakra_tabel():
+    if _CAKRA_TABEL["siap"]:
+        return
+    pk = "SERIAL PRIMARY KEY" if PG else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    with db() as c:   # catatan riset: bahan pengembangan AI MCI (aturan CEO: pemakaian mesin MCI = data dipakai untuk riset, tanpa identitas)
+        sql(c, f"CREATE TABLE IF NOT EXISTS cakra_log (id {pk}, waktu TEXT NOT NULL, jenis TEXT NOT NULL, pesan TEXT, jawaban TEXT, sumber TEXT, mesin TEXT, detik REAL)")
+    _CAKRA_TABEL["siap"] = True
+
+
+def _cakra_catat(jenis, pesan, jawaban, sumber=None, mesin="", detik=0.0):
+    try:
+        _cakra_tabel()
+        with db() as c:
+            sql(c, "INSERT INTO cakra_log (waktu,jenis,pesan,jawaban,sumber,mesin,detik) VALUES (?,?,?,?,?,?,?)",
+                (_now(), jenis, str(pesan)[:4000], str(jawaban)[:12000], json.dumps(sumber or [], ensure_ascii=False)[:6000], mesin, float(detik)))
+    except Exception:
+        log.exception("cakra_log gagal")
+
+
+def _cakra_sisip_rujukan(teks, gm):
+    """Sisipkan tanda [n] setelah kalimat yang didukung sumber (grounding_supports). Indeks dari Google memakai byte UTF-8."""
+    try:
+        sup = list(getattr(gm, "grounding_supports", None) or [])
+    except Exception:
+        return teks
+    if not sup:
+        return teks
+    b = teks.encode("utf-8")
+    titik = []
+    for s in sup:
+        seg = getattr(s, "segment", None)
+        idx = [int(i) for i in (getattr(s, "grounding_chunk_indices", None) or [])][:3]
+        akhir = int(getattr(seg, "end_index", 0) or 0) if seg else 0
+        if idx and 0 < akhir <= len(b):
+            titik.append((akhir, idx))
+    for akhir, idx in sorted(titik, key=lambda x: -x[0]):
+        while akhir < len(b) and (b[akhir] & 0xC0) == 0x80:   # jangan memotong di tengah huruf
+            akhir += 1
+        tanda = "".join(f"[{i + 1}]" for i in sorted(set(idx)))
+        b = b[:akhir] + tanda.encode() + b[akhir:]
+    return b.decode("utf-8", errors="ignore")
+
+
+@app.route("/cakra")
+def cakra_halaman():
+    r = role()
+    if not r or not is_admin(r):   # tahap uji: hanya CEO
+        return redirect("/login")
+    raw = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "cakra.html"), "rb").read()
+    resp = Response(raw, mimetype="text/html")
+    resp.headers["Cache-Control"] = "no-cache"
+    resp.headers["X-Robots-Tag"] = "noindex"
+    return resp
+
+
+@app.route("/api/cakra/tanya", methods=["POST"])
+def api_cakra_tanya():
+    need_ceo()
+    d = request.get_json(silent=True) or {}
+    pesan = str(d.get("pesan") or "").strip()[:4000]
+    if len(pesan) < 2:
+        return jsonify({"error": "Tulis pertanyaannya dulu"}), 400
+    riwayat = [h for h in (d.get("riwayat") or []) if isinstance(h, dict)][-12:]
+    dalam = bool(d.get("dalam", True))
+    cl = client("canvas")
+    if not cl:
+        return jsonify({"error": "Mesin AI belum siap"}), 503
+    isi = ke_content([{"role": "model" if h.get("role") == "model" else "user", "text": h.get("text")} for h in riwayat]) + \
+        [types.Content(role="user", parts=[types.Part(text=pesan)])]
+    t0 = time.time()
+
+    def jalan(pakai_cari):
+        cfg = {"system_instruction": CAKRA_SISTEM, "max_output_tokens": 2500}
+        if pakai_cari:
+            cfg["tools"] = [types.Tool(google_search=types.GoogleSearch())]
+        return cl.models.generate_content(model=MODEL, contents=isi, config=types.GenerateContentConfig(**cfg))
+
+    dicari, catatan = dalam, ""
+    try:
+        res = jalan(dalam)
+    except Exception as e:
+        if not dalam:
+            return jsonify({"error": f"Cakra gagal menjawab: {str(e)[:200]}"}), 502
+        log.warning("Cakra: penelusuran gagal, jawab tanpa penelusuran: %s", e)
+        dicari, catatan = False, "Penelusuran web sedang tidak tersedia, jadi jawaban ini tanpa sumber."
+        try:
+            res = jalan(False)
+        except Exception as e2:
+            return jsonify({"error": f"Cakra gagal menjawab: {str(e2)[:200]}"}), 502
+    try:
+        u = res.usage_metadata
+        usage_add(MODEL, int(getattr(u, "prompt_token_count", 0) or 0), int(getattr(u, "candidates_token_count", 0) or 0), int(getattr(u, "thoughts_token_count", 0) or 0))
+    except Exception:
+        pass
+    teks = (res.text or "").strip()
+    sumber, kueri = [], []
+    try:
+        gm = res.candidates[0].grounding_metadata if res.candidates else None
+    except Exception:
+        gm = None
+    if gm:
+        for ch in (getattr(gm, "grounding_chunks", None) or [])[:12]:
+            w = getattr(ch, "web", None)
+            if w and getattr(w, "uri", None):
+                judul = str(getattr(w, "title", "") or "")[:160]
+                sumber.append({"judul": judul or "Sumber web", "url": str(w.uri), "domain": judul if "." in judul and " " not in judul else ""})
+        kueri = [str(q)[:120] for q in (getattr(gm, "web_search_queries", None) or [])][:6]
+        teks = _cakra_sisip_rujukan(teks, gm)
+    if not teks:
+        return jsonify({"error": "Cakra tidak memberi jawaban. Coba ulangi pertanyaannya."}), 502
+    dik = re.findall(r"\[(\d+)\]", teks)
+    for i, sm in enumerate(sumber):
+        sm["dikutip"] = str(i + 1) in dik
+    detik = round(time.time() - t0, 1)
+    jalur = [{"judul": "Memahami pertanyaan", "ket": pesan[:90]}]
+    if dicari:
+        jalur.append({"judul": f"Menelusuri web ({len(kueri)} kata kunci)", "ket": ", ".join(kueri)[:200] or "-"})
+        jalur.append({"judul": f"Menemukan {len(sumber)} sumber", "ket": f"{sum(1 for x in sumber if x['dikutip'])} dikutip langsung"})
+    jalur.append({"judul": "Tiba di jawaban", "ket": f"Selesai dalam {detik} detik"})
+    _cakra_catat("tanya", pesan, teks, sumber, MODEL, detik)
+    return jsonify({"jawaban": latex_bersih(teks), "sumber": sumber, "kueri": kueri, "jalur": jalur, "detik": detik, "dicari": dicari, "catatan": catatan})
+
+
+@app.route("/api/cakra/soal")
+def api_cakra_soal():
+    """Ambil soal acak dari bank soal RnD (rnd/bank_soal.json) untuk Adu Model."""
+    need_ceo()
+    if not _CAKRA_BANK:
+        try:
+            _CAKRA_BANK.update(json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "rnd", "bank_soal.json"), encoding="utf-8")))
+        except Exception:
+            return jsonify({"error": "Bank soal tidak ditemukan"}), 404
+    semua = _CAKRA_BANK.get("soal") or []
+    kat = str(request.args.get("kat") or "").strip()
+    pil = [x for x in semua if not kat or str(x.get("kategori", "")).startswith(kat)] or semua
+    if not pil:
+        return jsonify({"error": "Bank soal kosong"}), 404
+    x = secrets.choice(pil)
+    kats = sorted({str(y.get("kategori", "")) for y in semua})
+    return jsonify({"soal": {k: x.get(k) for k in ("id", "kategori", "tipe", "soal", "jawaban", "kunci")}, "kategori": kats})
+
+
+@app.route("/api/cakra/cek", methods=["GET", "POST"])
+def api_cakra_cek():
+    """Tabel checklist perkembangan model milik CEO (disimpan di pengaturan)."""
+    need_ceo()
+    if request.method == "POST":
+        d = request.get_json(silent=True) or {}
+        items = []
+        for it in (d.get("items") or [])[:150]:
+            if not isinstance(it, dict) or not str(it.get("nama") or "").strip():
+                continue
+            hasil = {str(k)[:60]: ("L" if v == "L" else "G" if v == "G" else "-") for k, v in list((it.get("hasil") or {}).items())[:12]}
+            items.append({"id": str(it.get("id") or secrets.token_hex(4))[:16], "nama": str(it["nama"]).strip()[:160],
+                          "kat": str(it.get("kat") or "").strip()[:40], "hasil": hasil})
+        SET["cakra_cek"] = items
+        set_save()
+    return jsonify({"items": SET.get("cakra_cek") or []})
 
 
 if __name__ == "__main__":
