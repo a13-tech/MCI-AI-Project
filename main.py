@@ -7117,8 +7117,8 @@ def _pd_basi():
     """Panduan yang macet di status 'proses' (mis. server mulai ulang) ditandai gagal, dan jatahnya kembali."""
     batas = (datetime.now(WIB) - timedelta(minutes=9)).isoformat(timespec="seconds")
     with db() as c:
-        sql(c, "UPDATE panduan SET status='gagal', laporan=?, diubah=? WHERE status IN ('proses','menyusun') AND diubah<? AND judul NOT LIKE ?",   # Adu BPR punya penjaga sendiri (bisa >9 menit). Pola LIKE lewat parameter: '%' literal merusak placeholder Postgres
-            (json.dumps({"galat": ["Pembuatan terhenti (server dimulai ulang atau terlalu lama). Jatahmu tidak terpakai; coba konfirmasi lagi."]}), _now(), batas, "Uji ·%"))
+        sql(c, "UPDATE panduan SET status='gagal', laporan=?, diubah=? WHERE status IN ('proses','menyusun') AND diubah<? AND judul NOT LIKE ? AND judul NOT LIKE ?",   # Adu BPR punya penjaga sendiri (bisa >9 menit). Pola LIKE lewat parameter: '%' literal merusak placeholder Postgres
+            (json.dumps({"galat": ["Pembuatan terhenti (server dimulai ulang atau terlalu lama). Jatahmu tidak terpakai; coba konfirmasi lagi."]}), _now(), batas, "Uji ·%", "Cakra ·%"))
 
 
 def _pd_ringkas(x):
@@ -7137,7 +7137,8 @@ def panduan_payload(r):
     semua = [_pd_ringkas(_pd_row(i)) for i in ids]
     me = mid_of(r)
     sisa, batas, lagi = panduan_sisa(r)
-    return {"daftar": [p for p in semua if p["status"] == "jadi" or p["oleh_id"] == me or is_admin(r)],
+    cakra = set(SET.get("cakra_pd") or [])   # BPR dari MCI Cakra tidak ikut tampil di MCI HQ
+    return {"daftar": [p for p in semua if p["id"] not in cakra and (p["status"] == "jadi" or p["oleh_id"] == me or is_admin(r))],
             "papan": PANDUAN_PAPAN, "admin": is_admin(r), "me": me,
             "jatah": {"sisa": sisa, "batas": batas, "hari": PANDUAN_HARI, "lagi": lagi}}
 
@@ -15809,14 +15810,15 @@ def adu_siap(m):
     return cadangan_siap(m)
 
 
-def adu_satu(m, prompt):
+def adu_satu(m, prompt, sistem=None):
+    sistem = sistem or ADU_SISTEM
     t0 = time.time()
     try:
         if m in ("flash", "lite", "hydrogen", "argon") or m.startswith(("g1:", "gf:")):
             model = m[3:] if ":" in m else {"flash": MODEL, "lite": MODEL_LITE, "hydrogen": HYDROGEN_MODEL, "argon": ARGON_MODEL}[m]
             cl = (client_kunci(kunci_hydrogen()) if m == "hydrogen" or m.startswith("gf:") else client_kunci(kunci_argon()) if m == "argon"
                   else client_kunci(KUNCI_TIER1) if m.startswith("g1:") else client("canvas"))
-            r = cl.models.generate_content(model=model, contents=prompt, config=types.GenerateContentConfig(system_instruction=ADU_SISTEM, max_output_tokens=1500))
+            r = cl.models.generate_content(model=model, contents=prompt, config=types.GenerateContentConfig(system_instruction=sistem, max_output_tokens=1500))
             u = r.usage_metadata
             masuk, keluar = int(getattr(u, "prompt_token_count", 0) or 0), int(getattr(u, "candidates_token_count", 0) or 0)
             usage_add(model, masuk, keluar, int(getattr(u, "thoughts_token_count", 0) or 0))
@@ -15826,11 +15828,11 @@ def adu_satu(m, prompt):
                 hm, hk = harga_tier1(model) if m.startswith("g1:") else (SET.get("argon_harga") or [2, 10])
                 biaya = f"≈Rp{(masuk * hm + keluar * hk) / 1e6 * float(SET.get('kurs_usd') or 16500):,.0f}".replace(",", ".")
         elif m == "claude":
-            teks, biaya = _claude(ADU_SISTEM, prompt, 1500), "berbayar"
+            teks, biaya = _claude(sistem, prompt, 1500), "berbayar"
         elif m.startswith("rf:"):
-            teks, biaya = _kompatibel(router_mesin(m[3:]), ADU_SISTEM, prompt, 1500), "kredit router"
+            teks, biaya = _kompatibel(router_mesin(m[3:]), sistem, prompt, 1500), "kredit router"
         else:
-            teks, biaya = _kompatibel(m, ADU_SISTEM, prompt, 1500), ("lokal, gratis" if is_node(m) else "kredit router" if m.startswith("rt_") else "gratis")
+            teks, biaya = _kompatibel(m, sistem, prompt, 1500), ("lokal, gratis" if is_node(m) else "kredit router" if m.startswith("rt_") else "gratis")
         return {"mesin": m, "ok": True, "teks": latex_bersih(teks)[:6000], "detik": round(time.time() - t0, 1), "biaya": biaya or "gratis/sangat murah"}
     except Exception as e:
         return {"mesin": m, "ok": False, "teks": str(e)[:300], "detik": round(time.time() - t0, 1), "biaya": ""}
@@ -15892,7 +15894,7 @@ def api_panel_adu():
 ADU_BPR_MAKS = 8
 
 
-async def adu_bpr_satu(pid, m, ide):
+async def adu_bpr_satu(pid, m, ide, nama=None, awal="Uji"):
     """Satu model: rencana -> panduan (maks 3 putaran perbaikan). Catat waktu, putaran, kesalahan."""
     _KODE_PAKSA.set(m)
     info = {"putaran": 0, "kesalahan": [], "mulai": time.time(), "draf": None, "galat": [], "pid": pid}
@@ -15908,11 +15910,11 @@ async def adu_bpr_satu(pid, m, ide):
         uji = {"lolos": True, "putaran": info["putaran"], "kesalahan": info["kesalahan"], "detik": round(time.time() - info["mulai"]), "peringatan": len(waspada),
                "mentor": info.get("mentor", 0), "mentor_model": info.get("mentor_model", ""),
                "langkah": len(data.get("langkah") or []), "komponen": sum(len(k.get("komponen") or []) for k in (data.get("kantong") or []) if isinstance(k, dict))}
-        nm = dict(adu_mesin()).get(m, m)
+        nm = nama or dict(adu_mesin()).get(m, m)
         with db() as c:
             sql(c, "UPDATE panduan SET status='jadi', data=?, laporan=?, judul=?, diubah=? WHERE id=?",
                 (json.dumps(data, ensure_ascii=False), json.dumps({"peringatan": waspada, "uji": uji}, ensure_ascii=False),
-                 f"Uji · {nm}: {str(data.get('judul') or rc.get('judul') or ide)}"[:120], _now(), pid))
+                 f"{awal} · {nm}: {str(data.get('judul') or rc.get('judul') or ide)}"[:120], _now(), pid))
     except Exception as e:
         g = (str(e) or type(e).__name__)[:400]
         if "timed out" in g.lower():
@@ -15923,7 +15925,7 @@ async def adu_bpr_satu(pid, m, ide):
             sql(c, "UPDATE panduan SET status='gagal', data=?, laporan=?, judul=COALESCE(?, judul), diubah=? WHERE id=?",
                 (json.dumps(info["draf"], ensure_ascii=False) if info["draf"] else None,
                  json.dumps({"galat": [g] + [x for x in info["galat"] if x not in g][:6], "uji": uji}, ensure_ascii=False),
-                 (f"Uji · {dict(adu_mesin()).get(m, m)}: {info['draf'].get('judul')}"[:120] if info["draf"] and info["draf"].get("judul") else None), _now(), pid))
+                 (f"{awal} · {nama or dict(adu_mesin()).get(m, m)}: {info['draf'].get('judul')}"[:120] if info["draf"] and info["draf"].get("judul") else None), _now(), pid))
 
 
 def adu_bpr_basi(semua=False):
@@ -15931,16 +15933,18 @@ def adu_bpr_basi(semua=False):
     batas = (datetime.now(WIB) - timedelta(minutes=0 if semua else ADU_BASI_MENIT)).isoformat(timespec="seconds")
     g = "Pembuatan terputus: server web dimulai ulang (mis. saat pembaruan) atau model tidak memberi kabar terlalu lama. Klik Coba lagi."
     with db() as c:
-        sql(c, "UPDATE panduan SET status='gagal', laporan=?, diubah=? WHERE status='proses' AND judul LIKE ? AND diubah<=?",
-            (json.dumps({"galat": [g], "uji": {"lolos": False, "putaran": 0, "kesalahan": [], "detik": 0, "galat": g, "draf": False}}, ensure_ascii=False), _now(), "Uji ·%", batas))
+        for pola in ("Uji ·%", "Cakra ·%"):
+            sql(c, "UPDATE panduan SET status='gagal', laporan=?, diubah=? WHERE status='proses' AND judul LIKE ? AND diubah<=?",
+                (json.dumps({"galat": [g], "uji": {"lolos": False, "putaran": 0, "kesalahan": [], "detik": 0, "galat": g, "draf": False}}, ensure_ascii=False), _now(), pola, batas))
 
 
-async def adu_bpr_jalan(tugas, ide):
-    """Model cloud jalan bersamaan; model HDD bergantian (RAM Mac 8 GB)."""
+async def adu_bpr_jalan(tugas, ide, nama=None, awal="Uji"):
+    """Model cloud jalan bersamaan; model HDD bergantian (RAM Mac 8 GB). nama: peta mesin -> nama tampilan (MCI Cakra)."""
+    nama = nama or {}
     async def lokal():
         for pid, m in [t for t in tugas if is_node(t[1])]:
-            await adu_bpr_satu(pid, m, ide)
-    await asyncio.gather(*[adu_bpr_satu(pid, m, ide) for pid, m in tugas if not is_node(m)], lokal())
+            await adu_bpr_satu(pid, m, ide, nama.get(m), awal)
+    await asyncio.gather(*[adu_bpr_satu(pid, m, ide, nama.get(m), awal) for pid, m in tugas if not is_node(m)], lokal())
 
 
 @app.route("/api/adu/bpr", methods=["GET", "POST"])
@@ -17586,7 +17590,8 @@ def api_cakra_tanya():
         return jsonify({"error": "Tulis pertanyaannya dulu"}), 400
     riwayat = [h for h in (d.get("riwayat") or []) if isinstance(h, dict)][-12:]
     dalam = bool(d.get("dalam", True))
-    cl = client("canvas")
+    kh = kunci_hydrogen()   # aturan CEO 27 Nov 2026: Cakra memakai model gratis dulu (Zahravi)
+    cl, model = (client_kunci(kh), HYDROGEN_MODEL) if kh else (client("canvas"), MODEL)
     if not cl:
         return jsonify({"error": "Mesin AI belum siap"}), 503
     isi = ke_content([{"role": "model" if h.get("role") == "model" else "user", "text": h.get("text")} for h in riwayat]) + \
@@ -17597,7 +17602,7 @@ def api_cakra_tanya():
         cfg = {"system_instruction": CAKRA_SISTEM, "max_output_tokens": 2500}
         if pakai_cari:
             cfg["tools"] = [types.Tool(google_search=types.GoogleSearch())]
-        return cl.models.generate_content(model=MODEL, contents=isi, config=types.GenerateContentConfig(**cfg))
+        return cl.models.generate_content(model=model, contents=isi, config=types.GenerateContentConfig(**cfg))
 
     dicari, catatan = dalam, ""
     try:
@@ -17613,7 +17618,7 @@ def api_cakra_tanya():
             return jsonify({"error": f"Cakra gagal menjawab: {str(e2)[:200]}"}), 502
     try:
         u = res.usage_metadata
-        usage_add(MODEL, int(getattr(u, "prompt_token_count", 0) or 0), int(getattr(u, "candidates_token_count", 0) or 0), int(getattr(u, "thoughts_token_count", 0) or 0))
+        usage_add(model, int(getattr(u, "prompt_token_count", 0) or 0), int(getattr(u, "candidates_token_count", 0) or 0), int(getattr(u, "thoughts_token_count", 0) or 0))
     except Exception:
         pass
     teks = (res.text or "").strip()
@@ -17641,7 +17646,7 @@ def api_cakra_tanya():
         jalur.append({"judul": f"Menelusuri web ({len(kueri)} kata kunci)", "ket": ", ".join(kueri)[:200] or "-"})
         jalur.append({"judul": f"Menemukan {len(sumber)} sumber", "ket": f"{sum(1 for x in sumber if x['dikutip'])} dikutip langsung"})
     jalur.append({"judul": "Tiba di jawaban", "ket": f"Selesai dalam {detik} detik"})
-    _cakra_catat("tanya", pesan, teks, sumber, MODEL, detik)
+    _cakra_catat("tanya", pesan, teks, sumber, "zahravi", detik)
     return jsonify({"jawaban": latex_bersih(teks), "sumber": sumber, "kueri": kueri, "jalur": jalur, "detik": detik, "dicari": dicari, "catatan": catatan})
 
 
@@ -17679,7 +17684,203 @@ def api_cakra_cek():
                           "kat": str(it.get("kat") or "").strip()[:40], "hasil": hasil})
         SET["cakra_cek"] = items
         set_save()
+    asli = {n for _, n in adu_mesin()}
+    for it in SET.get("cakra_cek") or []:
+        it["hasil"] = {k: v for k, v in (it.get("hasil") or {}).items() if k not in asli}
     return jsonify({"items": SET.get("cakra_cek") or []})
+
+
+# Mesin MCI Cakra: hanya mesin GRATIS yang dipilih CEO (27 Nov 2026), tampil dengan nama MCI. Nama/penyedia asli tidak pernah dikirim ke browser.
+# (id tampilan, kunci mesin asli, nama MCI). Berbayar (sistem bayar sesuai pakai) menyusul.
+CAKRA_MESIN = [("zahravi", "hydrogen", "Zahravi"), ("aether", "groq", "Aether"), ("vortex", "mistral", "Vortex"),
+               ("kairo", "nvidia", "Kairo"), ("helix", "cloudflare", "Helix")]
+_CAKRA_ASLI = {a: m for a, m, _ in CAKRA_MESIN}
+_CAKRA_NAMA = {a: n for a, _, n in CAKRA_MESIN}
+_CAKRA_KATA_ASLI = re.compile(r"gemini|hydrogen|google|groq|llama|meta|mistral|mixtral|nvidia|nim|cloudflare|workers ai|qwen|deepseek|gemma|openai|gpt|anthropic|claude|cerebras",
+                              re.I)
+
+
+def _cakra_sistem(nama):
+    return (f"Kamu {nama}, salah satu mesin AI di MCI Cakra buatan Mahardika Cakrawala Indonesia (MCI). Jawab dalam bahasa Indonesia yang jelas dan ringkas. "
+            f"Jangan menyebut nama model, versi, atau perusahaan pembuat modelmu; kalau ditanya, jawab bahwa kamu {nama} dari MCI Cakra. Kalau tidak tahu, katakan tidak tahu.")
+
+
+def _cakra_galat(teks):
+    """Pesan galat dari penyedia bisa memuat nama aslinya: ganti dengan alasan umum."""
+    t = str(teks or "").lower()
+    if "429" in t or "rate" in t or "quota" in t or "jatah" in t or "limit" in t:
+        return "Jatah gratis mesin ini sedang habis. Coba lagi beberapa menit lagi."
+    if "timed out" in t or "timeout" in t or "terlalu lama" in t:
+        return "Mesin ini terlalu lama menjawab. Coba lagi."
+    if "413" in t or "token per menit" in t or "terlalu besar" in t:
+        return "Permintaan terlalu besar untuk paket gratis mesin ini."
+    if "tidak siap" in t or "kunci" in t or "401" in t or "403" in t:
+        return "Mesin ini belum siap dipakai."
+    return "Mesin ini sedang tidak bisa menjawab. Coba lagi nanti."
+
+
+def _cakra_bersih(teks):
+    return _CAKRA_KATA_ASLI.sub("mesin", str(teks or ""))
+
+
+@app.route("/api/cakra/mesin")
+def api_cakra_mesin():
+    need_ceo()
+    return jsonify({"mesin": [{"id": a, "nama": n, "siap": adu_siap(m)} for a, m, n in CAKRA_MESIN], "skor": SET.get("cakra_skor") or {}})
+
+
+@app.route("/api/cakra/adu", methods=["POST"])
+def api_cakra_adu():
+    """Adu Model MCI Cakra. Skor & hasil terpisah dari Adu Model MCI HQ."""
+    need_ceo()
+    d = request.get_json(silent=True) or {}
+    skor = SET.get("cakra_skor") or {}
+    if d.get("pilih"):
+        a = str(d["pilih"])
+        if a not in _CAKRA_ASLI:
+            return jsonify({"error": "Mesin tidak dikenal"}), 400
+        skor[a] = int(skor.get(a, 0)) + 1
+        SET["cakra_skor"] = skor
+        set_save()
+        return jsonify({"skor": skor})
+    prompt = str(d.get("prompt") or "").strip()[:3000]
+    pilih = [a for a in dict.fromkeys(d.get("mesin") or []) if a in _CAKRA_ASLI and adu_siap(_CAKRA_ASLI[a])][:5]
+    if not prompt or len(pilih) < (1 if d.get("satu") else 2):
+        return jsonify({"error": "Tulis soal dan pilih minimal 2 mesin yang siap"}), 400
+    from concurrent.futures import ThreadPoolExecutor
+
+    def kerja(a):
+        h = adu_satu(_CAKRA_ASLI[a], prompt, _cakra_sistem(_CAKRA_NAMA[a]))
+        if not h.get("ok"):
+            log.warning("Cakra adu %s gagal: %s", a, h.get("teks"))
+        return {"mesin": a, "nama": _CAKRA_NAMA[a], "ok": bool(h.get("ok")), "detik": h.get("detik"),
+                "teks": h["teks"] if h.get("ok") else _cakra_galat(h.get("teks"))}
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        hasil = list(ex.map(kerja, pilih))
+    for h in hasil:
+        if h["ok"]:
+            _cakra_catat("adu", prompt, h["teks"], None, h["mesin"], h["detik"] or 0)
+    return jsonify({"hasil": hasil, "skor": skor})
+
+
+@app.route("/api/cakra/adu-bpr", methods=["GET", "POST"])
+def api_cakra_adu_bpr():
+    """Adu BPR MCI Cakra: judul 'Cakra · <nama MCI>', daftar & data terpisah dari Adu BPR MCI HQ."""
+    r = need_ceo()
+    if request.method == "POST":
+        d = request.get_json(silent=True) or {}
+        ide = str(d.get("ide") or "").strip()[:1500]
+        pilih = [a for a in dict.fromkeys(d.get("mesin") or []) if a in _CAKRA_ASLI and adu_siap(_CAKRA_ASLI[a])][:5]
+        if len(ide) < 10 or not pilih:
+            return jsonify({"error": "Tulis ide rakitan (minimal 10 huruf) dan pilih minimal 1 mesin yang siap"}), 400
+        if rakit.BERBAHAYA.search(ide):
+            return jsonify({"error": "Rangkaian yang menyentuh listrik PLN/220V tidak dibuatkan panduannya demi keselamatan."}), 400
+        if not LOOP:
+            return jsonify({"error": "Mesin AI belum siap"}), 503
+        tugas = []
+        with db() as c:
+            for a in pilih:
+                q = "INSERT INTO panduan (oleh_id,oleh,judul,papan,status,permintaan,rencana,mesin,dibuat,diubah) VALUES (?,?,?,?,?,?,?,?,?,?)"
+                p = (mid_of(r), nama_peran(r), f"Cakra · {_CAKRA_NAMA[a]}: {ide}"[:120], "uno", "proses", ide, "{}", _CAKRA_ASLI[a], _now(), _now())
+                tugas.append((int(sql(c, q + " RETURNING id", p).fetchone()[0] if PG else sql(c, q, p).lastrowid), a))
+        SET["cakra_pd"] = (list(SET.get("cakra_pd") or []) + [pid for pid, _ in tugas])[-500:]
+        L = list(SET.get("cakra_adu_bpr") or [])
+        L.append({"id": int(time.time()), "ide": ide, "waktu": _now(), "item": [{"pid": pid, "mesin": a, "nama": _CAKRA_NAMA[a]} for pid, a in tugas]})
+        SET["cakra_adu_bpr"] = L[-10:]
+        set_save()
+        asyncio.run_coroutine_threadsafe(adu_bpr_jalan([(pid, _CAKRA_ASLI[a]) for pid, a in tugas], ide,
+                                                       {_CAKRA_ASLI[a]: _CAKRA_NAMA[a] for _, a in tugas}, "Cakra"), LOOP)
+    adu_bpr_basi()
+    out = []
+    for b in reversed(SET.get("cakra_adu_bpr") or []):
+        item = []
+        for it in b.get("item") or []:
+            x = _pd_row(it["pid"])
+            lap = (x or {}).get("laporan") or {}
+            u = dict(lap.get("uji") or {}) if isinstance(lap, dict) else {}
+            u.pop("mentor_model", None)
+            if u.get("galat"):
+                u["galat"] = _cakra_bersih(u["galat"])
+            item.append({**it, "status": (x or {}).get("status", "dihapus"), "uji": u or None})
+        out.append({**b, "item": item})
+    return jsonify({"batch": out})
+
+
+def _cakra_pd_keluar(o):
+    """Buang info mesin asli dari data panduan sebelum dikirim ke MCI Cakra."""
+    o = dict(o or {})
+    o.pop("mesin", None)
+    lap = o.get("laporan")
+    if isinstance(lap, dict):
+        lap = dict(lap)
+        if isinstance(lap.get("uji"), dict):
+            lap["uji"] = {k: v for k, v in lap["uji"].items() if k != "mentor_model"}
+        if lap.get("galat"):
+            lap["galat"] = [_cakra_bersih(g) for g in lap["galat"]]
+        o["laporan"] = lap
+    if str(o.get("judul") or "").startswith("Cakra · "):
+        o["judul"] = o["judul"].split(": ", 1)[-1]
+    return o
+
+
+def _cakra_pd_milik(i):
+    if int(i) not in set(SET.get("cakra_pd") or []):
+        abort(404)
+
+
+@app.route("/api/cakra/rakit", methods=["GET", "POST"])
+def api_cakra_rakit():
+    """BPR dari MCI Cakra memakai mesin gratis Zahravi saja, dan daftarnya terpisah dari BPR MCI HQ."""
+    r = need_ceo()
+    if request.method == "POST":
+        tok = _KODE_PAKSA.set("hydrogen")
+        try:
+            resp = api_panduan()
+        finally:
+            _KODE_PAKSA.reset(tok)
+        resp, kode = (resp if isinstance(resp, tuple) else (resp, 200))
+        d = resp.get_json() or {}
+        if kode != 200 or not d.get("panduan"):
+            return jsonify({"error": d.get("error") or "Rencana gagal dibuat"}), kode if kode != 200 else 502
+        SET["cakra_pd"] = (list(SET.get("cakra_pd") or []) + [int(d["panduan"]["id"])])[-500:]
+        set_save()
+        return jsonify({"panduan": _cakra_pd_keluar(d["panduan"])})
+    _pd_basi()
+    ids = list(reversed(SET.get("cakra_pd") or []))[:40]
+    daftar = []
+    for i in ids:
+        x = _pd_row(i)
+        if x:
+            daftar.append(_cakra_pd_keluar(_pd_ringkas(x)))
+    sisa, batas, lagi = panduan_sisa(r)
+    return jsonify({"daftar": daftar, "jatah": {"sisa": sisa, "batas": batas, "hari": PANDUAN_HARI}})
+
+
+@app.route("/api/cakra/rakit/<int:i>")
+def api_cakra_rakit_satu(i):
+    r = need_ceo()
+    _cakra_pd_milik(i)
+    _pd_basi()
+    x = _pd_row(i)
+    if not x:
+        return jsonify({"error": "Panduan tidak ditemukan"}), 404
+    return jsonify({"panduan": _cakra_pd_keluar(panduan_tampil(x, r))})
+
+
+@app.route("/api/cakra/rakit/<int:i>/konfirmasi", methods=["POST"])
+def api_cakra_rakit_konfirmasi(i):
+    need_ceo()
+    _cakra_pd_milik(i)
+    tok = _KODE_PAKSA.set("hydrogen")
+    try:
+        resp = api_panduan_konfirmasi(i)
+    finally:
+        _KODE_PAKSA.reset(tok)
+    resp, kode = (resp if isinstance(resp, tuple) else (resp, 200))
+    d = resp.get_json() or {}
+    if kode != 200:
+        return jsonify({"error": d.get("error") or "Gagal"}), kode
+    return jsonify({"panduan": _cakra_pd_keluar(d.get("panduan"))})
 
 
 if __name__ == "__main__":

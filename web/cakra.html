@@ -312,7 +312,7 @@ code.blok{display:block;font-size:13px;padding:10px 12px;border-radius:8px;backg
           <textarea id="aduSoal" class="isi" rows="3" style="border:0;padding:0;background:transparent" placeholder="Tulis soal sendiri atau tekan Minta soal"></textarea>
           <details id="aduKunci" hidden style="margin-top:8px"><summary style="cursor:pointer;font-size:14px;min-height:32px">Lihat kunci jawaban</summary><div class="kunci" id="aduKunciIsi" style="margin-top:8px"></div></details>
           <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:10px">
-            <span class="mute" id="aduCatatan" style="font-size:13px">Mesin di laptop markas dijalankan bergantian.</span>
+            <span class="mute" id="aduCatatan" style="font-size:13px">Semua mesin MCI di Cakra memakai paket gratis.</span>
             <button type="button" class="btn utama-b" id="btnAdu">Mulai adu</button>
           </div>
         </section>
@@ -324,7 +324,7 @@ code.blok{display:block;font-size:13px;padding:10px 12px;border-radius:8px;backg
     <!-- RAKIT -->
     <section class="view hal" id="v-rakit" aria-label="Rakit">
       <div class="rakitkiri">
-        <div><h1>Rakit dengan Cakra</h1><p class="lead">Ceritakan proyekmu. Cakra menyusun Buku Panduan Rakit, lalu mesin pemeriksa MCI mengecek kabel dan kodenya sebelum sampai ke kamu.</p></div>
+        <div><h1>Rakit dengan Cakra</h1><p class="lead">Ceritakan proyekmu. Zahravi menyusun Buku Panduan Rakit, lalu mesin pemeriksa MCI mengecek kabel dan kodenya sebelum sampai ke kamu.</p></div>
         <form id="fRakit" style="display:flex;flex-direction:column;gap:14px">
           <label class="f" for="rkMinta">Proyek yang ingin dirakit<textarea id="rkMinta" class="isi" rows="4" placeholder="misalnya lampu yang menyala otomatis saat ruangan gelap"></textarea></label>
           <label class="f" for="rkPapan">Papan<select id="rkPapan"><option value="">Biar Cakra yang pilih</option><option value="uno">Arduino Uno</option><option value="nano">Arduino Nano</option><option value="esp32">ESP32 DevKit</option></select></label>
@@ -529,14 +529,14 @@ $$("[data-mode]").forEach(b => b.onclick = () => {
   const bpr = ADU.mode === "bpr";
   $("#aduSoalLbl").textContent = bpr ? "Ide rakitan" : "Soal"; $("#mintaSoalBox").hidden = bpr; $("#aduKunci").hidden = bpr || !ADU.soal;
   $("#aduSoal").placeholder = bpr ? "misalnya lampu otomatis saat gelap dengan Arduino Uno" : "Tulis soal sendiri atau tekan Minta soal";
-  $("#aduCatatan").textContent = bpr ? "Adu BPR hanya untuk mesin MCI (sampai 8 mesin). Hasil dinilai mesin pemeriksa MCI." : "Mesin di laptop markas dijalankan bergantian.";
+  $("#aduCatatan").textContent = bpr ? "Adu BPR hanya untuk mesin MCI. Hasil dinilai mesin pemeriksa MCI." : "Semua mesin MCI di Cakra memakai paket gratis.";
   renderMesin(); ADU.hasil = []; bpr ? bprPantau() : renderHasil();
 });
 $$("[data-mode]")[0].click();
 
 async function aduMuat() {
   if (ADU.dimuat) return; ADU.dimuat = true;
-  try { const d = await api("/api/panel/adu"); ADU.mesin = d.mesin || []; ADU.skor = d.skor || {}; } catch (e) { $("#mesinL").innerHTML = `<span class="galat">${esc(e.message)}</span>`; }
+  try { const d = await api("/api/cakra/mesin"); ADU.mesin = d.mesin || []; ADU.skor = d.skor || {}; } catch (e) { $("#mesinL").innerHTML = `<span class="galat">${esc(e.message)}</span>`; }
   try { const c = await api("/api/cakra/cek"); ADU.cek = c.items || []; } catch (e) {}
   try { const s = await api("/api/cakra/soal"); $("#aduKat").innerHTML = `<option value="">Semua kategori</option>` + (s.kategori || []).map(k => `<option value="${esc(k.split(".")[0])}">${esc(k)}</option>`).join(""); } catch (e) {}
   renderMesin(); renderCek(); renderPeringkat();
@@ -592,18 +592,17 @@ $("#btnAdu").onclick = async () => {
   if (ADU.mode === "bpr") {
     if (soal.length < 10 || !srv.length) return toast("Tulis ide rakitan dan pilih minimal 1 mesin MCI");
     $("#btnAdu").disabled = true;
-    try { await api("/api/adu/bpr", { method: "POST", body: { ide: soal, mesin: srv } }); toast("Adu BPR dimulai. Hasil muncul bertahap."); bprPantau(); } catch (e) { toast(e.message); }
+    try { await api("/api/cakra/adu-bpr", { method: "POST", body: { ide: soal, mesin: srv } }); toast("Adu BPR dimulai. Hasil muncul bertahap."); bprPantau(); } catch (e) { toast(e.message); }
     $("#btnAdu").disabled = false; return;
   }
   if (!soal) return toast("Tulis soal dulu");
-  if (srv.length > 3) return toast("Mesin MCI maksimal 3 sekaligus");
   if (srv.length + mil.length < 2) return toast("Pilih minimal 2 mesin");
   $("#btnAdu").disabled = true;
   ADU.hasil = [...srv.map(id => ({ id, nama: (ADU.mesin.find(m => m.id === id) || {}).nama || id, tunggu: true, srv: true })), ...mil.map(m => ({ id: "milik:" + m.nama, nama: m.nama, tunggu: true, ket: m.jenis === "lokal" ? "laptop kamu" : "kunci kamu" }))];
   ADU.pilih = null; renderHasil();
   const kerja = [];
-  if (srv.length) kerja.push(api("/api/panel/adu", { method: "POST", body: { prompt: soal, mesin: srv, satu: true } }).then(d => {
-    (d.hasil || []).forEach(h => { const x = ADU.hasil.find(y => y.id === h.mesin); if (x) Object.assign(x, { tunggu: false, ok: h.ok, teks: h.teks, detik: h.detik, ket: h.biaya }); });
+  if (srv.length) kerja.push(api("/api/cakra/adu", { method: "POST", body: { prompt: soal, mesin: srv, satu: true } }).then(d => {
+    (d.hasil || []).forEach(h => { const x = ADU.hasil.find(y => y.id === h.mesin); if (x) Object.assign(x, { tunggu: false, ok: h.ok, teks: h.teks, detik: h.detik, ket: "MCI" }); });
     ADU.skor = d.skor || ADU.skor; renderPeringkat();
   }).catch(e => ADU.hasil.filter(x => x.srv).forEach(x => Object.assign(x, { tunggu: false, ok: false, teks: e.message }))).then(renderHasil));
   mil.forEach(m => kerja.push(panggilMilik(m, soal).then(r => Object.assign(ADU.hasil.find(y => y.id === "milik:" + m.nama), { tunggu: false, ok: true, teks: r.teks, detik: r.detik }))
@@ -621,7 +620,7 @@ function renderHasil() {
 }
 $("#aduHasil").onclick = async e => {
   const p = e.target.closest("[data-pilih]"), n = e.target.closest("[data-nilai]");
-  if (p) { const i = +p.dataset.pilih, h = ADU.hasil[i]; ADU.pilih = i; renderHasil(); if (h.srv) { try { const d = await api("/api/panel/adu", { method: "POST", body: { pilih: h.id } }); ADU.skor = d.skor; renderPeringkat(); } catch (er) {} } return; }
+  if (p) { const i = +p.dataset.pilih, h = ADU.hasil[i]; ADU.pilih = i; renderHasil(); if (h.srv) { try { const d = await api("/api/cakra/adu", { method: "POST", body: { pilih: h.id } }); ADU.skor = d.skor; renderPeringkat(); } catch (er) {} } return; }
   if (n) {
     const h = ADU.hasil[+n.dataset.i], soal = $("#aduSoal").value.trim(); if (!soal) return;
     const nama = (ADU.soal ? ADU.soal.id + " " : "") + soal.slice(0, 80);
@@ -654,12 +653,12 @@ $("#cekEkspor").onclick = () => {
 function renderPeringkat() {
   const L = Object.entries(ADU.skor || {}).map(([id, n]) => ({ nama: (ADU.mesin.find(m => m.id === id) || {}).nama || id, n: +n })).sort((a, b) => b.n - a.n);
   const tot = L.reduce((s, x) => s + x.n, 0) || 1;
-  $("#atHasil").innerHTML = `<p class="mute" style="font-size:13.5px;margin:12px 0">Berapa kali tiap mesin MCI kamu pilih sebagai jawaban terbaik.</p>` + (L.length ? `<ol style="list-style:none;margin:0;padding:0">${L.map(x => `<li style="padding:12px 0;border-bottom:1px solid var(--line)"><div style="display:flex;justify-content:space-between;gap:10px"><b style="font-size:14.5px">${esc(x.nama)}</b><span class="serif" style="font-size:20px">${x.n}</span></div><div style="margin-top:8px;height:6px;border-radius:3px;background:var(--line2)"><div style="height:6px;border-radius:3px;width:${Math.round(x.n / tot * 100)}%;background:var(--accent)"></div></div></li>`).join("")}</ol>` : `<p class="mute">Belum ada pilihan.</p>`);
+  $("#atHasil").innerHTML = `<p class="mute" style="font-size:13.5px;margin:12px 0">Berapa kali tiap mesin MCI kamu pilih sebagai jawaban terbaik di Cakra.</p>` + (L.length ? `<ol style="list-style:none;margin:0;padding:0">${L.map(x => `<li style="padding:12px 0;border-bottom:1px solid var(--line)"><div style="display:flex;justify-content:space-between;gap:10px"><b style="font-size:14.5px">${esc(x.nama)}</b><span class="serif" style="font-size:20px">${x.n}</span></div><div style="margin-top:8px;height:6px;border-radius:3px;background:var(--line2)"><div style="height:6px;border-radius:3px;width:${Math.round(x.n / tot * 100)}%;background:var(--accent)"></div></div></li>`).join("")}</ol>` : `<p class="mute">Belum ada pilihan.</p>`);
 }
 async function bprPantau() {
   clearTimeout(ADU.bprTimer); if (ADU.mode !== "bpr") return;
   try {
-    const d = await api("/api/adu/bpr"); const b = (d.batch || [])[0];
+    const d = await api("/api/cakra/adu-bpr"); const b = (d.batch || [])[0];
     $("#aduHasil").innerHTML = b ? `<div style="grid-column:1/-1"><b>${esc(b.ide)}</b> <span class="mute" style="font-size:13px">${esc(tglPendek(b.waktu))}</span></div>` + b.item.map(it => {
       const u = it.uji || {}, jalan = it.status === "proses";
       return `<article class="kartu"><div style="display:flex;justify-content:space-between;gap:8px"><b>${esc(it.nama)}</b><span class="mute" style="font-size:12.5px">${jalan ? "sedang dirakit…" : esc((u.detik ? u.detik + " detik" : "") + (u.putaran ? " · " + u.putaran + " putaran" : ""))}</span></div>
@@ -674,9 +673,9 @@ $("#aduHasil").addEventListener("click", e => { const a = e.target.closest("[dat
 let RK = { id: null, data: null, tab: "komponen", timer: null };
 async function rkMuat() {
   try {
-    const d = await api("/api/panduan");
+    const d = await api("/api/cakra/rakit");
     const j = d.jatah || {}; $("#rkJatah").textContent = j.sisa == null ? "" : `Sisa jatah panduan: ${j.sisa} dari ${j.batas} per ${j.hari} hari.`;
-    const L = (d.daftar || []).filter(p => p.oleh_id === d.me || d.admin).slice(0, 10);
+    const L = (d.daftar || []).slice(0, 12);
     $("#rkDaftar").innerHTML = L.length ? L.map(p => `<li><button type="button" data-pd="${p.id}">${esc(p.judul || "(tanpa judul)")}<small>${esc({ jadi: "Jadi", proses: "Sedang dibuat", rencana: "Menunggu konfirmasi", gagal: "Gagal", ditolak: "Ditolak" }[p.status] || p.status)} · ${esc(tglPendek(p.dibuat))}</small></button></li>`).join("") : `<li class="mute" style="font-size:14px">Belum ada.</li>`;
   } catch (e) { $("#rkDaftar").innerHTML = `<li class="galat">${esc(e.message)}</li>`; }
   if (RK.id) rkBuka(RK.id);
@@ -685,11 +684,11 @@ $("#rkDaftar").onclick = e => { const b = e.target.closest("[data-pd]"); if (b) 
 $("#fRakit").onsubmit = async e => {
   e.preventDefault(); const minta = $("#rkMinta").value.trim(); if (minta.length < 10) return toast("Ceritakan proyeknya minimal 10 huruf");
   $("#rkBtn").disabled = true; $("#rkBtn").textContent = "Menyusun rencana…";
-  try { const d = await api("/api/panduan", { method: "POST", body: { permintaan: minta, papan: $("#rkPapan").value } }); RK.id = d.panduan.id; rkTampil(d.panduan); rkMuat(); }
+  try { const d = await api("/api/cakra/rakit", { method: "POST", body: { permintaan: minta, papan: $("#rkPapan").value } }); RK.id = d.panduan.id; rkTampil(d.panduan); rkMuat(); }
   catch (err) { toast(err.message); }
   $("#rkBtn").disabled = false; $("#rkBtn").textContent = "Susun rencana";
 };
-async function rkBuka(id) { RK.id = id; clearTimeout(RK.timer); try { const d = await api("/api/panduan/" + id); rkTampil(d.panduan); } catch (e) { $("#rkKanan").innerHTML = `<div class="kotak bpr-isi galat">${esc(e.message)}</div>`; } }
+async function rkBuka(id) { RK.id = id; clearTimeout(RK.timer); try { const d = await api("/api/cakra/rakit/" + id); rkTampil(d.panduan); } catch (e) { $("#rkKanan").innerHTML = `<div class="kotak bpr-isi galat">${esc(e.message)}</div>`; } }
 function rp(n) { return "Rp" + Number(n || 0).toLocaleString("id-ID"); }
 function rkTampil(p) {
   RK.data = p; clearTimeout(RK.timer);
@@ -705,7 +704,7 @@ function rkTampil(p) {
         <button type="submit" class="btn utama-b" style="align-self:flex-start">Buat panduan lengkap</button></form></div></article>`;
     $("#fKonfirm").onsubmit = async e => {
       e.preventDefault(); if (!$("#rkSetuju").checked) return toast("Centang dulu bahwa rencananya sudah sesuai");
-      try { const d = await api(`/api/panduan/${p.id}/konfirmasi`, { method: "POST", body: { setuju: true, jawaban: (rc.pertanyaan || []).map((_, i) => $("#rq" + i).value) } }); rkTampil(d.panduan); rkMuat(); } catch (err) { toast(err.message); }
+      try { const d = await api(`/api/cakra/rakit/${p.id}/konfirmasi`, { method: "POST", body: { setuju: true, jawaban: (rc.pertanyaan || []).map((_, i) => $("#rq" + i).value) } }); rkTampil(d.panduan); rkMuat(); } catch (err) { toast(err.message); }
     };
     return;
   }
