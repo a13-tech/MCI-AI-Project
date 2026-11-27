@@ -41,7 +41,7 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlsplit
 
-VERSI = "1.2"
+VERSI = "1.3"
 TOKEN = os.getenv("NODE_TOKEN", "").strip()
 DIR = os.path.abspath(os.path.expanduser(os.getenv("NODE_DIR", "~/MCI-Node")))
 BERKAS = os.path.join(DIR, "berkas")
@@ -208,12 +208,15 @@ class Node(BaseHTTPRequestHandler):
         return self.balas(kode, {"error": pesan})
 
     def bertoken(self):
+        # Token 256-bit (secrets.token_urlsafe(32)) mustahil ditebak, jadi TIDAK ada kunci otomatis lagi (1.3).
+        # Dulu: >50 salah dalam 10 menit -> token yang BENAR pun ditolak, sehingga siapa pun bisa mematikan Node (DoS) cukup dengan spam token asal.
         kini = time.time()
         _SALAH[:] = [t for t in _SALAH if kini - t < 600]
-        if len(_SALAH) > 50:
-            return False   # terlalu banyak salah dalam 10 menit: tolak sementara
         h = self.headers.get("Authorization", "")
-        return bool(TOKEN) and h.startswith("Bearer ") and hmac.compare_digest(h[7:].strip(), TOKEN)
+        ok = bool(TOKEN) and h.startswith("Bearer ") and hmac.compare_digest(h[7:].strip(), TOKEN)
+        if not ok and len(_SALAH) == 50:
+            log("peringatan: 50 token salah dalam 10 menit (ada yang mencoba-coba)")
+        return ok
 
     def bertanda(self, method, key, q):
         try:

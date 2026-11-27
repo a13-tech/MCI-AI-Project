@@ -32,7 +32,7 @@ try:   # opsional: kalau Pillow belum terpasang, foto dikirim ukuran asli
     Image.MAX_IMAGE_PIXELS = 40_000_000
 except Exception:
     Image = None
-from flask import Flask, jsonify, abort, request, has_request_context, send_from_directory, make_response, redirect, Response
+from flask import Flask, jsonify, abort, request, has_request_context, send_from_directory, make_response, redirect, Response, g
 from pydantic import BaseModel
 from google import genai
 from google.genai import types
@@ -2789,6 +2789,27 @@ app = Flask(__name__, static_folder=None)
 
 
 @app.after_request
+def _kepala_aman(resp):
+    """Header keamanan untuk SEMUA jawaban (audit 27 Nov 2026).
+    - nosniff: browser tidak menebak-nebak jenis file (file 'foto' berisi HTML tidak akan dijalankan sebagai halaman).
+    - sandbox untuk gambar/berkas: SVG berisi skrip yang diunggah sebagai 'foto' tidak bisa menjalankan skrip di domain kita.
+    - SAMEORIGIN: web MCI tidak bisa dibingkai situs lain (cegah clickjacking).
+    - Cookie login yang sudah tidak berlaku dihapus supaya browser berhenti mengirimnya."""
+    h = resp.headers
+    h.setdefault("X-Content-Type-Options", "nosniff")
+    h.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    h.setdefault("X-Frame-Options", "SAMEORIGIN")
+    if os.getenv("RENDER"):
+        h.setdefault("Strict-Transport-Security", "max-age=15552000")
+    mt = resp.mimetype or ""
+    if (mt.startswith("image/") or mt in ("application/octet-stream", "text/xml", "application/xml")) and "Content-Security-Policy" not in h:
+        h["Content-Security-Policy"] = "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'"
+    if has_request_context() and g.get("mci_cookie_basi"):
+        resp.delete_cookie("mci_auth")
+    return resp
+
+
+@app.after_request
 def _gzip(resp):
     """Kompres JSON besar: hemat kuota bandwidth Render (5 GB/bulan) saat banyak viewer membuka web."""
     if (resp.status_code == 200 and not resp.direct_passthrough and resp.mimetype == "application/json"
@@ -2974,7 +2995,7 @@ def members_load():
 
 def token_baru(nama):
     depan = re.sub(r"[^a-z0-9]", "", (str(nama).strip().split() or ["anggota"])[0].lower()) or "anggota"
-    return f"{depan}-" + "".join(secrets.choice("abcdefghjkmnpqrstuvwxyz23456789") for _ in range(6))
+    return f"{depan}-" + "".join(secrets.choice("abcdefghjkmnpqrstuvwxyz23456789") for _ in range(10))   # 10 huruf acak (dulu 6): ~800 triliun kemungkinan
 
 
 def member_simpan(d):
@@ -3067,8 +3088,65 @@ def role_of(t):
     return "viewer" if _eq(t, VIEW_TOKEN) else None
 
 
+# Penjaga tebak-token (audit 27 Nov 2026). Dulu cookie mci_auth dicek di SETIAP permintaan tanpa batas, jadi token bisa ditebak
+# lewat cookie tanpa kena batas 8x salah di halaman login. Sekarang: salah per IP dan salah total (semua IP) dihitung.
+# Token yang sudah pernah sah sejak server nyala tetap diterima walau sedang dikunci, jadi anggota yang sudah login tidak ikut terkunci.
+_AUTH_OK = set()           # sha256 token yang pernah sah
+_GAGAL_SEMUA = []          # waktu salah dari semua IP
+GAGAL_IP_COOKIE = 30       # per IP per 10 menit (lewat cookie; longgar karena satu cookie basi bisa terkirim beberapa kali sekaligus)
+GAGAL_IP_LOGIN = 8         # per IP per 10 menit (halaman login / pintu rahasia)
+GAGAL_SEMUA_MAKS = 300     # semua IP per 10 menit; lewat dari ini hanya token yang sudah dikenal yang diterima
+
+
+def _sidik_token(t):
+    return hashlib.sha256(("tok:" + t).encode()).hexdigest()
+
+
+def _gagal_bersih(ip):
+    now = time.time()
+    FAILS[ip] = [t for t in FAILS.get(ip, []) if now - t < 600]
+    _GAGAL_SEMUA[:] = [t for t in _GAGAL_SEMUA if now - t < 600]
+    if len(FAILS) > 5000:
+        for k in [k for k, v in FAILS.items() if not v][:4000]:
+            FAILS.pop(k, None)
+    return FAILS[ip]
+
+
+def _gagal_catat(ip):
+    now = time.time()
+    FAILS.setdefault(ip, []).append(now)
+    _GAGAL_SEMUA.append(now)
+    if len(_GAGAL_SEMUA) == GAGAL_SEMUA_MAKS:
+        log.warning("Tebak token terdeteksi: %s salah dalam 10 menit dari banyak IP. Login baru dikunci sementara.", GAGAL_SEMUA_MAKS)
+
+
+def auth_cek(token, batas_ip):
+    """Cek token dengan batas salah. Balik (peran|None, terkunci:bool)."""
+    if not token:
+        return None, False
+    sid, ip = _sidik_token(token), client_ip()
+    kenal = sid in _AUTH_OK
+    if not kenal and (len(_gagal_bersih(ip)) >= batas_ip or len(_GAGAL_SEMUA) >= GAGAL_SEMUA_MAKS):
+        return None, True
+    r = role_of(token)
+    if r:
+        _AUTH_OK.add(sid)
+    else:
+        _gagal_catat(ip)
+    return r, False
+
+
 def role():
-    return role_of(request.cookies.get("mci_auth", ""))
+    if not has_request_context():
+        return None
+    if "mci_peran" in g:
+        return g.mci_peran
+    t = request.cookies.get("mci_auth", "")
+    r, kunci = auth_cek(t, GAGAL_IP_COOKIE) if t else (None, False)
+    if t and not r and not kunci:   # cookie benar-benar tidak berlaku (bukan sekadar sedang dikunci) -> dihapus
+        g.mci_cookie_basi = True
+    g.mci_peran = r
+    return r
 
 
 COOKIE_HARI = 400   # batas maksimal yang diterima Chrome; diperpanjang otomatis setiap kali aplikasi dibuka (/api/me)
@@ -3077,6 +3155,8 @@ COOKIE_HARI = 400   # batas maksimal yang diterima Chrome; diperpanjang otomatis
 def _setcookie(resp, token):
     # Lax, bukan Strict: dengan Strict, membuka web dari link WhatsApp/Instagram tidak mengirim cookie, sehingga pengguna dianggap orang baru
     # dan loginnya tertimpa akses viewer. Permintaan yang mengubah data tetap aman karena wajib header X-MCI (lihat guard()).
+    if has_request_context():
+        g.mci_cookie_basi = False   # cookie baru dipasang: jangan dihapus oleh _kepala_aman
     resp.set_cookie("mci_auth", token, max_age=COOKIE_HARI * 86400, httponly=True, samesite="Lax", secure=bool(os.getenv("RENDER")))
     return resp
 
@@ -3086,13 +3166,12 @@ def _ip():
 
 
 def _try_login(token):
-    now, ip = time.time(), _ip()
-    FAILS[ip] = [t for t in FAILS.get(ip, []) if now - t < 600]
-    if len(FAILS[ip]) >= 8:
+    r, kunci = auth_cek(token, GAGAL_IP_LOGIN)
+    if kunci:
         abort(429)
-    if role_of(token):
+    if r:
+        g.mci_cookie_basi = False
         return _setcookie(make_response(redirect("/")), token)
-    FAILS[ip].append(now)
     return None
 
 
@@ -3146,15 +3225,13 @@ def login():
 @app.route("/api/masuk", methods=["POST"])
 def api_masuk():
     """Pintu rahasia admin (logo / kotak Hemat token diketuk 7x). Dibatasi 8 percobaan salah per 10 menit per IP."""
-    now, ip = time.time(), _ip()
-    FAILS[ip] = [t for t in FAILS.get(ip, []) if now - t < 600]
-    if len(FAILS[ip]) >= 8:
-        return jsonify({"error": "Terlalu banyak percobaan. Coba lagi 10 menit lagi."}), 429
     tok = str((request.get_json(silent=True) or {}).get("token", "")).strip()
-    r = role_of(tok)
+    r, kunci = auth_cek(tok, GAGAL_IP_LOGIN)
+    if kunci:
+        return jsonify({"error": "Terlalu banyak percobaan. Coba lagi 10 menit lagi."}), 429
     if r and r != "viewer":   # admin atau token pribadi anggota
+        g.mci_cookie_basi = False
         return _setcookie(jsonify({"role": "admin" if is_admin(r) else "anggota", "nama": nama_peran(r)}), tok)
-    FAILS[ip].append(now)
     return jsonify({"error": "Token salah."}), 401
 
 
