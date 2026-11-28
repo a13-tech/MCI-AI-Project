@@ -140,6 +140,8 @@ PANGGILAN_BOS = ("\n\nLAWAN BICARAMU: Alvaro, Owner, CEO, dan General Founder MC
 import contextvars as _cv
 import functools
 _PENANYA = _cv.ContextVar("penanya", default=None)   # peran yang sedang mengobrol dengan bot (web / Telegram)
+# Siapa yang memicu panggilan AI, untuk jatah token model berbayar (28 Nov 2026): "ceo", "anggota", atau "sistem" (tugas latar / CEO).
+_AKTOR = _cv.ContextVar("aktor", default="sistem")
 
 
 def _penanya_bos():
@@ -741,6 +743,11 @@ def usage_add(model, masuk, keluar, pikir):
                 (today(), model, masuk, keluar, pikir))
     except Exception:
         log.exception("Gagal menyimpan pemakaian token")
+    try:
+        if model_berbayar(model):
+            bayar_catat(int(masuk or 0) + int(keluar or 0) + int(pikir or 0))
+    except Exception:
+        log.exception("Gagal mencatat jatah token berbayar")
     if "argon" in str(model).lower() or "neon" in str(model).lower():   # model berbayar utama (Neon, dulu Argon)
         try:
             threading.Thread(target=argon_cek_peringatan, daemon=True).start()
@@ -3192,6 +3199,15 @@ p{margin:0;color:#F2B8B0;font-size:14px}.mt{font:italic 600 15px 'Cormorant Gara
 
 
 @app.before_request
+def _tandai_aktor():
+    try:
+        r = role()
+        _AKTOR.set("ceo" if r and is_admin(r) else "anggota" if r and r != "viewer" else "anggota")   # tamu & viewer ikut jatah anggota
+    except Exception:
+        _AKTOR.set("anggota")
+
+
+@app.before_request
 def guard():
     if request.method not in ("GET", "HEAD") and request.path != "/login" and request.headers.get("X-MCI") != "1":
         abort(403)
@@ -3428,6 +3444,7 @@ def api_argon_anggaran():
     rp = argon_biaya_bulan(True)
     return jsonify({"terpakai": round(rp), "anggaran": int(SET.get("argon_anggaran") or 0), "kurs": SET.get("kurs_usd"), "harga": SET.get("argon_harga"),
                     "habis": argon_habis(), "bulan": today()[:7], "kunci": bool(KUNCI_TIER1),
+                    "token_bayar": {**bayar_data(), "batas": BAYAR_BATAS},
                     "mesin": ai_kode() or ("claude" if ANTHROPIC_KEY else "gemini"), "aktif": mesin_kode(), "claude_kunci": bool(ANTHROPIC_KEY),
                     "claude_model": claude_model(), "claude_pilihan": CLAUDE_PILIHAN, "claude_harga": {k: CLAUDE_HARGA[k] for k in CLAUDE_PILIHAN},
                     "lain": [{"id": k, "nama": v["nama"], "model": v["model"], "siap": bool(mesin_kunci(k)), "kunci": v["kunci"]} for k, v in MESIN_LAIN.items()]})
@@ -6296,7 +6313,7 @@ def harga_tier1(model):
 
 def kunci_argon():
     """Kunci Argon. Kosong kalau anggaran bulan ini habis -> semua fitur otomatis memakai mesin biasa (Flash)."""
-    if argon_habis():
+    if bayar_tutup():
         return ""
     return KUNCI_TIER1 or gkey("canvas")
 
@@ -6333,6 +6350,68 @@ def argon_biaya_bulan(segar=False):
         rp = _ARGON_BIAYA[1]
     _ARGON_BIAYA[0], _ARGON_BIAYA[1] = time.time(), rp
     return rp
+
+
+# ---------- JATAH TOKEN MODEL BERBAYAR (perintah CEO 28 Nov 2026) ----------
+# Semua model berbayar (Neon, Gemini tier 1 seperti Carbon, Claude, model Router berkredit): anggota & tamu bersama-sama maks
+# 100 ribu token (masuk + keluar + pikir) per bulan; lewat dari itu otomatis pindah ke mesin gratis. CEO tidak dibatasi,
+# tetapi diingatkan lewat Inbox setiap pemakaiannya lewat kelipatan 100 ribu token.
+BAYAR_BATAS = int(os.getenv("BAYAR_BATAS_TOKEN", "100000"))
+_BAYAR_KUNCI = threading.Lock()
+
+
+def model_berbayar(model):
+    m = str(model or "").lower()
+    if "neon" in m or "argon" in m or m.startswith("claude") or m.startswith("rt_"):
+        return True
+    try:
+        return m in [x.lower() for x in gemini_tambahan("tier1")]
+    except Exception:
+        return False
+
+
+def bayar_data():
+    d = SET.get("bayar_token") or {}
+    if d.get("bulan") != today()[:7]:
+        d = {"bulan": today()[:7], "anggota": 0, "ceo": 0, "ingat_ceo": 0, "ingat_anggota": 0}
+        SET["bayar_token"] = d
+    return d
+
+
+def bayar_catat(n):
+    if n <= 0:
+        return
+    pesan = []
+    with _BAYAR_KUNCI:
+        d = bayar_data()
+        kelompok = "anggota" if _AKTOR.get() == "anggota" else "ceo"
+        d[kelompok] = int(d.get(kelompok, 0)) + n
+        if kelompok == "ceo" and d["ceo"] // 100000 > int(d.get("ingat_ceo", 0)):
+            d["ingat_ceo"] = d["ceo"] // 100000
+            pesan.append((f"Pemakaian model berbayar kamu lewat {d['ingat_ceo'] * 100:,} ribu token".replace(",", "."),
+                          f"Bulan {d['bulan']} kamu sudah memakai {d['ceo']:,} token model berbayar (masuk + keluar). Kamu tidak dibatasi; ini hanya pengingat.".replace(",", ".")))
+        if kelompok == "anggota":
+            for tahap in (80, 100):
+                if d["anggota"] * 100 >= BAYAR_BATAS * tahap and int(d.get("ingat_anggota", 0)) < tahap:
+                    d["ingat_anggota"] = tahap
+                    pesan.append((f"Jatah token berbayar anggota {'HABIS' if tahap == 100 else 'sudah 80%'}",
+                                  f"Anggota sudah memakai {d['anggota']:,} dari {BAYAR_BATAS:,} token model berbayar bulan {d['bulan']}. ".replace(",", ".") +
+                                  ("Mulai sekarang anggota otomatis memakai mesin gratis sampai tanggal 1." if tahap == 100 else "")))
+    set_save()
+    for judul, isi in pesan:
+        try:
+            inbox_kirim(_dev_ids(), "info", judul, isi)
+        except Exception:
+            log.exception("Kabar jatah token gagal")
+
+
+def bayar_tutup():
+    """True = model berbayar tidak boleh dipakai sekarang (anggaran rupiah habis, atau jatah token anggota habis)."""
+    if argon_habis():
+        return True
+    if _AKTOR.get() != "anggota":
+        return False
+    return int(bayar_data().get("anggota", 0)) >= BAYAR_BATAS
 
 
 def argon_habis():
@@ -6450,11 +6529,11 @@ def mesin_kode():
         return "argon"
     if k == "hydrogen" and kunci_hydrogen():
         return "hydrogen"
-    if k == "gemini" or (k in MESIN_LAIN and mesin_kunci(k)):
+    if k == "gemini" or (k in MESIN_LAIN and mesin_kunci(k) and not (k.startswith("rt_") and bayar_tutup())):
         return k
     if k == "argon":   # Argon dipilih tetapi anggaran habis / kunci kosong -> mesin gratis
         return "gemini"
-    return "claude" if ANTHROPIC_KEY and not argon_habis() else "gemini"   # Claude juga berhenti saat anggaran AI berbayar habis
+    return "claude" if ANTHROPIC_KEY and not bayar_tutup() else "gemini"   # Claude juga berhenti saat anggaran / jatah token berbayar habis
 
 
 def _kompatibel(k, sistem, prompt, maks=8000, json_mode=False, pesan=None, info=None, timeout=240):
@@ -6545,7 +6624,7 @@ def router_sinkron():
     """Model yang dicentang 'Cadangan' di Panel CEO -> ikut antrean cadangan (sebelum Ollama laptop)."""
     for k in [k for k in MESIN_LAIN if k.startswith("rt_")]:
         MESIN_LAIN.pop(k, None)
-    if not router_siap():
+    if not router_siap() or bayar_tutup():   # kredit router = berbayar, ikut jatah token
         return []
     return [router_mesin(m) for m in (SET.get("router_cad") or [])[:12]]
 
@@ -12917,7 +12996,7 @@ def apex_model_daftar(r="admin"):
          {"id": "lite", "nama": "Gemini Flash Lite", "model": MODEL_LITE, "siap": bool(client("apex")), "ket": "paling ringan"},
          {"id": "argon", "nama": "Gemini 4 Neon", "model": ARGON_MODEL, "siap": bool(kunci_argon()) and ARGON_AKTIF, "ket": "penalaran berat, berbayar"}]
     if is_admin(r):   # CEO: semua AI yang ada (permintaan 23 Nov 2026)
-        L += [{"id": "g1:" + m, "nama": f"{gemini_nama(m)} · Tier 1", "model": m, "siap": bool(KUNCI_TIER1) and not argon_habis(),
+        L += [{"id": "g1:" + m, "nama": f"{gemini_nama(m)} · Tier 1", "model": m, "siap": bool(KUNCI_TIER1) and not bayar_tutup(),
                "ket": "berbayar, akses data penuh"} for m in gemini_tambahan("tier1")]
         L += [{"id": "gf:" + m, "nama": gemini_nama(m), "model": m, "siap": bool(kunci_hydrogen()), "ket": "kunci gratis, akses data penuh"}
               for m in gemini_tambahan("free")]
@@ -12939,7 +13018,7 @@ def _apex_mesin(mid, r="admin"):
     pil = next((m for m in apex_model_daftar(r) if m["id"] == mid and m["siap"]), None) or apex_model_daftar(r)[0]
     i = pil["id"]
     kunci = (kunci_hydrogen() if i == "hydrogen" or i.startswith("gf:") else kunci_argon() if i == "argon"
-             else (KUNCI_TIER1 if not argon_habis() else "") if i.startswith("g1:") else None)
+             else (KUNCI_TIER1 if not bayar_tutup() else "") if i.startswith("g1:") else None)
     return pil, kunci
 
 
@@ -15796,7 +15875,7 @@ def adu_mesin():
 
 def adu_siap(m):
     if m.startswith("g1:"):
-        return bool(KUNCI_TIER1) and not argon_habis()
+        return bool(KUNCI_TIER1) and not bayar_tutup()
     if m.startswith("gf:"):
         return bool(kunci_hydrogen())
     if m.startswith("rf:"):
@@ -17036,6 +17115,7 @@ async def tg_gambar(m, c, prompt, foto_msg=None):
 
 async def tg_suara(u, c):
     m = u.message
+    _AKTOR.set("ceo" if tg_role(u.effective_user) == "admin" else "anggota")
     if not m or m.chat.type != "private" or not _ok(u.effective_user):   # voice note hanya di chat pribadi
         return
     a = m.voice or m.audio
@@ -17180,6 +17260,7 @@ def make_handlers(key):
         m = u.message
         if not m or not m.text or not _addressed(u, c):
             return
+        _AKTOR.set("ceo" if tg_role(u.effective_user) == "admin" else "anggota")
         if not fitur_on("telegram") and tg_role(u.effective_user) != "admin":   # bot dimatikan di Panel CEO (CEO tetap dijawab)
             return
         _PENANYA.set(tg_role(u.effective_user))
@@ -17315,6 +17396,7 @@ def make_handlers(key):
 
     async def photo(u, c):
         m = u.message
+        _AKTOR.set("ceo" if tg_role(u.effective_user) == "admin" else "anggota")
         if not fitur_on("telegram") and tg_role(u.effective_user) != "admin":   # bot dimatikan di Panel CEO (CEO tetap dijawab)
             return
         _PENANYA.set(tg_role(u.effective_user))
