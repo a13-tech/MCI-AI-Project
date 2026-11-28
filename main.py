@@ -6724,6 +6724,7 @@ def _claude(sistem, prompt, maks=16000, parts=None, schema=None):
     return "".join(b.get("text", "") for b in d.get("content", []) if b.get("type") == "text").strip()
 
 
+_KODE_PILIH = contextvars.ContextVar("kode_pilih", default="")   # BPR: mesin pilihan (masih boleh jatuh ke cadangan), dari Model per tugas > BPR
 _KODE_PAKSA = contextvars.ContextVar("kode_paksa", default="")   # Adu BPR: paksa satu mesin (id daftar Adu model), tanpa jatuh ke mesin lain
 _BPR_INFO = contextvars.ContextVar("bpr_info", default=None)    # Adu BPR: catat putaran perbaikan & kesalahan
 
@@ -6779,7 +6780,11 @@ async def kode_ai(sistem, prompt, act, schema=None, parts=None):
     if _KODE_PAKSA.get():
         m = _KODE_PAKSA.get()
         return await _kode_paksa(m, sistem, prompt, act, schema), m
-    pilih = mesin_kode()
+    pilih = _KODE_PILIH.get() or mesin_kode()
+    if pilih == "flash":
+        pilih = "gemini"
+    if (pilih == "hydrogen" and not kunci_hydrogen()) or (pilih == "argon" and not (ARGON_AKTIF and kunci_argon())):
+        pilih = mesin_kode()   # kunci kosong / jatah berbayar habis -> mesin biasa
     if pilih in ("argon", "hydrogen"):
         try:
             return await ask("canvas", prompt, parts=parts, sistem=sistem, schema=schema, use_mcp=False, cache=False, act=f"{act} ({pilih.title()})",
@@ -7277,7 +7282,13 @@ def panduan_tampil(x, r):
     return o
 
 
+def _bpr_pilih_mesin():
+    p = model_tugas("bpr")
+    _KODE_PILIH.set("" if p == "studio" else p)   # berlaku hanya di tugas (coroutine) BPR ini
+
+
 async def panduan_rencana(permintaan, jawaban_lama=None, rencana_lama=None, scratch=False):
+    _bpr_pilih_mesin()
     prompt = f"PERMINTAAN ANGGOTA:\n{permintaan}"
     if rencana_lama:
         prompt += f"\n\nRENCANA SEBELUMNYA:\n{json.dumps(rencana_lama, ensure_ascii=False)}\n\nPERUBAHAN YANG DIMINTA ANGGOTA:\n{jawaban_lama}\n\nTulis rencana baru yang sudah disesuaikan."
@@ -7342,6 +7353,7 @@ async def bpr_minta_mentor(data, teks_mentah, galat, pekerja):
 
 async def panduan_bangun(permintaan, rencana, jawaban):
     """AI menulis panduan -> mesin memeriksa sambungan -> kalau ada galat, AI memperbaiki (maks 3 putaran)."""
+    _bpr_pilih_mesin()
     dasar = (f"PERMINTAAN ANGGOTA:\n{permintaan}\n\nRENCANA YANG SUDAH DIKONFIRMASI:\n{json.dumps(rencana, ensure_ascii=False)}"
              + (f"\n\nJAWABAN / CATATAN ANGGOTA:\n{jawaban}" if jawaban else "") + f"\n\nPapan WAJIB: {rencana.get('papan')}.")
     prompt, data, galat, waspada, mesin = dasar, None, [], [], "gemini"
@@ -15094,6 +15106,9 @@ MODEL_TUGAS = {   # pilihan model per tugas (tombol di panel)
                "pilihan": [("argon", "Gemini 4 Neon", "$3/$15"), ("claude:claude-sonnet-5-5", "Claude Sonnet 5.5", "$2/$10"),
                            ("claude:claude-opus-5-5", "Claude Opus 5.5", "$4/$20"), ("gemini", "Gemini Flash", "gratis / sangat murah"),
                            ("groq", "Groq", "gratis"), ("nvidia", "NVIDIA NIM", "gratis"), ("mistral", "Mistral", "gratis (data dipakai latihan)")]},
+    "bpr": {"judul": "Buku Panduan Rakit (BPR)", "ket": "Menyusun rencana dan panduan rakit. Bawaan Hydrogen (gratis); kalau gagal otomatis pindah ke mesin cadangan.",
+            "pilihan": [("hydrogen", "Gemini 4 Hydrogen", "gratis"), ("studio", "Ikut mesin Studio 3D", "sesuai pilihan Studio"), ("flash", "Gemini Flash", "sangat murah"),
+                        ("argon", "Gemini 4 Neon", "$3/$15, mahal")]},
     "bot": {"judul": "Bot Telegram dan asisten anggota", "ket": "Obrolan sehari-hari bot. Hanya keluarga Gemini, karena bot memakai alat data (cek kas, stok, dll).",
             "pilihan": [("flash", "Gemini Flash", "sangat murah"), ("hydrogen", "Gemini 4 Hydrogen", "gratis"), ("argon", "Gemini 4 Neon", "$3/$15, mahal")]},
     "pusat_info": {"judul": "Pusat Info (tamu)", "ket": "Menjawab pertanyaan pengunjung tentang MCI.",
@@ -15127,6 +15142,8 @@ def model_tugas(t):
 
 
 def _model_siap(t, pid):
+    if pid == "studio":
+        return True
     if pid in ("flash", "lite", "gemini"):
         return bool(client("canvas")) if t != "pusat_info" else bool(pi_key() or os.getenv("GEMINI_API_KEY"))
     if pid == "hydrogen":
