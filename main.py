@@ -741,7 +741,7 @@ def usage_add(model, masuk, keluar, pikir):
                 (today(), model, masuk, keluar, pikir))
     except Exception:
         log.exception("Gagal menyimpan pemakaian token")
-    if "argon" in str(model).lower():
+    if "argon" in str(model).lower() or "neon" in str(model).lower():   # model berbayar utama (Neon, dulu Argon)
         try:
             threading.Thread(target=argon_cek_peringatan, daemon=True).start()
         except Exception:
@@ -756,7 +756,7 @@ def usage_add(model, masuk, keluar, pikir):
 def gaya_model(model):
     """Karakter tiap model (butir 3): Hydrogen/Flash-Lite cepat & ringkas, Argon penalaran berat."""
     m = str(model or "").lower()
-    if "argon" in m:
+    if "argon" in m or "neon" in m:
         return ("\n\nMODE PENALARAN MENDALAM: kamu dipakai untuk soal berat (logika, rangkaian, kode). Pikirkan langkah demi langkah sebelum menjawab, "
                 "periksa ulang hitungan dan pin, sebut asumsi yang kamu pakai, dan beri kode lengkap kalau diminta.")
     if "hydrogen" in m or "lite" in m:
@@ -6262,9 +6262,10 @@ MESIN_LAIN = {
     # Cloudflare Workers AI (jatah gratis harian); alamatnya memakai CF_ACCOUNT_ID, diisi saat dipanggil
     "cloudflare": {"nama": "Cloudflare Workers AI", "url": "", "kunci": "CF_API_TOKEN", "model": os.getenv("CF_TEKS_MODEL", "@cf/meta/llama-3.3-70b-instruct-fp8-fast")},
 }
-# Gemini 4 Argon: model terkuat Google (rilis umum 13 Okt 2026), BERBAYAR saja (tidak ada di paket gratis).
-# Aktif hanya kalau ARGON_AKTIF=1 (tanda billing Gemini sudah dinyalakan). Gagal/ditolak -> otomatis jatuh ke mesin biasa.
-ARGON_MODEL = os.getenv("ARGON_MODEL", "gemini-4-argon")
+# Mesin berbayar utama: Gemini 4 Neon (rilis 18 Nov 2026, $3/$15 per 1 juta token, tanpa paket gratis). Dulu Gemini 4 Argon;
+# diganti atas perintah CEO 28 Nov 2026. Kode internal tetap "argon" supaya pengaturan lama (anggaran, pilihan mesin) tidak rusak.
+# Aktif hanya kalau ARGON_AKTIF=1 / kunci tier 1 ada. Gagal/ditolak -> otomatis jatuh ke mesin biasa.
+ARGON_MODEL = os.getenv("NEON_MODEL", "gemini-4-neon")   # variabel lama ARGON_MODEL sengaja diabaikan supaya tidak kembali ke Argon
 KUNCI_TIER1 = os.getenv("GEMINI_KEY_TIER1", "").strip()   # kunci Gemini berbayar (tier 1): dipakai Argon
 KUNCI_FREE = os.getenv("GEMINI_KEY_FREE", "").strip()     # kunci Gemini gratis: dipakai Hydrogen
 ARGON_AKTIF = bool(KUNCI_TIER1) or os.getenv("ARGON_AKTIF", "").strip() in ("1", "true", "ya")
@@ -6303,7 +6304,7 @@ def kunci_argon():
 # ---------- ANGGARAN ARGON: tagihan Argon per bulan tidak boleh lewat batas ----------
 SET.setdefault("argon_anggaran", int(os.getenv("ARGON_ANGGARAN_RP", "40000")))   # rupiah per bulan; 0 = tanpa batas
 SET.setdefault("kurs_usd", int(os.getenv("KURS_USD", "16500")))
-SET.setdefault("argon_harga", [float(os.getenv("ARGON_HARGA_MASUK", "2")), float(os.getenv("ARGON_HARGA_KELUAR", "10"))])   # USD per 1 juta token (promo)
+SET.setdefault("argon_harga", [float(os.getenv("ARGON_HARGA_MASUK", "3")), float(os.getenv("ARGON_HARGA_KELUAR", "15"))])   # USD per 1 juta token (Gemini 4 Neon)
 _ARGON_BIAYA = [0.0, 0.0]   # (waktu hitung, rupiah)
 
 
@@ -6315,12 +6316,15 @@ def argon_biaya_bulan(segar=False):
     try:
         with db() as c:
             r = sql(c, "SELECT COALESCE(SUM(masuk),0), COALESCE(SUM(keluar),0), COALESCE(SUM(pikir),0) FROM pemakaian WHERE tanggal>=? AND model LIKE ?",
-                    (today()[:8] + "01", "%argon%")).fetchone()
+                    (today()[:8] + "01", "%neon%")).fetchone()
+            ra = sql(c, "SELECT COALESCE(SUM(masuk),0), COALESCE(SUM(keluar),0), COALESCE(SUM(pikir),0) FROM pemakaian WHERE tanggal>=? AND model LIKE ?",
+                     (today()[:8] + "01", "%argon%")).fetchone()   # sisa pemakaian Argon bulan ini, dihitung dengan harga promo Argon
             cl = sql(c, "SELECT model, COALESCE(SUM(masuk),0), COALESCE(SUM(keluar),0) FROM pemakaian WHERE tanggal>=? AND model LIKE ? GROUP BY model",
                      (today()[:8] + "01", "claude%")).fetchall()
             t1 = [sql(c, "SELECT ?, COALESCE(SUM(masuk),0), COALESCE(SUM(keluar),0), COALESCE(SUM(pikir),0) FROM pemakaian WHERE tanggal>=? AND model=?",
                       (m, today()[:8] + "01", m)).fetchone() for m in gemini_tambahan("tier1")]
         usd = (float(r[0]) * hm + (float(r[1]) + float(r[2])) * hk) / 1e6
+        usd += (float(ra[0]) * 2 + (float(ra[1]) + float(ra[2])) * 10) / 1e6
         usd += sum((float(a) * harga_tier1(m)[0] + (float(b) + float(pk)) * harga_tier1(m)[1]) / 1e6 for m, a, b, pk in t1)   # Carbon dkk ikut anggaran AI berbayar
         usd += sum((float(a) * claude_harga(m)[0] + float(b) * claude_harga(m)[1]) / 1e6 for m, a, b in cl)   # Claude ikut satu anggaran AI berbayar
         rp = usd * float(SET.get("kurs_usd") or 16500)
@@ -6342,13 +6346,13 @@ def argon_cek_peringatan():
     if not batas:
         return
     rp, bln = argon_biaya_bulan(True), today()[:7]
-    for tingkat, judul in ((100, "Anggaran Argon bulan ini HABIS"), (80, "Anggaran Argon bulan ini sudah 80%")):
+    for tingkat, judul in ((100, "Anggaran Neon bulan ini HABIS"), (80, "Anggaran Neon bulan ini sudah 80%")):
         if rp >= batas * tingkat / 100:
             k = f"{bln}:{tingkat}"
             if SET.get("argon_kabar") != k and not (tingkat == 80 and str(SET.get("argon_kabar", "")).endswith(":100") and str(SET.get("argon_kabar", "")).startswith(bln)):
                 SET["argon_kabar"] = k
                 set_save()
-                isi = (f"Perkiraan tagihan Argon {bln}: Rp{rp:,.0f} dari batas Rp{batas:,.0f}.".replace(",", ".") +
+                isi = (f"Perkiraan tagihan Neon {bln}: Rp{rp:,.0f} dari batas Rp{batas:,.0f}.".replace(",", ".") +
                        (" Semua fitur sekarang otomatis memakai Gemini Flash sampai bulan depan. Batas bisa dinaikkan di halaman Tim & Token." if tingkat == 100 else ""))
                 try:
                     inbox_kirim(_dev_ids(), "sistem", judul, isi)
@@ -6433,7 +6437,7 @@ def mesin_daftar():
     out = [{"id": "gemini", "nama": "Gemini", "model": MODEL, "siap": bool(client("canvas"))},
            {"id": "hydrogen", "nama": "Gemini 4 Hydrogen", "model": HYDROGEN_MODEL, "siap": bool(kunci_hydrogen()),
             "catatan": "" if kunci_hydrogen() else "isi GEMINI_KEY_FREE di Render"},
-           {"id": "argon", "nama": "Gemini 4 Argon", "model": ARGON_MODEL, "siap": bool(kunci_argon()) and ARGON_AKTIF,
+           {"id": "argon", "nama": "Gemini 4 Neon", "model": ARGON_MODEL, "siap": bool(kunci_argon()) and ARGON_AKTIF,
             "catatan": "" if ARGON_AKTIF else "berbayar: isi GEMINI_KEY_TIER1 (kunci tier 1) di Render"},
            {"id": "claude", "nama": CLAUDE_PILIHAN.get(claude_model(), "Claude"), "model": claude_model(), "siap": bool(ANTHROPIC_KEY),
             "catatan": "" if ANTHROPIC_KEY else "isi ANTHROPIC_API_KEY di Render"}]
@@ -12911,7 +12915,7 @@ def apex_model_daftar(r="admin"):
     L = [{"id": "gemini", "nama": "Gemini Flash", "model": MODEL, "siap": bool(client("apex")), "ket": "seimbang"},
          {"id": "hydrogen", "nama": "Gemini 4 Hydrogen", "model": HYDROGEN_MODEL, "siap": bool(kunci_hydrogen()), "ket": "cepat, ringan"},
          {"id": "lite", "nama": "Gemini Flash Lite", "model": MODEL_LITE, "siap": bool(client("apex")), "ket": "paling ringan"},
-         {"id": "argon", "nama": "Gemini 4 Argon", "model": ARGON_MODEL, "siap": bool(kunci_argon()) and ARGON_AKTIF, "ket": "penalaran berat, berbayar"}]
+         {"id": "argon", "nama": "Gemini 4 Neon", "model": ARGON_MODEL, "siap": bool(kunci_argon()) and ARGON_AKTIF, "ket": "penalaran berat, berbayar"}]
     if is_admin(r):   # CEO: semua AI yang ada (permintaan 23 Nov 2026)
         L += [{"id": "g1:" + m, "nama": f"{gemini_nama(m)} · Tier 1", "model": m, "siap": bool(KUNCI_TIER1) and not argon_habis(),
                "ket": "berbayar, akses data penuh"} for m in gemini_tambahan("tier1")]
@@ -14961,7 +14965,7 @@ ENV_ASLI = {}                               # nilai dari Render, dipakai lagi ka
 
 KUNCI_DAFTAR = [   # (nama env, label, kelompok, cara uji). Token login, SECRET_KEY, DATABASE_URL & token bot sengaja tidak ada di sini.
     ("GEMINI_API_KEY", "Gemini utama (Flash)", "Gemini", "gemini"),
-    ("GEMINI_KEY_TIER1", "Gemini 4 Argon (berbayar, tier 1)", "Gemini", "gemini"),
+    ("GEMINI_KEY_TIER1", "Gemini 4 Neon (berbayar, tier 1)", "Gemini", "gemini"),
     ("GEMINI_KEY_FREE", "Gemini 4 Hydrogen (gratis)", "Gemini", "gemini"),
     ("GEMINI_PUSAT_INFO", "Pusat Info (tamu)", "Gemini", "gemini"),
     ("ANTHROPIC_API_KEY", "Claude (Sonnet / Opus)", "Lainnya", "claude"),
@@ -15008,11 +15012,11 @@ FITUR_HAL = {"absen": ["absen"], "pusat_info": ["info"], "studio_gambar": ["gamb
 
 MODEL_TUGAS = {   # pilihan model per tugas (tombol di panel)
     "studio": {"judul": "Studio 3D dan Panduan Rakit", "ket": "Tugas berat: menyusun resep model 3D dan panduan merakit.",
-               "pilihan": [("argon", "Gemini 4 Argon", "$2/$10, naik $4/$20 mulai 1 Des"), ("claude:claude-sonnet-5-5", "Claude Sonnet 5.5", "$2/$10"),
+               "pilihan": [("argon", "Gemini 4 Neon", "$3/$15"), ("claude:claude-sonnet-5-5", "Claude Sonnet 5.5", "$2/$10"),
                            ("claude:claude-opus-5-5", "Claude Opus 5.5", "$4/$20"), ("gemini", "Gemini Flash", "gratis / sangat murah"),
                            ("groq", "Groq", "gratis"), ("nvidia", "NVIDIA NIM", "gratis"), ("mistral", "Mistral", "gratis (data dipakai latihan)")]},
     "bot": {"judul": "Bot Telegram dan asisten anggota", "ket": "Obrolan sehari-hari bot. Hanya keluarga Gemini, karena bot memakai alat data (cek kas, stok, dll).",
-            "pilihan": [("flash", "Gemini Flash", "sangat murah"), ("hydrogen", "Gemini 4 Hydrogen", "gratis"), ("argon", "Gemini 4 Argon", "$2/$10, mahal")]},
+            "pilihan": [("flash", "Gemini Flash", "sangat murah"), ("hydrogen", "Gemini 4 Hydrogen", "gratis"), ("argon", "Gemini 4 Neon", "$3/$15, mahal")]},
     "pusat_info": {"judul": "Pusat Info (tamu)", "ket": "Menjawab pertanyaan pengunjung tentang MCI.",
                    "pilihan": [("lite", "Gemini Flash Lite", "paling hemat"), ("flash", "Gemini Flash", "lebih pintar"), ("hydrogen", "Gemini 4 Hydrogen", "gratis"), ("groq", "Groq", "gratis")]},
     "ringan": {"judul": "Catatan, rekam suara, Laporan Pagi", "ket": "Merapikan catatan, menyalin rekaman, laporan harian.",
@@ -15768,7 +15772,7 @@ def pi_cache_simpan(q, vec, jawab, ver):
 
 
 # ---------- 6. Adu model (A/B) di Panel CEO ----------
-ADU_MESIN = [("flash", "Gemini Flash"), ("lite", "Gemini Flash Lite"), ("hydrogen", "Gemini 4 Hydrogen"), ("argon", "Gemini 4 Argon"), ("claude", "Claude"),
+ADU_MESIN = [("flash", "Gemini Flash"), ("lite", "Gemini Flash Lite"), ("hydrogen", "Gemini 4 Hydrogen"), ("argon", "Gemini 4 Neon"), ("claude", "Claude"),
              ("groq", "Groq"), ("mistral", "Mistral"), ("nvidia", "NVIDIA NIM"), ("cloudflare", "Cloudflare")]
 ADU_SISTEM = "Kamu asisten AI MCI (Mahardika Cakrawala Indonesia). Jawab dalam Bahasa Indonesia yang jelas dan ringkas."
 
@@ -16617,7 +16621,7 @@ def harga_bawaan():
         R("mci", "Database (Neon)", "Free, 100 CU-jam", "Rp0", "per bulan", "", "Jatah CU reset tiap tanggal 1", "https://console.neon.tech"),
         R("mci", "Email @mci-ai.my.id (Zoho)", "Forever Free, maks 5 akun", "Rp0", "", "", "Tanpa IMAP/POP/SMTP", "https://mailadmin.zoho.com"),
         R("mci", "Groq (AI cadangan)", "Kunci gratis", "Rp0", "", g, "Ganti kunci di Panel CEO sebelum berakhir", "https://console.groq.com/keys"),
-        R("mci", "Gemini API tier 1", "Bayar sesuai pemakaian", "Lihat anggaran Argon di Kesehatan Sistem", "per bulan", "", "", "https://aistudio.google.com"),
+        R("mci", "Gemini API tier 1", "Bayar sesuai pemakaian", "Lihat anggaran Neon di Kesehatan Sistem", "per bulan", "", "", "https://aistudio.google.com"),
         # Harga token API per model (USD per 1 juta token, input / output), per 17 Nov 2026
         R("token", "gemini-3.8-flash", "Google · bot & Studio utama", "$0.75", "$3.75", "", "Ada jatah gratis; naik 2x mulai 1 Jan 2027", "https://ai.google.dev/gemini-api/docs/pricing"),
         R("token", "gemini-3.5-flash-lite", "Google · Pusat Info & catatan", "$0.30", "$2.50", "", "Ada jatah gratis", "https://ai.google.dev/gemini-api/docs/pricing"),
@@ -16649,6 +16653,9 @@ def harga_ingat_cek():
     """Kabari CEO 30, 7, dan 1 hari sebelum tanggal berakhir (sekali per tahap)."""
     tanda = SET.setdefault("harga_ingat", {})
     ubah = False
+    if not SET.get("mig_neon_1128"):   # 28 Nov 2026: Argon diganti Gemini 4 Neon -> hitungan anggaran ikut harga Neon ($3/$15)
+        SET["argon_harga"], SET["mig_neon_1128"] = [3.0, 15.0], 1
+        ubah = True
     if today() >= "2026-12-01" and list(SET.get("argon_harga") or []) == [2.0, 10.0]:   # promo Argon habis: hitungan anggaran ikut harga baru
         SET["argon_harga"] = [4.0, 20.0]
         ubah = True
